@@ -1,0 +1,279 @@
+<?php
+require_once '../includes/config.php';
+require_once '../includes/db.php';
+require_once '../includes/auth.php';
+
+// Only admin can access
+redirectIfNotAdmin();
+
+// Fetch statistics
+$stats = [];
+
+// Total users
+$stmt = $db->query("SELECT COUNT(*) FROM users");
+$stats['total_users'] = $stmt->fetchColumn();
+
+// Total books
+$stmt = $db->query("SELECT COUNT(*) FROM books");
+$stats['total_books'] = $stmt->fetchColumn();
+
+// Total poems
+$stmt = $db->query("SELECT COUNT(*) FROM poems");
+$stats['total_poems'] = $stmt->fetchColumn();
+
+// Total sessions booked
+$stmt = $db->query("SELECT COUNT(*) FROM sessions");
+$stats['total_sessions'] = $stmt->fetchColumn();
+
+// Total blog posts
+$stmt = $db->query("SELECT COUNT(*) FROM blog_posts");
+$stats['total_posts'] = $stmt->fetchColumn();
+
+// Total questions (community)
+$stmt = $db->query("SELECT COUNT(*) FROM questions");
+$stats['total_questions'] = $stmt->fetchColumn();
+
+// Total newsletter subscribers
+$stmt = $db->query("SELECT COUNT(*) FROM newsletter WHERE is_active = 1");
+$stats['total_subscribers'] = $stmt->fetchColumn();
+
+// Recent sessions (pending)
+$stmt = $db->prepare("
+    SELECT s.*, u.name AS user_name, u.email 
+    FROM sessions s 
+    JOIN users u ON s.user_id = u.id 
+    WHERE s.status = 'pending' 
+    ORDER BY s.date ASC, s.time ASC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Recent contact messages
+$stmt = $db->prepare("
+    SELECT * FROM contact_messages 
+    WHERE is_read = 0 
+    ORDER BY created_at DESC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Recent book uploads
+$stmt = $db->prepare("
+    SELECT * FROM books 
+    ORDER BY created_at DESC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$pageTitle = 'Admin Dashboard';
+?>
+<?php require_once '../includes/header.php'; ?>
+
+<div class="admin-dashboard">
+    <div class="container">
+        <!-- Page Header -->
+        <div class="dashboard-header">
+            <div class="dashboard-header-text">
+                <h1>Admin Dashboard</h1>
+                <p>Welcome back, <?php echo htmlspecialchars($_SESSION['name'] ?? 'Admin'); ?>! Here's what's happening on your site.</p>
+            </div>
+            <div class="dashboard-header-actions">
+                <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> New Book
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-secondary">
+                    <i class="fas fa-plus"></i> New Poem
+                </a>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(219, 161, 162, 0.15); color: var(--rose);">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_users']; ?></span>
+                    <span class="stat-label">Total Users</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(46, 204, 113, 0.15); color: #2ecc71;">
+                    <i class="fas fa-book-open"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_books']; ?></span>
+                    <span class="stat-label">Total Books</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(155, 89, 182, 0.15); color: #9b59b6;">
+                    <i class="fas fa-feather-alt"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_poems']; ?></span>
+                    <span class="stat-label">Total Poems</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(52, 152, 219, 0.15); color: #3498db;">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_sessions']; ?></span>
+                    <span class="stat-label">Total Sessions</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(241, 196, 15, 0.15); color: #f1c40f;">
+                    <i class="fas fa-blog"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_posts']; ?></span>
+                    <span class="stat-label">Blog Posts</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(231, 76, 60, 0.15); color: #e74c3c;">
+                    <i class="fas fa-question-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_questions']; ?></span>
+                    <span class="stat-label">Community Q&A</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(255, 64, 129, 0.15); color: #ff4081;">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_subscribers']; ?></span>
+                    <span class="stat-label">Newsletter Subscribers</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <h2>Quick Actions</h2>
+            <div class="action-grid">
+                <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="action-card">
+                    <i class="fas fa-book"></i>
+                    <span>Manage Books</span>
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="action-card">
+                    <i class="fas fa-feather"></i>
+                    <span>Manage Poems</span>
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="action-card">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Manage Sessions</span>
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="action-card">
+                    <i class="fas fa-user-cog"></i>
+                    <span>Manage Users</span>
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="action-card">
+                    <i class="fas fa-edit"></i>
+                    <span>Manage Blog</span>
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="action-card">
+                    <i class="fas fa-cog"></i>
+                    <span>Site Settings</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Recent Items -->
+        <div class="recent-grid">
+            <!-- Pending Sessions -->
+            <div class="recent-card">
+                <div class="recent-header">
+                    <h3><i class="fas fa-clock"></i> Pending Sessions</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="view-all">View All →</a>
+                </div>
+                <?php if (count($recent_sessions) > 0): ?>
+                    <div class="recent-list">
+                        <?php foreach ($recent_sessions as $session): ?>
+                            <div class="recent-item">
+                                <div class="recent-item-info">
+                                    <strong><?php echo htmlspecialchars($session['user_name']); ?></strong>
+                                    <span><?php echo htmlspecialchars($session['email']); ?></span>
+                                    <small><?php echo htmlspecialchars($session['date']); ?> at <?php echo htmlspecialchars($session['time']); ?></small>
+                                </div>
+                                <span class="status-badge pending">Pending</span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="no-items">No pending sessions.</p>
+                <?php endif; ?>
+            </div>
+
+            <!-- Recent Contact Messages -->
+            <div class="recent-card">
+                <div class="recent-header">
+                    <h3><i class="fas fa-envelope"></i> Unread Messages</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="view-all">View All →</a>
+                </div>
+                <?php if (count($recent_messages) > 0): ?>
+                    <div class="recent-list">
+                        <?php foreach ($recent_messages as $message): ?>
+                            <div class="recent-item">
+                                <div class="recent-item-info">
+                                    <strong><?php echo htmlspecialchars($message['name']); ?></strong>
+                                    <span><?php echo htmlspecialchars($message['email']); ?></span>
+                                    <small><?php echo htmlspecialchars(substr($message['message'], 0, 60)); ?>...</small>
+                                </div>
+                                <span class="status-badge unread">Unread</span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="no-items">No unread messages.</p>
+                <?php endif; ?>
+            </div>
+
+            <!-- Recent Books -->
+            <div class="recent-card">
+                <div class="recent-header">
+                    <h3><i class="fas fa-book"></i> Recently Added Books</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="view-all">View All →</a>
+                </div>
+                <?php if (count($recent_books) > 0): ?>
+                    <div class="recent-list">
+                        <?php foreach ($recent_books as $book): ?>
+                            <div class="recent-item">
+                                <div class="recent-item-info">
+                                    <strong><?php echo htmlspecialchars($book['title']); ?></strong>
+                                    <span><?php echo htmlspecialchars($book['author']); ?></span>
+                                    <small>
+                                        <?php if ($book['is_free']): ?>
+                                            <span class="badge free">Free</span>
+                                        <?php elseif ($book['is_sale']): ?>
+                                            <span class="badge sale">$<?php echo number_format($book['price'], 2); ?></span>
+                                        <?php endif; ?>
+                                    </small>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="no-items">No books added yet.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php require_once '../includes/footer.php'; ?>
