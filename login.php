@@ -70,7 +70,6 @@ $pageTitle = 'Login';
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
-                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="auth-logo">
                     <h1>Welcome Back</h1>
                     <p>Sign in to your AngelWrites account</p>
                 </div>
