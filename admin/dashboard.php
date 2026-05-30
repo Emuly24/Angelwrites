@@ -82,10 +82,10 @@ $pageTitle = 'Admin Dashboard';
             </div>
             <div class="dashboard-header-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> New Book
+                    <i class="fa-pen-fancy"></i> New Book
                 </a>
                 <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-secondary">
-                    <i class="fas fa-plus"></i> New Poem
+                    <i class="fa-pen-fancy"></i> New Poem
                 </a>
             </div>
         </div>

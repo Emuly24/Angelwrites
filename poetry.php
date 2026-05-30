@@ -62,7 +62,7 @@ $pageTitle = 'Poetry';
             </div>
         <?php else: ?>
             <div class="empty-state">
-                <i class="fas fa-feather-alt" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
+                <i class="fas fa-pen-fancy" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
                 <h3>No Poems Yet</h3>
                 <p>Check back soon for new poetry from Angella.</p>
             </div>

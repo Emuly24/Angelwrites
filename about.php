@@ -23,13 +23,10 @@ $pageTitle = 'About Angella Bottoman';
             <!-- Photo Section -->
             <div class="about-photo-section">
                 <div class="about-photo">
-                    <!-- Replace with actual photo of Angella -->
-                    <div class="photo-placeholder">
-                        <i class="fas fa-user-circle"></i>
-                    </div>
+                    <img src="<?php echo SITE_URL; ?>/assets/images/angella.jpg" alt="Angella Bottoman" class="about-photo-img">
                 </div>
                 <div class="about-photo-caption">
-                    <p>Angella Bottoman — passionate writer based in Malawi.</p>
+                    <p>Angella Bottoman — passionate writer.</p>
                 </div>
             </div>
 

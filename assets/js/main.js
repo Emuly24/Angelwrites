@@ -1,6 +1,6 @@
 /**
  * AngelWrites – Main JavaScript
- * Handles: Hamburger menu, Theme toggle, Bible modal with local JSON
+ * Handles: Hamburger menu, Theme toggle, Bible modal (API + Table of Contents + Translations)
  */
 
 (function() {
@@ -17,8 +17,10 @@
     const bibleToggle = document.getElementById('bibleToggle');
     const bibleModal = document.getElementById('bibleModal');
     const bibleClose = document.getElementById('bibleClose');
-    const bibleSearchForm = document.getElementById('bibleSearchForm');
-    const bibleQuery = document.getElementById('bibleQuery');
+    const bibleBookSelect = document.getElementById('bibleBook');
+    const bibleChapterSelect = document.getElementById('bibleChapter');
+    const bibleVerseSelect = document.getElementById('bibleVerse');
+    const bibleVersionSelect = document.getElementById('bibleVersion');
     const bibleResult = document.getElementById('bibleResult');
 
     // ============================================================
@@ -64,9 +66,8 @@
     function setTheme(theme) {
         const html = document.documentElement;
         html.setAttribute('data-theme', theme);
-        document.cookie = `theme=${theme}; path=/; max-age=${60*60*24*365}`; // 1 year
+        document.cookie = `theme=${theme}; path=/; max-age=${60*60*24*365}`;
 
-        // Update icon
         if (themeIcon) {
             if (theme === 'dark') {
                 themeIcon.className = 'fas fa-sun';
@@ -76,8 +77,6 @@
                 themeIcon.className = 'fas fa-circle-half-stroke';
             }
         }
-
-        // Save preference for future visits (localStorage fallback)
         localStorage.setItem('theme', theme);
     }
 
@@ -88,15 +87,9 @@
     }
 
     function initializeTheme() {
-        // Priority: cookie > localStorage > prefers-color-scheme
         let theme = document.cookie.replace(/(?:(?:^|.*;\s*)theme\s*=\s*([^;]+).*$)|^.*$/, '$1');
-        if (!theme) {
-            theme = localStorage.getItem('theme');
-        }
-        if (!theme) {
-            // Default to system
-            theme = 'system';
-        }
+        if (!theme) theme = localStorage.getItem('theme');
+        if (!theme) theme = 'system';
         setTheme(theme);
     }
 
@@ -108,51 +101,23 @@
         });
     }
 
-    // Initialize theme on page load
     initializeTheme();
 
-    // Listen for system theme changes (if browser supports it)
     if (window.matchMedia) {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         mediaQuery.addEventListener('change', function() {
             const current = document.documentElement.getAttribute('data-theme');
-            if (current === 'system') {
-                // Re-apply system theme (which adapts automatically via CSS)
-                setTheme('system');
-            }
+            if (current === 'system') setTheme('system');
         });
     }
 
     // ============================================================
-    // 4. Bible Modal (Local KJV JSON)
+    // 4. Bible Modal (API + Table of Contents + Multiple Versions)
     // ============================================================
-    let bibleData = null; // Will hold the parsed JSON
-
-    // Load Bible JSON once (lazy load)
-    function loadBibleData() {
-        if (bibleData !== null) return Promise.resolve(bibleData);
-        return fetch('/assets/bible/kjv.json')
-            .then(response => {
-                if (!response.ok) throw new Error('Bible file not found');
-                return response.json();
-            })
-            .then(data => {
-                bibleData = data;
-                return bibleData;
-            })
-            .catch(error => {
-                console.error('Failed to load Bible:', error);
-                bibleResult.innerHTML = '<p style="color:red;">⚠️ Bible file not found. Please upload kjv.json.</p>';
-                return null;
-            });
-    }
-
     function openBibleModal() {
         if (bibleModal) {
             bibleModal.classList.add('open');
             document.body.style.overflow = 'hidden';
-            // Focus input
-            if (bibleQuery) bibleQuery.focus();
         }
     }
 
@@ -163,24 +128,15 @@
         }
     }
 
-    if (bibleToggle) {
-        bibleToggle.addEventListener('click', openBibleModal);
-    }
+    if (bibleToggle) bibleToggle.addEventListener('click', openBibleModal);
+    if (bibleClose) bibleClose.addEventListener('click', closeBibleModal);
 
-    if (bibleClose) {
-        bibleClose.addEventListener('click', closeBibleModal);
-    }
-
-    // Click outside modal to close
     if (bibleModal) {
         bibleModal.addEventListener('click', function(e) {
-            if (e.target === bibleModal) {
-                closeBibleModal();
-            }
+            if (e.target === bibleModal) closeBibleModal();
         });
     }
 
-    // Escape key closes modal
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && bibleModal && bibleModal.classList.contains('open')) {
             closeBibleModal();
@@ -188,98 +144,114 @@
     });
 
     // ============================================================
-    // 5. Bible Search (Local JSON)
+    // 5. Bible Navigation (Book → Chapter → Verse)
     // ============================================================
-    function parseBibleReference(input) {
-        // Matches: "John 3:16", "Genesis 1:1", "Psalm 23:4"
-        // Supports book names with spaces: "1 Corinthians 13:4"
-        const match = input.trim().match(/^([\d\s\w]+)\s+(\d+):(\d+)$/i);
-        if (!match) return null;
-        const bookName = match[1].trim();
-        const chapter = parseInt(match[2], 10);
-        const verse = parseInt(match[3], 10);
-        return { bookName, chapter, verse };
+    async function loadBibleBooks() {
+        try {
+            const response = await fetch('https://bible-api.com/books');
+            const data = await response.json();
+            data.forEach(book => {
+                const option = document.createElement('option');
+                option.value = book.id;
+                option.textContent = book.name;
+                bibleBookSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load Bible books:', error);
+            bibleResult.innerHTML = '<p style="color:red;">⚠️ Failed to load Bible books. Try again later.</p>';
+        }
     }
 
-    function searchBibleVerse(query) {
-        const ref = parseBibleReference(query);
-        if (!ref) {
-            bibleResult.innerHTML = `<p style="color:var(--rose);">❌ Invalid format. Use: <strong>John 3:16</strong></p>`;
+    function getCurrentVersion() {
+        return bibleVersionSelect ? bibleVersionSelect.value : 'kjv';
+    }
+
+    // Book → Chapters
+    bibleBookSelect.addEventListener('change', async function() {
+        const bookId = this.value;
+        bibleChapterSelect.innerHTML = '<option value="">Select a chapter</option>';
+        bibleVerseSelect.innerHTML = '<option value="">Select a verse</option>';
+        bibleResult.innerHTML = '<p><em>Select a chapter and verse.</em></p>';
+        if (!bookId) return;
+        try {
+            const response = await fetch(`https://bible-api.com/${bookId}?verse_numbers=true`);
+            const data = await response.json();
+            const chapters = data.chapters || [];
+            for (let i = 1; i <= chapters.length; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Chapter ${i}`;
+                bibleChapterSelect.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Failed to load chapters:', error);
+            bibleResult.innerHTML = '<p style="color:red;">Failed to load chapters.</p>';
+        }
+    });
+
+    // Chapter → Verses
+    bibleChapterSelect.addEventListener('change', async function() {
+        const bookId = bibleBookSelect.value;
+        const chapter = this.value;
+        bibleVerseSelect.innerHTML = '<option value="">Select a verse</option>';
+        bibleResult.innerHTML = '<p><em>Select a verse to see it here.</em></p>';
+        if (!bookId || !chapter) return;
+        try {
+            const response = await fetch(`https://bible-api.com/${bookId}+${chapter}?verse_numbers=true`);
+            const data = await response.json();
+            const verses = data.verses || [];
+            for (let i = 1; i <= verses.length; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Verse ${i}`;
+                bibleVerseSelect.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Failed to load verses:', error);
+            bibleResult.innerHTML = '<p style="color:red;">Failed to load verses.</p>';
+        }
+    });
+
+    // Verse → Display with selected translation
+    bibleVerseSelect.addEventListener('change', async function() {
+        const bookId = bibleBookSelect.value;
+        const chapter = bibleChapterSelect.value;
+        const verse = this.value;
+        const version = getCurrentVersion();
+        if (!bookId || !chapter || !verse) {
+            bibleResult.innerHTML = '<p><em>Select a book, chapter, and verse.</em></p>';
             return;
         }
-
-        loadBibleData().then(data => {
-            if (!data) return;
-
-            // Try exact book name match
-            let bookKey = null;
-            const possibleKeys = Object.keys(data);
-            for (let key of possibleKeys) {
-                if (key.toLowerCase() === ref.bookName.toLowerCase()) {
-                    bookKey = key;
-                    break;
-                }
-            }
-            // If not found, try partial match
-            if (!bookKey) {
-                for (let key of possibleKeys) {
-                    if (key.toLowerCase().includes(ref.bookName.toLowerCase())) {
-                        bookKey = key;
-                        break;
-                    }
-                }
-            }
-
-            if (!bookKey) {
-                bibleResult.innerHTML = `<p style="color:var(--rose);">❌ Book "${ref.bookName}" not found.</p>`;
-                return;
-            }
-
-            const chapterData = data[bookKey];
-            if (!chapterData || typeof chapterData !== 'object') {
-                bibleResult.innerHTML = `<p style="color:var(--rose);">❌ No data for book "${bookKey}".</p>`;
-                return;
-            }
-
-            const chapterKey = String(ref.chapter);
-            const verses = chapterData[chapterKey];
-            if (!verses || !Array.isArray(verses)) {
-                bibleResult.innerHTML = `<p style="color:var(--rose);">❌ Chapter ${ref.chapter} not found.</p>`;
-                return;
-            }
-
-            const verseText = verses[ref.verse - 1];
-            if (!verseText) {
-                bibleResult.innerHTML = `<p style="color:var(--rose);">❌ Verse ${ref.verse} not found.</p>`;
-                return;
-            }
-
-            // Display result
+        try {
+            const response = await fetch(`https://bible-api.com/${bookId}+${chapter}:${verse}?translation=${version}&verse_numbers=true`);
+            const data = await response.json();
+            const versionName = bibleVersionSelect.options[bibleVersionSelect.selectedIndex].text.split('(')[0].trim();
             bibleResult.innerHTML = `
                 <div class="verse-display">
-                    <strong>${bookKey} ${ref.chapter}:${ref.verse}</strong>
-                    <p>${verseText}</p>
+                    <strong>${data.reference} (${versionName})</strong>
+                    <p>${data.text}</p>
                 </div>
             `;
-        }).catch(error => {
-            bibleResult.innerHTML = `<p style="color:red;">❌ Error: ${error.message}</p>`;
-        });
-    }
+        } catch (error) {
+            console.error('Failed to load verse:', error);
+            bibleResult.innerHTML = '<p style="color:red;">Failed to load verse.</p>';
+        }
+    });
 
-    if (bibleSearchForm) {
-        bibleSearchForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const query = bibleQuery.value.trim();
-            if (!query) {
-                bibleResult.innerHTML = `<p>Please enter a verse reference.</p>`;
-                return;
+    // Translation change refreshes current verse
+    if (bibleVersionSelect) {
+        bibleVersionSelect.addEventListener('change', function() {
+            const bookId = bibleBookSelect.value;
+            const chapter = bibleChapterSelect.value;
+            const verse = bibleVerseSelect.value;
+            if (bookId && chapter && verse) {
+                bibleVerseSelect.dispatchEvent(new Event('change'));
             }
-            bibleResult.innerHTML = `<p>Searching...</p>`;
-            searchBibleVerse(query);
         });
     }
 
-    // Optional: Auto-search on paste/change (better to use submit button)
+    // Load books on page load
+    loadBibleBooks();
 
     // ============================================================
     // 6. Navigation Active State (Highlight current page)
@@ -297,9 +269,5 @@
         });
     }
     setActiveNavLink();
-
-    // ============================================================
-    // 7. Optional: Prevent body scroll when modal open (already done)
-    // ============================================================
 
 })();

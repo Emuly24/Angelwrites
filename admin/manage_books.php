@@ -121,7 +121,7 @@ $pageTitle = 'Manage Books';
             <h1>Manage Books</h1>
             <div class="admin-actions">
                 <button id="showAddForm" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Add New Book
+                    <i class="fa-pen-fancy"></i> Add New Book
                 </button>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard

@@ -32,8 +32,8 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             <div class="container nav-container">
                 <!-- Logo -->
                 <a href="<?php echo SITE_URL; ?>/index.php" class="logo">
-    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="logo-img">
-</a>
+                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="logo-img">
+                </a>
 
                 <!-- Navigation Links (desktop) -->
                 <ul class="nav-links" id="navLinks">
@@ -98,19 +98,55 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <div class="menu-overlay" id="menuOverlay"></div>
     </header>
 
-    <!-- Bible modal (quick access) -->
+    <!-- ===== NEW BIBLE MODAL (Table of Contents + Multiple Translations) ===== -->
     <div class="bible-modal" id="bibleModal">
         <div class="bible-modal-content">
             <button class="bible-close" id="bibleClose"><i class="fas fa-times"></i></button>
-            <h3>📖 KJV Bible</h3>
-            <form id="bibleSearchForm">
-                <input type="text" id="bibleQuery" placeholder="e.g. John 3:16" required>
-                <button type="submit">Search</button>
-            </form>
-            <div id="bibleResult" class="bible-result">
-                <p><em>Type a verse reference above to see it here.</em></p>
+            <h3><i class="fas fa-book-bible"></i> KJV Bible</h3>
+            
+            <div class="bible-controls">
+                <div class="bible-select-group">
+                    <label for="bibleBook">Book</label>
+                    <select id="bibleBook">
+                        <option value="">Select a book</option>
+                    </select>
+                </div>
+                
+                <div class="bible-select-group">
+                    <label for="bibleChapter">Chapter</label>
+                    <select id="bibleChapter">
+                        <option value="">Select a chapter</option>
+                    </select>
+                </div>
+                
+                <div class="bible-select-group">
+                    <label for="bibleVerse">Verse</label>
+                    <select id="bibleVerse">
+                        <option value="">Select a verse</option>
+                    </select>
+                </div>
             </div>
-            <p class="bible-disclaimer">King James Version – local Bible</p>
+
+            <!-- Translation Version Dropdown -->
+            <div class="bible-version-group">
+                <label for="bibleVersion">Translation</label>
+                <select id="bibleVersion">
+                    <option value="kjv">King James Version (KJV)</option>
+                    <option value="esv">English Standard Version (ESV)</option>
+                    <option value="niv">New International Version (NIV)</option>
+                    <option value="nlt">New Living Translation (NLT)</option>
+                    <option value="nasb">New American Standard Bible (NASB)</option>
+                    <option value="csb">Christian Standard Bible (CSB)</option>
+                    <option value="ylt">Young's Literal Translation (YLT)</option>
+                </select>
+            </div>
+
+            <!-- Verse Display -->
+            <div id="bibleResult" class="bible-result">
+                <p><em>Select a book, chapter, and verse to see it here.</em></p>
+            </div>
+
+            <p class="bible-disclaimer">via bible-api.com — multiple translations available</p>
         </div>
     </div>
 
