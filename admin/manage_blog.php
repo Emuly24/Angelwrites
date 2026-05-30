@@ -105,13 +105,67 @@ $pageTitle = 'Manage Blog';
 </div>
 
 <style>
-    .admin-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    .admin-table th { background: var(--vanilla); text-align: left; padding: 12px 16px; font-weight: 600; border-bottom: 2px solid var(--border); }
-    .admin-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    .admin-table tr:hover { background: rgba(219, 161, 162, 0.05); }
-    .status-badge.draft { color: #f39c12; background: rgba(243,156,18,0.1); padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; }
-    .status-badge.published { color: #27ae60; background: rgba(39,174,96,0.1); padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; }
-    .table-responsive { overflow-x: auto; }
+    /* ===== ADMIN TABLE STYLES ===== */
+.admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 8px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.admin-table thead {
+    background: var(--vanilla);
+}
+
+.admin-table th {
+    text-align: left;
+    padding: 14px 20px;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 2px solid var(--border);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.admin-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+
+.admin-table tbody tr {
+    transition: all var(--transition);
+}
+
+.admin-table tbody tr:hover {
+    background: rgba(219, 161, 162, 0.08);
+    cursor: default;
+}
+
+.admin-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    margin-bottom: 16px;
+    border-radius: 12px;
+}
+
+/* Small screens tweaks */
+@media (max-width: 768px) {
+    .admin-table th,
+    .admin-table td {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+    }
+}
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
