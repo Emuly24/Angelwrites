@@ -185,6 +185,10 @@ $pageTitle = 'Admin Dashboard';
                 <i class="fas fa-edit"></i>
                 <span>Manage Blog</span>
             </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_reflections.php" class="action-card">
+                <i class="fas fa-church"></i>
+                <span>Manage Reflections</span>
+            </a>
             <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="action-card">
                 <i class="fas fa-cog"></i>
                 <span>Site Settings</span>
