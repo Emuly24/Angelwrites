@@ -294,7 +294,7 @@ $pageTitle = 'Manage Books';
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="price">Price (USD)</label>
+                                <label for="price">Price (MKW)</label>
                                 <input type="number" step="0.01" id="price" name="price" value="<?php echo $edit_book['price'] ?? '0'; ?>">
                             </div>
                             <div class="form-group checkbox-group">
