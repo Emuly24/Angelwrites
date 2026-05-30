@@ -46,8 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $expires = time() + (86400 * 30); // 30 days
                 setcookie('remember_token', $token, $expires, '/', '', false, true);
                 setcookie('user_id', $user['id'], $expires, '/', '', false, true);
-                // Store token in database (you would need a remember_tokens table for this)
-                // For now, we'll skip the database token storage for simplicity
             }
 
             // Redirect based on role
@@ -63,7 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Page title
 $pageTitle = 'Login';
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -73,11 +70,12 @@ $pageTitle = 'Login';
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
-                <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="auth-logo">
-                <h1>Welcome Back</h1>
-                <p>Sign in to your AngelWrites account</p>
-            </div>
-                <?php endif; ?>
+                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="auth-logo">
+                    <h1>Welcome Back</h1>
+                    <p>Sign in to your AngelWrites account</p>
+                </div>
+
+                <?php if ($error): ?>
                     <div class="alert alert-error">
                         <i class="fas fa-exclamation-circle"></i>
                         <?php echo htmlspecialchars($error); ?>
