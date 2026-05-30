@@ -45,12 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($stmt->execute([$name, $email, $hashed_password])) {
                 $success = 'Account created successfully! You can now <a href="login.php">login</a>.';
-                // Optional: Auto-login after registration
-                // $_SESSION['user_id'] = $db->lastInsertId();
-                // $_SESSION['role'] = 'reader';
-                // $_SESSION['name'] = $name;
-                // header('Location: ' . SITE_URL . '/library.php');
-                // exit;
             } else {
                 $error = 'Something went wrong. Please try again.';
             }
@@ -67,6 +61,7 @@ $pageTitle = 'Sign Up';
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
+                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="auth-logo">
                     <h1>Join AngellaWrites</h1>
                     <p>Create your free account to access books, poems, and community.</p>
                 </div>
@@ -121,10 +116,7 @@ $pageTitle = 'Sign Up';
                 </form>
 
                 <div class="auth-footer">
-                    <p>Already have an account? <a href="/login.php">Sign in here</a></p>
-                    <p class="auth-role-info">
-                        <small>All accounts are created as readers. Admin accounts are managed separately.</small>
-                    </p>
+                    <p>Already have an account? <a href="<?php echo SITE_URL; ?>/login.php">Sign in here</a></p>
                 </div>
             </div>
         </div>

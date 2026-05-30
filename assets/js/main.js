@@ -143,12 +143,45 @@
         }
     });
 
-    // ============================================================
+       // ============================================================
     // 5. Bible Navigation (Book → Chapter → Verse)
     // ============================================================
     async function loadBibleBooks() {
+        // Local fallback list of all 66 books (in case API fails)
+        const fallbackBooks = [
+            "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+            "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+            "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+            "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+            "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+            "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+            "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+            "Haggai", "Zechariah", "Malachi",
+            "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+            "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+            "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+            "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
+            "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+            "Jude", "Revelation"
+        ];
+
+        // Map book names to API-friendly IDs
+        const bookIdMap = {
+            "1 Samuel": "1samuel", "2 Samuel": "2samuel",
+            "1 Kings": "1kings", "2 Kings": "2kings",
+            "1 Chronicles": "1chronicles", "2 Chronicles": "2chronicles",
+            "Song of Solomon": "songofsolomon",
+            "1 Corinthians": "1corinthians", "2 Corinthians": "2corinthians",
+            "1 Thessalonians": "1thessalonians", "2 Thessalonians": "2thessalonians",
+            "1 Timothy": "1timothy", "2 Timothy": "2timothy",
+            "1 Peter": "1peter", "2 Peter": "2peter",
+            "1 John": "1john", "2 John": "2john", "3 John": "3john"
+        };
+
+        // Try API first, fallback to local list if it fails
         try {
             const response = await fetch('https://bible-api.com/books');
+            if (!response.ok) throw new Error('API unreachable');
             const data = await response.json();
             data.forEach(book => {
                 const option = document.createElement('option');
@@ -156,9 +189,20 @@
                 option.textContent = book.name;
                 bibleBookSelect.appendChild(option);
             });
+            return; // Success!
         } catch (error) {
-            console.error('Failed to load Bible books:', error);
-            bibleResult.innerHTML = '<p style="color:red;">⚠️ Failed to load Bible books. Try again later.</p>';
+            console.warn('Bible API unavailable, using fallback list.');
+            // Use fallback list
+            fallbackBooks.forEach(bookName => {
+                const option = document.createElement('option');
+                // Use mapped ID or lowercase name
+                const id = bookIdMap[bookName] || bookName.toLowerCase().replace(/ /g, '');
+                option.value = id;
+                option.textContent = bookName;
+                bibleBookSelect.appendChild(option);
+            });
+            // Clear any error message
+            bibleResult.innerHTML = '<p><em>Select a book, chapter, and verse to see it here.</em></p>';
         }
     }
 

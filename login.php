@@ -115,9 +115,6 @@ $pageTitle = 'Login';
 
                 <div class="auth-footer">
                     <p>Don't have an account? <a href="/register.php">Sign up here</a></p>
-                    <p class="auth-role-info">
-                        <small>All users — admin and readers — sign in here.</small>
-                    </p>
                 </div>
             </div>
         </div>
