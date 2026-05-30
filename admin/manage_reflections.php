@@ -7,7 +7,6 @@ redirectIfNotAdmin();
 
 $error = '';
 $success = '';
-$category_name = 'Christian Reflections';
 
 // ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
@@ -19,17 +18,25 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// ===== FETCH ALL REFLECTIONS (category = Christian Reflections) =====
-// FIXED: Use only c.name = ? (removed p.category)
-$stmt = $db->prepare("
-    SELECT p.*, c.name AS category_name
-    FROM blog_posts p
-    LEFT JOIN blog_categories c ON p.category_id = c.id
-    WHERE c.name = ?
-    ORDER BY p.created_at DESC
-");
-$stmt->execute([$category_name]);
-$reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// ===== FETCH ALL REFLECTIONS =====
+// Get category ID first
+$stmt = $db->prepare("SELECT id FROM blog_categories WHERE name = ?");
+$stmt->execute(['Christian Reflections']);
+$cat_id = $stmt->fetchColumn();
+
+if (!$cat_id) {
+    $reflections = [];
+} else {
+    $stmt = $db->prepare("
+        SELECT p.*, c.name AS category_name
+        FROM blog_posts p
+        LEFT JOIN blog_categories c ON p.category_id = c.id
+        WHERE p.category_id = ?
+        ORDER BY p.created_at DESC
+    ");
+    $stmt->execute([$cat_id]);
+    $reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 $pageTitle = 'Manage Reflections';
 ?>
