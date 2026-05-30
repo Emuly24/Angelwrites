@@ -61,11 +61,9 @@ $pageTitle = 'Sign Up';
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
-                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="auth-logo">
                     <h1>Join AngellaWrites</h1>
                     <p>Create your free account to access books, poems, and community.</p>
                 </div>
-
                 <?php if ($error): ?>
                     <div class="alert alert-error">
                         <i class="fas fa-exclamation-circle"></i>
@@ -102,13 +100,12 @@ $pageTitle = 'Sign Up';
                         <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter your password" required>
                     </div>
 
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" name="terms" required>
-                            <span>I agree to the <a href="/terms.php">Terms of Service</a> and <a href="/privacy.php">Privacy Policy</a></span>
+                    <div class="checkbox-group">
+                        <input type="checkbox" name="terms" id="terms" required>
+                        <label for="terms">
+                            I agree to the <a href="/terms.php">Terms of Service</a> and <a href="/privacy.php">Privacy Policy</a>
                         </label>
                     </div>
-
                     <button type="submit" class="btn btn-primary btn-block">
                         <i class="fas fa-user-plus"></i>
                         Create Account

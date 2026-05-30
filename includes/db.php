@@ -161,6 +161,7 @@ try {
             FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL
         )",
         
+        
         // ===== NEWSLETTER TABLE =====
         "CREATE TABLE IF NOT EXISTS newsletter (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
