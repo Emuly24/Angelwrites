@@ -20,14 +20,15 @@ if (isset($_GET['delete'])) {
 }
 
 // ===== FETCH ALL REFLECTIONS (category = Christian Reflections) =====
+// FIXED: Use only c.name = ? (removed p.category)
 $stmt = $db->prepare("
     SELECT p.*, c.name AS category_name
     FROM blog_posts p
     LEFT JOIN blog_categories c ON p.category_id = c.id
-    WHERE c.name = ? OR p.category = ?
+    WHERE c.name = ?
     ORDER BY p.created_at DESC
 ");
-$stmt->execute([$category_name, $category_name]);
+$stmt->execute([$category_name]);
 $reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Manage Reflections';
