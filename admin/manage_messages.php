@@ -41,7 +41,9 @@ $pageTitle = 'Contact Messages';
         <div class="admin-header">
             <h1>Contact Messages</h1>
             <div class="admin-actions">
-                <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Back</a>
+                <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
             </div>
         </div>
 
@@ -79,10 +81,16 @@ $pageTitle = 'Contact Messages';
                                 <div class="message-body"><?php echo nl2br(htmlspecialchars($msg['message'])); ?></div>
                                 <div class="message-actions">
                                     <?php if (!$msg['is_read']): ?>
-                                        <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?read=<?php echo $msg['id']; ?>" class="btn btn-sm btn-secondary"><i class="fas fa-check"></i> Mark read</a>
+                                        <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?read=<?php echo $msg['id']; ?>" class="btn btn-sm btn-secondary">
+                                            <i class="fas fa-check"></i> Mark read
+                                        </a>
                                     <?php endif; ?>
-                                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?delete=<?php echo $msg['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this message?');"><i class="fas fa-trash"></i> Delete</a>
-                                    <a href="mailto:<?php echo htmlspecialchars($msg['email']); ?>" class="btn btn-sm btn-primary"><i class="fas fa-reply"></i> Reply</a>
+                                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?delete=<?php echo $msg['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this message?');">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    <a href="mailto:<?php echo htmlspecialchars($msg['email']); ?>" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-reply"></i> Reply
+                                    </a>
                                 </div>
                             </div>
                         <?php endforeach; ?>

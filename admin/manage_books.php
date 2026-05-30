@@ -13,7 +13,6 @@ $edit_book = null;
 // ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    // Delete book from database
     $stmt = $db->prepare("DELETE FROM books WHERE id = ?");
     $stmt->execute([$id]);
     $success = 'Book deleted successfully.';
@@ -60,22 +59,125 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Handle file upload (PDF/EPUB)
+        // ===== Handle Book File Upload (PDF, EPUB, DOC, DOCX) =====
         $file_path = $edit_book['file_path'] ?? '';
         $file_type = $edit_book['file_type'] ?? '';
+        $file_size = $edit_book['file_size'] ?? 0;
+        $file_author = $edit_book['file_author'] ?? '';
+        $release_date = $edit_book['release_date'] ?? '';
+
         if (!empty($_FILES['book_file']['name'])) {
             $upload_dir = '../assets/uploads/books/';
             if (!is_dir($upload_dir)) {
                 mkdir($upload_dir, 0755, true);
             }
+
             $file_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['book_file']['name']);
             $file_path = 'assets/uploads/books/' . $file_filename;
+
             if (!move_uploaded_file($_FILES['book_file']['tmp_name'], '../' . $file_path)) {
                 $error = 'Failed to upload book file.';
             } else {
+                // Get file size
+                $file_size = $_FILES['book_file']['size'];
+
                 // Determine file type
                 $ext = strtolower(pathinfo($file_filename, PATHINFO_EXTENSION));
-                $file_type = in_array($ext, ['pdf', 'epub']) ? $ext : 'unknown';
+                $allowed_extensions = ['pdf', 'epub', 'doc', 'docx'];
+                if (in_array($ext, $allowed_extensions)) {
+                    $file_type = $ext;
+                } else {
+                    $file_type = 'unknown';
+                }
+
+                // ===== EXTRACT METADATA (Author, Release Date) =====
+                $full_path = '../' . $file_path;
+                $file_author = '';
+                $release_date = '';
+
+                if ($file_type === 'pdf' && file_exists($full_path)) {
+                    // Try to extract PDF metadata using built-in functions
+                    try {
+                        $pdf_info = @file_get_contents($full_path);
+                        if ($pdf_info) {
+                            // Simple regex to find Author and CreationDate in PDF
+                            preg_match('/\/Author\s*\(([^)]+)\)/', $pdf_info, $author_match);
+                            if (isset($author_match[1])) {
+                                $file_author = $author_match[1];
+                            }
+                            preg_match('/\/CreationDate\s*\(D:(\d{4})(\d{2})(\d{2})/', $pdf_info, $date_match);
+                            if (isset($date_match[1])) {
+                                $release_date = $date_match[1] . '-' . $date_match[2] . '-' . $date_match[3];
+                            }
+                        }
+                    } catch (Exception $e) {
+                        // Silently ignore errors
+                    }
+                } elseif ($file_type === 'docx' && file_exists($full_path)) {
+                    // DOCX metadata extraction (ZIP based)
+                    try {
+                        $zip = new ZipArchive();
+                        if ($zip->open($full_path) === true) {
+                            $xml = $zip->getFromName('docProps/core.xml');
+                            if ($xml) {
+                                $dom = new DOMDocument();
+                                $dom->loadXML($xml);
+                                $creators = $dom->getElementsByTagName('creator');
+                                if ($creators->length > 0) {
+                                    $file_author = $creators->item(0)->textContent;
+                                }
+                                $dates = $dom->getElementsByTagName('created');
+                                if ($dates->length > 0) {
+                                    $date_str = $dates->item(0)->textContent;
+                                    $release_date = substr($date_str, 0, 10);
+                                }
+                            }
+                            $zip->close();
+                        }
+                    } catch (Exception $e) {
+                        // Silently ignore
+                    }
+                } elseif ($file_type === 'epub' && file_exists($full_path)) {
+                    // EPUB metadata extraction (ZIP based)
+                    try {
+                        $zip = new ZipArchive();
+                        if ($zip->open($full_path) === true) {
+                            $xml = $zip->getFromName('META-INF/container.xml');
+                            if ($xml) {
+                                $dom = new DOMDocument();
+                                $dom->loadXML($xml);
+                                $rootfiles = $dom->getElementsByTagName('rootfile');
+                                if ($rootfiles->length > 0) {
+                                    $opf_path = $rootfiles->item(0)->getAttribute('full-path');
+                                    $opf_xml = $zip->getFromName($opf_path);
+                                    if ($opf_xml) {
+                                        $opf_dom = new DOMDocument();
+                                        $opf_dom->loadXML($opf_xml);
+                                        $creators = $opf_dom->getElementsByTagName('creator');
+                                        if ($creators->length > 0) {
+                                            $file_author = $creators->item(0)->textContent;
+                                        }
+                                        $dates = $opf_dom->getElementsByTagName('date');
+                                        if ($dates->length > 0) {
+                                            $release_date = substr($dates->item(0)->textContent, 0, 10);
+                                        }
+                                    }
+                                }
+                            }
+                            $zip->close();
+                        }
+                    } catch (Exception $e) {
+                        // Silently ignore
+                    }
+                }
+
+                // If no metadata found, fallback to filename-based extraction
+                if (empty($file_author)) {
+                    $file_author = $edit_book['author'] ?? '';
+                }
+                if (empty($release_date)) {
+                    $release_date = date('Y-m-d');
+                }
             }
         }
 
@@ -85,18 +187,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $db->prepare("
                     UPDATE books SET 
                         title = ?, author = ?, description = ?, price = ?, 
-                        is_free = ?, is_sale = ?, cover_path = ?, file_path = ?, file_type = ?
+                        is_free = ?, is_sale = ?, cover_path = ?, file_path = ?, 
+                        file_type = ?, file_size = ?, file_author = ?, release_date = ?
                     WHERE id = ?
                 ");
-                $stmt->execute([$title, $author, $description, $price, $is_free, $is_sale, $cover_path, $file_path, $file_type, $id]);
+                $stmt->execute([
+                    $title, $author, $description, $price, 
+                    $is_free, $is_sale, $cover_path, $file_path, 
+                    $file_type, $file_size, $file_author, $release_date, 
+                    $id
+                ]);
                 $success = 'Book updated successfully.';
             } else {
                 // Insert new book
                 $stmt = $db->prepare("
-                    INSERT INTO books (title, author, description, price, is_free, is_sale, cover_path, file_path, file_type) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO books (
+                        title, author, description, price, is_free, is_sale, 
+                        cover_path, file_path, file_type, file_size, file_author, release_date
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$title, $author, $description, $price, $is_free, $is_sale, $cover_path, $file_path, $file_type]);
+                $stmt->execute([
+                    $title, $author, $description, $price, 
+                    $is_free, $is_sale, $cover_path, $file_path, 
+                    $file_type, $file_size, $file_author, $release_date
+                ]);
                 $success = 'Book added successfully.';
             }
             // Redirect to clear form
@@ -109,6 +223,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ===== FETCH ALL BOOKS FOR LISTING =====
 $stmt = $db->query("SELECT * FROM books ORDER BY created_at DESC");
 $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Add schema columns if missing
+$stmt = $db->exec("
+    CREATE TABLE IF NOT EXISTS books (
+        file_size INTEGER DEFAULT 0,
+        file_author TEXT,
+        release_date TEXT
+    )
+");
 
 $pageTitle = 'Manage Books';
 ?>
@@ -150,7 +273,7 @@ $pageTitle = 'Manage Books';
                     <h2><?php echo $edit_book ? 'Edit Book' : 'Add New Book'; ?></h2>
                 </div>
                 <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" class="book-form">
+                    <form method="POST" enctype="multipart/form-data" class="admin-form">
                         <input type="hidden" name="book_id" value="<?php echo $edit_book['id'] ?? 0; ?>">
 
                         <div class="form-row">
@@ -200,13 +323,14 @@ $pageTitle = 'Manage Books';
                                 <?php endif; ?>
                             </div>
                             <div class="form-group">
-                                <label for="book_file">Book File (PDF or EPUB)</label>
-                                <input type="file" id="book_file" name="book_file" accept=".pdf,.epub">
+                                <label for="book_file">Book File (PDF, EPUB, DOC, DOCX)</label>
+                                <input type="file" id="book_file" name="book_file" accept=".pdf,.epub,.doc,.docx">
                                 <?php if ($edit_book && $edit_book['file_path']): ?>
                                     <div class="current-file">
                                         <small>Current file: <?php echo basename($edit_book['file_path']); ?></small>
                                     </div>
                                 <?php endif; ?>
+                                <small class="field-hint">Upload a book file. Metadata (author, date) will be extracted automatically.</small>
                             </div>
                         </div>
 
@@ -229,57 +353,74 @@ $pageTitle = 'Manage Books';
                 </div>
                 <div class="card-body">
                     <?php if (count($books) > 0): ?>
-                        <div class="book-list-table">
-                            <div class="book-list-header">
-                                <div class="col-cover">Cover</div>
-                                <div class="col-title">Title</div>
-                                <div class="col-author">Author</div>
-                                <div class="col-price">Price</div>
-                                <div class="col-status">Status</div>
-                                <div class="col-actions">Actions</div>
-                            </div>
-                            <?php foreach ($books as $book): ?>
-                                <div class="book-list-row">
-                                    <div class="col-cover">
-                                        <?php if ($book['cover_path']): ?>
-                                            <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" style="max-width: 50px;">
-                                        <?php else: ?>
-                                            <i class="fas fa-book" style="font-size: 2rem; color: var(--rose);"></i>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="col-title">
-                                        <strong><?php echo htmlspecialchars($book['title']); ?></strong>
-                                    </div>
-                                    <div class="col-author"><?php echo htmlspecialchars($book['author']); ?></div>
-                                    <div class="col-price">
-                                        <?php if ($book['is_free']): ?>
-                                            <span class="badge free">Free</span>
-                                        <?php elseif ($book['is_sale']): ?>
-                                            <span class="badge sale">$<?php echo number_format($book['price'], 2); ?></span>
-                                        <?php else: ?>
-                                            <span class="badge">$<?php echo number_format($book['price'], 2); ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="col-status">
-                                        <?php if ($book['file_path']): ?>
-                                            <span class="status-badge available">Available</span>
-                                        <?php else: ?>
-                                            <span class="status-badge missing">No file</span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="col-actions">
-                                        <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this book?');">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                        <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary" target="_blank">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
+                        <div class="table-responsive">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Cover</th>
+                                        <th>Title</th>
+                                        <th>Author</th>
+                                        <th>Price</th>
+                                        <th>File Info</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($books as $book): ?>
+                                        <tr>
+                                            <td>
+                                                <?php if ($book['cover_path']): ?>
+                                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" style="max-width: 50px; border-radius: 4px;">
+                                                <?php else: ?>
+                                                    <i class="fas fa-book" style="font-size: 1.5rem; color: var(--rose);"></i>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <strong><?php echo htmlspecialchars($book['title']); ?></strong>
+                                                <?php if ($book['release_date']): ?>
+                                                    <br><small>Released: <?php echo htmlspecialchars($book['release_date']); ?></small>
+                                                <?php endif; ?>
+                                                <?php if ($book['file_author']): ?>
+                                                    <br><small>File Author: <?php echo htmlspecialchars($book['file_author']); ?></small>
+                                                <?php endif; ?>
+                                                <?php if ($book['file_size']): ?>
+                                                    <br><small>Size: <?php echo number_format($book['file_size'] / 1024, 1); ?> KB</small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($book['author']); ?></td>
+                                            <td>
+                                                <?php if ($book['is_free']): ?>
+                                                    <span class="badge free">Free</span>
+                                                <?php elseif ($book['is_sale']): ?>
+                                                    <span class="badge sale">$<?php echo number_format($book['price'], 2); ?></span>
+                                                <?php else: ?>
+                                                    <span class="badge">$<?php echo number_format($book['price'], 2); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ($book['file_path']): ?>
+                                                    <span class="status-badge available">
+                                                        <?php echo strtoupper($book['file_type'] ?? 'Unknown'); ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="status-badge missing">No file</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="actions">
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this book?');">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                                <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary" target="_blank">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
                     <?php else: ?>
                         <p class="no-items">No books yet. Click "Add New Book" to get started.</p>
@@ -300,17 +441,14 @@ $pageTitle = 'Manage Books';
         function toggleForm(show) {
             formContainer.style.display = show ? 'block' : 'none';
             if (show) {
-                // Scroll to form
                 formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
-                // Redirect to remove edit param from URL
                 window.location.href = '<?php echo SITE_URL; ?>/admin/manage_books.php';
             }
         }
 
         if (showAddBtn) {
             showAddBtn.addEventListener('click', function() {
-                // If editing, cancel edit first
                 if (window.location.search.includes('edit')) {
                     window.location.href = '<?php echo SITE_URL; ?>/admin/manage_books.php';
                 } else {
@@ -325,7 +463,6 @@ $pageTitle = 'Manage Books';
             });
         }
 
-        // If there's an edit parameter, show form
         if (window.location.search.includes('edit')) {
             toggleForm(true);
         }

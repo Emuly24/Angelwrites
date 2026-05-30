@@ -7,7 +7,6 @@ redirectIfNotAdmin();
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// Fetch poem
 $stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
 $stmt->execute([$id]);
 $poem = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -28,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     }
 }
 
-// Fetch current status
 $stmt = $db->prepare("SELECT status FROM poem_status WHERE poem_id = ?");
 $stmt->execute([$id]);
 $status_row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -46,7 +44,7 @@ $pageTitle = 'Preview: ' . htmlspecialchars($poem['title']);
                 <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back
                 </a>
-                <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?edit=<?php echo $id; ?>" class="btn btn-secondary">
+                <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=poem&id=<?php echo $id; ?>" class="btn btn-secondary">
                     <i class="fas fa-edit"></i> Edit Poem
                 </a>
                 <form method="POST" class="status-form">
@@ -66,40 +64,41 @@ $pageTitle = 'Preview: ' . htmlspecialchars($poem['title']);
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- Poem Display (exactly as public sees it) -->
-        <div class="poem-preview-content">
-            <div class="poem-view-page">
-                <header class="poem-header">
-                    <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
-                    <div class="poem-meta">
-                        <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
-                        <span class="poem-status-badge <?php echo $current_status; ?>"><?php echo ucfirst($current_status); ?></span>
-                    </div>
-                </header>
+        <div class="card">
+            <div class="card-body">
+                <div class="poem-view-page">
+                    <header class="poem-header">
+                        <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
+                        <div class="poem-meta">
+                            <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
+                            <span class="poem-status-badge <?php echo $current_status; ?>"><?php echo ucfirst($current_status); ?></span>
+                        </div>
+                    </header>
 
-                <?php if ($poem['image_path']): ?>
-                    <div class="poem-image-container">
-                        <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
-                    </div>
-                <?php endif; ?>
+                    <?php if ($poem['image_path']): ?>
+                        <div class="poem-image-container">
+                            <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
+                        </div>
+                    <?php endif; ?>
 
-                <?php if ($poem['audio_path']): ?>
-                    <div class="poem-audio-player">
-                        <audio controls>
-                            <source src="<?php echo SITE_URL . '/' . $poem['audio_path']; ?>" type="audio/mpeg">
-                        </audio>
-                    </div>
-                <?php endif; ?>
+                    <?php if ($poem['audio_path']): ?>
+                        <div class="poem-audio-player">
+                            <audio controls>
+                                <source src="<?php echo SITE_URL . '/' . $poem['audio_path']; ?>" type="audio/mpeg">
+                            </audio>
+                        </div>
+                    <?php endif; ?>
 
-                <?php if ($poem['intro']): ?>
-                    <div class="poem-intro-section">
-                        <div class="intro-label">✧ Purpose of this poem</div>
-                        <div class="intro-body"><?php echo nl2br(htmlspecialchars($poem['intro'])); ?></div>
-                    </div>
-                <?php endif; ?>
+                    <?php if ($poem['intro']): ?>
+                        <div class="poem-intro-section">
+                            <div class="intro-label">✧ Purpose of this poem</div>
+                            <div class="intro-body"><?php echo nl2br(htmlspecialchars($poem['intro'])); ?></div>
+                        </div>
+                    <?php endif; ?>
 
-                <div class="poem-content-section">
-                    <div class="poem-body"><?php echo nl2br(htmlspecialchars($poem['content'])); ?></div>
+                    <div class="poem-content-section">
+                        <div class="poem-body"><?php echo nl2br(htmlspecialchars($poem['content'])); ?></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -118,7 +117,6 @@ $pageTitle = 'Preview: ' . htmlspecialchars($poem['title']);
 .poem-status-badge.review { background: #f39c12; color: white; }
 .poem-status-badge.published { background: #2ecc71; color: white; }
 .poem-status-badge.archived { background: #e74c3c; color: white; }
-.poem-preview-content { max-width: 780px; margin: 0 auto; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
