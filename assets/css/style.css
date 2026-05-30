@@ -154,14 +154,11 @@ a:hover {
 
 /* ===== LOGO ===== */
 .logo-img {
-    height: 80px;
+    height: 150px;
     width: auto;
     max-width: 280px;
     display: block;
     object-fit: contain;
-    background: rgba(255, 255, 255, 0.85);
-    padding: 4px 12px;
-    border-radius: 8px;
 }
 
 @media (max-width: 480px) {
