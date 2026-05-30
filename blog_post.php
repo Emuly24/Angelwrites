@@ -1,4 +1,29 @@
 <?php
+// ===== HANDLE COMMENT SUBMISSION =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isLoggedIn()) {
+    $reflection_id = (int)$_POST['reflection_id'];
+    $comment = trim($_POST['comment']);
+    
+    if (!empty($comment)) {
+        $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment) VALUES (?, ?, ?)");
+        $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment]);
+        $success = 'Your comment has been posted!';
+        header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
+        exit;
+    }
+}
+
+// ===== HANDLE PRAYER REQUEST =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_prayer']) && isLoggedIn()) {
+    $reflection_id = (int)$_POST['reflection_id'];
+    $message = trim($_POST['message'] ?? 'I would like prayer for this reflection.');
+    
+    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, reflection_id, request_type, message) VALUES (?, ?, 'prayer', ?)");
+    $stmt->execute([$_SESSION['user_id'], $reflection_id, $message]);
+    $success = 'Your prayer request has been sent!';
+    header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
+    exit;
+}
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -75,7 +100,22 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
             <div class="post-content">
                 <?php echo nl2br(htmlspecialchars($post['content'])); ?>
             </div>
-
+            <!-- ===== REFLECTION ACTIONS ===== -->
+            <div class="reflection-actions">
+                <!-- Request Prayer Button -->
+                <form method="POST" class="prayer-form">
+                    <input type="hidden" name="request_prayer" value="1">
+                    <input type="hidden" name="reflection_id" value="<?php echo $id; ?>">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-hands-praying"></i> Request Prayer
+                    </button>
+                </form>
+                
+                <!-- Book a Session Button -->
+                <a href="/book_session.php" class="btn btn-secondary">
+                    <i class="fas fa-calendar-check"></i> Book a Session
+                </a>
+            </div>
             <!-- Post Footer -->
             <div class="post-footer">
                 <div class="post-tags">
@@ -134,7 +174,59 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
         </section>
     </div>
 </div>
+<!-- ===== COMMENTS SECTION ===== -->
+<section class="reflection-comments">
+    <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments on this Reflection</h3>
+    
+    <?php
+    // Fetch existing comments
+    $stmt = $db->prepare("
+        SELECT c.*, u.name AS author_name 
+        FROM reflection_comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.reflection_id = ?
+        ORDER BY c.created_at DESC
+    ");
+    $stmt->execute([$id]);
+    $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    ?>
+    
+    <?php if (count($comments) > 0): ?>
+        <div class="comments-list">
+            <?php foreach ($comments as $comment): ?>
+                <div class="comment-item">
+                    <div class="comment-author">
+                        <i class="fas fa-user-circle"></i>
+                        <?php echo htmlspecialchars($comment['author_name']); ?>
+                    </div>
+                    <div class="comment-date"><?php echo date('M j, Y', strtotime($comment['created_at'])); ?></div>
+                    <div class="comment-body"><?php echo nl2br(htmlspecialchars($comment['comment'])); ?></div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p class="no-comments">No comments yet.</p>
+    <?php endif; ?>
 
+    <!-- Comment Form (logged in users only) -->
+    <?php if (isLoggedIn()): ?>
+        <div class="comment-form-container">
+            <h4>Add a Comment</h4>
+            <form method="POST" class="comment-form">
+                <input type="hidden" name="add_comment" value="1">
+                <input type="hidden" name="reflection_id" value="<?php echo $id; ?>">
+                <div class="form-group">
+                    <textarea name="comment" rows="3" placeholder="Share your thoughts about this reflection..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Post Comment</button>
+            </form>
+        </div>
+    <?php else: ?>
+        <div class="login-prompt">
+            <p><a href="<?php echo SITE_URL; ?>/login.php">Login</a> to comment on this reflection.</p>
+        </div>
+    <?php endif; ?>
+</section>
 <!-- ===== STYLES ===== -->
 <style>
 .blog-post-page {
@@ -385,6 +477,18 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
         width: 100%;
     }
 }
+.reflection-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 24px 0;
+    justify-content: center;
+}
+
+.prayer-form {
+    display: inline;
+}
 </style>
+
 
 <?php require_once 'includes/footer.php'; ?>
