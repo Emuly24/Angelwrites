@@ -15,76 +15,30 @@ if (isset($_GET['delete'])) {
     try {
         $db->beginTransaction();
         
-        // 1. Get the poem data
         $stmt = $db->prepare("SELECT image_path, audio_path FROM poems WHERE id = ?");
         $stmt->execute([$id]);
         $poem = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$poem) {
+        if ($poem) {
+            $doc_root = $_SERVER['DOCUMENT_ROOT'];
+            if (!empty($poem['image_path']) && file_exists($doc_root . '/' . $poem['image_path'])) {
+                @unlink($doc_root . '/' . $poem['image_path']);
+            }
+            if (!empty($poem['audio_path']) && file_exists($doc_root . '/' . $poem['audio_path'])) {
+                @unlink($doc_root . '/' . $poem['audio_path']);
+            }
+            $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?");
+            $stmt->execute([$id]);
+            $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?");
+            $stmt->execute([$id]);
+            $stmt = $db->prepare("DELETE FROM poems WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            $db->commit();
+            $success = 'Poem deleted successfully.';
+        } else {
             $error = 'Poem not found.';
-            $db->rollBack();
-            header('Location: ' . SITE_URL . '/admin/manage_poems.php');
-            exit;
         }
-        
-        // 2. Delete files with explicit path verification
-        $deleted_files = [];
-        $failed_files = [];
-        
-        $base_path = __DIR__ . '/../'; // This gets us to the root of 'htdocs'
-        
-        // Delete image
-        if (!empty($poem['image_path'])) {
-            $full_image_path = $base_path . $poem['image_path'];
-            if (file_exists($full_image_path)) {
-                if (@unlink($full_image_path)) {
-                    $deleted_files[] = 'Image: ' . basename($poem['image_path']);
-                } else {
-                    $failed_files[] = 'Image: ' . basename($poem['image_path']);
-                }
-            } else {
-                $failed_files[] = 'Image: ' . basename($poem['image_path']) . ' (file not found)';
-            }
-        }
-        
-        // Delete audio
-        if (!empty($poem['audio_path'])) {
-            $full_audio_path = $base_path . $poem['audio_path'];
-            if (file_exists($full_audio_path)) {
-                if (@unlink($full_audio_path)) {
-                    $deleted_files[] = 'Audio: ' . basename($poem['audio_path']);
-                } else {
-                    $failed_files[] = 'Audio: ' . basename($poem['audio_path']);
-                }
-            } else {
-                $failed_files[] = 'Audio: ' . basename($poem['audio_path']) . ' (file not found)';
-            }
-        }
-        
-        // 3. Delete foreign key records
-        $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?");
-        $stmt->execute([$id]);
-        
-        $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?");
-        $stmt->execute([$id]);
-        
-        // 4. Delete the poem from the database
-        $stmt = $db->prepare("DELETE FROM poems WHERE id = ?");
-        $stmt->execute([$id]);
-        
-        $db->commit();
-        
-        // 5. Build a detailed success message
-        $msg_parts = [];
-        $msg_parts[] = '✅ Poem deleted from database.';
-        if (!empty($deleted_files)) {
-            $msg_parts[] = '🗑️ Removed: ' . implode(', ', $deleted_files);
-        }
-        if (!empty($failed_files)) {
-            $msg_parts[] = '⚠️ Could not remove: ' . implode(', ', $failed_files);
-        }
-        $success = implode('<br>', $msg_parts);
-        
     } catch (PDOException $e) {
         $db->rollBack();
         $error = 'Database error: ' . $e->getMessage();
@@ -93,6 +47,34 @@ if (isset($_GET['delete'])) {
     header('Location: ' . SITE_URL . '/admin/manage_poems.php');
     exit;
 }
+
+// ===== HANDLE ADD NEW POEM =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_poem'])) {
+    $title = trim($_POST['title']);
+    $intro = trim($_POST['intro']);
+    $content = trim($_POST['content']); // TinyMCE content
+    
+    if (empty($title) || empty($content)) {
+        $error = 'Title and content are required.';
+    } else {
+        $image_path = '';
+        if (!empty($_FILES['image']['name'])) {
+            $upload_dir = '../assets/uploads/poems/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $image_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['image']['name']);
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $image_filename)) {
+                $image_path = 'assets/uploads/poems/' . $image_filename;
+            }
+        }
+        
+        $stmt = $db->prepare("INSERT INTO poems (title, intro, content, image_path) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$title, $intro, $content, $image_path]);
+        $success = 'Poem added successfully!';
+        header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+        exit;
+    }
+}
+
 // ===== FETCH ALL POEMS =====
 $stmt = $db->query("SELECT * FROM poems ORDER BY created_at DESC");
 $poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -124,7 +106,7 @@ $pageTitle = 'Manage Poems';
 
         <!-- ===== ADD POEM MODAL ===== -->
         <div id="addPoemModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-content" style="max-width: 700px;">
                 <div class="modal-header">
                     <h2>Add New Poem</h2>
                     <button class="modal-close">&times;</button>
@@ -141,10 +123,10 @@ $pageTitle = 'Manage Poems';
                     </div>
                     <div class="form-group">
                         <label for="modal_content">Content <span class="required">*</span></label>
-                        <textarea id="modal_content" name="content" rows="6" required></textarea>
+                        <textarea id="editor" name="content" rows="12"></textarea> <!-- The Note Editor -->
                     </div>
                     
-                    <!-- ===== DRAG & DROP IMAGE ZONE ===== -->
+                    <!-- DRAG & DROP IMAGE ZONE -->
                     <div class="form-group">
                         <label>Poem Image (Drag & Drop or Click to Choose)</label>
                         <div id="dropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
@@ -224,23 +206,31 @@ $pageTitle = 'Manage Poems';
                         </table>
                     </div>
                 <?php else: ?>
-                    <p class="no-items">No poems yet. Click "Add New Poem" to get started.</p>
+                    <p class="no-items">No poems yet.</p>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ===== MODAL & DRAG & DROP JAVASCRIPT ===== -->
+<!-- ===== TINYMCE & MODAL JAVASCRIPT ===== -->
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // === MODAL ===
+        let editorInitialized = false;
+
+        // ===== MODAL LOGIC =====
         const showModalBtn = document.getElementById('showAddModal');
         const modal = document.getElementById('addPoemModal');
         const closeButtons = document.querySelectorAll('.modal-close');
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
 
         showModalBtn.addEventListener('click', function() {
             modal.style.display = 'flex';
+            initTinyMCE(); // Initialize the editor when modal opens
         });
 
         closeButtons.forEach(function(btn) {
@@ -255,12 +245,28 @@ $pageTitle = 'Manage Poems';
             }
         });
 
-        // === DRAG & DROP ===
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-        const previewContainer = document.getElementById('previewContainer');
-        const previewImage = document.getElementById('previewImage');
+        // ===== TINYMCE INIT =====
+        function initTinyMCE() {
+            if (editorInitialized) return;
+            
+            tinymce.init({
+                selector: '#editor',
+                height: 400,
+                menubar: true,
+                plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+                toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
+                content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
+                forced_root_block: 'p',
+                setup: function(editor) {
+                    editor.on('change', function () {
+                        tinymce.triggerSave(); // Ensure data is saved to textarea for form submission
+                    });
+                }
+            });
+            editorInitialized = true;
+        }
 
+        // ===== DRAG & DROP =====
         dropZone.addEventListener('click', function() {
             fileInput.click();
         });
@@ -303,7 +309,6 @@ $pageTitle = 'Manage Poems';
             reader.onload = function(e) {
                 previewImage.src = e.target.result;
                 previewContainer.style.display = 'block';
-                // Associate the file with the file input
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(file);
                 fileInput.files = dataTransfer.files;
@@ -314,56 +319,58 @@ $pageTitle = 'Manage Poems';
 </script>
 
 <style>
-    /* ===== MODAL STYLES ===== */
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-    }
-    .modal-content {
-        background: var(--card-bg);
-        border-radius: 16px;
-        padding: 32px;
-        width: 90%;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .modal-header h2 { margin: 0; }
-    .modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
-    .modal-close:hover { color: var(--rose); }
+/* ===== MODAL STYLES ===== */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+.modal-content {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 32px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.modal-header h2 { margin: 0; }
+.modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
+.modal-close:hover { color: var(--rose); }
 
-    /* ===== ADMIN TABLE (Existing) ===== */
-    .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-    .admin-table thead { background: var(--vanilla); }
-    .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
-    .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
-    .admin-table tbody tr:last-child td { border-bottom: none; }
-    .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
-    .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
-    .admin-form .form-group { margin-bottom: 16px; }
-    .admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
-    .admin-form input, .admin-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
-    .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-    .admin-form textarea { resize: vertical; min-height: 60px; }
-    .required { color: #dc2626; }
-    .form-actions { display: flex; gap: 12px; margin-top: 16px; }
-    .form-actions .btn { min-width: 120px; justify-content: center; }
+/* ===== ADMIN TABLE ===== */
+.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.admin-table thead { background: var(--vanilla); }
+.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
+.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+.table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
+.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+
+/* ===== FORM STYLES ===== */
+.admin-form .form-group { margin-bottom: 16px; }
+.admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+.admin-form input[type="text"], .admin-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
+.admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.admin-form textarea { resize: vertical; min-height: 60px; }
+.required { color: #dc2626; }
+.form-actions { display: flex; gap: 12px; margin-top: 16px; }
+.form-actions .btn { min-width: 120px; justify-content: center; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
