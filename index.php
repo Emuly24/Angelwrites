@@ -101,8 +101,19 @@ require_once 'includes/auth.php';
                 foreach ($poems as $poem):
             ?>
             <div class="poem-card">
+                <?php if ($poem['image_path']): ?>
+                    <div class="poem-thumbnail">
+                        <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
+                    </div>
+                <?php endif; ?>
                 <div class="poem-content">
                     <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
+                    <?php if ($poem['intro']): ?>
+                        <p class="poem-intro-preview">
+                            <span class="intro-label">✧ Purpose</span>
+                            <?php echo htmlspecialchars(substr($poem['intro'], 0, 120)); ?>...
+                        </p>
+                    <?php endif; ?>
                     <p class="poem-excerpt"><?php echo htmlspecialchars(substr($poem['intro'] ?: $poem['content'], 0, 120)); ?>...</p>
                     <a href="/poem_view.php?id=<?php echo $poem['id']; ?>" class="read-more">Read full poem →</a>
                 </div>
@@ -199,3 +210,82 @@ require_once 'includes/auth.php';
 </section>
 
 <?php require_once 'includes/footer.php'; ?>
+<style>
+    /* ===== POEM CARD WITH IMAGE ===== */
+.poem-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: all var(--transition);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+.poem-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+}
+
+.poem-thumbnail {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+}
+
+.poem-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+
+.poem-card:hover .poem-thumbnail img {
+    transform: scale(1.05);
+}
+
+.poem-content {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.poem-content h3 {
+    font-size: 1.2rem;
+    margin-bottom: 6px;
+}
+
+.poem-intro-preview {
+    background: var(--vanilla);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 6px 0 10px;
+    border-left: 3px solid var(--rose);
+}
+
+.poem-intro-preview .intro-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--rose);
+    margin-bottom: 2px;
+}
+
+.poem-excerpt {
+    color: var(--text-light);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 12px;
+    flex: 1;
+}
+
+.poem-audio {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+</style>
