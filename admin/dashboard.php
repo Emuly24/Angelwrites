@@ -78,7 +78,7 @@ $pageTitle = 'Admin Dashboard';
         <div class="dashboard-header">
             <div class="dashboard-header-text">
                 <h1>Admin Dashboard</h1>
-                <p>Welcome back, <?php echo htmlspecialchars($_SESSION['name'] ?? 'Admin'); ?>! Here's what's happening on your site.</p>
+                <p>Welcome back, <strong><?php echo htmlspecialchars($_SESSION['name'] ?? 'Admin'); ?></strong>! Here's what's happening on your site.</p>
             </div>
             <div class="dashboard-header-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-primary">
@@ -93,7 +93,7 @@ $pageTitle = 'Admin Dashboard';
         <!-- Statistics Cards -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(219, 161, 162, 0.15); color: var(--rose);">
+                <div class="stat-icon">
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-content">
@@ -164,251 +164,371 @@ $pageTitle = 'Admin Dashboard';
         </div>
 
         <!-- ===== QUICK ACTIONS ===== -->
-<div class="quick-actions-grid">
-    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="action-card">
-        <i class="fas fa-book"></i>
-        <span>Manage Books</span>
-    </a>
-    <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="action-card">
-        <i class="fas fa-feather-alt"></i>
-        <span>Manage Poems</span>
-    </a>
-    <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="action-card">
-        <i class="fas fa-calendar-check"></i>
-        <span>Manage Sessions</span>
-    </a>
-    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="action-card">
-        <i class="fas fa-users-cog"></i>
-        <span>Manage Users</span>
-    </a>
-    <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="action-card">
-        <i class="fas fa-edit"></i>
-        <span>Manage Blog</span>
-    </a>
-    <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="action-card">
-        <i class="fas fa-cog"></i>
-        <span>Site Settings</span>
-    </a>
+        <div class="quick-actions-grid">
+            <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="action-card">
+                <i class="fas fa-book"></i>
+                <span>Manage Books</span>
+            </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="action-card">
+                <i class="fas fa-feather-alt"></i>
+                <span>Manage Poems</span>
+            </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="action-card">
+                <i class="fas fa-calendar-check"></i>
+                <span>Manage Sessions</span>
+            </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="action-card">
+                <i class="fas fa-users-cog"></i>
+                <span>Manage Users</span>
+            </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="action-card">
+                <i class="fas fa-edit"></i>
+                <span>Manage Blog</span>
+            </a>
+            <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="action-card">
+                <i class="fas fa-cog"></i>
+                <span>Site Settings</span>
+            </a>
+        </div>
+
+        <!-- ===== DASHBOARD SECTIONS ===== -->
+        <div class="dashboard-grid">
+
+            <!-- Pending Sessions -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-clock"></i> Pending Sessions</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_sessions) > 0): ?>
+                        <?php foreach ($recent_sessions as $session): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($session['user_name']); ?></strong>
+                                    <small><?php echo htmlspecialchars($session['date']); ?> at <?php echo htmlspecialchars($session['time']); ?></small>
+                                </div>
+                                <span class="status-badge pending">Pending</span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-clock"></i>
+                            <p>No pending sessions</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Unread Messages -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-envelope"></i> Unread Messages</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_messages) > 0): ?>
+                        <?php foreach ($recent_messages as $message): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($message['name']); ?></strong>
+                                    <small><?php echo htmlspecialchars(substr($message['message'], 0, 40)); ?>...</small>
+                                </div>
+                                <span class="status-badge unread">Unread</span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-inbox"></i>
+                            <p>No unread messages</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Recently Added Books -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-book"></i> Recently Added Books</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_books) > 0): ?>
+                        <?php foreach ($recent_books as $book): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($book['title']); ?></strong>
+                                    <small>by <?php echo htmlspecialchars($book['author']); ?></small>
+                                </div>
+                                <span class="status-badge available">Available</span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-book"></i>
+                            <p>No books added yet</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
 
-<!-- ===== DASHBOARD SECTIONS ===== -->
-<div class="dashboard-grid">
-
-    <!-- Pending Sessions -->
-    <div class="dashboard-section-card">
-        <div class="dashboard-section-header">
-            <h3><i class="fas fa-clock"></i> Pending Sessions</h3>
-            <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="view-all-link">View All &rarr;</a>
-        </div>
-        <div class="dashboard-list-body">
-            <?php if (count($recent_sessions) > 0): ?>
-                <?php foreach ($recent_sessions as $session): ?>
-                    <div class="dashboard-list-item">
-                        <div class="dashboard-list-item-info">
-                            <strong><?php echo htmlspecialchars($session['user_name']); ?></strong>
-                            <small><?php echo htmlspecialchars($session['date']); ?> at <?php echo htmlspecialchars($session['time']); ?></small>
-                        </div>
-                        <span class="status-badge pending">Pending</span>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="no-items-message">No pending sessions.</div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Unread Messages -->
-    <div class="dashboard-section-card">
-        <div class="dashboard-section-header">
-            <h3><i class="fas fa-envelope"></i> Unread Messages</h3>
-            <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="view-all-link">View All &rarr;</a>
-        </div>
-        <div class="dashboard-list-body">
-            <?php if (count($recent_messages) > 0): ?>
-                <?php foreach ($recent_messages as $message): ?>
-                    <div class="dashboard-list-item">
-                        <div class="dashboard-list-item-info">
-                            <strong><?php echo htmlspecialchars($message['name']); ?></strong>
-                            <small><?php echo htmlspecialchars(substr($message['message'], 0, 50)); ?>...</small>
-                        </div>
-                        <span class="status-badge unread">Unread</span>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="no-items-message">No unread messages.</div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Recently Added Books -->
-    <div class="dashboard-section-card">
-        <div class="dashboard-section-header">
-            <h3><i class="fas fa-book"></i> Recently Added Books</h3>
-            <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="view-all-link">View All &rarr;</a>
-        </div>
-        <div class="dashboard-list-body">
-            <?php if (count($recent_books) > 0): ?>
-                <?php foreach ($recent_books as $book): ?>
-                    <div class="dashboard-list-item">
-                        <div class="dashboard-list-item-info">
-                            <strong><?php echo htmlspecialchars($book['title']); ?></strong>
-                            <small>by <?php echo htmlspecialchars($book['author']); ?></small>
-                        </div>
-                        <span class="status-badge available">Available</span>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="no-items-message">No books added yet.</div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-</div>
-    </div>
-</div>
-<?php require_once '../includes/footer.php'; ?>
+<!-- ===== INLINE STYLES ===== -->
 <style>
+    /* ===== STATS CARDS ===== */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+    .stat-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: all var(--transition);
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-hover);
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+    }
+    .stat-content {
+        display: flex;
+        flex-direction: column;
+    }
+    .stat-number {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--dark);
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
-/* ===== QUICK ACTIONS GRID ===== */
-.quick-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 32px;
-}
+    /* ===== QUICK ACTIONS ===== */
+    .quick-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 32px;
+    }
+    .action-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        transition: all var(--transition);
+        text-decoration: none;
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+    .action-card i {
+        font-size: 1.4rem;
+        color: var(--rose);
+        display: block;
+    }
+    .action-card span {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    .action-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-hover);
+        border-color: var(--rose);
+        color: var(--rose);
+    }
 
-.action-card {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 16px;
-    text-align: center;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    transition: all var(--transition);
-    text-decoration: none;
-    color: var(--text);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-}
+    /* ===== DASHBOARD CARDS ===== */
+    .dashboard-section-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        border-left: 6px solid var(--rose);
+        box-shadow: var(--shadow);
+        margin-bottom: 16px;
+        overflow: hidden;
+    }
+    .dashboard-section-header {
+        background: var(--vanilla);
+        padding: 10px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+    }
+    .dashboard-section-header h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .dashboard-section-header h3 i {
+        color: var(--rose-dark);
+        font-size: 1rem;
+    }
+    .view-all-link {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--rose-dark);
+        text-decoration: none;
+        transition: color var(--transition);
+    }
+    .view-all-link:hover {
+        color: var(--rose);
+        text-decoration: underline;
+    }
 
-.action-card i {
-    font-size: 1.4rem;
-    color: var(--rose);
-    display: block;
-}
+    .dashboard-list-body {
+        background: var(--white);
+    }
 
-.action-card span {
-    font-weight: 500;
-    font-size: 0.9rem;
-}
+    .dashboard-list-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--border);
+        transition: background var(--transition);
+    }
+    .dashboard-list-item:last-child {
+        border-bottom: none;
+    }
+    .dashboard-list-item:hover {
+        background: rgba(219, 161, 162, 0.05);
+    }
+    .dashboard-list-item-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .dashboard-list-item-info strong {
+        font-size: 0.9rem;
+        color: var(--text);
+    }
+    .dashboard-list-item-info small {
+        font-size: 0.75rem;
+        color: var(--text-light);
+    }
 
-.action-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-hover);
-    border-color: var(--rose);
-    color: var(--rose);
-}
+    .empty-state-card {
+        padding: 16px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: var(--text-light);
+        background: var(--fantasy);
+        font-size: 0.85rem;
+        min-height: 40px;
+    }
+    .empty-state-card i {
+        font-size: 1.2rem;
+        color: var(--border);
+    }
+    .empty-state-card p {
+        margin: 0;
+        font-weight: 400;
+    }
 
-/* ===== DASHBOARD CARDS (Sessions, Messages, Books) ===== */
-.dashboard-section-card {
-    background: var(--card-bg);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    margin-bottom: 24px;
-    overflow: hidden;
-}
+    .status-badge {
+        padding: 2px 10px;
+        border-radius: 10px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .status-badge.pending {
+        background: #f1c40f;
+        color: #fff;
+    }
+    .status-badge.unread {
+        background: var(--rose);
+        color: #fff;
+    }
+    .status-badge.available {
+        background: #2ecc71;
+        color: #fff;
+    }
+    .status-badge.missing {
+        background: #e74c3c;
+        color: #fff;
+    }
 
-.dashboard-section-header {
-    background: var(--vanilla);
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+    /* ===== HEADER ===== */
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    .dashboard-header h1 {
+        font-size: 2rem;
+        margin-bottom: 4px;
+    }
+    .dashboard-header p {
+        color: var(--text-light);
+        font-size: 1.05rem;
+    }
+    .dashboard-header-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
 
-.dashboard-section-header h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.dashboard-section-header h3 i {
-    color: var(--rose);
-}
-
-.view-all-link {
-    font-size: 0.85rem;
-    color: var(--text-light);
-    font-weight: 500;
-    text-decoration: none;
-    transition: color var(--transition);
-}
-
-.view-all-link:hover {
-    color: var(--rose);
-}
-
-.dashboard-list-body {
-    padding: 4px 0;
-}
-
-.dashboard-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--border);
-    transition: background var(--transition);
-}
-
-.dashboard-list-item:last-child {
-    border-bottom: none;
-}
-
-.dashboard-list-item:hover {
-    background: rgba(219, 161, 162, 0.05);
-}
-
-.dashboard-list-item-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.dashboard-list-item-info strong {
-    font-size: 0.95rem;
-    color: var(--text);
-}
-
-.dashboard-list-item-info small {
-    font-size: 0.8rem;
-    color: var(--text-light);
-}
-
-.status-badge {
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-.status-badge.pending { background: #f1c40f; color: white; }
-.status-badge.unread { background: var(--rose); color: white; }
-.status-badge.available { background: #2ecc71; color: white; }
-
-.no-items-message {
-    padding: 20px;
-    text-align: center;
-    color: var(--text-light);
-    font-size: 0.9rem;
-    font-style: italic;
-}
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .dashboard-header-actions {
+            width: 100%;
+        }
+        .dashboard-header-actions .btn {
+            flex: 1;
+            justify-content: center;
+        }
+    }
+    @media (max-width: 480px) {
+        .stats-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .quick-actions-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
 </style>
 
+<?php require_once '../includes/footer.php'; ?>
