@@ -211,7 +211,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     </div>
 </div>
 
-<!-- ===== STYLES ===== -->
+
 <style>
 /* ===== POEM VIEW PAGE ===== */
 .poem-view-page {
@@ -262,13 +262,14 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     max-width: 700px;
     text-align: center;
 }
+/* ===== POEM FEATURE IMAGE ===== */
 .poem-feature-image {
     width: 100%;
     height: auto;
-    max-height: 500px;
-    object-fit: cover;
-    border-radius: 12px;
+    border: 6px solid var(--rose);
+    border-radius: 16px;
     box-shadow: var(--shadow-hover);
+    display: block;
 }
 
 /* ===== AUDIO ===== */
@@ -310,7 +311,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     color: var(--rose);
     margin-bottom: 6px;
 }
@@ -319,12 +320,18 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     font-size: 1.05rem;
     color: var(--text);
     line-height: 1.8;
+    text-align: justify; 
 }
 
 /* ===== POEM BODY – BEAUTIFULLY SPACED & CENTERED ===== */
 .poem-content-section {
     max-width: 700px;
-    margin: 0 auto;
+    margin: 0 auto 32px;
+    border: 4px solid var(--rose); 
+    border-radius: 16px;
+    padding: 32px;
+    background: var(--card-bg);
+    box-shadow: var(--shadow-hover);
 }
 .poem-body {
     font-family: 'Georgia', 'Times New Roman', serif;
@@ -332,7 +339,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     line-height: 2.4;
     color: var(--text);
     text-align: center;
-    padding: 8px 0;
+    padding: 0;
 }
 .poem-body p {
     margin-bottom: 24px;
