@@ -1,6 +1,6 @@
 /**
  * AngelWrites – Main JavaScript
- * Handles: Hamburger menu, Theme toggle, Bible modal (API + Table of Contents + Translations)
+ * Handles: Hamburger menu, Theme toggle, Bible modal (Local Database)
  */
 
 (function() {
@@ -112,7 +112,7 @@
     }
 
     // ============================================================
-    // 4. Bible Modal (API + Table of Contents + Multiple Versions)
+    // 4. Bible Modal (Local Database)
     // ============================================================
     function openBibleModal() {
         if (bibleModal) {
@@ -143,159 +143,104 @@
         }
     });
 
-       // ============================================================
-    // 5. Bible Navigation (Book → Chapter → Verse)
-    // ============================================================
-    async function loadBibleBooks() {
-        // Local fallback list of all 66 books (in case API fails)
-        const fallbackBooks = [
-            "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-            "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
-            "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
-            "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
-            "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
-            "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-            "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-            "Haggai", "Zechariah", "Malachi",
-            "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-            "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
-            "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
-            "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
-            "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
-            "Jude", "Revelation"
-        ];
+    // ===== LOCAL BIBLE NAVIGATION =====
+    // List of Bible books
+    const books = [
+        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+        "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+        "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+        "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+        "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+        "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+        "Haggai", "Zechariah", "Malachi",
+        "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
+        "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+        "Jude", "Revelation"
+    ];
 
-        // Map book names to API-friendly IDs
-        const bookIdMap = {
-            "1 Samuel": "1samuel", "2 Samuel": "2samuel",
-            "1 Kings": "1kings", "2 Kings": "2kings",
-            "1 Chronicles": "1chronicles", "2 Chronicles": "2chronicles",
-            "Song of Solomon": "songofsolomon",
-            "1 Corinthians": "1corinthians", "2 Corinthians": "2corinthians",
-            "1 Thessalonians": "1thessalonians", "2 Thessalonians": "2thessalonians",
-            "1 Timothy": "1timothy", "2 Timothy": "2timothy",
-            "1 Peter": "1peter", "2 Peter": "2peter",
-            "1 John": "1john", "2 John": "2john", "3 John": "3john"
-        };
+    // Populate book dropdown
+    books.forEach(book => {
+        const option = document.createElement('option');
+        option.value = book;
+        option.textContent = book;
+        bibleBookSelect.appendChild(option);
+    });
 
-        // Try API first, fallback to local list if it fails
-        try {
-            const response = await fetch('https://bible-api.com/books');
-            if (!response.ok) throw new Error('API unreachable');
-            const data = await response.json();
-            data.forEach(book => {
-                const option = document.createElement('option');
-                option.value = book.id;
-                option.textContent = book.name;
-                bibleBookSelect.appendChild(option);
-            });
-            return; // Success!
-        } catch (error) {
-            console.warn('Bible API unavailable, using fallback list.');
-            // Use fallback list
-            fallbackBooks.forEach(bookName => {
-                const option = document.createElement('option');
-                // Use mapped ID or lowercase name
-                const id = bookIdMap[bookName] || bookName.toLowerCase().replace(/ /g, '');
-                option.value = id;
-                option.textContent = bookName;
-                bibleBookSelect.appendChild(option);
-            });
-            // Clear any error message
-            bibleResult.innerHTML = '<p><em>Select a book, chapter, and verse to see it here.</em></p>';
-        }
-    }
-
-    function getCurrentVersion() {
-        return bibleVersionSelect ? bibleVersionSelect.value : 'kjv';
-    }
+    // Populate version dropdown with all 9 versions
+    const versions = ["KJV", "NIV", "ESV", "NASB", "NKJV", "AMP", "ASV", "WEB", "YLT"];
+    versions.forEach(version => {
+        const option = document.createElement('option');
+        option.value = version;
+        option.textContent = version;
+        bibleVersionSelect.appendChild(option);
+    });
 
     // Book → Chapters
-    bibleBookSelect.addEventListener('change', async function() {
-        const bookId = this.value;
+    bibleBookSelect.addEventListener('change', function() {
+        const book = this.value;
         bibleChapterSelect.innerHTML = '<option value="">Select a chapter</option>';
         bibleVerseSelect.innerHTML = '<option value="">Select a verse</option>';
         bibleResult.innerHTML = '<p><em>Select a chapter and verse.</em></p>';
-        if (!bookId) return;
-        try {
-            const response = await fetch(`https://bible-api.com/${bookId}?verse_numbers=true`);
-            const data = await response.json();
-            const chapters = data.chapters || [];
-            for (let i = 1; i <= chapters.length; i++) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = `Chapter ${i}`;
-                bibleChapterSelect.appendChild(option);
-            }
-        } catch (error) {
-            console.error('Failed to load chapters:', error);
-            bibleResult.innerHTML = '<p style="color:red;">Failed to load chapters.</p>';
+        if (!book) return;
+        const chapters = book === "Psalms" ? 150 : book === "Isaiah" ? 66 : 21;
+        for (let i = 1; i <= chapters; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Chapter ${i}`;
+            bibleChapterSelect.appendChild(option);
         }
     });
 
     // Chapter → Verses
-    bibleChapterSelect.addEventListener('change', async function() {
-        const bookId = bibleBookSelect.value;
-        const chapter = this.value;
+    bibleChapterSelect.addEventListener('change', function() {
+        const chapter = parseInt(this.value);
         bibleVerseSelect.innerHTML = '<option value="">Select a verse</option>';
         bibleResult.innerHTML = '<p><em>Select a verse to see it here.</em></p>';
-        if (!bookId || !chapter) return;
-        try {
-            const response = await fetch(`https://bible-api.com/${bookId}+${chapter}?verse_numbers=true`);
-            const data = await response.json();
-            const verses = data.verses || [];
-            for (let i = 1; i <= verses.length; i++) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = `Verse ${i}`;
-                bibleVerseSelect.appendChild(option);
-            }
-        } catch (error) {
-            console.error('Failed to load verses:', error);
-            bibleResult.innerHTML = '<p style="color:red;">Failed to load verses.</p>';
+        if (!chapter) return;
+        const verses = chapter === 119 ? 176 : 30;
+        for (let i = 1; i <= verses; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Verse ${i}`;
+            bibleVerseSelect.appendChild(option);
         }
     });
 
-    // Verse → Display with selected translation
-    bibleVerseSelect.addEventListener('change', async function() {
-        const bookId = bibleBookSelect.value;
+    // Verse → Fetch from local database
+    bibleVerseSelect.addEventListener('change', function() {
+        const book = bibleBookSelect.value;
         const chapter = bibleChapterSelect.value;
         const verse = this.value;
-        const version = getCurrentVersion();
-        if (!bookId || !chapter || !verse) {
+        const version = bibleVersionSelect.value;
+        if (!book || !chapter || !verse) {
             bibleResult.innerHTML = '<p><em>Select a book, chapter, and verse.</em></p>';
             return;
         }
-        try {
-            const response = await fetch(`https://bible-api.com/${bookId}+${chapter}:${verse}?translation=${version}&verse_numbers=true`);
-            const data = await response.json();
-            const versionName = bibleVersionSelect.options[bibleVersionSelect.selectedIndex].text.split('(')[0].trim();
-            bibleResult.innerHTML = `
-                <div class="verse-display">
-                    <strong>${data.reference} (${versionName})</strong>
-                    <p>${data.text}</p>
-                </div>
-            `;
-        } catch (error) {
-            console.error('Failed to load verse:', error);
-            bibleResult.innerHTML = '<p style="color:red;">Failed to load verse.</p>';
-        }
+        fetch('/includes/bible_lookup.php?book=' + encodeURIComponent(book) + '&chapter=' + chapter + '&verse=' + verse + '&version=' + version)
+        .then(response => response.text())
+        .then(text => {
+            bibleResult.innerHTML = `<div class="verse-display"><strong>${book} ${chapter}:${verse} (${version})</strong><p>${text}</p></div>`;
+        })
+        .catch(error => {
+            bibleResult.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+        });
     });
 
-    // Translation change refreshes current verse
+    // Refresh verse when translation changes
     if (bibleVersionSelect) {
         bibleVersionSelect.addEventListener('change', function() {
-            const bookId = bibleBookSelect.value;
+            const book = bibleBookSelect.value;
             const chapter = bibleChapterSelect.value;
             const verse = bibleVerseSelect.value;
-            if (bookId && chapter && verse) {
+            if (book && chapter && verse) {
                 bibleVerseSelect.dispatchEvent(new Event('change'));
             }
         });
     }
-
-    // Load books on page load
-    loadBibleBooks();
 
     // ============================================================
     // 6. Navigation Active State (Highlight current page)
