@@ -2,9 +2,6 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-// We do NOT include header/footer here — we will include them at the top and bottom.
-// However, since header.php is dynamic and requires session, we include it below after potential logic.
-// For clarity, let's structure it with the header inclusion at the top.
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -22,7 +19,6 @@ require_once 'includes/auth.php';
             </div>
         </div>
         <div class="hero-image">
-            <!-- Replace with a real image of Angella or her book cover -->
             <div class="hero-placeholder">
                 <i class="fas fa-book-open"></i>
                 <span>Her Story Lives Here</span>
@@ -40,7 +36,6 @@ require_once 'includes/auth.php';
         </div>
         <div class="book-grid">
             <?php
-            // Fetch latest 3 books
             $stmt = $db->prepare("SELECT * FROM books ORDER BY created_at DESC LIMIT 3");
             $stmt->execute();
             $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -93,12 +88,15 @@ require_once 'includes/auth.php';
         </div>
         <div class="poem-grid">
             <?php
-            // Fetch latest 3 poems
             $stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 3");
             $stmt->execute();
             $poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (count($poems) > 0):
                 foreach ($poems as $poem):
+                    // Split the introduction into verse (first para) and purpose (second para)
+                    $intro_parts = explode("\n\n", $poem['intro'] ?? '');
+                    $verse = $intro_parts[0] ?? '';
+                    $purpose = $intro_parts[1] ?? '';
             ?>
             <div class="poem-card">
                 <?php if ($poem['image_path']): ?>
@@ -108,21 +106,28 @@ require_once 'includes/auth.php';
                 <?php endif; ?>
                 <div class="poem-content">
                     <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                    <?php if ($poem['intro']): ?>
-                        <p class="poem-intro-preview">
-                            <span class="intro-label">✧ Purpose</span>
-                            <?php echo htmlspecialchars(substr($poem['intro'], 0, 120)); ?>...
-                        </p>
+                    
+                    <!-- Verse inside the box -->
+                    <?php if ($verse): ?>
+                    <div class="poem-intro-preview">
+                        <span class="intro-label">✧ Verse</span>
+                        <p><?php echo htmlspecialchars(substr($verse, 0, 150)); ?><?php if (strlen($verse) > 150) echo '...'; ?></p>
+                    </div>
                     <?php endif; ?>
-                    <p class="poem-excerpt"><?php echo htmlspecialchars(substr($poem['intro'] ?: $poem['content'], 0, 120)); ?>...</p>
+
+                    <!-- Purpose outside the box -->
+                    <?php if ($purpose): ?>
+                    <p class="poem-excerpt"><?php echo htmlspecialchars(substr($purpose, 0, 120)); ?><?php if (strlen($purpose) > 120) echo '...'; ?></p>
+                    <?php endif; ?>
+
                     <a href="/poem_view.php?id=<?php echo $poem['id']; ?>" class="read-more">Read full poem →</a>
                 </div>
                 <?php if ($poem['audio_path']): ?>
-                    <div class="poem-audio">
-                        <audio controls>
-                            <source src="<?php echo $poem['audio_path']; ?>" type="audio/mpeg">
-                        </audio>
-                    </div>
+                <div class="poem-audio">
+                    <audio controls>
+                        <source src="<?php echo $poem['audio_path']; ?>" type="audio/mpeg">
+                    </audio>
+                </div>
                 <?php endif; ?>
             </div>
             <?php endforeach; else: ?>
@@ -137,17 +142,19 @@ require_once 'includes/auth.php';
 
 <!-- COMMUNITY & SESSION CALL TO ACTION -->
 <section class="cta-section section-padding" style="background: linear-gradient(135deg, #DBA1A2 0%, #EFD8D6 100%);">
-    <div class="container cta-content">
-        <div class="cta-text">
-            <h2>Need Guidance or a Listening Ear?</h2>
-            <p>Book a 1-on-1 live session with Angella. She is passionate about helping women discover their purpose and find healing through faith.</p>
-            <div class="cta-buttons">
-                <a href="/book_session.php" class="btn btn-white">Book a Session</a>
-                <a href="/community.php" class="btn btn-white-outline">Join Community Q&A</a>
+    <div class="container">
+        <div class="cta-content">
+            <div class="cta-text">
+                <h2>Need Guidance or a Listening Ear?</h2>
+                <p>Book a 1-on-1 live session with Angella. She is passionate about helping women discover their purpose and find healing through faith.</p>
+                <div class="cta-buttons">
+                    <a href="/book_session.php" class="btn btn-white">Book a Session</a>
+                    <a href="/community.php" class="btn btn-white-outline">Join Community Q&A</a>
+                </div>
             </div>
-        </div>
-        <div class="cta-image">
-            <i class="fas fa-hands-praying"></i>
+            <div class="cta-image">
+                <i class="fas fa-hands-praying"></i>
+            </div>
         </div>
     </div>
 </section>
@@ -161,29 +168,44 @@ require_once 'includes/auth.php';
         </div>
         <div class="blog-grid">
             <?php
-            // Fetch latest 3 blog posts (assuming there is a 'blog_posts' table)
-            // For now we'll use a placeholder query — adjust when you have the table.
-            // For demonstration, we'll use a direct query that could work if you had the table.
-            // If not, we'll show a placeholder.
-            /*
-            $stmt = $db->prepare("SELECT * FROM blog_posts ORDER BY created_at DESC LIMIT 3");
+            // Fetch latest 3 published blog posts
+            $stmt = $db->prepare("
+                SELECT * FROM blog_posts 
+                WHERE status = 'published' 
+                ORDER BY published_at DESC 
+                LIMIT 3
+            ");
             $stmt->execute();
             $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            */
-            // Placeholder data for now:
-            $posts = [];
             ?>
             <?php if (count($posts) > 0): ?>
                 <?php foreach ($posts as $post): ?>
                 <div class="blog-card">
-                    <h3><?php echo htmlspecialchars($post['title']); ?></h3>
-                    <p><?php echo htmlspecialchars(substr($post['content'], 0, 100)); ?>...</p>
-                    <a href="/blog_post.php?id=<?php echo $post['id']; ?>" class="read-more">Read full reflection →</a>
+                    <?php if ($post['featured_image']): ?>
+                        <div class="blog-thumbnail">
+                            <img src="<?php echo SITE_URL . '/' . $post['featured_image']; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                        </div>
+                    <?php endif; ?>
+                    <div class="blog-content">
+                        <div class="blog-meta">
+                            <span class="blog-category"><?php echo htmlspecialchars($post['category']); ?></span>
+                            <span class="blog-date"><?php echo date('M j, Y', strtotime($post['published_at'])); ?></span>
+                        </div>
+                        <h3><?php echo htmlspecialchars($post['title']); ?></h3>
+                        <?php if ($post['excerpt']): ?>
+                            <p class="blog-excerpt"><?php echo htmlspecialchars($post['excerpt']); ?></p>
+                        <?php else: ?>
+                            <p class="blog-excerpt"><?php echo htmlspecialchars(substr($post['content'], 0, 120)); ?>...</p>
+                        <?php endif; ?>
+                        <a href="/blog_post.php?slug=<?php echo $post['slug']; ?>" class="read-more">Read full reflection →</a>
+                    </div>
                 </div>
                 <?php endforeach; ?>
             <?php else: ?>
                 <div class="placeholder-card">
-                    <p>Coming soon — daily reflections and devotions from Angella.</p>
+                    <div class="placeholder-icon"><i class="fas fa-blog"></i></div>
+                    <h3>Coming Soon</h3>
+                    <p>Daily reflections and devotions from Angella will be available here soon.</p>
                     <a href="/blog.php" class="btn btn-outline">Visit Blog</a>
                 </div>
             <?php endif; ?>
@@ -287,5 +309,108 @@ require_once 'includes/auth.php';
     margin-top: auto;
     padding-top: 12px;
     border-top: 1px solid var(--border);
+}
+/* ===== BLOG CARDS ===== */
+.blog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.blog-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: all var(--transition);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+.blog-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+}
+
+.blog-thumbnail {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    background: var(--vanilla);
+}
+
+.blog-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+
+.blog-card:hover .blog-thumbnail img {
+    transform: scale(1.05);
+}
+
+.blog-content {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.blog-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.blog-category {
+    background: var(--vanilla);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.blog-content h3 {
+    font-size: 1.15rem;
+    margin-bottom: 6px;
+}
+
+.blog-excerpt {
+    color: var(--text-light);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 12px;
+    flex: 1;
+}
+
+.placeholder-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    grid-column: 1 / -1;
+}
+
+.placeholder-icon {
+    font-size: 2.5rem;
+    color: var(--rose);
+    margin-bottom: 12px;
+}
+
+.placeholder-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+}
+
+.placeholder-card p {
+    color: var(--text-light);
+    margin-bottom: 16px;
 }
 </style>
