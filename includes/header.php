@@ -59,6 +59,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                         <li class="nav-separator">|</li>
                         <li><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                     <?php else: ?>
+                        <!-- Reader menu -->
                         <li><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>">Home</a></li>
                         <li><a href="<?php echo SITE_URL; ?>/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
                         <li><a href="<?php echo SITE_URL; ?>/library.php" class="<?php echo $currentPage === 'library.php' ? 'active' : ''; ?>"><i class="fas fa-book-reader"></i> My Library</a></li>
@@ -74,10 +75,10 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 
                 <!-- Right-side actions -->
                 <div class="nav-actions">
-                    <!-- Bible quick access -->
-                    <button class="bible-toggle" id="bibleToggle" aria-label="Open Bible">
+                    <!-- Bible quick access - NOW A LINK TO THE FULL READER -->
+                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="bible-toggle" aria-label="Open Bible">
                         <i class="fas fa-book-bible"></i>
-                    </button>
+                    </a>
                     
                     <!-- Theme toggle -->
                     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
@@ -97,58 +98,6 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <!-- Overlay for hamburger menu (closes when clicked outside) -->
         <div class="menu-overlay" id="menuOverlay"></div>
     </header>
-
-    <!-- ===== NEW BIBLE MODAL (Table of Contents + Multiple Translations) ===== -->
-    <div class="bible-modal" id="bibleModal">
-        <div class="bible-modal-content">
-            <button class="bible-close" id="bibleClose"><i class="fas fa-times"></i></button>
-            <h3><i class="fas fa-book-bible"></i> KJV Bible</h3>
-            
-            <div class="bible-controls">
-                <div class="bible-select-group">
-                    <label for="bibleBook">Book</label>
-                    <select id="bibleBook">
-                        <option value="">Select a book</option>
-                    </select>
-                </div>
-                
-                <div class="bible-select-group">
-                    <label for="bibleChapter">Chapter</label>
-                    <select id="bibleChapter">
-                        <option value="">Select a chapter</option>
-                    </select>
-                </div>
-                
-                <div class="bible-select-group">
-                    <label for="bibleVerse">Verse</label>
-                    <select id="bibleVerse">
-                        <option value="">Select a verse</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Translation Version Dropdown -->
-            <div class="bible-version-group">
-                <label for="bibleVersion">Translation</label>
-                <select id="bibleVersion">
-                    <option value="kjv">King James Version (KJV)</option>
-                    <option value="esv">English Standard Version (ESV)</option>
-                    <option value="niv">New International Version (NIV)</option>
-                    <option value="nlt">New Living Translation (NLT)</option>
-                    <option value="nasb">New American Standard Bible (NASB)</option>
-                    <option value="csb">Christian Standard Bible (CSB)</option>
-                    <option value="ylt">Young's Literal Translation (YLT)</option>
-                </select>
-            </div>
-
-            <!-- Verse Display -->
-            <div id="bibleResult" class="bible-result">
-                <p><em>Select a book, chapter, and verse to see it here.</em></p>
-            </div>
-
-            <p class="bible-disclaimer">via bible-api.com — multiple translations available</p>
-        </div>
-    </div>
 
     <!-- Start of main content wrapper -->
     <main class="site-main">
