@@ -101,3 +101,28 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 
     <!-- Start of main content wrapper -->
     <main class="site-main">
+        <style>
+            /* ===== FIX FOR HEADER OVERLAP ===== */
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.nav-actions .bible-toggle {
+    color: var(--text);
+    transition: color var(--transition);
+}
+
+.nav-actions .bible-toggle:hover {
+    color: var(--rose);
+}
+
+@media (max-width: 480px) {
+    .nav-actions {
+        gap: 6px;
+    }
+}
+        </style>

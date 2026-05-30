@@ -3,7 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
-$pageTitle = 'KJV Bible Reader';
+$pageTitle = 'Bible Reader';
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -11,21 +11,22 @@ $pageTitle = 'KJV Bible Reader';
     <div class="container">
         <div class="page-header">
             <h1>📖 Bible Reader</h1>
-            <p>Read, copy, compare, and highlight — all in one place.</p>
+            <p>Read, copy, compare, and highlight — all in one place, completely free.</p>
         </div>
 
         <!-- Version Selector -->
         <div class="version-selector">
             <label for="bibleVersion">Choose Translation:</label>
             <select id="bibleVersion">
-                <option value="KJV">King James Version (KJV)</option>
-                <option value="NIV">New International Version (NIV)</option>
-                <option value="ESV">English Standard Version (ESV)</option>
-                <option value="NASB">New American Standard Bible (NASB)</option>
-                <option value="NKJV">New King James Version (NKJV)</option>
-                <option value="AMP">Amplified Bible (AMP)</option>
-                <option value="ASV">American Standard Version (ASV)</option>
-                <option value="WEB">World English Bible (WEB)</option>
+                <option value="1">King James Version (KJV)</option>
+                <option value="111">New International Version (NIV)</option>
+                <option value="59">English Standard Version (ESV)</option>
+                <option value="100">New American Standard Bible (NASB)</option>
+                <option value="114">New King James Version (NKJV)</option>
+                <option value="158">Amplified Bible (AMP)</option>
+                <option value="10">American Standard Version (ASV)</option>
+                <option value="206">World English Bible (WEB)</option>
+                <option value="16">Young's Literal Translation (YLT)</option>
             </select>
         </div>
 
@@ -35,11 +36,11 @@ $pageTitle = 'KJV Bible Reader';
             <button id="goToVerseBtn" class="btn btn-primary">Go</button>
         </div>
 
-        <!-- Bible Reader Iframe -->
+        <!-- Bible Reader Iframe (Bible.com - Non-profit, ad-free) -->
         <div class="bible-iframe-wrapper">
             <iframe 
                 id="bibleIframe" 
-                src="https://www.biblegateway.com/passage/?search=John+3&version=KJV" 
+                src="https://www.bible.com/bible/1/john.3.16" 
                 width="100%" 
                 height="700px" 
                 frameborder="0" 
@@ -59,10 +60,19 @@ $pageTitle = 'KJV Bible Reader';
 
         // Function to update the iframe
         function updateBible() {
-            const version = versionSelect.value;
-            const query = verseInput.value.trim() || 'John 3:16';
-            const encodedQuery = encodeURIComponent(query);
-            bibleIframe.src = `https://www.biblegateway.com/passage/?search=${encodedQuery}&version=${version}`;
+            const versionId = versionSelect.value;
+            let query = verseInput.value.trim();
+            
+            // If empty, default to John 3:16
+            if (!query) {
+                query = 'John 3:16';
+                verseInput.value = query;
+            }
+
+            // Format the query for Bible.com (replace spaces with dots)
+            const formattedQuery = query.replace(/\s+/g, '.').replace(/:/g, '.');
+            
+            bibleIframe.src = `https://www.bible.com/bible/${versionId}/${formattedQuery}`;
         }
 
         // Event Listeners
@@ -143,6 +153,20 @@ $pageTitle = 'KJV Bible Reader';
     .bible-iframe-wrapper {
         max-width: 1000px;
         margin: 0 auto;
+    }
+
+    /* FIX: Prevent header buttons from overlapping */
+    .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .nav-actions .bible-toggle {
+        margin-right: 4px;
+    }
+    .nav-actions .btn-logout {
+        margin-left: 4px;
     }
 </style>
 
