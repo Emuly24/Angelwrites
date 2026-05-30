@@ -8,56 +8,88 @@ redirectIfNotAdmin();
 $error = '';
 $success = '';
 
-/// ===== HANDLE DELETE =====
+// ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     
     try {
-        // Start a transaction to ensure everything is deleted cleanly
         $db->beginTransaction();
         
-        // First, get the poem data
+        // 1. Get the poem data
         $stmt = $db->prepare("SELECT image_path, audio_path FROM poems WHERE id = ?");
         $stmt->execute([$id]);
         $poem = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($poem) {
-            // Delete image file if exists - with error suppression
-            if (!empty($poem['image_path']) && file_exists('../' . $poem['image_path'])) {
-                @unlink('../' . $poem['image_path']); // @ suppresses warnings
-            }
-            
-            // Delete audio file if exists - with error suppression
-            if (!empty($poem['audio_path']) && file_exists('../' . $poem['audio_path'])) {
-                @unlink('../' . $poem['audio_path']); // @ suppresses warnings
-            }
-            
-            // Delete related entries in poem_status first (if any)
-            $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?");
-            $stmt->execute([$id]);
-            
-            // Delete related reviews (if any)
-            $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?");
-            $stmt->execute([$id]);
-            
-            // Now delete the poem itself
-            $stmt = $db->prepare("DELETE FROM poems WHERE id = ?");
-            $stmt->execute([$id]);
-            
-            // Commit the transaction
-            $db->commit();
-            
-            $success = 'Poem deleted successfully.';
-        } else {
+        if (!$poem) {
             $error = 'Poem not found.';
+            $db->rollBack();
+            header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+            exit;
         }
+        
+        // 2. Delete files with explicit path verification
+        $deleted_files = [];
+        $failed_files = [];
+        
+        $base_path = __DIR__ . '/../'; // This gets us to the root of 'htdocs'
+        
+        // Delete image
+        if (!empty($poem['image_path'])) {
+            $full_image_path = $base_path . $poem['image_path'];
+            if (file_exists($full_image_path)) {
+                if (@unlink($full_image_path)) {
+                    $deleted_files[] = 'Image: ' . basename($poem['image_path']);
+                } else {
+                    $failed_files[] = 'Image: ' . basename($poem['image_path']);
+                }
+            } else {
+                $failed_files[] = 'Image: ' . basename($poem['image_path']) . ' (file not found)';
+            }
+        }
+        
+        // Delete audio
+        if (!empty($poem['audio_path'])) {
+            $full_audio_path = $base_path . $poem['audio_path'];
+            if (file_exists($full_audio_path)) {
+                if (@unlink($full_audio_path)) {
+                    $deleted_files[] = 'Audio: ' . basename($poem['audio_path']);
+                } else {
+                    $failed_files[] = 'Audio: ' . basename($poem['audio_path']);
+                }
+            } else {
+                $failed_files[] = 'Audio: ' . basename($poem['audio_path']) . ' (file not found)';
+            }
+        }
+        
+        // 3. Delete foreign key records
+        $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?");
+        $stmt->execute([$id]);
+        
+        $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?");
+        $stmt->execute([$id]);
+        
+        // 4. Delete the poem from the database
+        $stmt = $db->prepare("DELETE FROM poems WHERE id = ?");
+        $stmt->execute([$id]);
+        
+        $db->commit();
+        
+        // 5. Build a detailed success message
+        $msg_parts = [];
+        $msg_parts[] = '✅ Poem deleted from database.';
+        if (!empty($deleted_files)) {
+            $msg_parts[] = '🗑️ Removed: ' . implode(', ', $deleted_files);
+        }
+        if (!empty($failed_files)) {
+            $msg_parts[] = '⚠️ Could not remove: ' . implode(', ', $failed_files);
+        }
+        $success = implode('<br>', $msg_parts);
+        
     } catch (PDOException $e) {
-        // Roll back the transaction if anything went wrong
         $db->rollBack();
         $error = 'Database error: ' . $e->getMessage();
     }
     
-    // Redirect after handling
     header('Location: ' . SITE_URL . '/admin/manage_poems.php');
     exit;
 }
