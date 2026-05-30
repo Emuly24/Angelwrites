@@ -60,7 +60,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
             </div>
         </header>
 
-        <!-- Poem Image -->
+        <!-- Poem Image – ALWAYS at the top, before introduction -->
         <?php if ($poem['image_path']): ?>
             <div class="poem-image-container">
                 <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" 
@@ -92,7 +92,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
             </div>
         <?php endif; ?>
 
-        <!-- Poem Content -->
+        <!-- Poem Content – Centered with beautiful spacing -->
         <div class="poem-content-section">
             <div class="poem-body">
                 <?php echo $poem['content']; ?>
@@ -213,6 +213,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 
 <!-- ===== STYLES ===== -->
 <style>
+/* ===== POEM VIEW PAGE ===== */
 .poem-view-page {
     padding: 32px 0 60px;
 }
@@ -232,9 +233,10 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     margin-right: 6px;
 }
 
+/* ===== HEADER ===== */
 .poem-header {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
 }
 .poem-header h1 {
     font-family: 'Playfair Display', serif;
@@ -256,7 +258,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 
 /* ===== POEM IMAGE ===== */
 .poem-image-container {
-    margin: 0 auto 24px;
+    margin: 0 auto 32px;
     max-width: 700px;
     text-align: center;
 }
@@ -269,11 +271,13 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     box-shadow: var(--shadow-hover);
 }
 
+/* ===== AUDIO ===== */
 .poem-audio-player {
+    max-width: 700px;
+    margin: 0 auto 24px;
     background: var(--vanilla);
     border-radius: 12px;
     padding: 20px 24px;
-    margin-bottom: 24px;
     border: 1px solid var(--border);
 }
 .audio-label {
@@ -293,12 +297,14 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     border-radius: 8px;
 }
 
+/* ===== PURPOSE / INTRODUCTION ===== */
 .poem-intro-section {
+    max-width: 700px;
+    margin: 0 auto 32px;
     background: var(--fantasy);
     border-left: 4px solid var(--rose);
     border-radius: 0 12px 12px 0;
     padding: 20px 24px;
-    margin-bottom: 24px;
 }
 .intro-label {
     font-size: 0.7rem;
@@ -315,31 +321,182 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     line-height: 1.8;
 }
 
+/* ===== POEM BODY – BEAUTIFULLY SPACED & CENTERED ===== */
 .poem-content-section {
-    margin-bottom: 40px;
-}
-.poem-body {
-    font-family: 'Georgia', 'Times New Roman', serif;
-    font-size: 1.1rem;
-    line-height: 2;
-    color: var(--text);
-    padding: 4px 0;
     max-width: 700px;
     margin: 0 auto;
 }
+.poem-body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 1.15rem;
+    line-height: 2.4;
+    color: var(--text);
+    text-align: center;
+    padding: 8px 0;
+}
 .poem-body p {
-    margin-bottom: 12px;
+    margin-bottom: 24px;
+}
+.poem-body p:last-child {
+    margin-bottom: 0;
+}
+.poem-body br {
+    display: block;
+    content: "";
+    margin: 12px 0;
+}
+.poem-body .wp-block-paragraph {
+    margin-bottom: 24px;
 }
 .poem-body img {
     max-width: 100%;
     height: auto;
-    margin: 8px 0;
+    margin: 16px auto;
+    display: block;
+    border-radius: 8px;
 }
-.poem-body .wp-block-paragraph {
-    margin-bottom: 12px;
+.poem-body em {
+    font-style: italic;
+}
+.poem-body strong {
+    font-weight: 700;
 }
 
+/* ===== REVIEWS ===== */
+.reviews-section {
+    max-width: 700px;
+    margin: 48px auto 0;
+}
+.reviews-section h3 {
+    font-size: 1.4rem;
+    margin-bottom: 16px;
+}
+.rating-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.rating-stars {
+    display: flex;
+    gap: 2px;
+}
+.rating-stars .filled {
+    color: #f1c40f;
+}
+.rating-stars .empty {
+    color: #ddd;
+}
+.rating-score {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+.rating-count {
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+.review-form-container {
+    background: var(--vanilla);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+.review-form-container h4 {
+    margin-bottom: 12px;
+}
+.star-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.stars {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 2px;
+}
+.stars input {
+    display: none;
+}
+.stars label {
+    font-size: 1.4rem;
+    color: #ddd;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+.stars label:hover,
+.stars label:hover ~ label {
+    color: #f1c40f;
+}
+.stars input:checked ~ label {
+    color: #f1c40f;
+}
+.review-form textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    resize: vertical;
+    min-height: 60px;
+    background: var(--input-bg);
+    color: var(--text);
+}
+.review-form textarea:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+.review-form .btn {
+    margin-top: 8px;
+}
+.reviews-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.review-item {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+}
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.review-author {
+    font-weight: 600;
+}
+.review-author i {
+    margin-right: 4px;
+    color: var(--rose);
+}
+.review-date {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+.review-rating {
+    margin-bottom: 6px;
+}
+.review-rating .filled {
+    color: #f1c40f;
+}
+.review-rating .empty {
+    color: #ddd;
+}
+.review-comment {
+    line-height: 1.6;
+    color: var(--text);
+}
+
+/* ===== FOOTER ACTIONS ===== */
 .poem-footer-actions {
+    max-width: 700px;
+    margin: 32px auto 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -347,10 +504,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     gap: 16px;
     padding-top: 24px;
     border-top: 1px solid var(--border);
-    max-width: 700px;
-    margin: 0 auto;
 }
-
 .share-section {
     display: flex;
     align-items: center;
@@ -381,6 +535,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     font-size: 0.85rem;
 }
 
+/* ===== RESPONSIVE ===== */
 @media (max-width: 480px) {
     .poem-header h1 {
         font-size: 1.8rem;
@@ -396,7 +551,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     }
     .poem-body {
         font-size: 1rem;
-        line-height: 1.8;
+        line-height: 2;
     }
 }
 </style>

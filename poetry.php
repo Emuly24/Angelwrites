@@ -24,40 +24,22 @@ $pageTitle = 'Poetry';
             <div class="poems-grid">
                 <?php foreach ($poems as $poem): ?>
                     <div class="poem-card">
-                        <div class="poem-card-content">
-                            <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                            
-                            <!-- Introduction preview -->
-                            <?php if ($poem['intro']): ?>
-                                <div class="poem-intro-preview">
-                                    <span class="intro-label">✧ Purpose</span>
-                                    <p><?php echo htmlspecialchars(substr($poem['intro'], 0, 120)); ?><?php if (strlen($poem['intro']) > 120) echo '...'; ?></p>
-                                </div>
-                            <?php endif; ?>
-
-                            <!-- Content preview (only if no intro) -->
-                            <?php if (!$poem['intro'] && $poem['content']): ?>
-                                <div class="poem-content-preview">
-                                    <p><?php echo htmlspecialchars(substr($poem['content'], 0, 120)); ?><?php if (strlen($poem['content']) > 120) echo '...'; ?></p>
-                                </div>
-                            <?php endif; ?>
-
-                            <!-- Audio indicator -->
-                            <?php if ($poem['audio_path']): ?>
-                                <div class="poem-audio-indicator">
-                                    <i class="fas fa-headphones"></i>
-                                    <span>Audio available</span>
-                                </div>
-                            <?php endif; ?>
-
-                            <div class="poem-card-footer">
-                                <span class="poem-date"><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></span>
-                                <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">
-                                    <i class="fas fa-feather-alt"></i> Read Poem
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+    <?php if ($poem['image_path']): ?>
+        <div class="poem-thumbnail">
+            <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
+        </div>
+    <?php endif; ?>
+    <div class="poem-card-content">
+        <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
+        <?php if ($poem['intro']): ?>
+            <div class="poem-intro-preview">
+                <span class="intro-label">✧ Purpose</span>
+                <p><?php echo htmlspecialchars(substr($poem['intro'], 0, 120)); ?></p>
+            </div>
+        <?php endif; ?>
+        <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="read-more">Read Poem →</a>
+    </div>
+</div>
                 <?php endforeach; ?>
             </div>
         <?php else: ?>
@@ -193,6 +175,21 @@ $pageTitle = 'Poetry';
     .poems-grid {
         grid-template-columns: 1fr;
     }
+}
+.poem-thumbnail {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    border-radius: 12px 12px 0 0;
+}
+.poem-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+.poem-card:hover .poem-thumbnail img {
+    transform: scale(1.05);
 }
 </style>
 

@@ -52,12 +52,15 @@ if (isset($_GET['delete'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_poem'])) {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
-    $content = trim($_POST['content']); // TinyMCE content
+    $content = trim($_POST['content']);
     
     if (empty($title) || empty($content)) {
         $error = 'Title and content are required.';
     } else {
         $image_path = '';
+        $audio_path = '';
+        
+        // Handle image upload
         if (!empty($_FILES['image']['name'])) {
             $upload_dir = '../assets/uploads/poems/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -67,8 +70,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_poem'])) {
             }
         }
         
-        $stmt = $db->prepare("INSERT INTO poems (title, intro, content, image_path) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$title, $intro, $content, $image_path]);
+        // Handle audio upload
+        if (!empty($_FILES['audio']['name'])) {
+            $upload_dir = '../assets/uploads/audio/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $audio_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['audio']['name']);
+            if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $audio_filename)) {
+                $audio_path = 'assets/uploads/audio/' . $audio_filename;
+            }
+        }
+        
+        $stmt = $db->prepare("INSERT INTO poems (title, intro, content, image_path, audio_path) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$title, $intro, $content, $image_path, $audio_path]);
         $success = 'Poem added successfully!';
         header('Location: ' . SITE_URL . '/admin/manage_poems.php');
         exit;
@@ -123,10 +136,10 @@ $pageTitle = 'Manage Poems';
                     </div>
                     <div class="form-group">
                         <label for="modal_content">Content <span class="required">*</span></label>
-                        <textarea id="editor" name="content" rows="12"></textarea> <!-- The Note Editor -->
+                        <textarea id="editor" name="content" rows="12"></textarea>
                     </div>
                     
-                    <!-- DRAG & DROP IMAGE ZONE -->
+                    <!-- ===== DRAG & DROP IMAGE ZONE ===== -->
                     <div class="form-group">
                         <label>Poem Image (Drag & Drop or Click to Choose)</label>
                         <div id="dropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
@@ -135,6 +148,21 @@ $pageTitle = 'Manage Poems';
                             <input type="file" id="fileInput" name="image" accept="image/*" style="display: none;">
                             <div id="previewContainer" style="display: none; margin-top: 12px;">
                                 <img id="previewImage" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ===== AUDIO UPLOAD ZONE ===== -->
+                    <div class="form-group">
+                        <label>Poem Audio (MP3 or WAV) – optional</label>
+                        <div id="audioDropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                            <i class="fas fa-music" style="font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block;"></i>
+                            <p style="margin: 0; color: var(--text-light);">Click to upload an audio file (MP3, WAV)</p>
+                            <input type="file" id="audioInput" name="audio" accept="audio/*" style="display: none;">
+                            <div id="audioPreviewContainer" style="display: none; margin-top: 12px;">
+                                <audio controls id="audioPreview" style="width: 100%;">
+                                    <source src="" type="audio/mpeg">
+                                </audio>
                             </div>
                         </div>
                     </div>
@@ -161,6 +189,7 @@ $pageTitle = 'Manage Poems';
                                     <th>Image</th>
                                     <th>Title</th>
                                     <th>Introduction</th>
+                                    <th>Audio</th>
                                     <th>Views</th>
                                     <th>Actions</th>
                                 </tr>
@@ -186,6 +215,14 @@ $pageTitle = 'Manage Poems';
                                                 <span class="intro-preview"><?php echo htmlspecialchars(substr($poem['intro'], 0, 60)); ?>...</span>
                                             <?php else: ?>
                                                 <span class="text-muted">No introduction</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($poem['audio_path']): ?>
+                                                <i class="fas fa-music" style="color: var(--rose);"></i>
+                                                <span class="audio-label">Yes</span>
+                                            <?php else: ?>
+                                                <span class="text-muted">No</span>
                                             <?php endif; ?>
                                         </td>
                                         <td><?php echo number_format($poem['view_count'] ?? 0); ?></td>
@@ -227,10 +264,14 @@ $pageTitle = 'Manage Poems';
         const fileInput = document.getElementById('fileInput');
         const previewContainer = document.getElementById('previewContainer');
         const previewImage = document.getElementById('previewImage');
+        const audioDropZone = document.getElementById('audioDropZone');
+        const audioInput = document.getElementById('audioInput');
+        const audioPreviewContainer = document.getElementById('audioPreviewContainer');
+        const audioPreview = document.getElementById('audioPreview');
 
         showModalBtn.addEventListener('click', function() {
             modal.style.display = 'flex';
-            initTinyMCE(); // Initialize the editor when modal opens
+            initTinyMCE();
         });
 
         closeButtons.forEach(function(btn) {
@@ -245,10 +286,9 @@ $pageTitle = 'Manage Poems';
             }
         });
 
-        // ===== TINYMCE INIT =====
+        // ===== TINYMCE =====
         function initTinyMCE() {
             if (editorInitialized) return;
-            
             tinymce.init({
                 selector: '#editor',
                 height: 400,
@@ -259,47 +299,37 @@ $pageTitle = 'Manage Poems';
                 forced_root_block: 'p',
                 setup: function(editor) {
                     editor.on('change', function () {
-                        tinymce.triggerSave(); // Ensure data is saved to textarea for form submission
+                        tinymce.triggerSave();
                     });
                 }
             });
             editorInitialized = true;
         }
 
-        // ===== DRAG & DROP =====
+        // ===== IMAGE DRAG & DROP =====
         dropZone.addEventListener('click', function() {
             fileInput.click();
         });
-
         fileInput.addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
         });
-
         dropZone.addEventListener('dragover', function(e) {
             e.preventDefault();
             dropZone.style.borderColor = 'var(--rose)';
             dropZone.style.background = 'rgba(219, 161, 162, 0.1)';
         });
-
         dropZone.addEventListener('dragleave', function(e) {
             e.preventDefault();
             dropZone.style.borderColor = 'var(--border)';
             dropZone.style.background = 'transparent';
         });
-
         dropZone.addEventListener('drop', function(e) {
             e.preventDefault();
             dropZone.style.borderColor = 'var(--border)';
             dropZone.style.background = 'transparent';
-            
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
+            if (files.length > 0) handleFile(files[0]);
         });
-
         function handleFile(file) {
             if (!file.type.startsWith('image/')) {
                 alert('Please drop an image file.');
@@ -314,6 +344,43 @@ $pageTitle = 'Manage Poems';
                 fileInput.files = dataTransfer.files;
             };
             reader.readAsDataURL(file);
+        }
+
+        // ===== AUDIO DRAG & DROP =====
+        audioDropZone.addEventListener('click', function() {
+            audioInput.click();
+        });
+        audioInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) handleAudio(e.target.files[0]);
+        });
+        audioDropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            audioDropZone.style.borderColor = 'var(--rose)';
+            audioDropZone.style.background = 'rgba(219, 161, 162, 0.1)';
+        });
+        audioDropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            audioDropZone.style.borderColor = 'var(--border)';
+            audioDropZone.style.background = 'transparent';
+        });
+        audioDropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            audioDropZone.style.borderColor = 'var(--border)';
+            audioDropZone.style.background = 'transparent';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleAudio(files[0]);
+        });
+        function handleAudio(file) {
+            if (!file.type.startsWith('audio/')) {
+                alert('Please drop an audio file.');
+                return;
+            }
+            const url = URL.createObjectURL(file);
+            audioPreview.src = url;
+            audioPreviewContainer.style.display = 'block';
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            audioInput.files = dataTransfer.files;
         }
     });
 </script>
