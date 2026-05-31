@@ -547,7 +547,7 @@ $pageTitle = 'Bible Reader';
 
         function getVerseText(version, book, chapter, verse) {
             return fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&verse=${verse}&version=${version}`)
-                .then(response => response.text())
+                .then(response => response.json())
                 .then(text => {
                     if (text.includes('not found') || text.includes('Database error')) {
                         return `[${version} ${book} ${chapter}:${verse} not found]`;
