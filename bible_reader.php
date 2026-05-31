@@ -285,13 +285,13 @@ $pageTitle = 'Bible Reader';
     }
 
     .verse-content {
-        font-family: 'Georgia', serif;
-        font-size: 1.1rem;
-        line-height: 1.9;
-        color: var(--text);
-        min-height: 200px;
-        text-align: justify; /* Justified text */
-    }
+    font-family: 'Georgia', serif;
+    font-size: 1.1rem;
+    line-height: 1.9;
+    color: var(--text);
+    min-height: 200px;
+    text-align: justify; /* Justified text */
+}
 
     .verse-content p {
         margin-bottom: 12px;
@@ -546,16 +546,20 @@ $pageTitle = 'Bible Reader';
         }
 
         function getVerseText(version, book, chapter, verse) {
-            return fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&verse=${verse}&version=${version}`)
-                .then(response => response.text())
-                .then(text => {
-                    if (text.includes('not found') || text.includes('Database error')) {
-                        return `[${version} ${book} ${chapter}:${verse} not found]`;
-                    }
-                    return text;
-                });
-        }
-
+    return fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&verse=${verse}&version=${version}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data && data.data.length > 0) {
+                return data.data[0].text;
+            } else {
+                return `[${version} ${book} ${chapter}:${verse} not found]`;
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            return `[Error loading verse]`;
+        });
+}
         function renderVerse() {
             const book = state.book;
             const chapter = state.chapter;
