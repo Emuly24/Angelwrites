@@ -70,19 +70,21 @@ $pageTitle = 'Bible Reader';
                 <label for="verseSelect">Verse</label>
                 <select id="verseSelect"></select>
             </div>
-            <div class="control-group">
-                <button id="prevChapterBtn" class="btn btn-secondary btn-sm">◀ Prev Chapter</button>
-                <button id="nextChapterBtn" class="btn btn-secondary btn-sm">Next Chapter ▶</button>
+
+            <!-- Action Buttons with descriptions -->
+            <div class="control-group action-group">
+                <button id="prevChapterBtn" class="btn btn-secondary btn-sm" title="Previous Chapter">◀ Prev</button>
+                <button id="nextChapterBtn" class="btn btn-secondary btn-sm" title="Next Chapter">Next ▶</button>
             </div>
-            <div class="control-group">
-                <input type="text" id="goToInput" placeholder="e.g. John 3:16" value="John 3:16">
+            <div class="control-group action-group">
                 <button id="goToBtn" class="btn btn-primary btn-sm">Go</button>
+                <input type="text" id="goToInput" placeholder="e.g. John 3:16" value="John 3:16">
             </div>
-            <div class="control-group">
-                <button id="copyBtn" class="btn btn-secondary btn-sm">📋 Copy</button>
-                <button id="highlightBtn" class="btn btn-secondary btn-sm">✨ Highlight</button>
-                <button id="notesBtn" class="btn btn-secondary btn-sm">📝 Notes</button>
-                <button id="readerThemeToggle" class="btn btn-secondary btn-sm">🌓 Theme</button>
+            <div class="control-group action-group">
+                <button id="copyBtn" class="btn btn-secondary btn-sm" title="Copy this verse">📋 Copy</button>
+                <button id="highlightBtn" class="btn btn-secondary btn-sm" title="Toggle highlight for this verse">🖌️ Highlight</button>
+                <button id="notesBtn" class="btn btn-secondary btn-sm" title="Add a note to this verse">📝 Notes</button>
+                <button id="readerThemeToggle" class="btn btn-secondary btn-sm" title="Toggle light/dark theme">🌓 Theme</button>
             </div>
         </div>
 
@@ -143,6 +145,7 @@ $pageTitle = 'Bible Reader';
     .page-header h1 {
         font-size: 2.2rem;
         margin-bottom: 4px;
+        color: var(--dark);
     }
     .page-header p {
         color: var(--text-light);
@@ -172,6 +175,8 @@ $pageTitle = 'Bible Reader';
         font-size: 0.8rem;
         font-weight: 600;
         color: var(--text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     .control-group select,
     .control-group input {
@@ -188,9 +193,23 @@ $pageTitle = 'Bible Reader';
         border-color: var(--rose);
         box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
     }
-    .control-group .btn-sm {
-        padding: 6px 12px;
-        font-size: 0.8rem;
+
+    /* Action buttons group */
+    .action-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        flex-direction: row;
+        min-width: auto;
+    }
+    .action-group .btn-sm {
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
     }
 
     .toggle-group {
@@ -240,7 +259,7 @@ $pageTitle = 'Bible Reader';
         background: var(--card-bg);
         border-radius: 12px;
         padding: 24px;
-        border: 1px solid var(--border);
+        border: 2px solid var(--rose); /* Brand color border */
         box-shadow: var(--shadow);
         min-height: 400px;
     }
@@ -271,6 +290,7 @@ $pageTitle = 'Bible Reader';
         line-height: 1.9;
         color: var(--text);
         min-height: 200px;
+        text-align: justify; /* Justified text */
     }
 
     .verse-content p {
@@ -652,7 +672,6 @@ $pageTitle = 'Bible Reader';
                 const book = match[1].trim();
                 const chapter = parseInt(match[2], 10);
                 const verse = parseInt(match[3], 10);
-                // Find the closest book name
                 let found = BOOKS.find(b => b.toLowerCase() === book.toLowerCase());
                 if (!found) {
                     found = BOOKS.find(b => b.toLowerCase().includes(book.toLowerCase()));
@@ -672,17 +691,14 @@ $pageTitle = 'Bible Reader';
 
         // ===== EVENT LISTENERS =====
 
-        // Initialize
         populateBooks();
         populateChapters();
         populateVerses();
         loadVerse();
 
-        // Apply reader theme
         document.getElementById('bibleReader').setAttribute('data-theme', state.readerTheme);
         readerThemeToggle.textContent = state.readerTheme === 'light' ? '🌓 Theme' : '☀️ Theme';
 
-        // Book change
         bookSelect.addEventListener('change', function() {
             state.book = this.value;
             state.chapter = 1;
@@ -692,7 +708,6 @@ $pageTitle = 'Bible Reader';
             loadVerse();
         });
 
-        // Chapter change
         chapterSelect.addEventListener('change', function() {
             state.chapter = parseInt(this.value, 10);
             state.verse = 1;
@@ -700,32 +715,27 @@ $pageTitle = 'Bible Reader';
             loadVerse();
         });
 
-        // Verse change
         verseSelect.addEventListener('change', function() {
             state.verse = parseInt(this.value, 10);
             loadVerse();
         });
 
-        // Version 1 change
         version1Select.addEventListener('change', function() {
             state.version1 = this.value;
             loadVerse();
         });
 
-        // Version 2 change
         version2Select.addEventListener('change', function() {
             state.version2 = this.value;
             if (state.parallel) loadVerse();
         });
 
-        // Parallel toggle
         parallelToggle.addEventListener('change', function() {
             state.parallel = this.checked;
             version2Group.style.display = state.parallel ? 'block' : 'none';
             loadVerse();
         });
 
-        // Prev / Next chapter
         function prevChapter() {
             const book = state.book;
             const chapter = state.chapter;
@@ -735,7 +745,6 @@ $pageTitle = 'Bible Reader';
                 populateVerses();
                 loadVerse();
             } else {
-                // Go to previous book
                 const idx = BOOKS.indexOf(book);
                 if (idx > 0) {
                     state.book = BOOKS[idx - 1];
@@ -758,7 +767,6 @@ $pageTitle = 'Bible Reader';
                 populateVerses();
                 loadVerse();
             } else {
-                // Go to next book
                 const idx = BOOKS.indexOf(book);
                 if (idx < BOOKS.length - 1) {
                     state.book = BOOKS[idx + 1];
@@ -776,7 +784,6 @@ $pageTitle = 'Bible Reader';
         prevBtn2.addEventListener('click', prevChapter);
         nextBtn2.addEventListener('click', nextChapter);
 
-        // Go to
         goToBtn.addEventListener('click', function() {
             goToVerse(goToInput.value);
         });
@@ -784,13 +791,8 @@ $pageTitle = 'Bible Reader';
             if (e.key === 'Enter') goToVerse(goToInput.value);
         });
 
-        // Copy
         copyBtn.addEventListener('click', copyVerse);
-
-        // Highlight
         highlightBtn.addEventListener('click', toggleHighlight);
-
-        // Notes
         notesBtn.addEventListener('click', openNotes);
         saveNoteBtn.addEventListener('click', saveNote);
         closeNotesBtn.addEventListener('click', function() {
@@ -799,30 +801,21 @@ $pageTitle = 'Bible Reader';
         window.addEventListener('click', function(e) {
             if (e.target === notesModal) notesModal.style.display = 'none';
         });
-
-        // Reader theme toggle
         readerThemeToggle.addEventListener('click', toggleReaderTheme);
-
-        // Click on verse to toggle highlight
         document.addEventListener('click', function(e) {
             if (e.target.closest('.verse-content p')) {
                 toggleHighlight();
             }
         });
 
-        // Sync goToInput with current verse
         function syncGoToInput() {
             goToInput.value = `${state.book} ${state.chapter}:${state.verse}`;
         }
-        // Call sync after loadVerse
         const origLoad = loadVerse;
         loadVerse = function() {
             origLoad();
             syncGoToInput();
         };
-
-        // Load books into version dropdowns
-        // Already loaded via VERSION_MAP keys
 
     })();
 </script>
