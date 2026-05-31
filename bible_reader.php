@@ -285,13 +285,13 @@ $pageTitle = 'Bible Reader';
     }
 
     .verse-content {
-    font-family: 'Georgia', serif;
-    font-size: 1.1rem;
-    line-height: 1.9;
-    color: var(--text);
-    min-height: 200px;
-    text-align: justify; /* Justified text */
-}
+        font-family: 'Georgia', serif;
+        font-size: 1.1rem;
+        line-height: 1.9;
+        color: var(--text);
+        min-height: 200px;
+        text-align: justify; /* Justified text */
+    }
 
     .verse-content p {
         margin-bottom: 12px;
@@ -560,6 +560,7 @@ $pageTitle = 'Bible Reader';
             return `[Error loading verse]`;
         });
 }
+
         function renderVerse() {
             const book = state.book;
             const chapter = state.chapter;
