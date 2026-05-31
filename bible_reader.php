@@ -548,11 +548,14 @@ $pageTitle = 'Bible Reader';
         function getVerseText(version, book, chapter, verse) {
             return fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&verse=${verse}&version=${version}`)
                 .then(response => response.json())
-                .then(text => {
-                    if (text.includes('not found') || text.includes('Database error')) {
+                .then(data => {
+                    if (data.success && data.data && data.data.length > 0) {
+                        return data.data[0].text;
+                    } else {
                         return `[${version} ${book} ${chapter}:${verse} not found]`;
                     }
-                    return text;
+                }).catch(() => {
+                    return `[Error loading ${version} ${book} ${chapter}:${verse}]`;
                 });
         }
 
