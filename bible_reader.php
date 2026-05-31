@@ -575,38 +575,52 @@ $pageTitle = 'Bible Reader';
     const verse = state.verse;
 
     if (state.parallel) {
-    parallelView.style.display = 'grid';
-    singleView.style.display = 'none';
-    parallelTitle1.textContent = state.version1;
-    parallelTitle2.textContent = state.version2;
+        parallelView.style.display = 'grid';
+        singleView.style.display = 'none';
+        parallelTitle1.textContent = state.version1;
+        parallelTitle2.textContent = state.version2;
 
-    verseContent1p.innerHTML = '<p>Loading...</p>';
-    verseContent2p.innerHTML = '<p>Loading...</p>';
+        verseContent1p.innerHTML = '<p>Loading...</p>';
+        verseContent2p.innerHTML = '<p>Loading...</p>';
 
-    Promise.all([
-        getVerseText(state.version1, book, chapter, 0), // 0 means fetch whole chapter
-        getVerseText(state.version2, book, chapter, 0)
-    ]).then(([data1, data2]) => {
-        if (Array.isArray(data1)) {
-            verseContent1p.innerHTML = data1.map(v => {
-                const cleanText = v.text.replace(/\\/g, '');
-                return `<p>${v.verse}. ${cleanText}</p>`;
-            }).join('');
-            applyHighlights(verseContent1p);
-        } else {
-            verseContent1p.innerHTML = `<p>${data1}</p>`;
-        }
-        
-        if (Array.isArray(data2)) {
-            verseContent2p.innerHTML = data2.map(v => {
-                const cleanText = v.text.replace(/\\/g, '');
-                return `<p>${v.verse}. ${cleanText}</p>`;
-            }).join('');
-            applyHighlights(verseContent2p);
-        } else {
-            verseContent2p.innerHTML = `<p>${data2}</p>`;
-        }
-    });
+        Promise.all([
+            getVerseText(state.version1, book, chapter, 0), // 0 means fetch whole chapter
+            getVerseText(state.version2, book, chapter, 0)
+        ]).then(([data1, data2]) => {
+            if (Array.isArray(data1)) {
+                verseContent1p.innerHTML = data1.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                applyHighlights(verseContent1p);
+            } else {
+                verseContent1p.innerHTML = `<p>${data1}</p>`;
+            }
+            
+            if (Array.isArray(data2)) {
+                verseContent2p.innerHTML = data2.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                applyHighlights(verseContent2p);
+            } else {
+                verseContent2p.innerHTML = `<p>${data2}</p>`;
+            }
+        });
+    } else {
+        parallelView.style.display = 'none';
+        singleView.style.display = 'block';
+        verseContent1.innerHTML = '<p>Loading...</p>';
+
+        getVerseText(state.version1, book, chapter, 0).then(data => {
+            if (Array.isArray(data)) {
+                verseContent1.innerHTML = data.map(v => {
+    const cleanText = v.text.replace(/\\/g, '');
+    return `<p>${v.verse}. ${cleanText}</p>`;
+}).join('');
+                applyHighlights(verseContent1);
+            } else {
+                verseContent1.innerHTML = `<p>${data}</p>`;
+            }
+        });
+    }
+
+    chapterDisplay.textContent = `${book} ${chapter}`;
+    notesVerseRef.textContent = `${book} ${chapter}`;
 }
 
         function loadVerse() {
