@@ -545,57 +545,80 @@ $pageTitle = 'Bible Reader';
             verseSelect.value = state.verse;
         }
 
-        function getVerseText(version, book, chapter, verse) {
-            return fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&verse=${verse}&version=${version}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data && data.data.length > 0) {
-                        return data.data[0].text;
-                    } else {
-                        return `[${version} ${book} ${chapter}:${verse} not found]`;
-                    }
-                }).catch(() => {
-                    return `[Error loading ${version} ${book} ${chapter}:${verse}]`;
-                });
-        }
-
-        function renderVerse() {
-            const book = state.book;
-            const chapter = state.chapter;
-            const verse = state.verse;
-
-            if (state.parallel) {
-                parallelView.style.display = 'grid';
-                singleView.style.display = 'none';
-                parallelTitle1.textContent = state.version1;
-                parallelTitle2.textContent = state.version2;
-
-                verseContent1p.innerHTML = '<p>Loading...</p>';
-                verseContent2p.innerHTML = '<p>Loading...</p>';
-
-                Promise.all([
-                    getVerseText(state.version1, book, chapter, verse),
-                    getVerseText(state.version2, book, chapter, verse)
-                ]).then(([text1, text2]) => {
-                    verseContent1p.innerHTML = `<p>${text1}</p>`;
-                    verseContent2p.innerHTML = `<p>${text2}</p>`;
-                    applyHighlights(verseContent1p);
-                    applyHighlights(verseContent2p);
-                });
+       function getVerseText(version, book, chapter, verse) {
+    // Build the URL without the 'verse' parameter to get the whole chapter
+    let url = `/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version}`;
+    
+    // If a specific verse is requested, add it (optional, used for "Jump to verse")
+    if (verse > 0) {
+        url += `&verse_start=${verse}&verse_end=${verse}`;
+    }
+    
+    return fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data && data.data.length > 0) {
+                return data.data; // Return the array of verses
             } else {
-                parallelView.style.display = 'none';
-                singleView.style.display = 'block';
-                verseContent1.innerHTML = '<p>Loading...</p>';
-
-                getVerseText(state.version1, book, chapter, verse).then(text => {
-                    verseContent1.innerHTML = `<p>${text}</p>`;
-                    applyHighlights(verseContent1);
-                });
+                return `[${version} ${book} ${chapter} not found]`;
             }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            return `[Error loading chapter]`;
+        });
+}
 
-            chapterDisplay.textContent = `${book} ${chapter}:${verse}`;
-            notesVerseRef.textContent = `${book} ${chapter}:${verse}`;
-        }
+       function renderVerse() {
+    const book = state.book;
+    const chapter = state.chapter;
+    const verse = state.verse;
+
+    if (state.parallel) {
+        parallelView.style.display = 'grid';
+        singleView.style.display = 'none';
+        parallelTitle1.textContent = state.version1;
+        parallelTitle2.textContent = state.version2;
+
+        verseContent1p.innerHTML = '<p>Loading...</p>';
+        verseContent2p.innerHTML = '<p>Loading...</p>';
+
+        Promise.all([
+            getVerseText(state.version1, book, chapter, 0), // 0 means fetch whole chapter
+            getVerseText(state.version2, book, chapter, 0)
+        ]).then(([data1, data2]) => {
+            if (Array.isArray(data1)) {
+                verseContent1p.innerHTML = data1.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                applyHighlights(verseContent1p);
+            } else {
+                verseContent1p.innerHTML = `<p>${data1}</p>`;
+            }
+            
+            if (Array.isArray(data2)) {
+                verseContent2p.innerHTML = data2.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                applyHighlights(verseContent2p);
+            } else {
+                verseContent2p.innerHTML = `<p>${data2}</p>`;
+            }
+        });
+    } else {
+        parallelView.style.display = 'none';
+        singleView.style.display = 'block';
+        verseContent1.innerHTML = '<p>Loading...</p>';
+
+        getVerseText(state.version1, book, chapter, 0).then(data => {
+            if (Array.isArray(data)) {
+                verseContent1.innerHTML = data.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                applyHighlights(verseContent1);
+            } else {
+                verseContent1.innerHTML = `<p>${data}</p>`;
+            }
+        });
+    }
+
+    chapterDisplay.textContent = `${book} ${chapter}`;
+    notesVerseRef.textContent = `${book} ${chapter}`;
+}
 
         function loadVerse() {
             bookSelect.value = state.book;
