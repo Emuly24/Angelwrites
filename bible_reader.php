@@ -11,75 +11,64 @@ $pageTitle = 'Bible Reader';
     <div class="container">
         <div class="bible-header">
             <h1>📖 Bible Reader</h1>
-            <p>Read entire chapters, compare translations, highlight, and take notes — all offline and free.</p>
+            <p>Read entire chapters, compare translations, highlight, and take notes.</p>
         </div>
 
-        <!-- Controls -->
-        <div class="bible-controls">
-            <div class="control-row">
-                <div class="control-group">
-                    <label>Book</label>
+        <!-- Unified Control Bar -->
+        <div class="control-bar">
+            <!-- Navigation -->
+            <div class="nav-group">
+                <button id="prevChapterBtn" class="btn btn-secondary btn-icon" title="Previous Chapter">◀</button>
+                <div class="select-group">
                     <select id="bookSelect"></select>
-                </div>
-                <div class="control-group">
-                    <label>Chapter</label>
                     <select id="chapterSelect"></select>
                 </div>
-                <div class="control-group">
-                    <label>Version 1</label>
-                    <select id="version1">
-                        <option value="KJV">King James Version (KJV)</option>
-                        <option value="NIV">New International Version (NIV)</option>
-                        <option value="ESV">English Standard Version (ESV)</option>
-                        <option value="NASB">New American Standard Bible (NASB)</option>
-                        <option value="NKJV">New King James Version (NKJV)</option>
-                        <option value="AMP">Amplified Bible (AMP)</option>
-                        <option value="ASV">American Standard Version (ASV)</option>
-                        <option value="WEB">World English Bible (WEB)</option>
-                        <option value="YLT">Young's Literal Translation (YLT)</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label>Version 2 (Parallel)</label>
-                    <select id="version2">
-                        <option value="NIV">New International Version (NIV)</option>
-                        <option value="KJV">King James Version (KJV)</option>
-                        <option value="ESV">English Standard Version (ESV)</option>
-                        <option value="NASB">New American Standard Bible (NASB)</option>
-                        <option value="NKJV">New King James Version (NKJV)</option>
-                        <option value="AMP">Amplified Bible (AMP)</option>
-                        <option value="ASV">American Standard Version (ASV)</option>
-                        <option value="WEB">World English Bible (WEB)</option>
-                        <option value="YLT">Young's Literal Translation (YLT)</option>
-                    </select>
-                </div>
+                <button id="nextChapterBtn" class="btn btn-secondary btn-icon" title="Next Chapter">▶</button>
             </div>
 
-            <div class="control-row action-row">
-                <div class="control-group">
-                    <label>Go to</label>
-                    <div class="input-group">
-                        <input type="text" id="goToInput" placeholder="e.g. John 3" value="John 3">
-                        <button id="goToBtn" class="btn btn-primary">Go</button>
-                    </div>
+            <!-- Go to -->
+            <div class="go-group">
+                <input type="text" id="goToInput" placeholder="John 3" value="John 3">
+                <button id="goToBtn" class="btn btn-primary">Go</button>
+            </div>
+
+            <!-- Versions & Tools -->
+            <div class="tools-group">
+                <select id="version1">
+                    <option value="KJV">KJV</option>
+                    <option value="NIV">NIV</option>
+                    <option value="ESV">ESV</option>
+                    <option value="NASB">NASB</option>
+                    <option value="NKJV">NKJV</option>
+                    <option value="AMP">AMP</option>
+                    <option value="ASV">ASV</option>
+                    <option value="WEB">WEB</option>
+                    <option value="YLT">YLT</option>
+                </select>
+                
+                <div class="toggle-container">
+                    <input type="checkbox" id="parallelToggle">
+                    <label for="parallelToggle">Parallel</label>
                 </div>
-                <div class="control-group toggle-group">
-                    <label class="toggle-label">
-                        <input type="checkbox" id="parallelToggle">
-                        <span class="toggle-track"></span>
-                        <span class="toggle-text">Parallel Mode</span>
-                    </label>
+
+                <div id="version2Container" style="display:none;">
+                    <select id="version2">
+                        <option value="NIV">NIV</option>
+                        <option value="KJV">KJV</option>
+                        <option value="ESV">ESV</option>
+                        <option value="NASB">NASB</option>
+                        <option value="NKJV">NKJV</option>
+                        <option value="AMP">AMP</option>
+                        <option value="ASV">ASV</option>
+                        <option value="WEB">WEB</option>
+                        <option value="YLT">YLT</option>
+                    </select>
                 </div>
-                <div class="control-group">
-                    <button id="prevChapterBtn" class="btn btn-secondary">◀ Prev</button>
-                    <button id="nextChapterBtn" class="btn btn-secondary">Next ▶</button>
-                </div>
-                <div class="control-group">
-                    <button id="copyBtn" class="btn btn-outline">📋 Copy</button>
-                    <button id="highlightBtn" class="btn btn-outline">✨ Highlight</button>
-                    <button id="notesBtn" class="btn btn-outline">📝 Notes</button>
-                    <button id="themeToggle" class="btn btn-outline">🌓 Theme</button>
-                </div>
+
+                <button id="copyBtn" class="btn btn-outline btn-icon" title="Copy Chapter">📋</button>
+                <button id="highlightBtn" class="btn btn-outline btn-icon" title="Highlight Verse">✨</button>
+                <button id="notesBtn" class="btn btn-outline btn-icon" title="Chapter Notes">📝</button>
+                <button id="themeToggle" class="btn btn-outline btn-icon" title="Toggle Theme">🌓</button>
             </div>
         </div>
 
@@ -105,8 +94,8 @@ $pageTitle = 'Bible Reader';
         <!-- Notes Modal -->
         <div id="notesModal" class="modal" style="display:none;">
             <div class="modal-content">
-                <h3>📝 Notes</h3>
-                <p id="notesVerseRef">John 3</p>
+                <h3>📝 Chapter Notes</h3>
+                <p id="notesChapterRef">John 3</p>
                 <textarea id="notesTextarea" rows="6" placeholder="Write your notes here..."></textarea>
                 <div class="modal-actions">
                     <button id="saveNoteBtn" class="btn btn-primary">Save</button>
@@ -130,137 +119,136 @@ $pageTitle = 'Bible Reader';
         margin-bottom: 24px;
     }
     .bible-header h1 {
-        font-size: 2.4rem;
+        font-size: 2.2rem;
         margin-bottom: 4px;
         color: var(--dark);
     }
     .bible-header p {
         color: var(--text-light);
-        font-size: 1.05rem;
     }
 
-    .bible-controls {
+    /* ===== CONTROL BAR ===== */
+    .control-bar {
         background: var(--card-bg);
         border-radius: 16px;
-        padding: 20px;
+        padding: 16px;
         border: 1px solid var(--border);
         box-shadow: var(--shadow);
         margin-bottom: 24px;
-    }
-
-    .control-row {
         display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        align-items: flex-end;
-        margin-bottom: 12px;
-    }
-    .control-row:last-child {
-        margin-bottom: 0;
-    }
-
-    .control-group {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        flex: 1;
-        min-width: 120px;
-    }
-    .control-group label {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: var(--text-light);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .control-group select,
-    .control-group input {
-        padding: 8px 12px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--input-bg);
-        color: var(--text);
-        font-size: 0.95rem;
-        transition: all 0.3s ease;
-    }
-    .control-group select:focus,
-    .control-group input:focus {
-        outline: none;
-        border-color: var(--rose);
-        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-    }
-
-    .input-group {
-        display: flex;
-        gap: 8px;
-    }
-    .input-group input {
-        flex: 1;
-        min-width: 100px;
-    }
-
-    .action-row {
         flex-wrap: wrap;
         align-items: center;
+        justify-content: space-between;
         gap: 12px;
     }
 
-    .toggle-group {
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-    }
-    .toggle-label {
+    .nav-group {
         display: flex;
         align-items: center;
         gap: 8px;
-        cursor: pointer;
-        font-weight: 500;
-        font-size: 0.9rem;
+    }
+    .nav-group .select-group {
+        display: flex;
+        gap: 6px;
+    }
+    .nav-group select {
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--input-bg);
         color: var(--text);
-    }
-    .toggle-label input[type="checkbox"] {
-        display: none;
-    }
-    .toggle-track {
-        display: inline-block;
-        width: 44px;
-        height: 24px;
-        background: var(--border);
-        border-radius: 12px;
-        position: relative;
-        transition: background 0.3s;
-    }
-    .toggle-track::after {
-        content: '';
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 20px;
-        height: 20px;
-        background: white;
-        border-radius: 50%;
-        transition: transform 0.3s;
-    }
-    .toggle-label input:checked + .toggle-track {
-        background: var(--rose);
-    }
-    .toggle-label input:checked + .toggle-track::after {
-        transform: translateX(20px);
+        font-size: 0.9rem;
     }
 
+    .go-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .go-group input {
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--input-bg);
+        color: var(--text);
+        font-size: 0.9rem;
+        width: 120px;
+    }
+
+    .tools-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .tools-group select {
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--input-bg);
+        color: var(--text);
+        font-size: 0.9rem;
+    }
+
+    .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.85rem;
+        color: var(--text-light);
+    }
+    .toggle-container input[type="checkbox"] {
+        accent-color: var(--rose);
+    }
+
+    .btn-icon {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+    }
+    .btn-secondary {
+        background: var(--dark);
+        color: white;
+    }
+    .btn-secondary:hover {
+        background: #1e1414;
+        transform: translateY(-2px);
+    }
+    .btn-primary {
+        background: var(--rose);
+        color: white;
+    }
+    .btn-primary:hover {
+        background: var(--rose-dark);
+        transform: translateY(-2px);
+    }
+    .btn-outline {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+    }
+    .btn-outline:hover {
+        border-color: var(--rose);
+        color: var(--rose);
+    }
+
+    /* ===== DISPLAY ===== */
     .bible-display {
         background: var(--card-bg);
         border-radius: 16px;
         padding: 24px;
         border: 1px solid var(--border);
         box-shadow: var(--shadow);
-        min-height: 400px;
+        min-height: 300px;
     }
 
     .chapter-view h2 {
         font-family: 'Playfair Display', serif;
-        font-size: 1.8rem;
+        font-size: 1.6rem;
         margin-bottom: 16px;
         color: var(--dark);
         text-align: center;
@@ -274,26 +262,25 @@ $pageTitle = 'Bible Reader';
     .parallel-column {
         padding: 16px;
         background: var(--fantasy);
-        border-radius: 12px;
+        border-radius: 8px;
         border-top: 4px solid var(--rose);
     }
     .parallel-column h3 {
-        font-family: 'Playfair Display', serif;
-        font-size: 1.2rem;
-        margin-bottom: 12px;
+        font-size: 1rem;
+        margin-bottom: 8px;
         color: var(--dark);
     }
 
     .bible-text {
         font-family: 'Georgia', serif;
-        font-size: 1.05rem;
-        line-height: 1.9;
+        font-size: 1rem;
+        line-height: 1.8;
         color: var(--text);
     }
     .bible-text p {
-        margin-bottom: 8px;
-        padding: 4px 8px;
-        border-radius: 4px;
+        margin-bottom: 6px;
+        padding: 2px 6px;
+        border-radius: 3px;
         cursor: pointer;
         transition: background 0.2s;
     }
@@ -302,9 +289,10 @@ $pageTitle = 'Bible Reader';
     }
     .bible-text p.highlighted {
         background: #fff3b0;
-        border-left: 4px solid var(--rose);
+        border-left: 3px solid var(--rose);
     }
 
+    /* ===== MODAL ===== */
     .modal {
         position: fixed;
         top: 0;
@@ -322,12 +310,11 @@ $pageTitle = 'Bible Reader';
         background: var(--card-bg);
         border-radius: 16px;
         padding: 32px;
-        max-width: 500px;
+        max-width: 480px;
         width: 90%;
         box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
     .modal-content h3 {
-        font-size: 1.4rem;
         margin-bottom: 8px;
         color: var(--dark);
     }
@@ -355,68 +342,35 @@ $pageTitle = 'Bible Reader';
     .modal-actions .btn {
         flex: 1;
         justify-content: center;
-        padding: 10px;
-    }
-
-    .btn-primary {
-        background: var(--rose);
-        color: white;
-    }
-    .btn-primary:hover {
-        background: var(--rose-dark);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(219, 161, 162, 0.3);
-    }
-
-    .btn-secondary {
-        background: var(--dark);
-        color: white;
-    }
-    .btn-secondary:hover {
-        background: #1e1414;
-        transform: translateY(-2px);
-    }
-
-    .btn-outline {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text);
-    }
-    .btn-outline:hover {
-        border-color: var(--rose);
-        color: var(--rose);
-        transform: translateY(-2px);
     }
 
     @media (max-width: 768px) {
-        .control-row {
-            flex-direction: column;
-        }
-        .control-group {
-            min-width: auto;
-        }
-        .chapter-view.parallel {
-            grid-template-columns: 1fr;
-        }
-        .action-row {
+        .control-bar {
             flex-direction: column;
             align-items: stretch;
         }
-        .input-group {
+        .nav-group {
+            justify-content: center;
+        }
+        .nav-group .select-group {
             flex-direction: column;
         }
-        .toggle-group {
-            align-self: center;
+        .go-group {
+            justify-content: center;
+        }
+        .tools-group {
+            justify-content: center;
+        }
+        .chapter-view.parallel {
+            grid-template-columns: 1fr;
         }
     }
 </style>
 
 <!-- ===== JAVASCRIPT ===== -->
 <script>
-    (function() {
-        'use strict';
-
-        // ===== BOOK & CHAPTER DATA =====
+    document.addEventListener('DOMContentLoaded', function() {
+        // ===== DATA =====
         const BOOKS = [
             "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
             "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
@@ -433,7 +387,6 @@ $pageTitle = 'Bible Reader';
             "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
             "Jude", "Revelation"
         ];
-
         const CHAPTER_COUNTS = {
             "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
             "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24,
@@ -459,8 +412,7 @@ $pageTitle = 'Bible Reader';
             chapter: 3,
             version1: 'KJV',
             version2: 'NIV',
-            parallel: false,
-            theme: localStorage.getItem('readerTheme') || 'light'
+            parallel: false
         };
 
         // ===== DOM REFS =====
@@ -468,6 +420,7 @@ $pageTitle = 'Bible Reader';
         const chapterSelect = document.getElementById('chapterSelect');
         const version1Select = document.getElementById('version1');
         const version2Select = document.getElementById('version2');
+        const version2Container = document.getElementById('version2Container');
         const parallelToggle = document.getElementById('parallelToggle');
         const goToInput = document.getElementById('goToInput');
         const goToBtn = document.getElementById('goToBtn');
@@ -487,7 +440,7 @@ $pageTitle = 'Bible Reader';
         const parallelHeader2 = document.getElementById('parallelHeader2');
         const notesModal = document.getElementById('notesModal');
         const notesTextarea = document.getElementById('notesTextarea');
-        const notesVerseRef = document.getElementById('notesVerseRef');
+        const notesChapterRef = document.getElementById('notesChapterRef');
         const saveNoteBtn = document.getElementById('saveNoteBtn');
         const closeNotesBtn = document.getElementById('closeNotesBtn');
 
@@ -522,58 +475,44 @@ $pageTitle = 'Bible Reader';
             const version2 = state.version2;
             const isParallel = state.parallel;
 
-            // Update UI
             bookSelect.value = book;
             chapterSelect.value = chapter;
             version1Select.value = version1;
             version2Select.value = version2;
             goToInput.value = `${book} ${chapter}`;
-            singleHeader.textContent = `${book} ${chapter}`;
-            parallelHeader1.textContent = version1;
-            parallelHeader2.textContent = version2;
 
-            // Show loading
             if (isParallel) {
                 parallelView.style.display = 'grid';
                 singleView.style.display = 'none';
+                parallelHeader1.textContent = version1;
+                parallelHeader2.textContent = version2;
                 parallelContent1.innerHTML = '<p style="text-align:center;color:var(--text-light);">Loading...</p>';
                 parallelContent2.innerHTML = '<p style="text-align:center;color:var(--text-light);">Loading...</p>';
+                fetchChapter(book, chapter, version1, parallelContent1);
+                fetchChapter(book, chapter, version2, parallelContent2);
             } else {
                 parallelView.style.display = 'none';
                 singleView.style.display = 'block';
+                singleHeader.textContent = `${book} ${chapter}`;
                 singleContent.innerHTML = '<p style="text-align:center;color:var(--text-light);">Loading...</p>';
+                fetchChapter(book, chapter, version1, singleContent);
             }
+        }
 
-            // Fetch data
-            if (isParallel) {
-                Promise.all([
-                    fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version1}`),
-                    fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version2}`)
-                ])
-                .then(([res1, res2]) => Promise.all([res1.json(), res2.json()]))
-                .then(([data1, data2]) => {
-                    if (data1.success && data2.success) {
-                        parallelContent1.innerHTML = data1.data.map(v => `<p data-verse="${v.verse}">${v.verse}. ${v.text}</p>`).join('');
-                        parallelContent2.innerHTML = data2.data.map(v => `<p data-verse="${v.verse}">${v.verse}. ${v.text}</p>`).join('');
-                        applyHighlights(parallelContent1);
-                        applyHighlights(parallelContent2);
-                    } else {
-                        parallelContent1.innerHTML = '<p style="color:red;">Error loading chapter.</p>';
-                        parallelContent2.innerHTML = '<p style="color:red;">Error loading chapter.</p>';
-                    }
-                });
-            } else {
-                fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version1}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        singleContent.innerHTML = data.data.map(v => `<p data-verse="${v.verse}">${v.verse}. ${v.text}</p>`).join('');
-                        applyHighlights(singleContent);
-                    } else {
-                        singleContent.innerHTML = '<p style="color:red;">Error loading chapter.</p>';
-                    }
-                });
-            }
+        function fetchChapter(book, chapter, version, container) {
+            fetch(`/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    container.innerHTML = data.data.map(v => `<p data-verse="${v.verse}">${v.verse}. ${v.text}</p>`).join('');
+                    applyHighlights(container);
+                } else {
+                    container.innerHTML = `<p style="color:red;">${data.error}</p>`;
+                }
+            })
+            .catch(err => {
+                container.innerHTML = `<p style="color:red;">Error loading chapter.</p>`;
+            });
         }
 
         function applyHighlights(container) {
@@ -618,7 +557,7 @@ $pageTitle = 'Bible Reader';
             const key = `${state.book}-${state.chapter}`;
             const saved = JSON.parse(localStorage.getItem('bibleNotes') || '{}');
             notesTextarea.value = saved[key] || '';
-            notesVerseRef.textContent = `${state.book} ${state.chapter}`;
+            notesChapterRef.textContent = `${state.book} ${state.chapter}`;
             notesModal.style.display = 'flex';
         }
 
@@ -629,12 +568,6 @@ $pageTitle = 'Bible Reader';
             localStorage.setItem('bibleNotes', JSON.stringify(saved));
             notesModal.style.display = 'none';
             alert('Note saved!');
-        }
-
-        function toggleTheme() {
-            state.theme = state.theme === 'light' ? 'dark' : 'light';
-            localStorage.setItem('readerTheme', state.theme);
-            document.querySelector('.bible-reader-wrapper').setAttribute('data-theme', state.theme);
         }
 
         function goTo(input) {
@@ -686,6 +619,7 @@ $pageTitle = 'Bible Reader';
 
         parallelToggle.addEventListener('change', function() {
             state.parallel = this.checked;
+            version2Container.style.display = state.parallel ? 'inline-block' : 'none';
             loadChapter();
         });
 
@@ -728,9 +662,8 @@ $pageTitle = 'Bible Reader';
         closeNotesBtn.addEventListener('click', function() {
             notesModal.style.display = 'none';
         });
-        themeToggle.addEventListener('click', toggleTheme);
 
-        // Click on verse to highlight
+        // Click verse to highlight
         document.addEventListener('click', function(e) {
             if (e.target.closest('.bible-text p[data-verse]')) {
                 toggleHighlight();
@@ -742,9 +675,14 @@ $pageTitle = 'Bible Reader';
             if (e.target === notesModal) notesModal.style.display = 'none';
         });
 
-        // Init theme
-        document.querySelector('.bible-reader-wrapper').setAttribute('data-theme', state.theme);
-    })();
+        // Theme toggle (light/dark for reader)
+        themeToggle.addEventListener('click', function() {
+            const wrapper = document.querySelector('.bible-reader-wrapper');
+            const current = wrapper.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            wrapper.setAttribute('data-theme', next);
+        });
+    });
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
