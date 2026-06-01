@@ -175,20 +175,39 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
         <?php endif; ?>
     </div>
 
+    <!-- Audio Upload & Recording -->
+<div class="media-group">
+    <h3>Audio (Upload or Record)</h3>
+    
+    <!-- Upload Drop Zone -->
+    <div id="audioDropZone" class="upload-zone">
+        <i class="fas fa-music"></i>
+        <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
+        <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
+        <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
+            <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
+        </div>
+        <?php if (!empty($audio_path)): ?>
+            <div id="currentAudioContainer" style="margin-top:12px;">
+                <p><strong>Current Audio:</strong></p>
+                <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
+            </div>
+        <?php endif; ?>
+    </div>
+
     <!-- Recorder Section -->
     <div class="recorder-section">
         <h4>🎙️ Or Record Directly</h4>
         <div class="recorder-controls">
             <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
             <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-            <form id="recordingForm" style="display:none; margin-top:8px;">
+            <form id="recordingForm" style="display:none;">
                 <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
             </form>
         </div>
         <p class="field-hint">Record your poem directly in the browser. The recording will be saved when you submit the form.</p>
     </div>
 </div>
-
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Poem</button>
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('formAction').value='save_and_continue'; document.getElementById('poemForm').submit();">
@@ -222,6 +241,23 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
             });
         }
     });
+</script>
+<script>
+    // ===== AUTO-EXPAND INTRO TEXTAREA =====
+document.addEventListener('DOMContentLoaded', function() {
+    const introTextarea = document.getElementById('intro');
+    if (introTextarea) {
+        // Initial resize
+        introTextarea.style.height = 'auto';
+        introTextarea.style.height = (introTextarea.scrollHeight) + 'px';
+        
+        // Resize on input
+        introTextarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+    }
+});
 </script>
 
 <script>
@@ -328,14 +364,13 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
         }
     });
 
-    // ===== AUDIO RECORDER =====
+   // ===== AUDIO RECORDER (POEM EDITOR) =====
 document.addEventListener('DOMContentLoaded', function() {
     const recordBtn = document.getElementById('recordBtn');
     const recordingStatus = document.getElementById('recordingStatus');
     const recordingInput = document.getElementById('recordingInput');
     const audioPreviewContainer = document.getElementById('audioPreviewContainer');
     const audioPreview = document.getElementById('audioPreview');
-    const currentAudioContainer = document.getElementById('currentAudioContainer');
 
     let mediaRecorder = null;
     let audioChunks = [];
@@ -343,7 +378,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (recordBtn) {
         recordBtn.addEventListener('click', async function() {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
-                // Stop recording
                 mediaRecorder.stop();
                 recordingStatus.style.display = 'none';
                 recordBtn.textContent = '🎙️ Start Recording';
@@ -368,18 +402,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     dataTransfer.items.add(file);
                     recordingInput.files = dataTransfer.files;
 
-                    // Update the audio preview with the new recording
                     const url = URL.createObjectURL(file);
                     audioPreview.src = url;
-                    audioPreview.load(); // 🔥 THIS WAS MISSING
+                    audioPreview.load();
                     audioPreviewContainer.style.display = 'block';
-
-                    // Hide the current audio container if it exists
-                    if (currentAudioContainer) {
-                        currentAudioContainer.style.display = 'none';
-                    }
-
-                    // Show the recording form so the user knows it's attached
                     document.getElementById('recordingForm').style.display = 'block';
                 };
 
@@ -432,6 +458,13 @@ document.addEventListener('DOMContentLoaded', function() {
     .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
     .btn-danger { background: #e74c3c; color: white; }
     .btn-danger:hover { background: #c0392b; }
+    .form-section textarea#intro {
+    resize: vertical;
+    min-height: 60px;
+    height: auto;
+    overflow-y: hidden;
+    transition: height 0.2s ease;
+}
 
     @media (max-width: 768px) {
         .media-section { flex-direction: column; }

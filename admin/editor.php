@@ -485,70 +485,92 @@ $pageTitle = ucfirst($type) . ' Editor';
         }
     });
 </script>
+   // ===== VIDEO RECORDER JAVASCRIPT (FIXED) =====
+   <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const videoRecordBtn = document.getElementById('videoRecordBtn');
+    const videoRecordingStatus = document.getElementById('videoRecordingStatus');
+    const videoRecordingInput = document.getElementById('videoRecordingInput');
+    const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+    const videoPreview = videoPreviewContainer ? videoPreviewContainer.querySelector('video') : null;
 
-<!-- ===== VIDEO RECORDER JAVASCRIPT ===== -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const videoRecordBtn = document.getElementById('videoRecordBtn');
-        const videoRecordingStatus = document.getElementById('videoRecordingStatus');
-        const videoRecordingInput = document.getElementById('videoRecordingInput');
-        const videoPreviewContainer = document.getElementById('videoPreviewContainer');
-        const videoPreview = videoPreviewContainer ? videoPreviewContainer.querySelector('video') : null;
+    let videoMediaRecorder = null;
+    let videoChunks = [];
+    let videoStream = null;
 
-        let videoMediaRecorder = null;
-        let videoChunks = [];
+    if (videoRecordBtn) {
+        videoRecordBtn.addEventListener('click', async function() {
+            if (videoMediaRecorder && videoMediaRecorder.state === 'recording') {
+                videoMediaRecorder.stop();
+                videoRecordingStatus.style.display = 'none';
+                videoRecordBtn.textContent = '🎥 Start Recording';
+                videoRecordBtn.classList.remove('btn-danger');
+                videoRecordBtn.classList.add('btn-secondary');
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                    videoStream = null;
+                }
+                if (videoPreview) {
+                    videoPreview.srcObject = null;
+                }
+                return;
+            }
 
-        if (videoRecordBtn) {
-            videoRecordBtn.addEventListener('click', async function() {
-                if (videoMediaRecorder && videoMediaRecorder.state === 'recording') {
-                    videoMediaRecorder.stop();
-                    videoRecordingStatus.style.display = 'none';
-                    videoRecordBtn.textContent = '🎥 Start Recording';
-                    videoRecordBtn.classList.remove('btn-danger');
-                    videoRecordBtn.classList.add('btn-secondary');
-                    return;
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                videoMediaRecorder = new MediaRecorder(videoStream);
+                videoChunks = [];
+
+                // 🔥 SHOW LIVE PREVIEW DURING RECORDING
+                if (videoPreview) {
+                    videoPreview.srcObject = videoStream;
+                    videoPreview.muted = true;
+                    videoPreview.play();
                 }
 
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                    videoMediaRecorder = new MediaRecorder(stream);
-                    videoChunks = [];
+                videoMediaRecorder.ondataavailable = event => {
+                    videoChunks.push(event.data);
+                };
 
-                    videoMediaRecorder.ondataavailable = event => {
-                        videoChunks.push(event.data);
-                    };
+                videoMediaRecorder.onstop = () => {
+                    const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+                    const file = new File([videoBlob], 'video_recording.webm', { type: 'video/webm' });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    videoRecordingInput.files = dataTransfer.files;
 
-                    videoMediaRecorder.onstop = () => {
-                        const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
-                        const file = new File([videoBlob], 'video_recording.webm', { type: 'video/webm' });
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(file);
-                        videoRecordingInput.files = dataTransfer.files;
-
+                    if (videoPreview) {
+                        videoPreview.srcObject = null;
                         const url = URL.createObjectURL(file);
-                        if (videoPreview) {
-                            videoPreview.src = url;
-                            videoPreview.load();
-                        }
-                        videoPreviewContainer.style.display = 'block';
-                        document.getElementById('videoRecordingForm').style.display = 'block';
-                    };
+                        videoPreview.src = url;
+                        videoPreview.muted = false;
+                        videoPreview.load();
+                    }
+                    videoPreviewContainer.style.display = 'block';
+                    document.getElementById('videoRecordingForm').style.display = 'block';
+                };
 
-                    videoMediaRecorder.start();
-                    videoRecordingStatus.style.display = 'inline';
-                    videoRecordBtn.textContent = '⏹️ Stop Recording';
-                    videoRecordBtn.classList.remove('btn-secondary');
-                    videoRecordBtn.classList.add('btn-danger');
-                } catch (error) {
-                    alert('Camera/microphone access denied.');
-                    console.error('Recording error:', error);
-                }
-            });
-        }
-    });
+                videoMediaRecorder.start();
+                videoRecordingStatus.style.display = 'inline';
+                videoRecordBtn.textContent = '⏹️ Stop Recording';
+                videoRecordBtn.classList.remove('btn-secondary');
+                videoRecordBtn.classList.add('btn-danger');
+            } catch (error) {
+                alert('Camera/microphone access denied.');
+                console.error('Recording error:', error);
+            }
+        });
+    }
+});
 </script>
 
 <style>
+    
+    .form-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+    .form-row .form-group { flex: 1; min-width: 150px; }
+    .form-actions { display: flex; gap: 12px; margin-top: 16px; }
+    .card { margin-bottom: 24px; }
+    .card-body { padding: 20px; }
     .admin-editor { padding: 32px 0 60px; }
     .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
     .admin-header h1 { font-size: 2rem; margin: 0; }
