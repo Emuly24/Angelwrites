@@ -42,9 +42,9 @@ $pageTitle = 'Preview: ' . htmlspecialchars($poem['title']);
             <h1>Preview: <?php echo htmlspecialchars($poem['title']); ?></h1>
             <div class="preview-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-outline">
-                    <i class="fas fa-arrow-left"></i> Back
+                    <i class="fas fa-arrow-left"></i> Back to Poems
                 </a>
-                <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=poem&id=<?php echo $id; ?>" class="btn btn-secondary">
+                <a href="<?php echo SITE_URL; ?>/admin/poem_editor.php?id=<?php echo $id; ?>" class="btn btn-secondary">
                     <i class="fas fa-edit"></i> Edit Poem
                 </a>
                 <form method="POST" class="status-form">

@@ -7,6 +7,7 @@ redirectIfNotAdmin();
 
 $error = '';
 $success = '';
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
@@ -18,8 +19,18 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// ===== FETCH ALL POSTS =====
-$stmt = $db->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
+// ===== FETCH ALL POSTS (WITH SEARCH) =====
+$sql = "SELECT * FROM blog_posts";
+$params = [];
+if (!empty($search)) {
+    $sql .= " WHERE title LIKE ? OR content LIKE ?";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+}
+$sql .= " ORDER BY created_at DESC";
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
 $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Manage Blog';
@@ -52,6 +63,15 @@ $pageTitle = 'Manage Blog';
                 <h2>All Posts (<?php echo count($posts); ?>)</h2>
             </div>
             <div class="card-body">
+                <!-- Search Bar -->
+                <form method="GET" class="search-form">
+                    <input type="text" name="search" placeholder="Search posts by title or content..." value="<?php echo htmlspecialchars($search); ?>">
+                    <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                    <?php if (!empty($search)): ?>
+                        <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="btn btn-outline btn-sm">Clear</a>
+                    <?php endif; ?>
+                </form>
+
                 <?php if (count($posts) > 0): ?>
                     <div class="table-responsive">
                         <table class="admin-table">
@@ -71,7 +91,7 @@ $pageTitle = 'Manage Blog';
                                             <strong><?php echo htmlspecialchars($post['title']); ?></strong>
                                             <br><small><?php echo date('M j, Y', strtotime($post['created_at'])); ?></small>
                                         </td>
-                                        <td><?php echo htmlspecialchars($post['category']); ?></td>
+                                        <td><?php echo htmlspecialchars($post['category'] ?? 'General'); ?></td>
                                         <td>
                                             <span class="status-badge <?php echo $post['status']; ?>">
                                                 <?php echo ucfirst($post['status']); ?>
@@ -97,7 +117,7 @@ $pageTitle = 'Manage Blog';
                         </table>
                     </div>
                 <?php else: ?>
-                    <p class="no-items">No blog posts yet.</p>
+                    <p class="no-items">No blog posts yet. <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=blog">Create the first post</a>.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -105,67 +125,24 @@ $pageTitle = 'Manage Blog';
 </div>
 
 <style>
-    /* ===== ADMIN TABLE STYLES ===== */
-.admin-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-top: 8px;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: var(--shadow);
-}
+.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.admin-table thead { background: var(--vanilla); }
+.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
+.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+.table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
 
-.admin-table thead {
-    background: var(--vanilla);
-}
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+.status-badge.draft { background: #f1c40f; color: #fff; }
+.status-badge.published { background: #27ae60; color: #fff; }
+.status-badge.archived { background: #e74c3c; color: #fff; }
 
-.admin-table th {
-    text-align: left;
-    padding: 14px 20px;
-    font-weight: 600;
-    color: var(--text);
-    border-bottom: 2px solid var(--border);
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.admin-table td {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-    color: var(--text);
-    font-size: 0.95rem;
-}
-
-.admin-table tbody tr {
-    transition: all var(--transition);
-}
-
-.admin-table tbody tr:hover {
-    background: rgba(219, 161, 162, 0.08);
-    cursor: default;
-}
-
-.admin-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.table-responsive {
-    overflow-x: auto;
-    margin-bottom: 16px;
-    border-radius: 12px;
-}
-
-/* Small screens tweaks */
-@media (max-width: 768px) {
-    .admin-table th,
-    .admin-table td {
-        padding: 10px 12px;
-        font-size: 0.85rem;
-    }
-}
+.search-form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
+.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

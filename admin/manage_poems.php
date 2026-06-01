@@ -227,7 +227,7 @@ $pageTitle = 'Manage Poems';
                                         </td>
                                         <td><?php echo number_format($poem['view_count'] ?? 0); ?></td>
                                         <td class="actions">
-                                            <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=poem&id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-secondary">
+                                            <a href="<?php echo SITE_URL; ?>/admin/poem_editor.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-secondary">
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?delete=<?php echo $poem['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this poem?');">
