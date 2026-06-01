@@ -157,50 +157,37 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
             <div class="media-section">
                 <!-- Poem Cover Image -->
                 <div class="media-group">
-                    <h3>Cover Image</h3>
-                    <div id="dropZone" class="upload-zone">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>Drag & drop your image here, or <strong>click to browse</strong></p>
-                        <input type="file" id="fileInput" name="image" accept="image/*" style="display:none;">
-                        <div id="previewContainer" style="display:none; margin-top:12px;">
-                            <img id="previewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
-                        </div>
-                        <?php if (!empty($image_path)): ?>
-                            <div id="currentImageContainer" style="margin-top:12px;">
-                                <p><strong>Current Image:</strong></p>
-                                <img src="<?php echo SITE_URL . '/' . $image_path; ?>" style="max-width:150px; max-height:150px; border-radius:8px;">
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- Audio Upload & Recording -->
-                <div class="media-group">
-                    <h3>Audio (Upload or Record)</h3>
-                    <div id="audioDropZone" class="upload-zone">
-                        <i class="fas fa-music"></i>
-                        <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
-                        <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
-                        <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
-                            <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
-                        </div>
-                        <?php if (!empty($audio_path)): ?>
-                            <div id="currentAudioContainer" style="margin-top:12px;">
-                                <p><strong>Current Audio:</strong></p>
-                                <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <div class="recorder-section">
-                        <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                        <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                        <form id="recordingForm" style="display:none;">
-                            <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                        </form>
-                    </div>
-                </div>
+    <h3>Audio (Upload or Record)</h3>
+    
+    <!-- Upload Drop Zone -->
+    <div id="audioDropZone" class="upload-zone">
+        <i class="fas fa-music"></i>
+        <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
+        <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
+        <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
+            <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
+        </div>
+        <?php if (!empty($audio_path)): ?>
+            <div id="currentAudioContainer" style="margin-top:12px;">
+                <p><strong>Current Audio:</strong></p>
+                <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
             </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Recorder Section -->
+    <div class="recorder-section">
+        <h4>🎙️ Or Record Directly</h4>
+        <div class="recorder-controls">
+            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+            <form id="recordingForm" style="display:none; margin-top:8px;">
+                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+            </form>
+        </div>
+        <p class="field-hint">Record your poem directly in the browser. The recording will be saved when you submit the form.</p>
+    </div>
+</div>
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Poem</button>
@@ -342,70 +329,72 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
     });
 
     // ===== AUDIO RECORDER =====
-    document.addEventListener('DOMContentLoaded', function() {
-        const recordBtn = document.getElementById('recordBtn');
-        const recordingStatus = document.getElementById('recordingStatus');
-        const recordingInput = document.getElementById('recordingInput');
+document.addEventListener('DOMContentLoaded', function() {
+    const recordBtn = document.getElementById('recordBtn');
+    const recordingStatus = document.getElementById('recordingStatus');
+    const recordingInput = document.getElementById('recordingInput');
+    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
+    const audioPreview = document.getElementById('audioPreview');
+    const currentAudioContainer = document.getElementById('currentAudioContainer');
 
-        let mediaRecorder = null;
-        let audioChunks = [];
+    let mediaRecorder = null;
+    let audioChunks = [];
 
-        if (recordBtn) {
-            recordBtn.addEventListener('click', async function() {
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    // Stop recording
-                    mediaRecorder.stop();
-                    recordingStatus.style.display = 'none';
-                    recordBtn.textContent = '🎙️ Start Recording';
-                    recordBtn.classList.remove('btn-danger');
-                    recordBtn.classList.add('btn-secondary');
-                    return;
-                }
+    if (recordBtn) {
+        recordBtn.addEventListener('click', async function() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                // Stop recording
+                mediaRecorder.stop();
+                recordingStatus.style.display = 'none';
+                recordBtn.textContent = '🎙️ Start Recording';
+                recordBtn.classList.remove('btn-danger');
+                recordBtn.classList.add('btn-secondary');
+                return;
+            }
 
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
 
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
 
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const file = new File([audioBlob], 'poem_recording.webm', { type: 'audio/webm' });
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(file);
-                        recordingInput.files = dataTransfer.files;
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const file = new File([audioBlob], 'poem_recording.webm', { type: 'audio/webm' });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    recordingInput.files = dataTransfer.files;
 
-                        // Update the audio preview with the new recording
-                        const url = URL.createObjectURL(file);
-                        document.getElementById('audioPreview').src = url;
-                        document.getElementById('audioPreviewContainer').style.display = 'block';
+                    // Update the audio preview with the new recording
+                    const url = URL.createObjectURL(file);
+                    audioPreview.src = url;
+                    audioPreview.load(); // 🔥 THIS WAS MISSING
+                    audioPreviewContainer.style.display = 'block';
 
-                        // Hide the current audio container if it exists
-                        const currentAudioContainer = document.getElementById('currentAudioContainer');
-                        if (currentAudioContainer) currentAudioContainer.style.display = 'none';
+                    // Hide the current audio container if it exists
+                    if (currentAudioContainer) {
+                        currentAudioContainer.style.display = 'none';
+                    }
 
-                        // Show a success message or flash the button
-                        recordBtn.textContent = '✅ Recording Saved';
-                        setTimeout(() => {
-                            recordBtn.textContent = '🎙️ Record Again';
-                        }, 2000);
-                    };
+                    // Show the recording form so the user knows it's attached
+                    document.getElementById('recordingForm').style.display = 'block';
+                };
 
-                    mediaRecorder.start();
-                    recordingStatus.style.display = 'inline';
-                    recordBtn.textContent = '⏹️ Stop Recording';
-                    recordBtn.classList.remove('btn-secondary');
-                    recordBtn.classList.add('btn-danger');
-                } catch (error) {
-                    alert('Microphone access denied or not available.');
-                    console.error('Recording error:', error);
-                }
-            });
-        }
-    });
+                mediaRecorder.start();
+                recordingStatus.style.display = 'inline';
+                recordBtn.textContent = '⏹️ Stop Recording';
+                recordBtn.classList.remove('btn-secondary');
+                recordBtn.classList.add('btn-danger');
+            } catch (error) {
+                alert('Microphone access denied or not available.');
+                console.error('Recording error:', error);
+            }
+        });
+    }
+});
 </script>
 
 <style>

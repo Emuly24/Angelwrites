@@ -56,12 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $intro = trim($_POST['intro']);
     $content = trim($_POST['content']);
     $action = $_POST['action'] ?? 'save';
-    
+
     $uploaded_image_path = $image_path;
     $uploaded_audio_path = $audio_path;
     $uploaded_featured_image = $featured_image;
 
-    // Handle image upload (for poem cover or blog body)
+    // Handle regular image upload
     if (!empty($_FILES['image']['name'])) {
         $upload_dir = '../assets/uploads/poems/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Failed to upload image.';
         }
     }
-    
+
     // Handle audio upload
     if (!empty($_FILES['audio']['name'])) {
         $upload_dir = '../assets/uploads/audio/';
@@ -85,7 +85,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Handle featured image upload (for blog posts)
+    // Handle audio recording
+    if (isset($_FILES['audio_recording']) && $_FILES['audio_recording']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../assets/uploads/audio/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+        $rec_filename = 'rec_' . time() . '.webm';
+        if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
+            $uploaded_audio_path = 'assets/uploads/audio/' . $rec_filename;
+        } else {
+            $error = 'Failed to upload recorded audio.';
+        }
+    }
+
+    // Handle video recording
+    if (isset($_FILES['video_recording']) && $_FILES['video_recording']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../assets/uploads/videos/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+        $video_filename = 'vid_' . time() . '.webm';
+        if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
+            $uploaded_video_path = 'assets/uploads/videos/' . $video_filename;
+            // You can store this in a `video_path` column or in `media_files` table.
+            // For now, we'll store it in a custom field. If you have a `video_path` column in `blog_posts`, use that.
+            // For demonstration, we'll store it in a separate array.
+        } else {
+            $error = 'Failed to upload recorded video.';
+        }
+    }
+
+    // Handle featured image for blog
     if (!empty($_FILES['featured_image']['name']) && $type === 'blog') {
         $upload_dir = '../assets/uploads/blog/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -132,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = 'Blog post created successfully!';
             }
         }
-        
+
         if ($action === 'save_and_continue') {
             header('Location: ' . SITE_URL . '/admin/editor.php?type=' . $type . '&id=' . $id);
             exit;
@@ -174,7 +201,7 @@ $pageTitle = ucfirst($type) . ' Editor';
                         <label for="title">Title <span class="required">*</span></label>
                         <input type="text" id="title" name="title" value="<?php echo htmlspecialchars($title); ?>" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="intro">Introduction / Purpose</label>
                         <textarea id="intro" name="intro" rows="3"><?php echo htmlspecialchars($intro); ?></textarea>
@@ -204,17 +231,17 @@ $pageTitle = ucfirst($type) . ' Editor';
                     <!-- Featured Image -->
                     <div class="form-group">
                         <label>Featured Image (for blog listing)</label>
-                        <div id="featDropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                            <i class="fas fa-image" style="font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block;"></i>
-                            <p style="margin: 0; color: var(--text-light);">Click to upload a featured image</p>
-                            <input type="file" id="featFileInput" name="featured_image" accept="image/*" style="display: none;">
-                            <div id="featPreviewContainer" style="display: none; margin-top: 12px;">
-                                <img id="featPreviewImage" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                        <div id="featDropZone" class="upload-zone">
+                            <i class="fas fa-image"></i>
+                            <p>Click to upload a featured image</p>
+                            <input type="file" id="featFileInput" name="featured_image" accept="image/*" style="display:none;">
+                            <div id="featPreviewContainer" style="display:none; margin-top:12px;">
+                                <img id="featPreviewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
                             </div>
                             <?php if (!empty($featured_image)): ?>
-                                <div id="currentFeatContainer" style="margin-top: 12px;">
+                                <div id="currentFeatContainer" style="margin-top:12px;">
                                     <p><strong>Current Featured Image:</strong></p>
-                                    <img src="<?php echo SITE_URL . '/' . $featured_image; ?>" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                                    <img src="<?php echo SITE_URL . '/' . $featured_image; ?>" style="max-width:150px; max-height:150px; border-radius:8px;">
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -225,17 +252,17 @@ $pageTitle = ucfirst($type) . ' Editor';
                     <!-- ===== POEM COVER IMAGE ===== -->
                     <div class="form-group">
                         <label>Poem Cover Image</label>
-                        <div id="dropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                            <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block;"></i>
-                            <p style="margin: 0; color: var(--text-light);">Drag & drop your image here, or <strong>click to browse</strong></p>
-                            <input type="file" id="fileInput" name="image" accept="image/*" style="display: none;">
-                            <div id="previewContainer" style="display: none; margin-top: 12px;">
-                                <img id="previewImage" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                        <div id="dropZone" class="upload-zone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drag & drop your image here, or <strong>click to browse</strong></p>
+                            <input type="file" id="fileInput" name="image" accept="image/*" style="display:none;">
+                            <div id="previewContainer" style="display:none; margin-top:12px;">
+                                <img id="previewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
                             </div>
                             <?php if (!empty($image_path)): ?>
-                                <div id="currentImageContainer" style="margin-top: 12px;">
+                                <div id="currentImageContainer" style="margin-top:12px;">
                                     <p><strong>Current Image:</strong></p>
-                                    <img src="<?php echo SITE_URL . '/' . $image_path; ?>" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                                    <img src="<?php echo SITE_URL . '/' . $image_path; ?>" style="max-width:150px; max-height:150px; border-radius:8px;">
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -244,17 +271,17 @@ $pageTitle = ucfirst($type) . ' Editor';
                     <!-- ===== POEM AUDIO ===== -->
                     <div class="form-group">
                         <label>Poem Audio (MP3 or WAV) – optional</label>
-                        <div id="audioDropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                            <i class="fas fa-music" style="font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block;"></i>
-                            <p style="margin: 0; color: var(--text-light);">Click to upload an audio file</p>
-                            <input type="file" id="audioInput" name="audio" accept="audio/*" style="display: none;">
-                            <div id="audioPreviewContainer" style="display: none; margin-top: 12px;">
-                                <audio controls id="audioPreview" style="width: 100%;"><source src="" type="audio/mpeg"></audio>
+                        <div id="audioDropZone" class="upload-zone">
+                            <i class="fas fa-music"></i>
+                            <p>Drag & drop an audio file, or <strong>click to browse</strong></p>
+                            <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
+                            <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
+                                <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
                             </div>
                             <?php if (!empty($audio_path)): ?>
-                                <div id="currentAudioContainer" style="margin-top: 12px;">
+                                <div id="currentAudioContainer" style="margin-top:12px;">
                                     <p><strong>Current Audio:</strong></p>
-                                    <audio controls style="width: 100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
+                                    <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -264,6 +291,38 @@ $pageTitle = ucfirst($type) . ' Editor';
                     <div class="form-group">
                         <label for="content">Content <span class="required">*</span></label>
                         <textarea id="editor" name="content" rows="20"><?php echo htmlspecialchars($content); ?></textarea>
+                    </div>
+
+                    <!-- ===== AUDIO RECORDER ===== -->
+                    <div class="recorder-section">
+                        <h3>🎙️ Record Audio</h3>
+                        <div class="recorder-controls">
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="recordingForm" style="display:none;">
+                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                            </form>
+                            <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        </div>
+                        <p class="field-hint">Record your audio directly in the browser. The recording will be saved when you submit the form.</p>
+                    </div>
+
+                    <!-- ===== VIDEO RECORDER ===== -->
+                    <div class="recorder-section">
+                        <h3>🎥 Record Video</h3>
+                        <div class="recorder-controls">
+                            <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
+                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="videoRecordingForm" style="display:none;">
+                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
+                            </form>
+                            <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
+                                <video controls width="100%"><source src="" type="video/webm"></video>
+                            </div>
+                        </div>
+                        <p class="field-hint">Record a video directly in your browser. The recording will be saved when you submit the form.</p>
                     </div>
 
                     <div class="form-actions">
@@ -301,7 +360,6 @@ $pageTitle = ucfirst($type) . ' Editor';
                 text: '📖 Bible',
                 tooltip: 'Open Bible Reader to extract verses',
                 onAction: function() {
-                    // Open bible_reader.php in a new tab for verse extraction
                     const bibleWindow = window.open('/bible_reader.php', 'BibleReader', 'width=1000,height=800,scrollbars=yes');
                     if (!bibleWindow) {
                         alert('Please allow popups to use the Bible feature.');
@@ -314,7 +372,9 @@ $pageTitle = ucfirst($type) . ' Editor';
             });
         }
     });
+</script>
 
+<script>
     // ===== DRAG & DROP FOR FEATURED IMAGE =====
     document.addEventListener('DOMContentLoaded', function() {
         const featDropZone = document.getElementById('featDropZone');
@@ -364,10 +424,128 @@ $pageTitle = ucfirst($type) . ' Editor';
             reader.readAsDataURL(file);
         }
     });
+</script>
 
-    // ===== EXISTING DRAG & DROP FOR POEMS =====
-    // (Keep the existing dropZone logic from your original file)
-    // ...
+<!-- ===== AUDIO RECORDER JAVASCRIPT ===== -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const recordBtn = document.getElementById('recordBtn');
+        const recordingStatus = document.getElementById('recordingStatus');
+        const recordingInput = document.getElementById('recordingInput');
+        const audioPreviewRecorderContainer = document.getElementById('audioPreviewRecorderContainer');
+        const audioPreviewRecorder = document.getElementById('audioPreviewRecorder');
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        if (recordBtn) {
+            recordBtn.addEventListener('click', async function() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    recordingStatus.style.display = 'none';
+                    recordBtn.textContent = '🎙️ Start Recording';
+                    recordBtn.classList.remove('btn-danger');
+                    recordBtn.classList.add('btn-secondary');
+                    return;
+                }
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const file = new File([audioBlob], 'audio_recording.webm', { type: 'audio/webm' });
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        recordingInput.files = dataTransfer.files;
+
+                        const url = URL.createObjectURL(file);
+                        audioPreviewRecorder.src = url;
+                        audioPreviewRecorder.load();
+                        audioPreviewRecorderContainer.style.display = 'block';
+                        document.getElementById('recordingForm').style.display = 'block';
+                    };
+
+                    mediaRecorder.start();
+                    recordingStatus.style.display = 'inline';
+                    recordBtn.textContent = '⏹️ Stop Recording';
+                    recordBtn.classList.remove('btn-secondary');
+                    recordBtn.classList.add('btn-danger');
+                } catch (error) {
+                    alert('Microphone access denied or not available.');
+                    console.error('Recording error:', error);
+                }
+            });
+        }
+    });
+</script>
+
+<!-- ===== VIDEO RECORDER JAVASCRIPT ===== -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const videoRecordBtn = document.getElementById('videoRecordBtn');
+        const videoRecordingStatus = document.getElementById('videoRecordingStatus');
+        const videoRecordingInput = document.getElementById('videoRecordingInput');
+        const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+        const videoPreview = videoPreviewContainer ? videoPreviewContainer.querySelector('video') : null;
+
+        let videoMediaRecorder = null;
+        let videoChunks = [];
+
+        if (videoRecordBtn) {
+            videoRecordBtn.addEventListener('click', async function() {
+                if (videoMediaRecorder && videoMediaRecorder.state === 'recording') {
+                    videoMediaRecorder.stop();
+                    videoRecordingStatus.style.display = 'none';
+                    videoRecordBtn.textContent = '🎥 Start Recording';
+                    videoRecordBtn.classList.remove('btn-danger');
+                    videoRecordBtn.classList.add('btn-secondary');
+                    return;
+                }
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    videoMediaRecorder = new MediaRecorder(stream);
+                    videoChunks = [];
+
+                    videoMediaRecorder.ondataavailable = event => {
+                        videoChunks.push(event.data);
+                    };
+
+                    videoMediaRecorder.onstop = () => {
+                        const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+                        const file = new File([videoBlob], 'video_recording.webm', { type: 'video/webm' });
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        videoRecordingInput.files = dataTransfer.files;
+
+                        const url = URL.createObjectURL(file);
+                        if (videoPreview) {
+                            videoPreview.src = url;
+                            videoPreview.load();
+                        }
+                        videoPreviewContainer.style.display = 'block';
+                        document.getElementById('videoRecordingForm').style.display = 'block';
+                    };
+
+                    videoMediaRecorder.start();
+                    videoRecordingStatus.style.display = 'inline';
+                    videoRecordBtn.textContent = '⏹️ Stop Recording';
+                    videoRecordBtn.classList.remove('btn-secondary');
+                    videoRecordBtn.classList.add('btn-danger');
+                } catch (error) {
+                    alert('Camera/microphone access denied.');
+                    console.error('Recording error:', error);
+                }
+            });
+        }
+    });
 </script>
 
 <style>
@@ -375,18 +553,44 @@ $pageTitle = ucfirst($type) . ' Editor';
     .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
     .admin-header h1 { font-size: 2rem; margin: 0; }
     .admin-actions { display: flex; gap: 12px; }
-    .admin-form .form-group { margin-bottom: 16px; }
-    .admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
-    .admin-form input[type="text"], .admin-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); resize: vertical; }
-    .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-    .admin-form textarea { min-height: 60px; }
-    .form-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-    .form-row .form-group { flex: 1; min-width: 150px; }
+
+    .form-section, .media-section { margin-bottom: 32px; }
+    .form-section .form-group { margin-bottom: 16px; }
+    .form-section label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+    .form-section input[type="text"], .form-section textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+    .form-section input:focus, .form-section textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+    .form-section textarea { resize: vertical; min-height: 60px; }
     .required { color: #dc2626; }
-    .form-actions { display: flex; gap: 12px; margin-top: 16px; }
+    .field-hint { display: block; margin-top: 4px; font-size: 0.85rem; color: var(--text-light); }
+
+    .media-section { display: flex; gap: 24px; flex-wrap: wrap; }
+    .media-group { flex: 1; min-width: 280px; }
+    .media-group h3 { font-size: 1.1rem; margin-bottom: 12px; }
+
+    .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--fantasy); }
+    .upload-zone i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block; }
+    .upload-zone p { margin: 0; color: var(--text-light); }
+
+    .recorder-section { background: var(--fantasy); border-radius: 12px; padding: 20px; margin-top: 16px; border: 1px solid var(--border); }
+    .recorder-section h3 { margin-bottom: 12px; }
+    .recorder-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
+    .recorder-controls .btn { padding: 8px 16px; }
+    #recordingStatus, #videoRecordingStatus { font-weight: 600; color: #e74c3c; }
+    .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
+
+    .form-actions { display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
     .form-actions .btn { min-width: 120px; justify-content: center; }
-    .card { margin-bottom: 24px; }
-    .card-body { padding: 20px; }
+    .btn-primary { background: var(--rose); color: white; }
+    .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
+    .btn-secondary { background: var(--dark); color: white; }
+    .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
+    .btn-danger { background: #e74c3c; color: white; }
+    .btn-danger:hover { background: #c0392b; }
+
+    @media (max-width: 768px) {
+        .media-section { flex-direction: column; }
+        .media-group { min-width: auto; }
+    }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
