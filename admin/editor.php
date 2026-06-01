@@ -485,8 +485,8 @@ $pageTitle = ucfirst($type) . ' Editor';
         }
     });
 </script>
-   // ===== VIDEO RECORDER JAVASCRIPT (FIXED) =====
-   <script>
+<script>
+   // ===== VIDEO RECORDER JAVASCRIPT =====
 document.addEventListener('DOMContentLoaded', function() {
     const videoRecordBtn = document.getElementById('videoRecordBtn');
     const videoRecordingStatus = document.getElementById('videoRecordingStatus');
@@ -501,6 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (videoRecordBtn) {
         videoRecordBtn.addEventListener('click', async function() {
             if (videoMediaRecorder && videoMediaRecorder.state === 'recording') {
+                // Stop recording
                 videoMediaRecorder.stop();
                 videoRecordingStatus.style.display = 'none';
                 videoRecordBtn.textContent = '🎥 Start Recording';
@@ -512,6 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (videoPreview) {
                     videoPreview.srcObject = null;
+                    videoPreview.style.display = 'none'; // Hide after recording
                 }
                 return;
             }
@@ -521,10 +523,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 videoMediaRecorder = new MediaRecorder(videoStream);
                 videoChunks = [];
 
-                // 🔥 SHOW LIVE PREVIEW DURING RECORDING
+                // Show live preview during recording
                 if (videoPreview) {
                     videoPreview.srcObject = videoStream;
                     videoPreview.muted = true;
+                    videoPreview.style.display = 'block'; // 👈 Make sure it's visible
                     videoPreview.play();
                 }
 
@@ -545,6 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         videoPreview.src = url;
                         videoPreview.muted = false;
                         videoPreview.load();
+                        videoPreview.style.display = 'block'; // Keep visible after recording
                     }
                     videoPreviewContainer.style.display = 'block';
                     document.getElementById('videoRecordingForm').style.display = 'block';
@@ -608,6 +612,13 @@ document.addEventListener('DOMContentLoaded', function() {
     .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
     .btn-danger { background: #e74c3c; color: white; }
     .btn-danger:hover { background: #c0392b; }
+    #videoPreviewContainer video {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 8px;
+    background: #000;
+}
 
     @media (max-width: 768px) {
         .media-section { flex-direction: column; }

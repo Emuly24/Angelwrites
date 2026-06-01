@@ -3,14 +3,12 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-// Only admin can access
 redirectIfNotAdmin();
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $error = '';
 $success = '';
 
-// Fetch existing poem data
 $title = '';
 $intro = '';
 $content = '';
@@ -32,15 +30,15 @@ if ($id > 0) {
     }
 }
 
-// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
     $content = trim($_POST['content']);
     $action = $_POST['action'] ?? 'save';
 
-    // Handle image upload
     $uploaded_image_path = $image_path;
+    $uploaded_audio_path = $audio_path;
+
     if (!empty($_FILES['image']['name'])) {
         $upload_dir = '../assets/uploads/poems/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -52,8 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Handle audio upload (from file)
-    $uploaded_audio_path = $audio_path;
     if (!empty($_FILES['audio']['name'])) {
         $upload_dir = '../assets/uploads/audio/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -65,7 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Handle audio recording (from the recorder)
     if (isset($_FILES['audio_recording']) && $_FILES['audio_recording']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/audio/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -81,12 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Title and content are required.';
     } else {
         if ($id > 0) {
-            // Update existing poem
             $stmt = $db->prepare("UPDATE poems SET title = ?, intro = ?, content = ?, image_path = ?, audio_path = ? WHERE id = ?");
             $stmt->execute([$title, $intro, $content, $uploaded_image_path, $uploaded_audio_path, $id]);
             $success = 'Poem updated successfully!';
         } else {
-            // Insert new poem
             $stmt = $db->prepare("INSERT INTO poems (title, intro, content, image_path, audio_path) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$title, $intro, $content, $uploaded_image_path, $uploaded_audio_path]);
             $id = $db->lastInsertId();
@@ -134,20 +127,17 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
             <input type="hidden" name="action" id="formAction" value="save">
 
             <div class="form-section">
-                <!-- Title -->
                 <div class="form-group">
                     <label for="title">Poem Title <span class="required">*</span></label>
                     <input type="text" id="title" name="title" value="<?php echo htmlspecialchars($title); ?>" required>
                 </div>
 
-                <!-- Introduction / Purpose (Auto-expanding) -->
                 <div class="form-group">
                     <label for="intro">Purpose / Introduction</label>
-                    <textarea id="intro" name="intro" rows="3" placeholder="Write a short introduction explaining the purpose or inspiration behind this poem..." oninput="autoResize(this)"><?php echo htmlspecialchars($intro); ?></textarea>
+                    <textarea id="intro" name="intro" rows="3" placeholder="Write a short introduction explaining the purpose or inspiration behind this poem..."><?php echo htmlspecialchars($intro); ?></textarea>
                     <small class="field-hint">This will appear before the poem. It auto-expands as you type.</small>
                 </div>
 
-                <!-- Poem Content -->
                 <div class="form-group">
                     <label for="content">Poem Content <span class="required">*</span></label>
                     <textarea id="editor" name="content" rows="12"><?php echo htmlspecialchars($content); ?></textarea>
@@ -155,59 +145,58 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
             </div>
 
             <div class="media-section">
-                <!-- Poem Cover Image -->
                 <div class="media-group">
-    <h3>Audio (Upload or Record)</h3>
-    
-    <!-- Upload Drop Zone -->
-    <div id="audioDropZone" class="upload-zone">
-        <i class="fas fa-music"></i>
-        <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
-        <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
-        <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
-            <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
-        </div>
-        <?php if (!empty($audio_path)): ?>
-            <div id="currentAudioContainer" style="margin-top:12px;">
-                <p><strong>Current Audio:</strong></p>
-                <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
-            </div>
-        <?php endif; ?>
-    </div>
+                    <h3>Cover Image</h3>
+                    <div id="dropZone" class="upload-zone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag & drop your image here, or <strong>click to browse</strong></p>
+                        <input type="file" id="fileInput" name="image" accept="image/*" style="display:none;">
+                        <div id="previewContainer" style="display:none; margin-top:12px;">
+                            <img id="previewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
+                        </div>
+                        <?php if (!empty($image_path)): ?>
+                            <div id="currentImageContainer" style="margin-top:12px;">
+                                <p><strong>Current Image:</strong></p>
+                                <img src="<?php echo SITE_URL . '/' . $image_path; ?>" style="max-width:150px; max-height:150px; border-radius:8px;">
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
 
-    <!-- Audio Upload & Recording -->
-<div class="media-group">
-    <h3>Audio (Upload or Record)</h3>
-    
-    <!-- Upload Drop Zone -->
-    <div id="audioDropZone" class="upload-zone">
-        <i class="fas fa-music"></i>
-        <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
-        <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
-        <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
-            <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
-        </div>
-        <?php if (!empty($audio_path)): ?>
-            <div id="currentAudioContainer" style="margin-top:12px;">
-                <p><strong>Current Audio:</strong></p>
-                <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
-            </div>
-        <?php endif; ?>
-    </div>
+                <div class="media-group">
+                    <h3>Audio (Upload or Record)</h3>
+                    <div id="audioDropZone" class="upload-zone">
+                        <i class="fas fa-music"></i>
+                        <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
+                        <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
+                        <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
+                            <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
+                        </div>
+                        <?php if (!empty($audio_path)): ?>
+                            <div id="currentAudioContainer" style="margin-top:12px;">
+                                <p><strong>Current Audio:</strong></p>
+                                <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
+                            </div>
+                        <?php endif; ?>
+                    </div>
 
-    <!-- Recorder Section -->
-    <div class="recorder-section">
-        <h4>🎙️ Or Record Directly</h4>
-        <div class="recorder-controls">
-            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-            <form id="recordingForm" style="display:none;">
-                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-            </form>
-        </div>
-        <p class="field-hint">Record your poem directly in the browser. The recording will be saved when you submit the form.</p>
-    </div>
-</div>
+                    <div class="recorder-section">
+                        <h4>🎙️ Or Record Directly</h4>
+                        <div class="recorder-controls">
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="recordingForm" style="display:none;">
+                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                            </form>
+                            <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        </div>
+                        <p class="field-hint">Record your poem directly in the browser. The recording will be saved when you submit the form.</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Poem</button>
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('formAction').value='save_and_continue'; document.getElementById('poemForm').submit();">
@@ -242,30 +231,20 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
         }
     });
 </script>
-<script>
-    // ===== AUTO-EXPAND INTRO TEXTAREA =====
-document.addEventListener('DOMContentLoaded', function() {
-    const introTextarea = document.getElementById('intro');
-    if (introTextarea) {
-        // Initial resize
-        introTextarea.style.height = 'auto';
-        introTextarea.style.height = (introTextarea.scrollHeight) + 'px';
-        
-        // Resize on input
-        introTextarea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-    }
-});
-</script>
 
 <script>
     // ===== AUTO-EXPAND INTRO TEXTAREA =====
-    function autoResize(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight) + 'px';
-    }
+    document.addEventListener('DOMContentLoaded', function() {
+        const introTextarea = document.getElementById('intro');
+        if (introTextarea) {
+            introTextarea.style.height = 'auto';
+            introTextarea.style.height = (introTextarea.scrollHeight) + 'px';
+            introTextarea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+        }
+    });
 
     // ===== DRAG & DROP IMAGE =====
     document.addEventListener('DOMContentLoaded', function() {
@@ -364,63 +343,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-   // ===== AUDIO RECORDER (POEM EDITOR) =====
-document.addEventListener('DOMContentLoaded', function() {
-    const recordBtn = document.getElementById('recordBtn');
-    const recordingStatus = document.getElementById('recordingStatus');
-    const recordingInput = document.getElementById('recordingInput');
-    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
-    const audioPreview = document.getElementById('audioPreview');
+    // ===== AUDIO RECORDER =====
+    document.addEventListener('DOMContentLoaded', function() {
+        const recordBtn = document.getElementById('recordBtn');
+        const recordingStatus = document.getElementById('recordingStatus');
+        const recordingInput = document.getElementById('recordingInput');
+        const recordingPreviewContainer = document.getElementById('recordingPreviewContainer');
+        const recordingPreview = document.getElementById('recordingPreview');
 
-    let mediaRecorder = null;
-    let audioChunks = [];
+        let mediaRecorder = null;
+        let audioChunks = [];
 
-    if (recordBtn) {
-        recordBtn.addEventListener('click', async function() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                recordingStatus.style.display = 'none';
-                recordBtn.textContent = '🎙️ Start Recording';
-                recordBtn.classList.remove('btn-danger');
-                recordBtn.classList.add('btn-secondary');
-                return;
-            }
+        if (recordBtn) {
+            recordBtn.addEventListener('click', async function() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    recordingStatus.style.display = 'none';
+                    recordBtn.textContent = '🎙️ Start Recording';
+                    recordBtn.classList.remove('btn-danger');
+                    recordBtn.classList.add('btn-secondary');
+                    return;
+                }
 
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
 
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
 
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const file = new File([audioBlob], 'poem_recording.webm', { type: 'audio/webm' });
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    recordingInput.files = dataTransfer.files;
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const file = new File([audioBlob], 'poem_recording.webm', { type: 'audio/webm' });
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        recordingInput.files = dataTransfer.files;
 
-                    const url = URL.createObjectURL(file);
-                    audioPreview.src = url;
-                    audioPreview.load();
-                    audioPreviewContainer.style.display = 'block';
-                    document.getElementById('recordingForm').style.display = 'block';
-                };
+                        const url = URL.createObjectURL(file);
+                        recordingPreview.src = url;
+                        recordingPreview.load();
+                        recordingPreviewContainer.style.display = 'block';
+                        document.getElementById('recordingForm').style.display = 'block';
+                    };
 
-                mediaRecorder.start();
-                recordingStatus.style.display = 'inline';
-                recordBtn.textContent = '⏹️ Stop Recording';
-                recordBtn.classList.remove('btn-secondary');
-                recordBtn.classList.add('btn-danger');
-            } catch (error) {
-                alert('Microphone access denied or not available.');
-                console.error('Recording error:', error);
-            }
-        });
-    }
-});
+                    mediaRecorder.start();
+                    recordingStatus.style.display = 'inline';
+                    recordBtn.textContent = '⏹️ Stop Recording';
+                    recordBtn.classList.remove('btn-secondary');
+                    recordBtn.classList.add('btn-danger');
+                } catch (error) {
+                    alert('Microphone access denied or not available.');
+                    console.error('Recording error:', error);
+                }
+            });
+        }
+    });
 </script>
 
 <style>
@@ -435,8 +414,6 @@ document.addEventListener('DOMContentLoaded', function() {
     .form-section input[type="text"], .form-section textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
     .form-section input:focus, .form-section textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
     .form-section textarea { resize: vertical; min-height: 60px; }
-    .required { color: #dc2626; }
-    .field-hint { display: block; margin-top: 4px; font-size: 0.85rem; color: var(--text-light); }
 
     .media-section { display: flex; gap: 24px; flex-wrap: wrap; }
     .media-group { flex: 1; min-width: 280px; }
@@ -449,6 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
     .recorder-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .recorder-section .btn { padding: 8px 16px; }
     #recordingStatus { font-weight: 600; color: #e74c3c; }
+    .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
 
     .form-actions { display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
     .form-actions .btn { min-width: 120px; justify-content: center; }
@@ -456,15 +434,6 @@ document.addEventListener('DOMContentLoaded', function() {
     .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
     .btn-secondary { background: var(--dark); color: white; }
     .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
-    .btn-danger { background: #e74c3c; color: white; }
-    .btn-danger:hover { background: #c0392b; }
-    .form-section textarea#intro {
-    resize: vertical;
-    min-height: 60px;
-    height: auto;
-    overflow-y: hidden;
-    transition: height 0.2s ease;
-}
 
     @media (max-width: 768px) {
         .media-section { flex-direction: column; }
