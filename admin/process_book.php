@@ -3,10 +3,14 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// 1. DEFINE CORRECT LIBRARY PATH
+/// 1. DEFINE CORRECT LIBRARY PATH
 define('LIB_PATH', dirname(__DIR__) . '/libs/');
 
-// 2. AUTO-LOAD THE PDF PARSER LIBRARY (No more manual ordering issues!)
+// 2. MANUALLY LOAD THE BASE DEPENDENCY FIRST (Fixes the ElementString error)
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementString.php';
+
+// 3. AUTO-LOAD THE REST OF THE PDF PARSER
 function loadPdfParserClasses($dir) {
     $files = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
@@ -20,7 +24,6 @@ function loadPdfParserClasses($dir) {
 loadPdfParserClasses(LIB_PATH . 'pdfparser-master/src/');
 
 use Smalot\PdfParser\Parser;
-
 // 3. Include your site configuration
 require_once '../includes/config.php';
 require_once '../includes/db.php';
