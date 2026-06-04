@@ -48,46 +48,6 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// ===== HANDLE ADD NEW POEM =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_poem'])) {
-    $title = trim($_POST['title']);
-    $intro = trim($_POST['intro']);
-    $content = trim($_POST['content']);
-    
-    if (empty($title) || empty($content)) {
-        $error = 'Title and content are required.';
-    } else {
-        $image_path = '';
-        $audio_path = '';
-        
-        // Handle image upload
-        if (!empty($_FILES['image']['name'])) {
-            $upload_dir = '../assets/uploads/poems/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $image_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['image']['name']);
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $image_filename)) {
-                $image_path = 'assets/uploads/poems/' . $image_filename;
-            }
-        }
-        
-        // Handle audio upload
-        if (!empty($_FILES['audio']['name'])) {
-            $upload_dir = '../assets/uploads/audio/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $audio_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['audio']['name']);
-            if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $audio_filename)) {
-                $audio_path = 'assets/uploads/audio/' . $audio_filename;
-            }
-        }
-        
-        $stmt = $db->prepare("INSERT INTO poems (title, intro, content, image_path, audio_path) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$title, $intro, $content, $image_path, $audio_path]);
-        $success = 'Poem added successfully!';
-        header('Location: ' . SITE_URL . '/admin/manage_poems.php');
-        exit;
-    }
-}
-
 // ===== FETCH ALL POEMS =====
 $stmt = $db->query("SELECT * FROM poems ORDER BY created_at DESC");
 $poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -126,14 +86,19 @@ $pageTitle = 'Manage Poems';
                 </div>
                 <form method="POST" enctype="multipart/form-data" class="admin-form">
                     <input type="hidden" name="add_poem" value="1">
+                    
                     <div class="form-group">
                         <label for="modal_title">Title <span class="required">*</span></label>
                         <input type="text" id="modal_title" name="title" required>
                     </div>
+
+                    <!-- ===== AUTO-EXPANDING INTRODUCTION ===== -->
                     <div class="form-group">
                         <label for="modal_intro">Purpose / Introduction</label>
-                        <textarea id="modal_intro" name="intro" rows="3"></textarea>
+                        <textarea id="modal_intro" name="intro" rows="3" placeholder="Write a short introduction explaining the purpose or inspiration behind this poem..." oninput="this.style.height='auto'; this.style.height=(this.scrollHeight)+'px';"></textarea>
+                        <small class="field-hint">This will appear before the poem. It auto-expands as you type.</small>
                     </div>
+                    
                     <div class="form-group">
                         <label for="modal_content">Content <span class="required">*</span></label>
                         <textarea id="editor" name="content" rows="12"></textarea>
@@ -157,14 +122,28 @@ $pageTitle = 'Manage Poems';
                         <label>Poem Audio (MP3 or WAV) – optional</label>
                         <div id="audioDropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
                             <i class="fas fa-music" style="font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block;"></i>
-                            <p style="margin: 0; color: var(--text-light);">Click to upload an audio file (MP3, WAV)</p>
+                            <p style="margin: 0; color: var(--text-light);">Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
                             <input type="file" id="audioInput" name="audio" accept="audio/*" style="display: none;">
                             <div id="audioPreviewContainer" style="display: none; margin-top: 12px;">
-                                <audio controls id="audioPreview" style="width: 100%;">
-                                    <source src="" type="audio/mpeg">
-                                </audio>
+                                <audio controls id="audioPreview" style="width: 100%;"><source src="" type="audio/mpeg"></audio>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- ===== AUDIO RECORDER SECTION ===== -->
+                    <div class="recorder-section">
+                        <h4>🎙️ Or Record Directly</h4>
+                        <div class="recorder-controls">
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="recordingForm" style="display:none;">
+                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                            </form>
+                            <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        </div>
+                        <p class="field-hint">Record your poem directly in the browser. The recording will be saved when you submit the form.</p>
                     </div>
                     
                     <div class="form-actions">
@@ -268,6 +247,11 @@ $pageTitle = 'Manage Poems';
         const audioInput = document.getElementById('audioInput');
         const audioPreviewContainer = document.getElementById('audioPreviewContainer');
         const audioPreview = document.getElementById('audioPreview');
+        const recordBtn = document.getElementById('recordBtn');
+        const recordingStatus = document.getElementById('recordingStatus');
+        const recordingInput = document.getElementById('recordingInput');
+        const recordingPreviewContainer = document.getElementById('recordingPreviewContainer');
+        const recordingPreview = document.getElementById('recordingPreview');
 
         showModalBtn.addEventListener('click', function() {
             modal.style.display = 'flex';
@@ -382,62 +366,121 @@ $pageTitle = 'Manage Poems';
             dataTransfer.items.add(file);
             audioInput.files = dataTransfer.files;
         }
+
+        // ===== AUDIO RECORDER =====
+        if (recordBtn) {
+            recordBtn.addEventListener('click', async function() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    recordingStatus.style.display = 'none';
+                    recordBtn.textContent = '🎙️ Start Recording';
+                    recordBtn.classList.remove('btn-danger');
+                    recordBtn.classList.add('btn-secondary');
+                    return;
+                }
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const file = new File([audioBlob], 'poem_recording.webm', { type: 'audio/webm' });
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        recordingInput.files = dataTransfer.files;
+
+                        const url = URL.createObjectURL(file);
+                        recordingPreview.src = url;
+                        recordingPreview.load();
+                        recordingPreviewContainer.style.display = 'block';
+                        document.getElementById('recordingForm').style.display = 'block';
+                    };
+
+                    mediaRecorder.start();
+                    recordingStatus.style.display = 'inline';
+                    recordBtn.textContent = '⏹️ Stop Recording';
+                    recordBtn.classList.remove('btn-secondary');
+                    recordBtn.classList.add('btn-danger');
+                } catch (error) {
+                    alert('Microphone access denied or not available.');
+                    console.error('Recording error:', error);
+                }
+            });
+        }
     });
 </script>
 
 <style>
-/* ===== MODAL STYLES ===== */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-}
-.modal-content {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 32px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-}
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-.modal-header h2 { margin: 0; }
-.modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
-.modal-close:hover { color: var(--rose); }
+    /* ===== MODAL STYLES ===== */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+    .modal-content {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 32px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .modal-header h2 { margin: 0; }
+    .modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
+    .modal-close:hover { color: var(--rose); }
 
-/* ===== ADMIN TABLE ===== */
-.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-.admin-table thead { background: var(--vanilla); }
-.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
-.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
-.admin-table tbody tr:last-child td { border-bottom: none; }
-.table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
-.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+    /* ===== ADMIN TABLE ===== */
+    .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+    .admin-table thead { background: var(--vanilla); }
+    .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
+    .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+    .admin-table tbody tr:last-child td { border-bottom: none; }
+    .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
+    .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 
-/* ===== FORM STYLES ===== */
-.admin-form .form-group { margin-bottom: 16px; }
-.admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
-.admin-form input[type="text"], .admin-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
-.admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-.admin-form textarea { resize: vertical; min-height: 60px; }
-.required { color: #dc2626; }
-.form-actions { display: flex; gap: 12px; margin-top: 16px; }
-.form-actions .btn { min-width: 120px; justify-content: center; }
+    /* ===== FORM STYLES ===== */
+    .admin-form .form-group { margin-bottom: 16px; }
+    .admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+    .admin-form input[type="text"], .admin-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
+    .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+    .admin-form textarea { resize: vertical; min-height: 60px; }
+
+    /* ===== RECORDER STYLES ===== */
+    .recorder-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .recorder-section .btn { padding: 8px 16px; }
+    #recordingStatus { font-weight: 600; color: #e74c3c; }
+    .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
+
+    .form-actions { display: flex; gap: 12px; margin-top: 16px; }
+    .form-actions .btn { min-width: 120px; justify-content: center; }
+    .btn-primary { background: var(--rose); color: white; }
+    .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
+    .btn-secondary { background: var(--dark); color: white; }
+    .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
+    .btn-danger { background: #e74c3c; color: white; }
+    .btn-danger:hover { background: #c0392b; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

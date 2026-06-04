@@ -189,6 +189,18 @@ $pageTitle = 'Admin Dashboard';
                 <i class="fas fa-church"></i>
                 <span>Manage Reflections</span>
             </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php" class="action-card">
+                <i class="fas fa-question"></i>
+                <span>Manage Q&A</span>
+            </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="action-card">
+                <i class="fas fa-envelope"></i>
+                <span>Manage Messages</span>
+            </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php" class="action-card">
+                <i class="fas fa-newspaper"></i>
+                <span>Manage Newsletter</span>
+            </a>
             <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="action-card">
                 <i class="fas fa-cog"></i>
                 <span>Site Settings</span>
