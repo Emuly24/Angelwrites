@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['broadcast'])) {
             $headers = "From: " . SITE_NAME . " <admin@angelawrites.com>\r\n";
             $headers .= "Reply-To: admin@angelawrites.com\r\n";
             $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-            if (mail($email, $subject, nl2br($message), $headers)) {
+            if (mail($email, $subject, $message, $headers)) {
                 $count++;
             }
         }
@@ -84,7 +84,7 @@ $pageTitle = 'Newsletter';
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- Broadcast Email Form -->
+        <!-- Broadcast Email Form with TinyMCE -->
         <div class="card">
             <div class="card-header">
                 <h2>📨 Broadcast Email to Subscribers (<?php echo $active_count; ?> active)</h2>
@@ -97,7 +97,7 @@ $pageTitle = 'Newsletter';
                     </div>
                     <div class="form-group">
                         <label for="message">Message</label>
-                        <textarea id="message" name="message" rows="6" placeholder="Write your message here..." required></textarea>
+                        <textarea id="editor" name="message" rows="12"></textarea>
                     </div>
                     <div class="form-actions">
                         <button type="submit" name="broadcast" class="btn btn-primary btn-block">Send to All Subscribers</button>
@@ -157,6 +157,28 @@ $pageTitle = 'Newsletter';
         </div>
     </div>
 </div>
+
+<!-- ===== TINYMCE EDITOR ===== -->
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+<script>
+    tinymce.init({
+        selector: '#editor',
+        height: 400,
+        menubar: true,
+        plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+        toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
+        content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
+        forced_root_block: 'p',
+        init_instance_callback: function(editor) {
+            // Set initial content if any
+        },
+        setup: function(editor) {
+            editor.on('change', function () {
+                tinymce.triggerSave();
+            });
+        }
+    });
+</script>
 
 <style>
     /* ===== BROADCAST FORM STYLING ===== */

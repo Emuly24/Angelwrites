@@ -252,9 +252,9 @@ $pageTitle = htmlspecialchars($book['title']) . ' — Reader';
                     <?php if ($book['is_free']): ?>
                         <span class="badge free">Free</span>
                     <?php elseif ($book['is_sale']): ?>
-                        <span class="badge sale">$<?php echo number_format($book['price'], 2); ?></span>
+                        <span class="badge sale">MWK <?php echo number_format($book['price'], 2); ?></span>
                     <?php else: ?>
-                        <span class="badge">$<?php echo number_format($book['price'], 2); ?></span>
+                        <span class="badge">MWK <?php echo number_format($book['price'], 2); ?></span>
                     <?php endif; ?>
                     <?php if ($has_processed): ?>
                         <span class="badge processed">Processed</span>

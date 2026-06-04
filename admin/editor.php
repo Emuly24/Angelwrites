@@ -3,50 +3,43 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
+// Only admin can access
 redirectIfNotAdmin();
 
-$type = isset($_GET['type']) ? $_GET['type'] : 'poem';
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+// ===== REDIRECT POEM REQUESTS TO POEM EDITOR =====
+if (isset($_GET['type']) && $_GET['type'] === 'poem') {
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    header('Location: ' . SITE_URL . '/admin/poem_editor.php' . ($id ? '?id=' . $id : ''));
+    exit;
+}
 
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $error = '';
 $success = '';
-$existing_content = null;
+
+// Fetch existing blog post
 $title = '';
 $intro = '';
 $content = '';
-$image_path = '';
-$audio_path = '';
 $category = '';
 $tags = '';
 $status = 'draft';
 $featured_image = '';
 
-// Fetch existing content
 if ($id > 0) {
-    if ($type === 'poem') {
-        $stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
-        $stmt->execute([$id]);
-        $existing_content = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($existing_content) {
-            $title = $existing_content['title'];
-            $intro = $existing_content['intro'];
-            $content = $existing_content['content'];
-            $image_path = $existing_content['image_path'] ?? '';
-            $audio_path = $existing_content['audio_path'] ?? '';
-        }
-    } elseif ($type === 'blog') {
-        $stmt = $db->prepare("SELECT * FROM blog_posts WHERE id = ?");
-        $stmt->execute([$id]);
-        $existing_content = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($existing_content) {
-            $title = $existing_content['title'];
-            $intro = $existing_content['excerpt'] ?? '';
-            $content = $existing_content['content'];
-            $category = $existing_content['category'] ?? 'Christian Reflections';
-            $tags = $existing_content['tags'] ?? '';
-            $status = $existing_content['status'] ?? 'draft';
-            $featured_image = $existing_content['featured_image'] ?? '';
-        }
+    $stmt = $db->prepare("SELECT * FROM blog_posts WHERE id = ?");
+    $stmt->execute([$id]);
+    $post = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($post) {
+        $title = $post['title'];
+        $intro = $post['excerpt'] ?? '';
+        $content = $post['content'];
+        $category = $post['category'] ?? 'Christian Reflections';
+        $tags = $post['tags'] ?? '';
+        $status = $post['status'] ?? 'draft';
+        $featured_image = $post['featured_image'] ?? '';
+    } else {
+        $error = 'Post not found.';
     }
 }
 
@@ -55,33 +48,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
     $content = trim($_POST['content']);
+    $category = trim($_POST['category'] ?? 'Christian Reflections');
+    $tags = trim($_POST['tags'] ?? '');
+    $status = trim($_POST['status'] ?? 'draft');
     $action = $_POST['action'] ?? 'save';
 
-    $uploaded_image_path = $image_path;
-    $uploaded_audio_path = $audio_path;
     $uploaded_featured_image = $featured_image;
 
-    // Handle regular image upload
-    if (!empty($_FILES['image']['name'])) {
-        $upload_dir = '../assets/uploads/poems/';
+    // Handle featured image upload
+    if (!empty($_FILES['featured_image']['name'])) {
+        $upload_dir = '../assets/uploads/blog/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $image_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['image']['name']);
-        if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $image_filename)) {
-            $uploaded_image_path = 'assets/uploads/poems/' . $image_filename;
+        $feat_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['featured_image']['name']);
+        if (move_uploaded_file($_FILES['featured_image']['tmp_name'], $upload_dir . $feat_filename)) {
+            $uploaded_featured_image = 'assets/uploads/blog/' . $feat_filename;
         } else {
-            $error = 'Failed to upload image.';
-        }
-    }
-
-    // Handle audio upload
-    if (!empty($_FILES['audio']['name'])) {
-        $upload_dir = '../assets/uploads/audio/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $audio_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['audio']['name']);
-        if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $audio_filename)) {
-            $uploaded_audio_path = 'assets/uploads/audio/' . $audio_filename;
-        } else {
-            $error = 'Failed to upload audio.';
+            $error = 'Failed to upload featured image.';
         }
     }
 
@@ -92,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rec_filename = 'rec_' . time() . '.webm';
         if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
             $uploaded_audio_path = 'assets/uploads/audio/' . $rec_filename;
+            // Store in a custom field or attach to the post
         } else {
             $error = 'Failed to upload recorded audio.';
         }
@@ -104,20 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $video_filename = 'vid_' . time() . '.webm';
         if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
             $uploaded_video_path = 'assets/uploads/videos/' . $video_filename;
+            // Store in a custom field or attach to the post
         } else {
             $error = 'Failed to upload recorded video.';
-        }
-    }
-
-    // Handle featured image for blog
-    if (!empty($_FILES['featured_image']['name']) && $type === 'blog') {
-        $upload_dir = '../assets/uploads/blog/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $feat_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['featured_image']['name']);
-        if (move_uploaded_file($_FILES['featured_image']['tmp_name'], $upload_dir . $feat_filename)) {
-            $uploaded_featured_image = 'assets/uploads/blog/' . $feat_filename;
-        } else {
-            $error = 'Failed to upload featured image.';
         }
     }
 
@@ -125,58 +97,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Title and content are required.';
     } else {
         if ($id > 0) {
-            // Update existing
-            if ($type === 'poem') {
-                $stmt = $db->prepare("UPDATE poems SET title = ?, intro = ?, content = ?, image_path = ?, audio_path = ? WHERE id = ?");
-                $stmt->execute([$title, $intro, $content, $uploaded_image_path, $uploaded_audio_path, $id]);
-                $success = 'Poem updated successfully!';
-            } elseif ($type === 'blog') {
-                $category = trim($_POST['category'] ?? 'Christian Reflections');
-                $tags = trim($_POST['tags'] ?? '');
-                $status = trim($_POST['status'] ?? 'draft');
-                $stmt = $db->prepare("UPDATE blog_posts SET title = ?, content = ?, excerpt = ?, category = ?, tags = ?, status = ?, featured_image = ? WHERE id = ?");
-                $stmt->execute([$title, $content, $intro, $category, $tags, $status, $uploaded_featured_image, $id]);
-                $success = 'Blog post updated successfully!';
-            }
+            // Update existing blog post
+            $stmt = $db->prepare("UPDATE blog_posts SET title = ?, content = ?, excerpt = ?, category = ?, tags = ?, status = ?, featured_image = ? WHERE id = ?");
+            $stmt->execute([$title, $content, $intro, $category, $tags, $status, $uploaded_featured_image, $id]);
+            $success = 'Blog post updated successfully!';
         } else {
-            // Insert new
-            if ($type === 'poem') {
-                $stmt = $db->prepare("INSERT INTO poems (title, intro, content, image_path, audio_path) VALUES (?, ?, ?, ?, ?)");
-                $stmt->execute([$title, $intro, $content, $uploaded_image_path, $uploaded_audio_path]);
-                $id = $db->lastInsertId();
-                $success = 'Poem created successfully!';
-            } elseif ($type === 'blog') {
-                $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title)));
-                $category = trim($_POST['category'] ?? 'Christian Reflections');
-                $tags = trim($_POST['tags'] ?? '');
-                $status = trim($_POST['status'] ?? 'draft');
-                $stmt = $db->prepare("INSERT INTO blog_posts (title, slug, content, excerpt, category, tags, status, featured_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$title, $slug, $content, $intro, $category, $tags, $status, $uploaded_featured_image]);
-                $id = $db->lastInsertId();
-                $success = 'Blog post created successfully!';
+            // Insert new blog post
+            $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title)));
+            $stmt = $db->prepare("INSERT INTO blog_posts (title, slug, content, excerpt, category, tags, status, featured_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$title, $slug, $content, $intro, $category, $tags, $status, $uploaded_featured_image]);
+            $id = $db->lastInsertId();
+            $success = 'Blog post created successfully!';
+        }
+
+        // ===== HANDLE NEWSLETTER BROADCAST =====
+        if (isset($_POST['send_newsletter'])) {
+            $subject = $title;
+            $message_body = nl2br($content);
+            $headers = "From: " . SITE_NAME . " <admin@angelawrites.com>\r\n";
+            $headers .= "Reply-To: admin@angelawrites.com\r\n";
+            $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+
+            $stmt = $db->prepare("SELECT email FROM newsletter WHERE is_active = 1");
+            $stmt->execute();
+            $subscribers = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            $sent_count = 0;
+            foreach ($subscribers as $email) {
+                if (mail($email, $subject, $message_body, $headers)) {
+                    $sent_count++;
+                }
             }
+            $success .= " Broadcast sent to $sent_count subscribers.";
         }
 
         if ($action === 'save_and_continue') {
-            header('Location: ' . SITE_URL . '/admin/editor.php?type=' . $type . '&id=' . $id);
+            header('Location: ' . SITE_URL . '/admin/editor.php?id=' . $id);
             exit;
         } else {
-            header('Location: ' . SITE_URL . '/admin/manage_' . $type . 's.php');
+            header('Location: ' . SITE_URL . '/admin/manage_blog.php');
             exit;
         }
     }
 }
 
-$pageTitle = ucfirst($type) . ' Editor';
+$pageTitle = $id > 0 ? 'Edit Blog Post' : 'Add New Blog';
 ?>
 <?php require_once '../includes/header.php'; ?>
 
 <div class="admin-editor">
     <div class="container">
         <div class="admin-header">
-            <h1><?php echo $id > 0 ? 'Edit ' . ucfirst($type) : 'Add New ' . ucfirst($type); ?></h1>
+            <h1><?php echo $id > 0 ? 'Edit Blog Post' : 'Add New Blog'; ?></h1>
             <div class="admin-actions">
-                <a href="<?php echo SITE_URL; ?>/admin/manage_<?php echo $type; ?>s.php" class="btn btn-outline">
+                <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back
                 </a>
             </div>
@@ -194,18 +168,19 @@ $pageTitle = ucfirst($type) . ' Editor';
 
             <div class="card">
                 <div class="card-body">
+                    <!-- Title -->
                     <div class="form-group">
                         <label for="title">Title <span class="required">*</span></label>
                         <input type="text" id="title" name="title" value="<?php echo htmlspecialchars($title); ?>" required>
                     </div>
 
+                    <!-- Introduction -->
                     <div class="form-group">
                         <label for="intro">Introduction / Purpose</label>
                         <textarea id="intro" name="intro" rows="3"><?php echo htmlspecialchars($intro); ?></textarea>
                     </div>
 
-                    <?php if ($type === 'blog'): ?>
-                    <!-- ===== BLOG FIELDS ===== -->
+                    <!-- Blog Fields -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="category">Category</label>
@@ -218,9 +193,9 @@ $pageTitle = ucfirst($type) . ' Editor';
                         <div class="form-group">
                             <label for="status">Status</label>
                             <select id="status" name="status">
-                                <option value="draft" <?php echo ($status ?? 'draft') === 'draft' ? 'selected' : ''; ?>>Draft</option>
-                                <option value="published" <?php echo ($status ?? '') === 'published' ? 'selected' : ''; ?>>Published</option>
-                                <option value="archived" <?php echo ($status ?? '') === 'archived' ? 'selected' : ''; ?>>Archived</option>
+                                <option value="draft" <?php echo $status === 'draft' ? 'selected' : ''; ?>>Draft</option>
+                                <option value="published" <?php echo $status === 'published' ? 'selected' : ''; ?>>Published</option>
+                                <option value="archived" <?php echo $status === 'archived' ? 'selected' : ''; ?>>Archived</option>
                             </select>
                         </div>
                     </div>
@@ -243,48 +218,8 @@ $pageTitle = ucfirst($type) . ' Editor';
                             <?php endif; ?>
                         </div>
                     </div>
-                    <?php endif; ?>
 
-                    <?php if ($type === 'poem'): ?>
-                    <!-- ===== POEM COVER IMAGE ===== -->
-                    <div class="form-group">
-                        <label>Poem Cover Image</label>
-                        <div id="dropZone" class="upload-zone">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Drag & drop your image here, or <strong>click to browse</strong></p>
-                            <input type="file" id="fileInput" name="image" accept="image/*" style="display:none;">
-                            <div id="previewContainer" style="display:none; margin-top:12px;">
-                                <img id="previewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
-                            </div>
-                            <?php if (!empty($image_path)): ?>
-                                <div id="currentImageContainer" style="margin-top:12px;">
-                                    <p><strong>Current Image:</strong></p>
-                                    <img src="<?php echo SITE_URL . '/' . $image_path; ?>" style="max-width:150px; max-height:150px; border-radius:8px;">
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <!-- ===== POEM AUDIO ===== -->
-                    <div class="form-group">
-                        <label>Poem Audio (MP3 or WAV) – optional</label>
-                        <div id="audioDropZone" class="upload-zone">
-                            <i class="fas fa-music"></i>
-                            <p>Drag & drop an audio file, or <strong>click to browse</strong></p>
-                            <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
-                            <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
-                                <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
-                            </div>
-                            <?php if (!empty($audio_path)): ?>
-                                <div id="currentAudioContainer" style="margin-top:12px;">
-                                    <p><strong>Current Audio:</strong></p>
-                                    <audio controls style="width:100%;"><source src="<?php echo SITE_URL . '/' . $audio_path; ?>" type="audio/mpeg"></audio>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
+                    <!-- Content -->
                     <div class="form-group">
                         <label for="content">Content <span class="required">*</span></label>
                         <textarea id="editor" name="content" rows="20"><?php echo htmlspecialchars($content); ?></textarea>
@@ -322,11 +257,13 @@ $pageTitle = ucfirst($type) . ' Editor';
                         <p class="field-hint">Record a video directly in your browser. The recording will be saved when you submit the form.</p>
                     </div>
 
+                    <!-- Form Actions -->
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="submit" class="btn btn-primary">Save Blog</button>
                         <button type="button" class="btn btn-secondary" onclick="document.getElementById('formAction').value='save_and_continue'; document.getElementById('editorForm').submit();">
                             Save & Continue
                         </button>
+                        <button type="submit" name="send_newsletter" value="1" class="btn btn-info btn-block">📨 Save & Send to Newsletter</button>
                     </div>
                 </div>
             </div>
@@ -334,7 +271,7 @@ $pageTitle = ucfirst($type) . ' Editor';
     </div>
 </div>
 
-<!-- ===== TINYMCE EDITOR WITH BIBLE BUTTON ===== -->
+<!-- ===== TINYMCE EDITOR ===== -->
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
 <script>
     tinymce.init({
@@ -342,7 +279,7 @@ $pageTitle = ucfirst($type) . ' Editor';
         height: 600,
         menubar: true,
         plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
-        toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code | bible',
+        toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
         content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
         forced_root_block: 'p',
         init_instance_callback: function(editor) {
@@ -352,18 +289,6 @@ $pageTitle = ucfirst($type) . ' Editor';
             }
         },
         setup: function(editor) {
-            // ===== BIBLE BUTTON =====
-            editor.ui.registry.addButton('bible', {
-                text: '📖 Bible',
-                tooltip: 'Open Bible Reader to extract verses',
-                onAction: function() {
-                    const bibleWindow = window.open('/bible_reader.php', 'BibleReader', 'width=1000,height=800,scrollbars=yes');
-                    if (!bibleWindow) {
-                        alert('Please allow popups to use the Bible feature.');
-                    }
-                }
-            });
-
             editor.addShortcut('Ctrl+S', 'Save', function() {
                 document.querySelector('form').submit();
             });
@@ -441,7 +366,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (recordBtn) {
         recordBtn.addEventListener('click', async function() {
-            // If currently recording, stop it
             if (audioRecorder.mediaRecorder && audioRecorder.mediaRecorder.state === 'recording') {
                 audioRecorder.mediaRecorder.stop();
                 recordingStatus.style.display = 'none';
@@ -467,7 +391,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     audioPreviewRecorder.load();
                     audioPreviewRecorderContainer.style.display = 'block';
 
-                    // Replace controls with preview + confirm/retake
                     document.querySelector('.recorder-controls').innerHTML = `
                         <audio controls src="${url}" style="width:100%;"></audio>
                         <div style="display:flex; gap:12px; margin-top:10px;">
@@ -476,7 +399,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     `;
 
-                    // Confirm Audio
                     document.getElementById('confirmAudioBtn').addEventListener('click', function() {
                         const dt = new DataTransfer();
                         dt.items.add(new File([audioRecorder.blob], 'audio_recording.webm', { type: 'audio/webm' }));
@@ -492,11 +414,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
                             </div>
                         `;
-                        // Re-bind the record button by re-initializing the event listener (or reload)
-                        location.reload(); // simplest
+                        location.reload();
                     });
 
-                    // Retake Audio
                     document.getElementById('retakeAudioBtn').addEventListener('click', function() {
                         audioRecorder.blob = null;
                         audioPreviewRecorderContainer.style.display = 'none';
@@ -538,7 +458,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (videoRecordBtn) {
         videoRecordBtn.addEventListener('click', async function() {
-            // If currently recording, stop it
             if (videoRecorder.mediaRecorder && videoRecorder.mediaRecorder.state === 'recording') {
                 videoRecorder.mediaRecorder.stop();
                 videoRecordingStatus.textContent = '⏹️ Stopped';
@@ -553,7 +472,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 videoRecorder.mediaRecorder = new MediaRecorder(videoRecorder.stream);
                 videoRecorder.chunks = [];
 
-                // Show live preview during recording
                 if (videoPreview) {
                     videoPreview.srcObject = videoRecorder.stream;
                     videoPreview.muted = true;
@@ -578,7 +496,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     videoPreviewContainer.style.display = 'block';
 
-                    // Replace controls with preview + confirm/retake
                     document.querySelector('.recorder-controls').innerHTML = `
                         <video controls src="${url}" width="100%"></video>
                         <div style="display:flex; gap:12px; margin-top:10px;">
@@ -587,7 +504,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     `;
 
-                    // Confirm Video
                     document.getElementById('confirmVideoBtn').addEventListener('click', function() {
                         const dt = new DataTransfer();
                         dt.items.add(new File([videoRecorder.blob], 'video_recording.webm', { type: 'video/webm' }));
@@ -606,7 +522,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         location.reload();
                     });
 
-                    // Retake Video
                     document.getElementById('retakeVideoBtn').addEventListener('click', function() {
                         videoRecorder.blob = null;
                         videoPreviewContainer.style.display = 'none';
@@ -639,33 +554,51 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-    .form-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-    .form-row .form-group { flex: 1; min-width: 150px; }
-    .form-actions { display: flex; gap: 12px; margin-top: 16px; }
-    .card { margin-bottom: 24px; }
-    .card-body { padding: 20px; }
     .admin-editor { padding: 32px 0 60px; }
     .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
     .admin-header h1 { font-size: 2rem; margin: 0; }
     .admin-actions { display: flex; gap: 12px; }
 
-    .form-section, .media-section { margin-bottom: 32px; }
-    .form-section .form-group { margin-bottom: 16px; }
-    .form-section label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
-    .form-section input[type="text"], .form-section textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-    .form-section input:focus, .form-section textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-    .form-section textarea { resize: vertical; min-height: 60px; }
+    /* ===== FORM STYLES ===== */
+    .admin-form .form-group { margin-bottom: 16px; }
+    .admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
+    .admin-form input[type="text"], .admin-form textarea, .admin-form select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        background: var(--input-bg);
+        color: var(--text);
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .admin-form input[type="text"]:focus, .admin-form textarea:focus, .admin-form select:focus {
+        outline: none;
+        border-color: var(--rose);
+        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+    }
+    .admin-form textarea { resize: vertical; min-height: 60px; }
     .required { color: #dc2626; }
-    .field-hint { display: block; margin-top: 4px; font-size: 0.85rem; color: var(--text-light); }
 
-    .media-section { display: flex; gap: 24px; flex-wrap: wrap; }
-    .media-group { flex: 1; min-width: 280px; }
-    .media-group h3 { font-size: 1.1rem; margin-bottom: 12px; }
+    /* ===== FORM ROW ===== */
+    .form-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 12px; }
+    .form-row .form-group { flex: 1; min-width: 150px; }
 
-    .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--fantasy); }
+    /* ===== FEATURED IMAGE UPLOAD ===== */
+    .upload-zone {
+        border: 2px dashed var(--border);
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: var(--fantasy);
+    }
     .upload-zone i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block; }
     .upload-zone p { margin: 0; color: var(--text-light); }
+    .upload-zone:hover { border-color: var(--rose); background: rgba(219, 161, 162, 0.05); }
 
+    /* ===== RECORDER SECTION ===== */
     .recorder-section { background: var(--fantasy); border-radius: 12px; padding: 20px; margin-top: 16px; border: 1px solid var(--border); }
     .recorder-section h3 { margin-bottom: 12px; }
     .recorder-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
@@ -673,44 +606,21 @@ document.addEventListener('DOMContentLoaded', function() {
     #recordingStatus, #videoRecordingStatus { font-weight: 600; color: #e74c3c; }
     .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
 
-    .form-actions { display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
-    .form-actions .btn { min-width: 120px; justify-content: center; }
+    /* ===== FORM ACTIONS ===== */
+    .form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    .form-actions .btn { min-width: 120px; justify-content: center; padding: 10px 24px; font-weight: 600; border-radius: 30px; }
     .btn-primary { background: var(--rose); color: white; }
     .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
     .btn-secondary { background: var(--dark); color: white; }
     .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
-    .btn-danger { background: #e74c3c; color: white; }
-    .btn-danger:hover { background: #c0392b; }
-
-    /* Blinking animation for the recording status */
-    @keyframes blink-animation {
-      0% { opacity: 1; }
-      50% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-    #videoRecordingStatus.recording {
-      animation: blink-animation 1s infinite;
-      color: #e74c3c;
-      font-weight: bold;
-    }
-
-    /* Ensure the video preview container is visible during recording */
-    #videoPreviewContainer {
-      display: block !important;
-      width: 100%;
-      margin-top: 10px;
-    }
-    #videoPreviewContainer video {
-      width: 100%;
-      max-width: 100%;
-      border-radius: 8px;
-      background: #000;
-      display: block;
-    }
+    .btn-info { background: #3498db; color: white; }
+    .btn-info:hover { background: #2980b9; transform: translateY(-2px); }
+    .btn-block { width: 100%; }
 
     @media (max-width: 768px) {
-        .media-section { flex-direction: column; }
-        .media-group { min-width: auto; }
+        .form-row { flex-direction: column; }
+        .form-actions { flex-direction: column; }
+        .form-actions .btn { width: 100%; }
     }
 </style>
 
