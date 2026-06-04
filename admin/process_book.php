@@ -3,28 +3,21 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// 1. DEFINE CORRECT LIBRARY PATH (Step back from /admin/ to /htdocs/)
+// 1. DEFINE CORRECT LIBRARY PATH
 define('LIB_PATH', dirname(__DIR__) . '/libs/');
 
-// 2. Manually load the PDF Parser Library
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementArray.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementBoolean.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementDate.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementHexa.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementName.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementNull.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementNumeric.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementString.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementStruct.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Encoding.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Exception.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Font.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Header.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Page.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Pages.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Parser.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/PDFObject.php';
+// 2. AUTO-LOAD THE PDF PARSER LIBRARY (No more manual ordering issues!)
+function loadPdfParserClasses($dir) {
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
+    );
+    foreach ($files as $file) {
+        if ($file->isFile() && $file->getExtension() === 'php') {
+            require_once $file->getPathname();
+        }
+    }
+}
+loadPdfParserClasses(LIB_PATH . 'pdfparser-master/src/');
 
 use Smalot\PdfParser\Parser;
 
