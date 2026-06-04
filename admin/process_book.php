@@ -26,54 +26,65 @@ $existing_content = $stmt->fetch(PDO::FETCH_ASSOC);
 // ===== REAL EXTRACTION ENGINE =====
 
 function extract_pdf($file_path) {
+    if (!file_exists($file_path)) return false;
     // Use smalot/pdfparser
     $parser = new \Smalot\PdfParser\Parser();
-    $pdf = $parser->parseFile($file_path);
-    $text = $pdf->getText();
-    // Convert plain text to simple HTML (headings, paragraphs)
-    $lines = explode("\n", $text);
-    $html = '';
-    foreach ($lines as $line) {
-        $trimmed = trim($line);
-        if (empty($trimmed)) continue;
-        // Guess heading (all caps or short line)
-        if (strtoupper($trimmed) === $trimmed && strlen($trimmed) < 100) {
-            $html .= "<h2>$trimmed</h2>";
-        } else {
-            $html .= "<p>$trimmed</p>";
+    try {
+        $pdf = $parser->parseFile($file_path);
+        $text = $pdf->getText();
+        // Convert plain text to simple HTML (headings, paragraphs)
+        $lines = explode("\n", $text);
+        $html = '';
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if (empty($trimmed)) continue;
+            // Guess heading (all caps or short line)
+            if (strtoupper($trimmed) === $trimmed && strlen($trimmed) < 100) {
+                $html .= "<h2>$trimmed</h2>";
+            } else {
+                $html .= "<p>$trimmed</p>";
+            }
         }
+        return $html;
+    } catch (Exception $e) {
+        return false;
     }
-    return $html;
 }
 
 function extract_docx($file_path) {
+    if (!file_exists($file_path)) return false;
     // Use PHPSpreadsheet for DOCX parsing
-    $phpWord = \PhpOffice\PhpWord\IOFactory::load($file_path);
-    $html = '';
-    foreach ($phpWord->getSections() as $section) {
-        foreach ($section->getElements() as $element) {
-            if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
-                $text = '';
-                foreach ($element->getElements() as $textElement) {
-                    if ($textElement instanceof \PhpOffice\PhpWord\Element\Text) {
-                        $text .= $textElement->getText();
+    try {
+        $phpWord = \PhpOffice\PhpWord\IOFactory::load($file_path);
+        $html = '';
+        foreach ($phpWord->getSections() as $section) {
+            foreach ($section->getElements() as $element) {
+                if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
+                    $text = '';
+                    foreach ($element->getElements() as $textElement) {
+                        if ($textElement instanceof \PhpOffice\PhpWord\Element\Text) {
+                            $text .= $textElement->getText();
+                        }
                     }
+                    $html .= "<p>$text</p>";
+                } elseif ($element instanceof \PhpOffice\PhpWord\Element\Title) {
+                    $level = $element->getDepth();
+                    $text = $element->getText();
+                    $tag = $level == 1 ? 'h1' : ($level == 2 ? 'h2' : 'h3');
+                    $html .= "<$tag>$text</$tag>";
+                } elseif ($element instanceof \PhpOffice\PhpWord\Element\Text) {
+                    $html .= "<p>" . $element->getText() . "</p>";
                 }
-                $html .= "<p>$text</p>";
-            } elseif ($element instanceof \PhpOffice\PhpWord\Element\Title) {
-                $level = $element->getDepth();
-                $text = $element->getText();
-                $tag = $level == 1 ? 'h1' : ($level == 2 ? 'h2' : 'h3');
-                $html .= "<$tag>$text</$tag>";
-            } elseif ($element instanceof \PhpOffice\PhpWord\Element\Text) {
-                $html .= "<p>" . $element->getText() . "</p>";
             }
         }
+        return $html;
+    } catch (Exception $e) {
+        return false;
     }
-    return $html;
 }
 
 function extract_epub($file_path) {
+    if (!file_exists($file_path)) return false;
     // EPUB is a ZIP file with HTML/XHTML inside
     $zip = new ZipArchive();
     if ($zip->open($file_path) !== TRUE) {
