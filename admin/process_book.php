@@ -1,4 +1,33 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Define paths (adjust if your libs folder is elsewhere)
+define('LIB_PATH', __DIR__ . '/libs/');
+
+// Manually require the PdfParser main class
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementArray.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementBoolean.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementDate.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementHexa.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementName.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementNull.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementNumeric.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementString.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementStruct.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Encoding.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Exception.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Font.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Header.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Page.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Pages.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Parser.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/PDFObject.php';
+
+// Now you can use the library
+use Smalot\PdfParser\Parser;
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
