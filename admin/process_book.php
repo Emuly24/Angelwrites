@@ -9,6 +9,7 @@ define('LIB_PATH', dirname(__DIR__) . '/libs/');
 // 2. MANUALLY LOAD THE BASE DEPENDENCY FIRST (Fixes the ElementString error)
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element.php';
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementString.php';
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/PDFObject.php'; 
 
 // 3. AUTO-LOAD THE REST OF THE PDF PARSER
 function loadPdfParserClasses($dir) {
