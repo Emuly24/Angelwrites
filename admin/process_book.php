@@ -60,6 +60,8 @@ function extract_pdf($file_path) {
     try {
         $pdf = $parser->parseFile($file_path);
         $text = $pdf->getText();
+        // Force UTF-8 encoding
+        $text = mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
         // Convert plain text to simple HTML
         $lines = explode("\n", $text);
         $html = '';
@@ -100,15 +102,17 @@ function extract_docx($file_path) {
     }
     zip_close($zip);
     
-    // FORCE UTF-8 ENCODING HERE
-   $content = mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
+    // 🔥 CRITICAL FIX: Convert from Windows-1252 to UTF-8 (NOT ISO-8859-1)
+    $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
+    
     // Format into paragraphs
     $lines = explode("\n", $content);
     $html = '';
     foreach ($lines as $line) {
         $trimmed = trim($line);
         if (!empty($trimmed)) {
-            $html .= "<p>$trimmed</p>";
+            // Escape HTML to prevent XSS
+            $html .= "<p>" . htmlspecialchars($trimmed, ENT_QUOTES, 'UTF-8') . "</p>";
         }
     }
     return $html;
@@ -147,6 +151,7 @@ function extract_epub($file_path) {
         $full_path = $base_dir . $href;
         $content = $zip->getFromName($full_path);
         if ($content) {
+            $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
             $dom = new DOMDocument();
             @$dom->loadHTML($content);
             $xpath = new DOMXPath($dom);
@@ -206,13 +211,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['extract_content'])) {
             $updated_html = $dom->saveHTML();
             $toc_json = json_encode($toc);
 
-            if ($existing_content) {
-                $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, is_processed = 0 WHERE book_id = ?");
-                $stmt->execute([$updated_html, $toc_json, $book_id]);
-            } else {
-                $stmt = $db->prepare("INSERT INTO book_content (book_id, title, content_html, toc_json, is_processed) VALUES (?, ?, ?, ?, 0)");
-                $stmt->execute([$book_id, $book['title'], $updated_html, $toc_json]);
-            }
+            // Delete old content before inserting new one to avoid corruption
+            $stmt = $db->prepare("DELETE FROM book_content WHERE book_id = ?");
+            $stmt->execute([$book_id]);
+
+            $stmt = $db->prepare("INSERT INTO book_content (book_id, title, content_html, toc_json, is_processed) VALUES (?, ?, ?, ?, 0)");
+            $stmt->execute([$book_id, $book['title'], $updated_html, $toc_json]);
+            
             $success = 'Content extracted successfully. Please review and edit below.';
             header('Location: ' . SITE_URL . '/admin/process_book.php?id=' . $book_id);
             exit;
@@ -293,7 +298,7 @@ $pageTitle = 'Process Book: ' . htmlspecialchars($book['title']);
                 <form method="POST" id="processForm">
                     <input type="hidden" name="save_processed" value="1">
                     
-                    <!-- Hidden TOC JSON field (no more clutter!) -->
+                    <!-- Hidden TOC JSON field -->
                     <input type="hidden" name="toc_json" id="toc_json" value="<?php echo htmlspecialchars($existing_content['toc_json'] ?? '[]'); ?>">
 
                     <div class="form-group">
@@ -323,18 +328,12 @@ $pageTitle = 'Process Book: ' . htmlspecialchars($book['title']);
 <script>
     tinymce.init({
         selector: '#advancedEditor',
-        height: 800, // Massive, comfortable editor
+        height: 800,
         menubar: true,
         plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount code',
         toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
         content_style: 'body { font-family: Inter, sans-serif; font-size: 18px; line-height: 2; }',
         forced_root_block: 'p',
-        setup: function(editor) {
-            // Auto-sync the TOC JSON when content changes (optional, but useful)
-            editor.on('change', function() {
-                // You can add logic here to auto-generate TOC if needed
-            });
-        },
         init_instance_callback: function(editor) {
             const existingContent = <?php echo json_encode($existing_content['content_html'] ?? ''); ?>;
             if (existingContent) {
