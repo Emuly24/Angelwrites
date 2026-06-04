@@ -3,10 +3,10 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Define paths (adjust if your libs folder is elsewhere)
-define('LIB_PATH', __DIR__ . '/libs/');
+// 1. DEFINE CORRECT LIBRARY PATH (Step back from /admin/ to /htdocs/)
+define('LIB_PATH', dirname(__DIR__) . '/libs/');
 
-// Manually require the PdfParser main class
+// 2. Manually load the PDF Parser Library
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element.php';
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementArray.php';
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementBoolean.php';
@@ -26,8 +26,9 @@ require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Pages.php';
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Parser.php';
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/PDFObject.php';
 
-// Now you can use the library
 use Smalot\PdfParser\Parser;
+
+// 3. Include your site configuration
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
@@ -56,12 +57,11 @@ $existing_content = $stmt->fetch(PDO::FETCH_ASSOC);
 
 function extract_pdf($file_path) {
     if (!file_exists($file_path)) return false;
-    // Use smalot/pdfparser
     $parser = new \Smalot\PdfParser\Parser();
     try {
         $pdf = $parser->parseFile($file_path);
         $text = $pdf->getText();
-        // Convert plain text to simple HTML (headings, paragraphs)
+        // Convert plain text to simple HTML
         $lines = explode("\n", $text);
         $html = '';
         foreach ($lines as $line) {
@@ -80,41 +80,42 @@ function extract_pdf($file_path) {
     }
 }
 
+// NEW: Simple DOCX extraction using ZipArchive (NO extra libraries required!)
 function extract_docx($file_path) {
     if (!file_exists($file_path)) return false;
-    // Use PHPSpreadsheet for DOCX parsing
-    try {
-        $phpWord = \PhpOffice\PhpWord\IOFactory::load($file_path);
-        $html = '';
-        foreach ($phpWord->getSections() as $section) {
-            foreach ($section->getElements() as $element) {
-                if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
-                    $text = '';
-                    foreach ($element->getElements() as $textElement) {
-                        if ($textElement instanceof \PhpOffice\PhpWord\Element\Text) {
-                            $text .= $textElement->getText();
-                        }
-                    }
-                    $html .= "<p>$text</p>";
-                } elseif ($element instanceof \PhpOffice\PhpWord\Element\Title) {
-                    $level = $element->getDepth();
-                    $text = $element->getText();
-                    $tag = $level == 1 ? 'h1' : ($level == 2 ? 'h2' : 'h3');
-                    $html .= "<$tag>$text</$tag>";
-                } elseif ($element instanceof \PhpOffice\PhpWord\Element\Text) {
-                    $html .= "<p>" . $element->getText() . "</p>";
-                }
+    
+    $zip = zip_open($file_path);
+    if (!$zip || is_numeric($zip)) return false;
+    
+    $content = '';
+    while ($zip_entry = zip_read($zip)) {
+        if (zip_entry_name($zip_entry) == 'word/document.xml') {
+            if (zip_entry_open($zip, $zip_entry, "r")) {
+                $xml = zip_entry_read($zip_entry, zip_entry_filesize($zip_entry));
+                $xml = strip_tags($xml, '<w:t>');
+                $xml = str_replace(['<w:t>', '</w:t>'], '', $xml);
+                $content = html_entity_decode($xml);
+                zip_entry_close($zip_entry);
+                break;
             }
         }
-        return $html;
-    } catch (Exception $e) {
-        return false;
     }
+    zip_close($zip);
+    
+    // Format into paragraphs
+    $lines = explode("\n", $content);
+    $html = '';
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if (!empty($trimmed)) {
+            $html .= "<p>$trimmed</p>";
+        }
+    }
+    return $html;
 }
 
 function extract_epub($file_path) {
     if (!file_exists($file_path)) return false;
-    // EPUB is a ZIP file with HTML/XHTML inside
     $zip = new ZipArchive();
     if ($zip->open($file_path) !== TRUE) {
         return false;
@@ -188,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['extract_content'])) {
         }
 
         if (empty($error) && !empty($extracted_html)) {
-            // Generate a simple TOC from h1, h2, h3 headings in the extracted HTML
+            // Generate a simple TOC from h1, h2, h3 headings
             $dom = new DOMDocument();
             @$dom->loadHTML($extracted_html);
             $xpath = new DOMXPath($dom);
@@ -246,6 +247,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_processed'])) {
 $pageTitle = 'Process Book: ' . htmlspecialchars($book['title']);
 ?>
 <?php require_once '../includes/header.php'; ?>
+
+<!-- ... REST OF YOUR EXISTING HTML AND JAVASCRIPT REMAINS EXACTLY THE SAME ... -->
+<!-- I have preserved the complete UI below -->
 
 <div class="admin-process-book">
     <div class="container">
