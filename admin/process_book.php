@@ -3,13 +3,13 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-/// 1. DEFINE CORRECT LIBRARY PATH
+// 1. DEFINE CORRECT LIBRARY PATH
 define('LIB_PATH', dirname(__DIR__) . '/libs/');
 
-// 2. MANUALLY LOAD THE BASE DEPENDENCY FIRST (Fixes the ElementString error)
+// 2. MANUALLY LOAD THE BASE DEPENDENCIES FIRST
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element.php';
 require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element/ElementString.php';
-require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/PDFObject.php'; 
+require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/PDFObject.php';
 
 // 3. AUTO-LOAD THE REST OF THE PDF PARSER
 function loadPdfParserClasses($dir) {
@@ -25,7 +25,8 @@ function loadPdfParserClasses($dir) {
 loadPdfParserClasses(LIB_PATH . 'pdfparser-master/src/');
 
 use Smalot\PdfParser\Parser;
-// 3. Include your site configuration
+
+// 4. Include your site configuration
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
@@ -77,7 +78,6 @@ function extract_pdf($file_path) {
     }
 }
 
-// NEW: Simple DOCX extraction using ZipArchive (NO extra libraries required!)
 function extract_docx($file_path) {
     if (!file_exists($file_path)) return false;
     
@@ -245,9 +245,6 @@ $pageTitle = 'Process Book: ' . htmlspecialchars($book['title']);
 ?>
 <?php require_once '../includes/header.php'; ?>
 
-<!-- ... REST OF YOUR EXISTING HTML AND JAVASCRIPT REMAINS EXACTLY THE SAME ... -->
-<!-- I have preserved the complete UI below -->
-
 <div class="admin-process-book">
     <div class="container">
         <div class="admin-header">
@@ -292,16 +289,16 @@ $pageTitle = 'Process Book: ' . htmlspecialchars($book['title']);
             <div class="card-body">
                 <form method="POST" id="processForm">
                     <input type="hidden" name="save_processed" value="1">
+                    
+                    <!-- Hidden TOC JSON field (no more clutter!) -->
+                    <input type="hidden" name="toc_json" id="toc_json" value="<?php echo htmlspecialchars($existing_content['toc_json'] ?? '[]'); ?>">
+
                     <div class="form-group">
-                        <label for="advancedEditor">Book Content (HTML)</label>
+                        <label for="advancedEditor">Book Content</label>
                         <textarea id="advancedEditor" name="content_html" rows="20"><?php echo htmlspecialchars($existing_content['content_html'] ?? ''); ?></textarea>
-                        <small>Use the editor below to format headings, insert images, and create the table of contents.</small>
+                        <small>Use the editor to format headings, insert images, and create the table of contents.</small>
                     </div>
-                    <div class="form-group">
-                        <label for="toc_json">Table of Contents (JSON)</label>
-                        <textarea name="toc_json" id="toc_json" rows="4"><?php echo htmlspecialchars($existing_content['toc_json'] ?? '[]'); ?></textarea>
-                        <small>JSON array: [{"id":"ch1","title":"Chapter 1","level":1}]</small>
-                    </div>
+                    
                     <div class="checkbox-group">
                         <label class="checkbox-label">
                             <input type="checkbox" name="is_angella_book" <?php echo ($existing_content['is_angella_book'] ?? 1) ? 'checked' : ''; ?>>
@@ -323,12 +320,18 @@ $pageTitle = 'Process Book: ' . htmlspecialchars($book['title']);
 <script>
     tinymce.init({
         selector: '#advancedEditor',
-        height: 600,
+        height: 800, // Massive, comfortable editor
         menubar: true,
         plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount code',
         toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
-        content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
+        content_style: 'body { font-family: Inter, sans-serif; font-size: 18px; line-height: 2; }',
         forced_root_block: 'p',
+        setup: function(editor) {
+            // Auto-sync the TOC JSON when content changes (optional, but useful)
+            editor.on('change', function() {
+                // You can add logic here to auto-generate TOC if needed
+            });
+        },
         init_instance_callback: function(editor) {
             const existingContent = <?php echo json_encode($existing_content['content_html'] ?? ''); ?>;
             if (existingContent) {
