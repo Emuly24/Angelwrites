@@ -104,9 +104,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $video_filename = 'vid_' . time() . '.webm';
         if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
             $uploaded_video_path = 'assets/uploads/videos/' . $video_filename;
-            // You can store this in a `video_path` column or in `media_files` table.
-            // For now, we'll store it in a custom field. If you have a `video_path` column in `blog_posts`, use that.
-            // For demonstration, we'll store it in a separate array.
         } else {
             $error = 'Failed to upload recorded video.';
         }
@@ -374,188 +371,261 @@ $pageTitle = ucfirst($type) . ' Editor';
     });
 </script>
 
+<!-- ===== FULL RECORDER JAVASCRIPT (Audio + Video with Confirm/Retake) ===== -->
 <script>
-    // ===== DRAG & DROP FOR FEATURED IMAGE =====
-    document.addEventListener('DOMContentLoaded', function() {
-        const featDropZone = document.getElementById('featDropZone');
-        const featFileInput = document.getElementById('featFileInput');
-        const featPreviewContainer = document.getElementById('featPreviewContainer');
-        const featPreviewImage = document.getElementById('featPreviewImage');
+document.addEventListener('DOMContentLoaded', function() {
+    // ============================================================
+    // 1. DRAG & DROP FOR FEATURED IMAGE
+    // ============================================================
+    const featDropZone = document.getElementById('featDropZone');
+    const featFileInput = document.getElementById('featFileInput');
+    const featPreviewContainer = document.getElementById('featPreviewContainer');
+    const featPreviewImage = document.getElementById('featPreviewImage');
 
-        if (featDropZone) {
-            featDropZone.addEventListener('click', function() { featFileInput.click(); });
-            featFileInput.addEventListener('change', function(e) {
-                if (e.target.files.length > 0) handleFeatFile(e.target.files[0]);
-            });
-            featDropZone.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                featDropZone.style.borderColor = 'var(--rose)';
-                featDropZone.style.background = 'rgba(219, 161, 162, 0.1)';
-            });
-            featDropZone.addEventListener('dragleave', function(e) {
-                e.preventDefault();
-                featDropZone.style.borderColor = 'var(--border)';
-                featDropZone.style.background = 'transparent';
-            });
-            featDropZone.addEventListener('drop', function(e) {
-                e.preventDefault();
-                featDropZone.style.borderColor = 'var(--border)';
-                featDropZone.style.background = 'transparent';
-                const files = e.dataTransfer.files;
-                if (files.length > 0) handleFeatFile(files[0]);
-            });
+    if (featDropZone) {
+        featDropZone.addEventListener('click', () => featFileInput.click());
+        featFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFeatFile(e.target.files[0]);
+        });
+        featDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            featDropZone.style.borderColor = 'var(--rose)';
+            featDropZone.style.background = 'rgba(219, 161, 162, 0.1)';
+        });
+        featDropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            featDropZone.style.borderColor = 'var(--border)';
+            featDropZone.style.background = 'transparent';
+        });
+        featDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            featDropZone.style.borderColor = 'var(--border)';
+            featDropZone.style.background = 'transparent';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFeatFile(files[0]);
+        });
+    }
+
+    function handleFeatFile(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file.');
+            return;
         }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            featPreviewImage.src = e.target.result;
+            featPreviewContainer.style.display = 'block';
+            const currentFeat = document.getElementById('currentFeatContainer');
+            if (currentFeat) currentFeat.style.display = 'none';
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            featFileInput.files = dt.files;
+        };
+        reader.readAsDataURL(file);
+    }
 
-        function handleFeatFile(file) {
-            if (!file.type.startsWith('image/')) {
-                alert('Please select an image file.');
+    // ============================================================
+    // 2. SHARED RECORDER STATE
+    // ============================================================
+    let audioRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
+    let videoRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
+
+    // ============================================================
+    // 3. AUDIO RECORDER (with preview + retake)
+    // ============================================================
+    const recordBtn = document.getElementById('recordBtn');
+    const recordingStatus = document.getElementById('recordingStatus');
+    const recordingInput = document.getElementById('recordingInput');
+    const audioPreviewRecorderContainer = document.getElementById('audioPreviewRecorderContainer');
+    const audioPreviewRecorder = document.getElementById('audioPreviewRecorder');
+
+    if (recordBtn) {
+        recordBtn.addEventListener('click', async function() {
+            // If currently recording, stop it
+            if (audioRecorder.mediaRecorder && audioRecorder.mediaRecorder.state === 'recording') {
+                audioRecorder.mediaRecorder.stop();
+                recordingStatus.style.display = 'none';
+                recordBtn.textContent = '🎙️ Start Recording';
+                recordBtn.classList.remove('btn-danger');
+                recordBtn.classList.add('btn-secondary');
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                featPreviewImage.src = e.target.result;
-                featPreviewContainer.style.display = 'block';
-                const currentFeat = document.getElementById('currentFeatContainer');
-                if (currentFeat) currentFeat.style.display = 'none';
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                featFileInput.files = dt.files;
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-</script>
 
-<!-- ===== AUDIO RECORDER JAVASCRIPT ===== -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const recordBtn = document.getElementById('recordBtn');
-        const recordingStatus = document.getElementById('recordingStatus');
-        const recordingInput = document.getElementById('recordingInput');
-        const audioPreviewRecorderContainer = document.getElementById('audioPreviewRecorderContainer');
-        const audioPreviewRecorder = document.getElementById('audioPreviewRecorder');
+            try {
+                audioRecorder.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioRecorder.mediaRecorder = new MediaRecorder(audioRecorder.stream);
+                audioRecorder.chunks = [];
 
-        let mediaRecorder = null;
-        let audioChunks = [];
+                audioRecorder.mediaRecorder.ondataavailable = event => {
+                    audioRecorder.chunks.push(event.data);
+                };
 
-        if (recordBtn) {
-            recordBtn.addEventListener('click', async function() {
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                    recordingStatus.style.display = 'none';
-                    recordBtn.textContent = '🎙️ Start Recording';
-                    recordBtn.classList.remove('btn-danger');
-                    recordBtn.classList.add('btn-secondary');
-                    return;
-                }
+                audioRecorder.mediaRecorder.onstop = () => {
+                    audioRecorder.blob = new Blob(audioRecorder.chunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(audioRecorder.blob);
+                    audioPreviewRecorder.src = url;
+                    audioPreviewRecorder.load();
+                    audioPreviewRecorderContainer.style.display = 'block';
 
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
+                    // Replace controls with preview + confirm/retake
+                    document.querySelector('.recorder-controls').innerHTML = `
+                        <audio controls src="${url}" style="width:100%;"></audio>
+                        <div style="display:flex; gap:12px; margin-top:10px;">
+                            <button type="button" id="confirmAudioBtn" class="btn btn-success btn-sm">✅ Use This</button>
+                            <button type="button" id="retakeAudioBtn" class="btn btn-warning btn-sm">🔄 Retake</button>
+                        </div>
+                    `;
 
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const file = new File([audioBlob], 'audio_recording.webm', { type: 'audio/webm' });
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(file);
-                        recordingInput.files = dataTransfer.files;
-
-                        const url = URL.createObjectURL(file);
-                        audioPreviewRecorder.src = url;
-                        audioPreviewRecorder.load();
-                        audioPreviewRecorderContainer.style.display = 'block';
+                    // Confirm Audio
+                    document.getElementById('confirmAudioBtn').addEventListener('click', function() {
+                        const dt = new DataTransfer();
+                        dt.items.add(new File([audioRecorder.blob], 'audio_recording.webm', { type: 'audio/webm' }));
+                        recordingInput.files = dt.files;
                         document.getElementById('recordingForm').style.display = 'block';
-                    };
+                        document.querySelector('.recorder-controls').innerHTML = `
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="recordingForm" style="display:none;">
+                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                            </form>
+                            <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        `;
+                        // Re-bind the record button by re-initializing the event listener (or reload)
+                        location.reload(); // simplest
+                    });
 
-                    mediaRecorder.start();
-                    recordingStatus.style.display = 'inline';
-                    recordBtn.textContent = '⏹️ Stop Recording';
-                    recordBtn.classList.remove('btn-secondary');
-                    recordBtn.classList.add('btn-danger');
-                } catch (error) {
-                    alert('Microphone access denied or not available.');
-                    console.error('Recording error:', error);
-                }
-            });
-        }
-    });
-</script>
-<script>
-   // ===== VIDEO RECORDER JAVASCRIPT =====
-document.addEventListener('DOMContentLoaded', function() {
+                    // Retake Audio
+                    document.getElementById('retakeAudioBtn').addEventListener('click', function() {
+                        audioRecorder.blob = null;
+                        audioPreviewRecorderContainer.style.display = 'none';
+                        document.querySelector('.recorder-controls').innerHTML = `
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="recordingForm" style="display:none;">
+                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                            </form>
+                            <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        `;
+                        location.reload();
+                    });
+                };
+
+                audioRecorder.mediaRecorder.start();
+                recordingStatus.style.display = 'inline';
+                recordBtn.textContent = '⏹️ Stop Recording';
+                recordBtn.classList.remove('btn-secondary');
+                recordBtn.classList.add('btn-danger');
+            } catch (error) {
+                alert('Microphone access denied or not available.');
+                console.error('Recording error:', error);
+            }
+        });
+    }
+
+    // ============================================================
+    // 4. VIDEO RECORDER (with preview + retake)
+    // ============================================================
     const videoRecordBtn = document.getElementById('videoRecordBtn');
     const videoRecordingStatus = document.getElementById('videoRecordingStatus');
     const videoRecordingInput = document.getElementById('videoRecordingInput');
     const videoPreviewContainer = document.getElementById('videoPreviewContainer');
     const videoPreview = videoPreviewContainer ? videoPreviewContainer.querySelector('video') : null;
-
-    let videoMediaRecorder = null;
-    let videoChunks = [];
-    let videoStream = null;
+    const videoRecordingForm = document.getElementById('videoRecordingForm');
 
     if (videoRecordBtn) {
         videoRecordBtn.addEventListener('click', async function() {
-            if (videoMediaRecorder && videoMediaRecorder.state === 'recording') {
-                // Stop recording
-                videoMediaRecorder.stop();
-                videoRecordingStatus.style.display = 'none';
+            // If currently recording, stop it
+            if (videoRecorder.mediaRecorder && videoRecorder.mediaRecorder.state === 'recording') {
+                videoRecorder.mediaRecorder.stop();
+                videoRecordingStatus.textContent = '⏹️ Stopped';
                 videoRecordBtn.textContent = '🎥 Start Recording';
                 videoRecordBtn.classList.remove('btn-danger');
                 videoRecordBtn.classList.add('btn-secondary');
-                if (videoStream) {
-                    videoStream.getTracks().forEach(track => track.stop());
-                    videoStream = null;
-                }
-                if (videoPreview) {
-                    videoPreview.srcObject = null;
-                    videoPreview.style.display = 'none'; // Hide after recording
-                }
                 return;
             }
 
             try {
-                videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                videoMediaRecorder = new MediaRecorder(videoStream);
-                videoChunks = [];
+                videoRecorder.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                videoRecorder.mediaRecorder = new MediaRecorder(videoRecorder.stream);
+                videoRecorder.chunks = [];
 
                 // Show live preview during recording
                 if (videoPreview) {
-                    videoPreview.srcObject = videoStream;
+                    videoPreview.srcObject = videoRecorder.stream;
                     videoPreview.muted = true;
-                    videoPreview.style.display = 'block'; // 👈 Make sure it's visible
+                    videoPreview.style.display = 'block';
+                    videoPreviewContainer.style.display = 'block';
                     videoPreview.play();
                 }
 
-                videoMediaRecorder.ondataavailable = event => {
-                    videoChunks.push(event.data);
+                videoRecorder.mediaRecorder.ondataavailable = event => {
+                    videoRecorder.chunks.push(event.data);
                 };
 
-                videoMediaRecorder.onstop = () => {
-                    const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
-                    const file = new File([videoBlob], 'video_recording.webm', { type: 'video/webm' });
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    videoRecordingInput.files = dataTransfer.files;
-
+                videoRecorder.mediaRecorder.onstop = () => {
+                    videoRecorder.blob = new Blob(videoRecorder.chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(videoRecorder.blob);
                     if (videoPreview) {
                         videoPreview.srcObject = null;
-                        const url = URL.createObjectURL(file);
                         videoPreview.src = url;
                         videoPreview.muted = false;
                         videoPreview.load();
-                        videoPreview.style.display = 'block'; // Keep visible after recording
+                        videoPreview.style.display = 'block';
                     }
                     videoPreviewContainer.style.display = 'block';
-                    document.getElementById('videoRecordingForm').style.display = 'block';
+
+                    // Replace controls with preview + confirm/retake
+                    document.querySelector('.recorder-controls').innerHTML = `
+                        <video controls src="${url}" width="100%"></video>
+                        <div style="display:flex; gap:12px; margin-top:10px;">
+                            <button type="button" id="confirmVideoBtn" class="btn btn-success btn-sm">✅ Use This</button>
+                            <button type="button" id="retakeVideoBtn" class="btn btn-warning btn-sm">🔄 Retake</button>
+                        </div>
+                    `;
+
+                    // Confirm Video
+                    document.getElementById('confirmVideoBtn').addEventListener('click', function() {
+                        const dt = new DataTransfer();
+                        dt.items.add(new File([videoRecorder.blob], 'video_recording.webm', { type: 'video/webm' }));
+                        videoRecordingInput.files = dt.files;
+                        document.getElementById('videoRecordingForm').style.display = 'block';
+                        document.querySelector('.recorder-controls').innerHTML = `
+                            <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
+                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="videoRecordingForm" style="display:none;">
+                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
+                            </form>
+                            <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
+                                <video controls width="100%"><source src="" type="video/webm"></video>
+                            </div>
+                        `;
+                        location.reload();
+                    });
+
+                    // Retake Video
+                    document.getElementById('retakeVideoBtn').addEventListener('click', function() {
+                        videoRecorder.blob = null;
+                        videoPreviewContainer.style.display = 'none';
+                        document.querySelector('.recorder-controls').innerHTML = `
+                            <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
+                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="videoRecordingForm" style="display:none;">
+                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
+                            </form>
+                            <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
+                                <video controls width="100%"><source src="" type="video/webm"></video>
+                            </div>
+                        `;
+                        location.reload();
+                    });
                 };
 
-                videoMediaRecorder.start();
-                videoRecordingStatus.style.display = 'inline';
+                videoRecorder.mediaRecorder.start();
+                videoRecordingStatus.textContent = '🔴 Recording...';
                 videoRecordBtn.textContent = '⏹️ Stop Recording';
                 videoRecordBtn.classList.remove('btn-secondary');
                 videoRecordBtn.classList.add('btn-danger');
@@ -569,7 +639,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-    
     .form-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
     .form-row .form-group { flex: 1; min-width: 150px; }
     .form-actions { display: flex; gap: 12px; margin-top: 16px; }
@@ -612,13 +681,32 @@ document.addEventListener('DOMContentLoaded', function() {
     .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
     .btn-danger { background: #e74c3c; color: white; }
     .btn-danger:hover { background: #c0392b; }
+
+    /* Blinking animation for the recording status */
+    @keyframes blink-animation {
+      0% { opacity: 1; }
+      50% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    #videoRecordingStatus.recording {
+      animation: blink-animation 1s infinite;
+      color: #e74c3c;
+      font-weight: bold;
+    }
+
+    /* Ensure the video preview container is visible during recording */
+    #videoPreviewContainer {
+      display: block !important;
+      width: 100%;
+      margin-top: 10px;
+    }
     #videoPreviewContainer video {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    border-radius: 8px;
-    background: #000;
-}
+      width: 100%;
+      max-width: 100%;
+      border-radius: 8px;
+      background: #000;
+      display: block;
+    }
 
     @media (max-width: 768px) {
         .media-section { flex-direction: column; }

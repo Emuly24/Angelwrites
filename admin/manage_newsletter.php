@@ -100,7 +100,7 @@ $pageTitle = 'Newsletter';
                         <textarea id="message" name="message" rows="6" placeholder="Write your message here..." required></textarea>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" name="broadcast" class="btn btn-primary">Send to All Subscribers</button>
+                        <button type="submit" name="broadcast" class="btn btn-primary btn-block">Send to All Subscribers</button>
                     </div>
                 </form>
             </div>
@@ -159,6 +159,56 @@ $pageTitle = 'Newsletter';
 </div>
 
 <style>
+    /* ===== BROADCAST FORM STYLING ===== */
+    .admin-form .form-group {
+        margin-bottom: 16px;
+    }
+
+    .admin-form label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-size: 0.95rem;
+    }
+
+    .admin-form input[type="text"],
+    .admin-form textarea,
+    .admin-form select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        background: var(--input-bg);
+        color: var(--text);
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .admin-form input[type="text"]:focus,
+    .admin-form textarea:focus,
+    .admin-form select:focus {
+        outline: none;
+        border-color: var(--rose);
+        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+    }
+
+    .admin-form textarea {
+        resize: vertical;
+        min-height: 120px;
+    }
+
+    /* Ensure the button looks good under the inputs */
+    .admin-form .form-actions {
+        margin-top: 16px;
+    }
+
+    .admin-form .btn-block {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* ===== ADMIN TABLE ===== */
     .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
     .admin-table thead { background: var(--vanilla); }
     .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -166,9 +216,11 @@ $pageTitle = 'Newsletter';
     .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
     .admin-table tbody tr:last-child td { border-bottom: none; }
     .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
+
     .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
     .status-badge.active { background: #27ae60; color: #fff; }
     .status-badge.inactive { background: #95a5a6; color: #fff; }
+
     .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 </style>
 

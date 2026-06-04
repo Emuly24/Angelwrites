@@ -233,187 +233,235 @@ $pageTitle = 'Manage Poems';
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        let editorInitialized = false;
+    let editorInitialized = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordedAudioBlob = null;
 
-        // ===== MODAL LOGIC =====
-        const showModalBtn = document.getElementById('showAddModal');
-        const modal = document.getElementById('addPoemModal');
-        const closeButtons = document.querySelectorAll('.modal-close');
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-        const previewContainer = document.getElementById('previewContainer');
-        const previewImage = document.getElementById('previewImage');
-        const audioDropZone = document.getElementById('audioDropZone');
-        const audioInput = document.getElementById('audioInput');
-        const audioPreviewContainer = document.getElementById('audioPreviewContainer');
-        const audioPreview = document.getElementById('audioPreview');
-        const recordBtn = document.getElementById('recordBtn');
-        const recordingStatus = document.getElementById('recordingStatus');
-        const recordingInput = document.getElementById('recordingInput');
-        const recordingPreviewContainer = document.getElementById('recordingPreviewContainer');
-        const recordingPreview = document.getElementById('recordingPreview');
+    // ===== DOM REFS =====
+    const showModalBtn = document.getElementById('showAddModal');
+    const modal = document.getElementById('addPoemModal');
+    const closeButtons = document.querySelectorAll('.modal-close');
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImage = document.getElementById('previewImage');
+    const audioDropZone = document.getElementById('audioDropZone');
+    const audioInput = document.getElementById('audioInput');
+    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
+    const audioPreview = document.getElementById('audioPreview');
+    const recordBtn = document.getElementById('recordBtn');
+    const recordingStatus = document.getElementById('recordingStatus');
+    const recordingInput = document.getElementById('recordingInput');
+    const recordingPreviewContainer = document.getElementById('recordingPreviewContainer');
+    const recordingPreview = document.getElementById('recordingPreview');
 
-        showModalBtn.addEventListener('click', function() {
-            modal.style.display = 'flex';
-            initTinyMCE();
-        });
+    // ===== MODAL LOGIC =====
+    showModalBtn.addEventListener('click', function() {
+        modal.style.display = 'flex';
+        initTinyMCE();
+    });
 
-        closeButtons.forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                modal.style.display = 'none';
-            });
+    closeButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            modal.style.display = 'none';
         });
+    });
 
-        window.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        });
-
-        // ===== TINYMCE =====
-        function initTinyMCE() {
-            if (editorInitialized) return;
-            tinymce.init({
-                selector: '#editor',
-                height: 400,
-                menubar: true,
-                plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
-                toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
-                content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
-                forced_root_block: 'p',
-                setup: function(editor) {
-                    editor.on('change', function () {
-                        tinymce.triggerSave();
-                    });
-                }
-            });
-            editorInitialized = true;
-        }
-
-        // ===== IMAGE DRAG & DROP =====
-        dropZone.addEventListener('click', function() {
-            fileInput.click();
-        });
-        fileInput.addEventListener('change', function(e) {
-            if (e.target.files.length > 0) handleFile(e.target.files[0]);
-        });
-        dropZone.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            dropZone.style.borderColor = 'var(--rose)';
-            dropZone.style.background = 'rgba(219, 161, 162, 0.1)';
-        });
-        dropZone.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            dropZone.style.borderColor = 'var(--border)';
-            dropZone.style.background = 'transparent';
-        });
-        dropZone.addEventListener('drop', function(e) {
-            e.preventDefault();
-            dropZone.style.borderColor = 'var(--border)';
-            dropZone.style.background = 'transparent';
-            const files = e.dataTransfer.files;
-            if (files.length > 0) handleFile(files[0]);
-        });
-        function handleFile(file) {
-            if (!file.type.startsWith('image/')) {
-                alert('Please drop an image file.');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                previewImage.src = e.target.result;
-                previewContainer.style.display = 'block';
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(file);
-                fileInput.files = dataTransfer.files;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        // ===== AUDIO DRAG & DROP =====
-        audioDropZone.addEventListener('click', function() {
-            audioInput.click();
-        });
-        audioInput.addEventListener('change', function(e) {
-            if (e.target.files.length > 0) handleAudio(e.target.files[0]);
-        });
-        audioDropZone.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            audioDropZone.style.borderColor = 'var(--rose)';
-            audioDropZone.style.background = 'rgba(219, 161, 162, 0.1)';
-        });
-        audioDropZone.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            audioDropZone.style.borderColor = 'var(--border)';
-            audioDropZone.style.background = 'transparent';
-        });
-        audioDropZone.addEventListener('drop', function(e) {
-            e.preventDefault();
-            audioDropZone.style.borderColor = 'var(--border)';
-            audioDropZone.style.background = 'transparent';
-            const files = e.dataTransfer.files;
-            if (files.length > 0) handleAudio(files[0]);
-        });
-        function handleAudio(file) {
-            if (!file.type.startsWith('audio/')) {
-                alert('Please drop an audio file.');
-                return;
-            }
-            const url = URL.createObjectURL(file);
-            audioPreview.src = url;
-            audioPreviewContainer.style.display = 'block';
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            audioInput.files = dataTransfer.files;
-        }
-
-        // ===== AUDIO RECORDER =====
-        if (recordBtn) {
-            recordBtn.addEventListener('click', async function() {
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop();
-                    recordingStatus.style.display = 'none';
-                    recordBtn.textContent = '🎙️ Start Recording';
-                    recordBtn.classList.remove('btn-danger');
-                    recordBtn.classList.add('btn-secondary');
-                    return;
-                }
-
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const file = new File([audioBlob], 'poem_recording.webm', { type: 'audio/webm' });
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(file);
-                        recordingInput.files = dataTransfer.files;
-
-                        const url = URL.createObjectURL(file);
-                        recordingPreview.src = url;
-                        recordingPreview.load();
-                        recordingPreviewContainer.style.display = 'block';
-                        document.getElementById('recordingForm').style.display = 'block';
-                    };
-
-                    mediaRecorder.start();
-                    recordingStatus.style.display = 'inline';
-                    recordBtn.textContent = '⏹️ Stop Recording';
-                    recordBtn.classList.remove('btn-secondary');
-                    recordBtn.classList.add('btn-danger');
-                } catch (error) {
-                    alert('Microphone access denied or not available.');
-                    console.error('Recording error:', error);
-                }
-            });
+    window.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.style.display = 'none';
         }
     });
+
+    // ===== TINYMCE INIT =====
+    function initTinyMCE() {
+        if (editorInitialized) return;
+        tinymce.init({
+            selector: '#editor',
+            height: 400,
+            menubar: true,
+            plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+            toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
+            content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
+            forced_root_block: 'p',
+            setup: function(editor) {
+                editor.on('change', function () {
+                    tinymce.triggerSave();
+                });
+            }
+        });
+        editorInitialized = true;
+    }
+
+    // ===== IMAGE DRAG & DROP =====
+    dropZone.addEventListener('click', function() { fileInput.click(); });
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) handleFile(e.target.files[0]);
+    });
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--rose)';
+        dropZone.style.background = 'rgba(219, 161, 162, 0.1)';
+    });
+    dropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--border)';
+        dropZone.style.background = 'transparent';
+    });
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--border)';
+        dropZone.style.background = 'transparent';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleFile(files[0]);
+    });
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please drop an image file.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            previewContainer.style.display = 'block';
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ===== AUDIO DRAG & DROP =====
+    audioDropZone.addEventListener('click', function() { audioInput.click(); });
+    audioInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) handleAudio(e.target.files[0]);
+    });
+    audioDropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        audioDropZone.style.borderColor = 'var(--rose)';
+        audioDropZone.style.background = 'rgba(219, 161, 162, 0.1)';
+    });
+    audioDropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        audioDropZone.style.borderColor = 'var(--border)';
+        audioDropZone.style.background = 'transparent';
+    });
+    audioDropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        audioDropZone.style.borderColor = 'var(--border)';
+        audioDropZone.style.background = 'transparent';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleAudio(files[0]);
+    });
+    function handleAudio(file) {
+        if (!file.type.startsWith('audio/')) {
+            alert('Please drop an audio file.');
+            return;
+        }
+        const url = URL.createObjectURL(file);
+        audioPreview.src = url;
+        audioPreviewContainer.style.display = 'block';
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        audioInput.files = dataTransfer.files;
+    }
+
+    // ===== AUDIO RECORDER (Fixed) =====
+    if (recordBtn) {
+        recordBtn.addEventListener('click', async function() {
+            // If currently recording, stop it
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                recordingStatus.style.display = 'none';
+                recordBtn.textContent = '🎙️ Start Recording';
+                recordBtn.classList.remove('btn-danger');
+                recordBtn.classList.add('btn-secondary');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+                    // Show the preview player with the recorded audio
+                    const url = URL.createObjectURL(recordedAudioBlob);
+                    recordingPreview.src = url;
+                    recordingPreview.load();
+                    recordingPreviewContainer.style.display = 'block';
+
+                    // Show confirmation controls
+                    document.getElementById('recordingForm').style.display = 'block';
+                    document.querySelector('.recorder-controls').innerHTML = `
+                        <audio controls src="${url}" style="width:100%;"></audio>
+                        <div style="display:flex; gap:12px; margin-top:10px;">
+                            <button type="button" id="confirmRecordingBtn" class="btn btn-success btn-sm">✅ Use This Recording</button>
+                            <button type="button" id="reRecordBtn" class="btn btn-warning btn-sm">🔄 Re-record</button>
+                        </div>
+                    `;
+
+                    // Attach confirm event
+                    document.getElementById('confirmRecordingBtn').addEventListener('click', function() {
+                        const dataTransfer = new DataTransfer();
+                        const file = new File([recordedAudioBlob], 'poem_recording.webm', { type: 'audio/webm' });
+                        dataTransfer.items.add(file);
+                        recordingInput.files = dataTransfer.files;
+                        recordingPreviewContainer.style.display = 'none';
+                        alert('Recording confirmed! It will be saved with the poem.');
+                        // Reset recorder UI
+                        document.querySelector('.recorder-controls').innerHTML = `
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="recordingForm" style="display:none;">
+                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                            </form>
+                            <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        `;
+                        // Re-bind the record button
+                        location.reload(); // Simplest reset
+                    });
+
+                    // Attach re-record event
+                    document.getElementById('reRecordBtn').addEventListener('click', function() {
+                        recordedAudioBlob = null;
+                        recordingPreviewContainer.style.display = 'none';
+                        document.querySelector('.recorder-controls').innerHTML = `
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form id="recordingForm" style="display:none;">
+                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                            </form>
+                            <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        `;
+                        // Re-bind record button
+                        location.reload(); // Simplest reset
+                    });
+                };
+
+                mediaRecorder.start();
+                recordingStatus.style.display = 'inline';
+                recordBtn.textContent = '⏹️ Stop Recording';
+                recordBtn.classList.remove('btn-secondary');
+                recordBtn.classList.add('btn-danger');
+            } catch (error) {
+                alert('Microphone access denied or not available.');
+                console.error('Recording error:', error);
+            }
+        });
+    }
+});
 </script>
 
 <style>
