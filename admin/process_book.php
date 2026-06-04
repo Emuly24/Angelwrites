@@ -2,6 +2,7 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+header('Content-Type: text/html; charset=utf-8');
 
 // 1. DEFINE CORRECT LIBRARY PATH
 define('LIB_PATH', dirname(__DIR__) . '/libs/');
@@ -99,6 +100,8 @@ function extract_docx($file_path) {
     }
     zip_close($zip);
     
+    // FORCE UTF-8 ENCODING HERE
+   $content = mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
     // Format into paragraphs
     $lines = explode("\n", $content);
     $html = '';
