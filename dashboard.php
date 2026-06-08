@@ -13,25 +13,52 @@ if (isAdmin()) {
 }
 
 $user_id = $_SESSION['user_id'];
-$error = '';
-$success = '';
 
-// Fetch user data (for display only)
+// Fetch user data
 $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// ===== FETCH USER'S BOOKS (purchased or reading) =====
-$stmt = $db->prepare("
-    SELECT b.*, rs.status, rs.progress 
-    FROM books b
-    LEFT JOIN reading_status rs ON b.id = rs.book_id AND rs.user_id = ?
-    ORDER BY rs.updated_at DESC
-");
-$stmt->execute([$user_id]);
-$my_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// ===== FETCH ANGELLA'S BOOKS =====
+$stmt = $db->prepare("SELECT * FROM books WHERE is_angella_book = 1 ORDER BY created_at DESC LIMIT 6");
+$stmt->execute();
+$angella_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== FETCH SESSIONS =====
+// ===== FETCH POEMS =====
+$stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 6");
+$stmt->execute();
+$poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== FETCH BLOG POSTS =====
+$stmt = $db->prepare("SELECT * FROM blog_posts ORDER BY published_at DESC LIMIT 6");
+$stmt->execute();
+$blog_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== FETCH SHORT VIDEOS =====
+$stmt = $db->prepare("SELECT * FROM videos WHERE type = 'short' ORDER BY created_at DESC LIMIT 6");
+$stmt->execute();
+$videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== FETCH CHRISTIAN REFLECTIONS =====
+$stmt = $db->prepare("SELECT * FROM reflections ORDER BY created_at DESC LIMIT 6");
+$stmt->execute();
+$reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== FETCH COMMUNITY QUESTIONS =====
+$stmt = $db->prepare("
+    SELECT q.*, u.name AS author_name, COUNT(a.id) AS answer_count 
+    FROM questions q
+    JOIN users u ON q.user_id = u.id
+    LEFT JOIN answers a ON q.id = a.question_id
+    WHERE q.status = 'approved'
+    GROUP BY q.id
+    ORDER BY q.created_at DESC
+    LIMIT 5
+");
+$stmt->execute();
+$community_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== FETCH USER SESSIONS =====
 $stmt = $db->prepare("
     SELECT * FROM sessions 
     WHERE user_id = ? 
@@ -40,7 +67,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $my_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== FETCH USER'S QUESTIONS =====
+// ===== FETCH USER QUESTIONS =====
 $stmt = $db->prepare("
     SELECT q.*, COUNT(a.id) AS answer_count 
     FROM questions q
@@ -85,100 +112,251 @@ $pageTitle = 'My Dashboard';
 <div class="user-dashboard">
     <div class="container">
         <div class="dashboard-header">
-            <h1>My Dashboard</h1>
-            <p>Welcome back, <?php echo htmlspecialchars($user['name']); ?>!</p>
-            <div class="header-actions">
-                <a href="<?php echo SITE_URL; ?>/library.php" class="btn btn-sm btn-primary">My Library</a>
-            </div>
+            <h1>Welcome Back, <?php echo htmlspecialchars($user['name']); ?>! 🌿</h1>
+            <p>Explore the latest from AngellaWrites and manage your activity below.</p>
         </div>
 
-        <?php if ($error): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
-
-        <!-- Dashboard Grid -->
         <div class="dashboard-grid">
-            <!-- Left Column -->
+            <!-- ===== MAIN CONTENT (LEFT COLUMN) ===== -->
             <div class="dashboard-main">
-                <!-- Notifications -->
-                <section class="dashboard-section" id="notifications">
-                    <h2><i class="fas fa-bell" style="color: var(--rose);"></i> Notifications</h2>
-                    <?php if (count($notifications) > 0): ?>
-                        <div class="notification-list">
-                            <?php foreach ($notifications as $notif): ?>
-                                <div class="notification-item <?php echo $notif['is_read'] ? 'read' : 'unread'; ?>">
-                                    <div class="notif-title"><?php echo htmlspecialchars($notif['title']); ?></div>
-                                    <div class="notif-message"><?php echo htmlspecialchars($notif['message']); ?></div>
-                                    <div class="notif-date"><?php echo date('M j, Y g:i a', strtotime($notif['created_at'])); ?></div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <p class="no-items">No notifications yet.</p>
-                    <?php endif; ?>
-                </section>
-
-                <!-- My Books -->
-                <section class="dashboard-section" id="books">
-                    <h2><i class="fas fa-book-open" style="color: var(--rose);"></i> My Books</h2>
-                    <?php if (count($my_books) > 0): ?>
-                        <div class="book-grid-small">
-                            <?php foreach ($my_books as $book): ?>
-                                <div class="book-card-mini">
-                                    <div class="book-cover-mini">
+                
+                <!-- Angella's Books -->
+                <section class="dashboard-section" id="angella-books">
+                    <div class="section-header">
+                        <h2><i class="fas fa-book" style="color: var(--rose);"></i> Books by Angella</h2>
+                        <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">View All →</a>
+                    </div>
+                    <?php if (count($angella_books) > 0): ?>
+                        <div class="content-grid">
+                            <?php foreach ($angella_books as $book): ?>
+                                <div class="content-card">
+                                    <div class="content-cover">
                                         <?php if ($book['cover_path']): ?>
                                             <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
                                         <?php else: ?>
-                                            <i class="fas fa-book"></i>
+                                            <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="book-info-mini">
-                                        <h4><?php echo htmlspecialchars($book['title']); ?></h4>
-                                        <span class="status-badge <?php echo $book['status'] ?? 'none'; ?>">
-                                            <?php echo $book['status'] ?? 'Not started'; ?>
-                                        </span>
-                                        <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Read</a>
+                                    <div class="content-info">
+                                        <h3><?php echo htmlspecialchars($book['title']); ?></h3>
+                                        <?php if ($book['description']): ?>
+                                            <p class="content-description"><?php echo htmlspecialchars(substr($book['description'], 0, 100)) . '...'; ?></p>
+                                        <?php endif; ?>
+                                        <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Read Book</a>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <p class="no-items">No books in your library yet. <a href="<?php echo SITE_URL; ?>/books.php">Browse books</a></p>
+                        <p class="no-items">No books published yet.</p>
                     <?php endif; ?>
                 </section>
 
-                <!-- My Sessions -->
-                <section class="dashboard-section" id="sessions">
-                    <h2><i class="fas fa-calendar-check" style="color: var(--rose);"></i> My Sessions</h2>
-                    <?php if (count($my_sessions) > 0): ?>
-                        <div class="session-list">
-                            <?php foreach ($my_sessions as $session): ?>
-                                <div class="session-item">
-                                    <div class="session-info">
-                                        <strong><?php echo htmlspecialchars($session['date']); ?></strong> at <?php echo htmlspecialchars($session['time']); ?>
-                                        <span class="status-badge <?php echo $session['status']; ?>"><?php echo ucfirst($session['status']); ?></span>
-                                        <?php if ($session['message']): ?>
-                                            <p class="session-message"><?php echo htmlspecialchars($session['message']); ?></p>
+                <!-- Poems -->
+                <section class="dashboard-section" id="poems">
+                    <div class="section-header">
+                        <h2><i class="fas fa-feather-alt" style="color: var(--rose);"></i> Poems</h2>
+                        <a href="<?php echo SITE_URL; ?>/poems.php" class="btn btn-sm btn-outline">Browse →</a>
+                    </div>
+                    <?php if (count($poems) > 0): ?>
+                        <div class="content-grid">
+                            <?php foreach ($poems as $poem): ?>
+                                <div class="content-card">
+                                    <div class="content-cover">
+                                        <?php if ($poem['cover_image']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $poem['cover_image']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
+                                        <?php else: ?>
+                                            <div class="placeholder-cover"><i class="fas fa-feather-alt"></i></div>
                                         <?php endif; ?>
                                     </div>
+                                    <div class="content-info">
+                                        <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
+                                        <?php if ($poem['purpose']): ?>
+                                            <p class="content-description"><?php echo htmlspecialchars(substr($poem['purpose'], 0, 80)) . '...'; ?></p>
+                                        <?php endif; ?>
+                                        <a href="<?php echo SITE_URL; ?>/poem.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">Read Poem</a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="no-items">No poems published yet.</p>
+                    <?php endif; ?>
+                </section>
+
+                <!-- Blog Posts -->
+                <section class="dashboard-section" id="blog-posts">
+                    <div class="section-header">
+                        <h2><i class="fas fa-pen-fancy" style="color: var(--rose);"></i> Blog Posts</h2>
+                        <a href="<?php echo SITE_URL; ?>/blog.php" class="btn btn-sm btn-outline">Read Blog →</a>
+                    </div>
+                    <?php if (count($blog_posts) > 0): ?>
+                        <div class="content-grid">
+                            <?php foreach ($blog_posts as $post): ?>
+                                <div class="content-card">
+                                    <div class="content-cover">
+                                        <?php if ($post['featured_image']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $post['featured_image']; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                                        <?php else: ?>
+                                            <div class="placeholder-cover"><i class="fas fa-pen-fancy"></i></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="content-info">
+                                        <h3><?php echo htmlspecialchars($post['title']); ?></h3>
+                                        <?php if ($post['excerpt']): ?>
+                                            <p class="content-description"><?php echo htmlspecialchars(substr($post['excerpt'], 0, 80)) . '...'; ?></p>
+                                        <?php endif; ?>
+                                        <a href="<?php echo SITE_URL; ?>/blog_post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Read Post</a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="no-items">No blog posts yet.</p>
+                    <?php endif; ?>
+                </section>
+
+                <!-- Short Videos -->
+                <section class="dashboard-section" id="videos">
+                    <div class="section-header">
+                        <h2><i class="fas fa-video" style="color: var(--rose);"></i> Short Videos</h2>
+                        <a href="<?php echo SITE_URL; ?>/videos.php" class="btn btn-sm btn-outline">Watch More →</a>
+                    </div>
+                    <?php if (count($videos) > 0): ?>
+                        <div class="content-grid">
+                            <?php foreach ($videos as $video): ?>
+                                <div class="content-card">
+                                    <div class="content-cover video-thumb">
+                                        <?php if ($video['thumbnail']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
+                                            <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
+                                        <?php else: ?>
+                                            <div class="placeholder-cover"><i class="fas fa-video"></i></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="content-info">
+                                        <h3><?php echo htmlspecialchars($video['title']); ?></h3>
+                                        <?php if ($video['description']): ?>
+                                            <p class="content-description"><?php echo htmlspecialchars(substr($video['description'], 0, 60)) . '...'; ?></p>
+                                        <?php endif; ?>
+                                        <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch Video</a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="no-items">No short videos yet.</p>
+                    <?php endif; ?>
+                </section>
+
+                <!-- Christian Reflections -->
+                <section class="dashboard-section" id="reflections">
+                    <div class="section-header">
+                        <h2><i class="fas fa-pray" style="color: var(--rose);"></i> Christian Reflections</h2>
+                        <a href="<?php echo SITE_URL; ?>/reflections.php" class="btn btn-sm btn-outline">Read All →</a>
+                    </div>
+                    <?php if (count($reflections) > 0): ?>
+                        <div class="content-grid">
+                            <?php foreach ($reflections as $reflection): ?>
+                                <div class="content-card">
+                                    <div class="content-cover">
+                                        <?php if ($reflection['image_path']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $reflection['image_path']; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>">
+                                        <?php else: ?>
+                                            <div class="placeholder-cover"><i class="fas fa-pray"></i></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="content-info">
+                                        <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
+                                        <?php if ($reflection['excerpt']): ?>
+                                            <p class="content-description"><?php echo htmlspecialchars(substr($reflection['excerpt'], 0, 80)) . '...'; ?></p>
+                                        <?php endif; ?>
+                                        <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="btn btn-sm btn-primary">Read Reflection</a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="no-items">No reflections published yet.</p>
+                    <?php endif; ?>
+                </section>
+
+                <!-- Community Q&A -->
+                <section class="dashboard-section" id="community-qa">
+                    <div class="section-header">
+                        <h2><i class="fas fa-comments" style="color: var(--rose);"></i> Community Q&A</h2>
+                        <a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-sm btn-outline">Ask a Question →</a>
+                    </div>
+                    <?php if (count($community_questions) > 0): ?>
+                        <div class="qa-list">
+                            <?php foreach ($community_questions as $q): ?>
+                                <div class="qa-item">
+                                    <div class="qa-title">
+                                        <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>">
+                                            <?php echo htmlspecialchars($q['title']); ?>
+                                        </a>
+                                        <span class="qa-author">— <?php echo htmlspecialchars($q['author_name']); ?></span>
+                                    </div>
+                                    <div class="qa-meta">
+                                        <span><?php echo date('M j, Y', strtotime($q['created_at'])); ?></span>
+                                        <span class="answer-count"><?php echo $q['answer_count']; ?> answer(s)</span>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="no-items">Be the first to ask a question!</p>
+                    <?php endif; ?>
+                </section>
+
+            </div>
+
+            <!-- ===== SIDEBAR (RIGHT COLUMN) ===== -->
+            <div class="dashboard-sidebar">
+                
+                <!-- Profile Summary -->
+                <div class="profile-summary" id="profile">
+                    <div class="profile-pic">
+                        <?php if ($user['profile_pic']): ?>
+                            <img src="<?php echo SITE_URL . '/' . $user['profile_pic']; ?>" alt="<?php echo htmlspecialchars($user['name']); ?>">
+                        <?php else: ?>
+                            <i class="fas fa-user-circle"></i>
+                        <?php endif; ?>
+                    </div>
+                    <h3><?php echo htmlspecialchars($user['name']); ?></h3>
+                    <p class="user-email"><?php echo htmlspecialchars($user['email']); ?></p>
+                    <?php if ($user['bio']): ?>
+                        <p class="user-bio"><?php echo htmlspecialchars($user['bio']); ?></p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- My Sessions -->
+                <div class="dashboard-card" id="my-sessions">
+                    <h4><i class="fas fa-calendar-check" style="color: var(--rose);"></i> My Sessions</h4>
+                    <?php if (count($my_sessions) > 0): ?>
+                        <div class="mini-list">
+                            <?php foreach ($my_sessions as $session): ?>
+                                <div class="mini-item">
+                                    <strong><?php echo htmlspecialchars($session['date']); ?></strong> at <?php echo htmlspecialchars($session['time']); ?>
+                                    <span class="status-badge <?php echo $session['status']; ?>"><?php echo ucfirst($session['status']); ?></span>
+                                    <?php if ($session['message']): ?>
+                                        <p class="session-message"><?php echo htmlspecialchars($session['message']); ?></p>
+                                    <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
                         <p class="no-items">No sessions booked. <a href="<?php echo SITE_URL; ?>/book_session.php">Book a session</a></p>
                     <?php endif; ?>
-                </section>
+                </div>
 
-                <!-- My Questions & Admin Answers -->
-                <section class="dashboard-section" id="questions">
-                    <h2><i class="fas fa-comments" style="color: var(--rose);"></i> My Questions</h2>
+                <!-- My Questions -->
+                <div class="dashboard-card" id="my-questions">
+                    <h4><i class="fas fa-question-circle" style="color: var(--rose);"></i> My Questions</h4>
                     <?php if (count($my_questions) > 0): ?>
-                        <div class="question-list">
+                        <div class="mini-list">
                             <?php foreach ($my_questions as $q): ?>
-                                <div class="question-item">
+                                <div class="mini-item">
                                     <div class="question-title">
                                         <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>">
                                             <?php echo htmlspecialchars($q['title']); ?>
@@ -194,24 +372,23 @@ $pageTitle = 'My Dashboard';
                     <?php else: ?>
                         <p class="no-items">You haven't asked any questions yet. <a href="<?php echo SITE_URL; ?>/community.php">Ask a question</a></p>
                     <?php endif; ?>
-                </section>
-            </div>
+                </div>
 
-            <!-- Right Column -->
-            <div class="dashboard-sidebar">
-                <!-- Profile Summary -->
-                <div class="profile-summary" id="profile">
-                    <div class="profile-pic">
-                        <?php if ($user['profile_pic']): ?>
-                            <img src="<?php echo SITE_URL . '/' . $user['profile_pic']; ?>" alt="<?php echo htmlspecialchars($user['name']); ?>">
-                        <?php else: ?>
-                            <i class="fas fa-user-circle"></i>
-                        <?php endif; ?>
-                    </div>
-                    <h3><?php echo htmlspecialchars($user['name']); ?></h3>
-                    <p class="user-email"><?php echo htmlspecialchars($user['email']); ?></p>
-                    <?php if ($user['bio']): ?>
-                        <p class="user-bio"><?php echo htmlspecialchars($user['bio']); ?></p>
+                <!-- Notifications -->
+                <div class="dashboard-card" id="notifications">
+                    <h4><i class="fas fa-bell" style="color: var(--rose);"></i> Notifications</h4>
+                    <?php if (count($notifications) > 0): ?>
+                        <div class="mini-list">
+                            <?php foreach ($notifications as $notif): ?>
+                                <div class="mini-item <?php echo $notif['is_read'] ? 'read' : 'unread'; ?>">
+                                    <div class="notif-title"><?php echo htmlspecialchars($notif['title']); ?></div>
+                                    <div class="notif-message"><?php echo htmlspecialchars($notif['message']); ?></div>
+                                    <div class="notif-date"><?php echo date('M j, Y g:i a', strtotime($notif['created_at'])); ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p class="no-items">No notifications yet.</p>
                     <?php endif; ?>
                 </div>
 
@@ -250,32 +427,86 @@ $pageTitle = 'My Dashboard';
                         <p class="no-items">No tags followed yet.</p>
                     <?php endif; ?>
                 </div>
+
             </div>
         </div>
     </div>
 </div>
 
 <style>
+/* ---- Dashboard Layout ---- */
 .user-dashboard { padding: 32px 0 60px; }
 .dashboard-header { text-align: center; margin-bottom: 32px; }
-.dashboard-header h1 { font-size: 2.2rem; }
-.dashboard-header .header-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.dashboard-header h1 { font-size: 2.2rem; color: var(--text); }
+.dashboard-header p { color: var(--text-light); font-size: 1.1rem; }
 
 .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; }
 
-.dashboard-section { margin-bottom: 32px; background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
-.dashboard-section h2 { font-size: 1.3rem; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+/* ---- Section Styling ---- */
+.dashboard-section { margin-bottom: 48px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.section-header h2 { font-size: 1.5rem; margin: 0; display: flex; align-items: center; gap: 8px; }
 
-.book-grid-small { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
-.book-card-mini { background: var(--bg); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-.book-cover-mini { height: 120px; background: var(--vanilla); display: flex; align-items: center; justify-content: center; }
-.book-cover-mini img { width: 100%; height: 100%; object-fit: cover; }
-.book-cover-mini i { font-size: 3rem; color: var(--rose); }
-.book-info-mini { padding: 12px; }
-.book-info-mini h4 { font-size: 0.95rem; margin-bottom: 4px; }
+/* ---- Content Grid (Cards) ---- */
+.content-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+.content-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); transition: transform 0.2s; }
+.content-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+.content-cover { height: 150px; background: var(--vanilla); display: flex; align-items: center; justify-content: center; position: relative; }
+.content-cover img { width: 100%; height: 100%; object-fit: cover; }
+.placeholder-cover { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--rose); background: var(--vanilla); }
+.video-thumb .play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); color: white; font-size: 3.5rem; opacity: 0.7; transition: opacity 0.2s; }
+.video-thumb:hover .play-overlay { opacity: 1; }
+.content-info { padding: 14px; }
+.content-info h3 { font-size: 1.05rem; margin: 0 0 6px 0; }
+.content-description { font-size: 0.9rem; color: var(--text-light); margin-bottom: 10px; }
+
+/* ---- Q&A List ---- */
+.qa-list { display: flex; flex-direction: column; gap: 8px; }
+.qa-item { background: var(--bg); padding: 14px; border-radius: 8px; border: 1px solid var(--border); }
+.qa-title a { color: var(--text); font-weight: 500; }
+.qa-title a:hover { color: var(--rose); }
+.qa-author { font-size: 0.85rem; color: var(--text-light); margin-left: 6px; }
+.qa-meta { display: flex; gap: 12px; font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }
+
+/* ---- Sidebar Cards ---- */
+.dashboard-sidebar { display: flex; flex-direction: column; gap: 20px; }
+.dashboard-card { background: var(--card-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border); }
+.dashboard-card h4 { margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+
+.mini-list { display: flex; flex-direction: column; gap: 8px; }
+.mini-item { background: var(--bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
+.mini-item.unread { border-left: 3px solid var(--rose); }
+.notif-title { font-weight: 600; font-size: 0.95rem; }
+.notif-message { color: var(--text-light); font-size: 0.85rem; }
+.notif-date { font-size: 0.75rem; color: var(--text-light); margin-top: 4px; }
+
+.session-message { font-size: 0.85rem; color: var(--text-light); margin-top: 4px; }
+
+.question-title a { color: var(--text); font-weight: 500; }
+.question-title a:hover { color: var(--rose); }
+.question-meta { display: flex; gap: 12px; font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }
+
+/* ---- Profile Summary ---- */
+.profile-summary { text-align: center; padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }
+.profile-pic { width: 90px; height: 90px; border-radius: 50%; margin: 0 auto 10px; overflow: hidden; background: var(--vanilla); display: flex; align-items: center; justify-content: center; }
+.profile-pic img { width: 100%; height: 100%; object-fit: cover; }
+.profile-pic i { font-size: 3.5rem; color: var(--rose); }
+.profile-summary h3 { margin-bottom: 4px; }
+.user-email { color: var(--text-light); font-size: 0.9rem; }
+.user-bio { color: var(--text); font-size: 0.9rem; margin-top: 8px; line-height: 1.5; }
+
+/* ---- Tags & Connections ---- */
+.connection-list { list-style: none; padding: 0; margin: 0; }
+.connection-list li { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+.connection-list li:last-child { border-bottom: none; }
+
+.tags-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-pill { background: var(--vanilla); padding: 4px 12px; border-radius: 14px; font-size: 0.8rem; color: var(--text); }
+
+/* ---- Status Badges ---- */
 .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
-.status-badge.currently reading { background: var(--rose); color: white; }
-.status-badge.want to read { background: #3498db; color: white; }
+.status-badge.currently\ reading { background: var(--rose); color: white; }
+.status-badge.want\ to\ read { background: #3498db; color: white; }
 .status-badge.finished { background: #27ae60; color: white; }
 .status-badge.none { background: var(--border); color: var(--text-light); }
 .status-badge.pending { background: #f1c40f; color: white; }
@@ -283,38 +514,24 @@ $pageTitle = 'My Dashboard';
 .status-badge.completed { background: #3498db; color: white; }
 .status-badge.cancelled { background: #e74c3c; color: white; }
 
-.session-list, .notification-list, .question-list { display: flex; flex-direction: column; gap: 8px; }
-.session-item, .notification-item, .question-item { background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-.notification-item.unread { border-left: 3px solid var(--rose); }
-.notif-title { font-weight: 600; }
-.notif-message { color: var(--text-light); font-size: 0.9rem; }
-.notif-date { font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }
+/* ---- Utilities ---- */
+.no-items { color: var(--text-light); padding: 8px 0; text-align: center; font-size: 0.9rem; }
+.no-items a { color: var(--rose); }
+.btn-sm { padding: 6px 14px; font-size: 0.85rem; }
+.btn-outline { background: transparent; border: 1px solid var(--rose); color: var(--rose); }
+.btn-outline:hover { background: var(--rose); color: white; }
 
-.question-title a { color: var(--text); font-weight: 500; }
-.question-title a:hover { color: var(--rose); }
-.question-meta { display: flex; gap: 12px; font-size: 0.8rem; color: var(--text-light); }
-
-.dashboard-sidebar { display: flex; flex-direction: column; gap: 16px; }
-.dashboard-card { background: var(--card-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border); }
-.dashboard-card h4 { margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-
-.profile-summary { text-align: center; padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }
-.profile-pic { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px; overflow: hidden; background: var(--vanilla); display: flex; align-items: center; justify-content: center; }
-.profile-pic img { width: 100%; height: 100%; object-fit: cover; }
-.profile-pic i { font-size: 4rem; color: var(--rose); }
-.profile-summary h3 { margin-bottom: 4px; }
-.user-email { color: var(--text-light); font-size: 0.9rem; }
-.user-bio { color: var(--text); font-size: 0.9rem; margin-top: 8px; line-height: 1.5; }
-
-.connection-list { list-style: none; padding: 0; }
-.connection-list li { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-.connection-list li:last-child { border-bottom: none; }
-
-.tags-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.tag-pill { background: var(--vanilla); padding: 4px 12px; border-radius: 14px; font-size: 0.8rem; color: var(--text); }
-
-@media (max-width: 768px) {
+/* ---- Responsive ---- */
+@media (max-width: 1024px) {
     .dashboard-grid { grid-template-columns: 1fr; }
+    .dashboard-sidebar { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+}
+@media (max-width: 600px) {
+    .dashboard-sidebar { grid-template-columns: 1fr; }
+    .content-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 400px) {
+    .content-grid { grid-template-columns: 1fr; }
 }
 </style>
 
