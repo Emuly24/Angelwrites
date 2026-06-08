@@ -24,17 +24,15 @@ $pageTitle = 'Books';
             <div class="books-grid">
                 <?php foreach ($books as $book): ?>
                     <div class="book-card">
-                        <!-- Book Cover -->
-                        <div class="book-cover">
+                        <!-- Book Cover (Centered) -->
+                        <div class="book-cover-wrapper">
                             <?php if ($book['cover_path']): ?>
                                 <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
                             <?php else: ?>
-                                <div class="book-cover-placeholder">
+                                <div class="placeholder-cover">
                                     <i class="fas fa-book"></i>
                                 </div>
                             <?php endif; ?>
-
-                            <!-- Badges -->
                             <?php if ($book['is_free']): ?>
                                 <span class="badge free">Free</span>
                             <?php elseif ($book['is_sale']): ?>
@@ -42,27 +40,34 @@ $pageTitle = 'Books';
                             <?php endif; ?>
                         </div>
 
-                        <!-- Book Info -->
-                        <div class="book-info">
+                        <!-- Book Details -->
+                        <div class="book-details">
                             <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                             <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-                            <p class="book-desc"><?php echo htmlspecialchars(substr($book['description'] ?? '', 0, 100)); ?><?php if (strlen($book['description'] ?? '') > 100) echo '...'; ?></p>
+
+                            <!-- Full Description (Justified) with Read More toggle -->
+                            <div class="book-description-wrapper">
+                                <div class="book-description" id="desc-<?php echo $book['id']; ?>">
+                                    <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
+                                </div>
+                                <?php if (strlen($book['description'] ?? '') > 400): ?>
+                                    <button class="toggle-desc-btn" data-id="<?php echo $book['id']; ?>">Read More</button>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- Bottom: Price & Action -->
                             <div class="book-bottom">
                                 <div class="book-price">
                                     <?php if ($book['is_free']): ?>
                                         <span class="free-text">Free</span>
                                     <?php elseif ($book['is_sale']): ?>
-                                        <span class="sale-text">$<?php echo number_format($book['price'], 2); ?></span>
+                                        <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
                                     <?php else: ?>
-                                        <span>$<?php echo number_format($book['price'], 2); ?></span>
+                                        <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                     <?php endif; ?>
                                 </div>
-                                <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
-                                    <?php if ($book['file_path']): ?>
-                                        <i class="fas fa-book-open"></i> Read
-                                    <?php else: ?>
-                                        <i class="fas fa-info-circle"></i> Details
-                                    <?php endif; ?>
+                                <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
+                                    <i class="fas fa-book-open"></i> Read
                                 </a>
                             </div>
                         </div>
@@ -82,129 +87,204 @@ $pageTitle = 'Books';
 <!-- ===== STYLES ===== -->
 <style>
 .books-page {
-    padding: 32px 0;
+    padding: 40px 0 60px;
 }
 
 .books-header {
     text-align: center;
-    margin-bottom: 32px;
+    margin-bottom: 48px;
 }
 .books-header h1 {
-    font-size: 2.4rem;
-    margin-bottom: 4px;
+    font-size: 2.6rem;
+    margin-bottom: 8px;
+    color: var(--text);
+    font-family: 'Playfair Display', serif;
 }
 .books-header p {
     color: var(--text-light);
     font-size: 1.1rem;
 }
 
+/* ===== GRID ===== */
 .books-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 40px;
 }
 
+/* ===== CARD ===== */
 .book-card {
     background: var(--card-bg);
-    border-radius: 12px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: var(--shadow);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
     border: 1px solid var(--border);
-    transition: transform var(--transition), box-shadow var(--transition);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     display: flex;
     flex-direction: column;
 }
 .book-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-hover);
+    transform: translateY(-6px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.10);
 }
 
-.book-cover {
+/* ===== COVER (CENTERED) ===== */
+.book-cover-wrapper {
     position: relative;
-    height: 240px;
+    width: 100%;
+    height: 320px;
+    overflow: hidden;
     background: var(--vanilla);
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
 }
-.book-cover img {
-    width: 100%;
+.book-cover-wrapper img {
+    width: auto;
     height: 100%;
     object-fit: cover;
+    display: block;
+    max-width: 100%;
 }
-.book-cover-placeholder {
+.placeholder-cover {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 4rem;
     color: var(--rose);
+    background: var(--vanilla);
 }
 
+/* ===== BADGE ===== */
 .badge {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    padding: 4px 12px;
-    border-radius: 16px;
-    font-size: 0.7rem;
+    top: 16px;
+    right: 16px;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    color: white;
 }
-.badge.free { background: #2ecc71; color: white; }
-.badge.sale { background: #e67e22; color: white; }
+.badge.free { background: #27ae60; }
+.badge.sale { background: #e74c3c; }
 
-.book-info {
-    padding: 16px;
+/* ===== DETAILS ===== */
+.book-details {
+    padding: 24px;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
-.book-info h3 {
-    font-size: 1.1rem;
-    margin-bottom: 2px;
+.book-details h3 {
+    font-size: 1.4rem;
+    margin: 0 0 4px 0;
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+    color: var(--text);
 }
 .book-author {
-    font-size: 0.85rem;
+    text-align: center;
     color: var(--text-light);
-}
-.book-desc {
-    font-size: 0.9rem;
-    color: var(--text-light);
-    margin: 6px 0 12px;
-    line-height: 1.4;
-    flex: 1;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
 }
 
+/* ===== DESCRIPTION (JUSTIFIED) ===== */
+.book-description-wrapper {
+    flex: 1;
+}
+.book-description {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: var(--text);
+    text-align: justify;
+    margin-bottom: 12px;
+    max-height: 200px;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+}
+.book-description.expanded {
+    max-height: none;
+}
+.toggle-desc-btn {
+    background: none;
+    border: none;
+    color: var(--rose);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 12px;
+}
+.toggle-desc-btn:hover {
+    text-decoration: underline;
+}
+
+/* ===== BOTTOM ===== */
 .book-bottom {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
 }
 .book-price {
     font-weight: 700;
     font-size: 1rem;
+    color: var(--text);
 }
-.free-text { color: #2ecc71; }
-.sale-text { color: #e67e22; }
+.free-text { color: #27ae60; }
+.sale-text { color: #e74c3c; }
+.book-bottom .btn {
+    padding: 8px 24px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+}
 
+/* ===== EMPTY STATE ===== */
 .empty-state {
+    grid-column: 1 / -1;
     text-align: center;
     padding: 60px 20px;
     color: var(--text-light);
 }
-.empty-state h3 {
-    font-size: 1.4rem;
-    margin-bottom: 6px;
-}
+.empty-state i { display: block; margin-bottom: 16px; }
+.empty-state h3 { font-size: 1.4rem; margin-bottom: 4px; }
 
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .books-grid { grid-template-columns: 1fr; max-width: 450px; margin: 0 auto; }
+    .book-cover-wrapper { height: 260px; }
+}
 @media (max-width: 480px) {
-    .books-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-    .book-cover {
-        height: 160px;
-    }
+    .book-cover-wrapper { height: 200px; }
+    .book-details { padding: 16px; }
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtns = document.querySelectorAll('.toggle-desc-btn');
+    toggleBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const desc = document.getElementById('desc-' + id);
+            if (desc.classList.contains('expanded')) {
+                desc.classList.remove('expanded');
+                this.textContent = 'Read More';
+            } else {
+                desc.classList.add('expanded');
+                this.textContent = 'Show Less';
+            }
+        });
+    });
+});
+</script>
 
 <?php require_once 'includes/footer.php'; ?>
