@@ -22,9 +22,6 @@ $processed_content = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $has_processed = !empty($processed_content) && $processed_content['is_processed'] == 1;
 
-// Determine if the user has access to download/read (e.g., logged in or purchased)
-// Simplified for now: if free, user can read. If not free, check purchase logic or session.
-
 $pageTitle = htmlspecialchars($book['title']);
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -46,12 +43,10 @@ $pageTitle = htmlspecialchars($book['title']);
                 
                 <div class="book-actions">
                     <?php if ($has_processed): ?>
-                        <!-- Primary action: Read -->
                         <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-block btn-lg">
                             <i class="fas fa-book-open"></i> Read Book
                         </a>
                     <?php else: ?>
-                        <!-- If not processed, maybe just download -->
                         <?php if ($book['is_free']): ?>
                             <a href="<?php echo SITE_URL . '/' . $book['file_path']; ?>" download class="btn btn-primary btn-block btn-lg">
                                 <i class="fas fa-download"></i> Download (<?php echo strtoupper($book['file_type']); ?>)
@@ -93,7 +88,6 @@ $pageTitle = htmlspecialchars($book['title']);
                     <?php endif; ?>
                 </div>
                 
-                <!-- Social Sharing -->
                 <div class="share-section">
                     <span class="share-label">Share:</span>
                     <div class="share-icons">
@@ -117,15 +111,22 @@ $pageTitle = htmlspecialchars($book['title']);
                     <p class="byline">by <?php echo htmlspecialchars($book['author']); ?></p>
                 </div>
 
-                <div class="book-description">
+                <div class="book-description" id="bookDescription">
                     <?php if ($book['description']): ?>
-                        <?php echo nl2br(htmlspecialchars($book['description'])); ?>
+                        <div class="description-content" id="descContent">
+                            <?php echo nl2br(htmlspecialchars($book['description'])); ?>
+                        </div>
+                        <?php if (strlen($book['description']) > 500): ?>
+                            <button id="toggleDescBtn" class="btn btn-sm btn-outline" style="margin-top:12px;">
+                                <i class="fas fa-chevron-down"></i> Read More
+                            </button>
+                        <?php endif; ?>
                     <?php else: ?>
                         <p class="text-muted">No description available.</p>
                     <?php endif; ?>
                 </div>
 
-                <!-- Reviews / Rating (optional) -->
+                <!-- Reviews -->
                 <div class="reviews-section">
                     <h3>What Readers Say</h3>
                     <?php
@@ -149,25 +150,49 @@ $pageTitle = htmlspecialchars($book['title']);
                     <?php else: ?>
                         <p><a href="<?php echo SITE_URL; ?>/login.php">Login</a> to rate and review this book.</p>
                     <?php endif; ?>
-                    <!-- Placeholder for loading existing reviews -->
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('toggleDescBtn');
+    if (toggleBtn) {
+        const content = document.getElementById('descContent');
+        let isExpanded = false;
+        toggleBtn.addEventListener('click', function() {
+            isExpanded = !isExpanded;
+            if (isExpanded) {
+                content.style.maxHeight = 'none';
+                toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> Show Less';
+            } else {
+                content.style.maxHeight = '200px';
+                toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> Read More';
+            }
+        });
+        // Start collapsed if description is long
+        if (content.scrollHeight > 200) {
+            content.style.maxHeight = '200px';
+            content.style.overflow = 'hidden';
+            toggleBtn.style.display = 'inline-block';
+        } else {
+            toggleBtn.style.display = 'none';
+        }
+    }
+});
+</script>
+
 <style>
-/* Book Landing Page Styles */
 .book-landing { padding: 40px 0 60px; }
 .book-layout { display: grid; grid-template-columns: 320px 1fr; gap: 40px; }
 
 .book-sidebar { position: sticky; top: 20px; align-self: start; }
-
 .book-cover-wrapper { margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-hover); }
 .cover-image { width: 100%; height: auto; display: block; }
 .placeholder-cover { height: 400px; background: var(--vanilla); display: flex; align-items: center; justify-content: center; font-size: 4rem; color: var(--rose); }
 
-.book-actions { margin-bottom: 24px; }
 .btn-lg { padding: 16px 24px; font-size: 1.1rem; }
 
 .book-meta-sidebar { background: var(--card-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
@@ -178,7 +203,6 @@ $pageTitle = htmlspecialchars($book['title']);
 .free-badge { color: #27ae60; font-weight: 700; }
 
 .share-section { display: flex; align-items: center; gap: 12px; }
-.share-label { font-weight: 600; font-size: 0.9rem; color: var(--text-light); }
 .share-icons { display: flex; gap: 8px; }
 .share-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: white; font-size: 0.9rem; transition: transform 0.2s; }
 .share-btn:hover { transform: scale(1.05); }
@@ -192,7 +216,7 @@ $pageTitle = htmlspecialchars($book['title']);
 .book-header .byline { font-size: 1.1rem; color: var(--text-light); }
 
 .book-description { font-size: 1.1rem; line-height: 1.8; color: var(--text); margin-bottom: 32px; }
-.book-description p { margin-bottom: 16px; }
+.book-description .description-content { transition: max-height 0.4s ease; }
 
 .reviews-section { border-top: 1px solid var(--border); padding-top: 24px; margin-top: 24px; }
 .rating-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }

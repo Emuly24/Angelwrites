@@ -110,7 +110,7 @@ $pageTitle = 'My Activity';
 <div class="user-dashboard">
     <div class="container">
         <div class="dashboard-header">
-            <h1>Welcome Back, <?php echo htmlspecialchars($user['name']); ?>! 🌿</h1>
+            <h1>Welcome Back, <?php echo htmlspecialchars($user['name']); ?>!</h1>
             <p>Your personal reading and listening journey — curated just for you.</p>
         </div>
 

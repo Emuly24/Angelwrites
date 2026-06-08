@@ -32,6 +32,7 @@ $user_progress = null;
 $position_offset = 0;
 $position_section = '';
 $progress_percent = 0;
+$current_page_index = 0;
 
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
@@ -44,12 +45,10 @@ if (isLoggedIn()) {
         $position_section = $user_progress['position_section'] ?? '';
         $progress_percent = $user_progress['progress_percent'] ?? 0;
     } else {
-        // Create initial progress
         $stmt = $db->prepare("INSERT INTO reading_progress (user_id, book_id, position_offset, position_section, progress_percent) VALUES (?, ?, 0, '', 0)");
         $stmt->execute([$user_id, $book_id]);
     }
     
-    // Set status to 'currently reading'
     $stmt = $db->prepare("INSERT OR REPLACE INTO reading_status (user_id, book_id, status) VALUES (?, ?, 'currently reading')");
     $stmt->execute([$user_id, $book_id]);
 }
@@ -60,16 +59,37 @@ if ($has_processed) {
     $toc = json_decode($processed_content['toc_json'], true) ?? [];
 }
 
+// === PAGE PAGINATION LOGIC FOR HTML READER ===
+$pages = [];
+$total_pages = 1;
+$current_page = 0;
+
+if ($has_processed) {
+    // Split content by <h1> headings to create pages
+    $content_html = $processed_content['content_html'];
+    $pages = preg_split('/<h1[^>]*>/', $content_html);
+    $total_pages = count($pages);
+    
+    // Determine current page from saved position_section (e.g., "page_2")
+    if (!empty($position_section) && strpos($position_section, 'page_') === 0) {
+        $page_num = (int)str_replace('page_', '', $position_section);
+        if ($page_num > 0 && $page_num <= $total_pages) {
+            $current_page = $page_num - 1;
+        }
+    }
+}
+
 // Get user preferences
 $reader_theme = $_COOKIE['reader_theme'] ?? 'paper';
 $reader_font = $_COOKIE['reader_font'] ?? 'serif';
 $reader_font_size = $_COOKIE['reader_font_size'] ?? 'medium';
+$reading_mode = $_COOKIE['reading_mode'] ?? 'scroll'; // 'scroll' or 'page'
 
 $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 ?>
 <?php require_once 'includes/header.php'; ?>
 
-<div class="reader-app" data-theme="<?php echo $reader_theme; ?>" data-font="<?php echo $reader_font; ?>" data-font-size="<?php echo $reader_font_size; ?>" data-progress="<?php echo $progress_percent; ?>">
+<div class="reader-app" data-theme="<?php echo $reader_theme; ?>" data-font="<?php echo $reader_font; ?>" data-font-size="<?php echo $reader_font_size; ?>" data-mode="<?php echo $reading_mode; ?>">
     <div class="container">
         
         <!-- Reader Header -->
@@ -127,6 +147,17 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                         <button id="increase-size" aria-label="Increase font size"><i class="fas fa-font" style="font-size: 1.2rem;"></i></button>
                     </div>
                 </div>
+                <div class="control-group">
+                    <label>Reading Mode</label>
+                    <div class="mode-options">
+                        <button class="mode-btn" data-mode="scroll" aria-label="Scroll mode">
+                            <i class="fas fa-arrows-alt-v"></i> Scroll
+                        </button>
+                        <button class="mode-btn" data-mode="page" aria-label="Page flipping mode">
+                            <i class="fas fa-book-open"></i> Page Flip
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -134,8 +165,20 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
         <div class="reader-content-area">
             <?php if ($has_processed): ?>
                 <!-- HTML Reader -->
-                <div class="html-reader" id="reader-text" data-book-id="<?php echo $book_id; ?>" data-initial-offset="<?php echo $position_offset; ?>">
-                    <?php echo $processed_content['content_html']; ?>
+                <div class="html-reader" id="reader-text" data-book-id="<?php echo $book_id; ?>" data-initial-offset="<?php echo $position_offset; ?>" data-total-pages="<?php echo $total_pages; ?>" data-current-page="<?php echo $current_page; ?>">
+                    <!-- All pages are rendered but controlled by JS -->
+                    <?php for ($i = 0; $i < $total_pages; $i++): ?>
+                        <div class="page-content" data-page-index="<?php echo $i; ?>" style="<?php echo ($i == $current_page) ? 'display:block;' : 'display:none;'; ?>">
+                            <?php echo $pages[$i]; ?>
+                        </div>
+                    <?php endfor; ?>
+                </div>
+
+                <!-- Page Navigation Controls (Visible only in Page Mode) -->
+                <div class="page-nav-controls" id="pageNavControls" style="display:none;">
+                    <button id="prev-page-btn" class="nav-btn"><i class="fas fa-chevron-left"></i> Previous</button>
+                    <span id="page-indicator">Page 1 of <?php echo $total_pages; ?></span>
+                    <button id="next-page-btn" class="nav-btn">Next <i class="fas fa-chevron-right"></i></button>
                 </div>
             <?php else: ?>
                 <!-- Fallback to PDF/EPUB -->
@@ -255,124 +298,256 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     applySize(currentSizeIndex);
 
-    // ---- Scroll Position Saving (HTML Reader only) ----
+    // ---- Reading Mode (Scroll vs Page Flip) ----
+    const modeBtns = document.querySelectorAll('.mode-btn');
+    const pageNavControls = document.getElementById('pageNavControls');
     const readerText = document.getElementById('reader-text');
-    if (readerText) {
-        const bookId = readerText.dataset.bookId;
-        const initialOffset = parseInt(readerText.dataset.initialOffset || '0');
-        if (initialOffset > 0) {
-            window.scrollTo({ top: initialOffset, behavior: 'smooth' });
-        }
-        let saveTimeout;
-        function savePosition() {
-            const scrollTop = window.scrollY;
-            const docHeight = document.documentElement.scrollHeight;
-            const winHeight = window.innerHeight;
-            const percent = Math.min(100, Math.round((scrollTop / (docHeight - winHeight)) * 100));
-            
-            const formData = new FormData();
-            formData.append('save_position', '1');
-            formData.append('offset', scrollTop);
-            formData.append('section', '');
-            formData.append('percent', percent);
-            
-            fetch('<?php echo SITE_URL; ?>/reader.php?id=' + bookId, {
-                method: 'POST',
-                body: formData
-            }).then(r => r.json()).then(data => {
-                if (data.success) {
-                    const progressDisplay = document.querySelector('.progress-display');
-                    if (progressDisplay) progressDisplay.textContent = percent + '%';
-                }
+    const totalPages = parseInt(readerText.dataset.totalPages);
+    let currentPage = parseInt(readerText.dataset.currentPage) || 0;
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+    const pageIndicator = document.getElementById('page-indicator');
+
+    function setMode(mode) {
+        readerApp.dataset.mode = mode;
+        document.cookie = 'reading_mode=' + mode + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+        
+        // Show/hide page navigation
+        if (mode === 'page' && totalPages > 1) {
+            pageNavControls.style.display = 'flex';
+            updatePageDisplay();
+        } else {
+            pageNavControls.style.display = 'none';
+            // Show all content for scroll mode
+            document.querySelectorAll('.page-content').forEach(el => {
+                el.style.display = 'block';
             });
         }
+        modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    }
+
+    function updatePageDisplay() {
+        // Hide all pages
+        document.querySelectorAll('.page-content').forEach(el => {
+            el.style.display = 'none';
+        });
+        // Show current page
+        const currentPageEl = document.querySelector(`.page-content[data-page-index="${currentPage}"]`);
+        if (currentPageEl) {
+            currentPageEl.style.display = 'block';
+        }
+        // Update indicator
+        pageIndicator.textContent = `Page ${currentPage + 1} of ${totalPages}`;
+        prevBtn.disabled = (currentPage === 0);
+        nextBtn.disabled = (currentPage === totalPages - 1);
+        
+        // Save progress for page mode
+        savePagePosition();
+    }
+
+    function savePagePosition() {
+        if (!isLoggedIn) return;
+        const bookId = readerText.dataset.bookId;
+        const formData = new FormData();
+        formData.append('save_position', '1');
+        formData.append('offset', 0);
+        formData.append('section', 'page_' + (currentPage + 1));
+        formData.append('percent', Math.round(((currentPage + 1) / totalPages) * 100));
+        fetch('<?php echo SITE_URL; ?>/reader.php?id=' + bookId, {
+            method: 'POST',
+            body: formData
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                const progressDisplay = document.querySelector('.progress-display');
+                if (progressDisplay) {
+                    progressDisplay.textContent = Math.round(((currentPage + 1) / totalPages) * 100) + '%';
+                }
+            }
+        });
+    }
+
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            setMode(this.dataset.mode);
+        });
+        if (btn.dataset.mode === readerApp.dataset.mode) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Initialize mode based on cookie
+    setMode(readerApp.dataset.mode);
+
+    // Page navigation buttons
+    if (prevBtn) {
+        prevBtn.addEventListener('click', function() {
+            if (currentPage > 0) {
+                currentPage--;
+                updatePageDisplay();
+            }
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', function() {
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                updatePageDisplay();
+            }
+        });
+    }
+
+    // ---- Scroll Position Saving (only in Scroll Mode) ----
+    let saveTimeout;
+    function saveScrollPosition() {
+        const scrollTop = window.scrollY;
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        const percent = Math.min(100, Math.round((scrollTop / (docHeight - winHeight)) * 100));
+        
+        const formData = new FormData();
+        formData.append('save_position', '1');
+        formData.append('offset', scrollTop);
+        formData.append('section', '');
+        formData.append('percent', percent);
+        
+        fetch('<?php echo SITE_URL; ?>/reader.php?id=' + bookId, {
+            method: 'POST',
+            body: formData
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                const progressDisplay = document.querySelector('.progress-display');
+                if (progressDisplay) progressDisplay.textContent = percent + '%';
+            }
+        });
+    }
+
+    // Only bind scroll saving if in scroll mode
+    if (readerApp.dataset.mode === 'scroll') {
         window.addEventListener('scroll', function() {
             clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(savePosition, 1500);
+            saveTimeout = setTimeout(saveScrollPosition, 1500);
         });
         window.addEventListener('beforeunload', function() {
-            savePosition();
+            saveScrollPosition();
         });
     }
 });
 </script>
 
 <style>
-/* Reader App Styles */
+/* ===== READER APP BRAND STYLING ===== */
 .reader-app {
-    background: #fafaf8; /* paper default */
-    color: #2c2c2c;
+    background: var(--vanilla);
+    color: var(--text);
     padding: 24px 0 60px;
     min-height: 80vh;
-    transition: background 0.3s, color 0.3s;
+    transition: all 0.3s ease;
 }
-.reader-app[data-theme="paper"] { background: #fafaf8; color: #2c2c2c; }
+
+/* Branded Borders */
+.reader-header {
+    border-bottom: 2px solid var(--rose-light);
+}
+.reader-settings {
+    border: 1px solid var(--rose-light);
+}
+
+/* ===== THEMES ===== */
+.reader-app[data-theme="paper"] { background: var(--vanilla); color: var(--text); }
 .reader-app[data-theme="light"] { background: #ffffff; color: #1a1a1a; }
 .reader-app[data-theme="dark"] { background: #1a1a1a; color: #f0f0f0; }
 .reader-app[data-theme="sepia"] { background: #f4ecd8; color: #5b4636; }
 
+/* ===== FONTS ===== */
 .reader-app[data-font="serif"] #reader-text { font-family: Georgia, 'Times New Roman', serif; }
 .reader-app[data-font="sans-serif"] #reader-text { font-family: 'Inter', -apple-system, sans-serif; }
 .reader-app[data-font="monospace"] #reader-text { font-family: 'Courier New', monospace; }
 
+/* ===== FONT SIZES ===== */
 .reader-app[data-font-size="small"] #reader-text { font-size: 0.9rem; line-height: 1.7; }
 .reader-app[data-font-size="medium"] #reader-text { font-size: 1.1rem; line-height: 1.8; }
 .reader-app[data-font-size="large"] #reader-text { font-size: 1.4rem; line-height: 1.9; }
 .reader-app[data-font-size="xlarge"] #reader-text { font-size: 1.8rem; line-height: 2.0; }
 
-/* Reader Header */
+/* ===== READER HEADER ===== */
 .reader-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
     margin-bottom: 24px;
 }
-.reader-header-left .back-link { color: var(--rose); font-weight: 500; text-decoration: none; }
+.back-link { color: var(--rose); font-weight: 500; text-decoration: none; }
 .reader-header-center { text-align: center; }
-.reader-header-center .reader-book-title { font-size: 1.4rem; margin: 0; color: var(--text); }
-.reader-header-center .reader-author { color: var(--text-light); margin: 4px 0 0; }
+.reader-book-title { font-size: 1.4rem; margin: 0; color: var(--text); }
+.reader-author { color: var(--text-light); margin: 4px 0 0; }
 .reader-header-right { display: flex; align-items: center; gap: 16px; }
 .progress-display { font-weight: 600; font-size: 0.9rem; color: var(--rose); }
-.settings-btn { background: transparent; border: none; font-size: 1.2rem; color: var(--text); cursor: pointer; transition: transform 0.2s; }
+.settings-btn { background: transparent; border: none; font-size: 1.2rem; color: var(--text); cursor: pointer; transition: transform 0.2s, color 0.2s; }
 .settings-btn:hover { transform: rotate(45deg); color: var(--rose); }
 
-/* Settings Panel */
+/* ===== SETTINGS PANEL ===== */
 .reader-settings {
     display: none;
     background: var(--card-bg);
-    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 24px;
-    box-shadow: var(--shadow);
 }
 .reader-settings.open { display: block; }
 .settings-content { display: flex; flex-wrap: wrap; gap: 24px; }
-.control-group { flex: 1; min-width: 150px; }
+.control-group { flex: 1; min-width: 140px; }
 .control-group label { display: block; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-light); margin-bottom: 8px; }
-.theme-options, .font-options { display: flex; gap: 8px; flex-wrap: wrap; }
-.theme-btn, .font-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
-.theme-btn:hover, .font-btn:hover { border-color: var(--rose); }
-.theme-btn.active, .font-btn.active { border-color: var(--rose); background: var(--rose); color: white; }
-.color-preview { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
-.color-preview.paper { background: #fafaf8; border: 1px solid #ddd; }
-.color-preview.light { background: #ffffff; border: 1px solid #ddd; }
-.color-preview.dark { background: #1a1a1a; border: 1px solid #444; }
-.color-preview.sepia { background: #f4ecd8; border: 1px solid #ddd; }
-
+.theme-options, .font-options, .mode-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.theme-btn, .font-btn, .mode-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
+.theme-btn:hover, .font-btn:hover, .mode-btn:hover { border-color: var(--rose); }
+.theme-btn.active, .font-btn.active, .mode-btn.active { border-color: var(--rose); background: var(--rose); color: white; }
+.color-preview { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; margin-right: 4px; border: 1px solid #ddd; }
 .size-controls { display: flex; align-items: center; gap: 12px; }
 .size-controls button { background: transparent; border: 1px solid var(--border); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; color: var(--text); transition: all 0.2s; }
 .size-controls button:hover { border-color: var(--rose); color: var(--rose); }
 .size-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Content Area */
-.reader-content-area { max-width: 800px; margin: 0 auto; }
-#reader-text h1, #reader-text h2, #reader-text h3 { color: var(--text); margin-top: 32px; margin-bottom: 16px; }
-#reader-text p { margin-bottom: 16px; color: var(--text); }
+/* ===== PAGE NAVIGATION CONTROLS ===== */
+.page-nav-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 32px;
+    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--rose-light);
+}
+.page-nav-controls .nav-btn {
+    background: var(--rose);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    padding: 8px 20px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+.page-nav-controls .nav-btn:hover { background: var(--rose-dark); transform: scale(1.02); }
+.page-nav-controls .nav-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+#page-indicator { font-weight: 600; color: var(--text); }
 
-/* Fallback */
+/* ===== CONTENT AREA ===== */
+.reader-content-area { max-width: 800px; margin: 0 auto; }
+
+/* Scroll Mode */
+.reader-app[data-mode="scroll"] .page-content { display: block !important; }
+.reader-app[data-mode="scroll"] .page-content[data-page-index] { display: block; }
+
+/* Page Mode */
+.reader-app[data-mode="page"] .html-reader { height: 70vh; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 0 20px; }
+.reader-app[data-mode="page"] .page-content { display: none; max-height: 70vh; overflow-y: auto; padding: 20px; background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow-hover); border: 1px solid var(--rose-light); width: 100%; }
+.reader-app[data-mode="page"] .page-content:first-child { display: block; }
+.reader-app[data-mode="page"] .page-content h1 { font-size: 1.8rem; margin-top: 0; }
+.reader-app[data-mode="page"] .page-content p { margin-bottom: 12px; line-height: 1.8; }
+
+/* ===== FALLBACK READER ===== */
 .fallback-reader { padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }
 .epub-controls { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; }
 .epub-controls .nav-btn { background: var(--rose); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; transition: background 0.2s; }
@@ -380,6 +555,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .unsupported-message { text-align: center; padding: 40px 20px; color: var(--text-light); }
 .unsupported-message i { font-size: 3rem; color: var(--rose); display: block; margin-bottom: 16px; }
 
+/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
     .reader-header { flex-direction: column; gap: 8px; text-align: center; }
     .reader-header-left, .reader-header-right { width: 100%; display: flex; justify-content: center; }
