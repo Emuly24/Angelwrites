@@ -108,8 +108,10 @@ $pageTitle = 'Books';
 /* ===== GRID ===== */
 .books-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    grid-template-columns: 1fr;
     gap: 40px;
+    max-width: 600px;
+    margin: 0 auto;
     justify-content: center;
 }
 
@@ -133,7 +135,7 @@ $pageTitle = 'Books';
 .book-cover-wrapper {
     position: relative;
     width: 100%;
-    height: 400px;
+    height: 380px;
     overflow: hidden;
     background: var(--vanilla);
     display: flex;
@@ -259,14 +261,11 @@ $pageTitle = 'Books';
 .empty-state h3 { font-size: 1.4rem; margin-bottom: 4px; }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    .books-grid { grid-template-columns: 1fr; max-width: 600px; margin: 0 auto; }
-    .book-cover-wrapper { height: 300px; }
-}
-@media (max-width: 480px) {
-    .book-cover-wrapper { height: 240px; }
-    .book-details { padding: 20px; }
-    .book-details h3 { font-size: 1.3rem; }
+@media (min-width: 768px) {
+    .books-grid {
+        grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+        max-width: 1000px;
+    }
 }
 </style>
 
