@@ -19,23 +19,7 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// === Helper: Get image with fallback ===
-function getImageSrc($row, $column, $placeholder = 'fas fa-image') {
-    if (isset($row[$column]) && !empty($row[$column])) {
-        return SITE_URL . '/' . $row[$column];
-    }
-    return null;
-}
-
-// === Helper: Get text with fallback ===
-function getText($row, $column, $default = 'No description available.') {
-    if (isset($row[$column]) && !empty($row[$column])) {
-        return htmlspecialchars(substr($row[$column], 0, 100)) . '...';
-    }
-    return $default;
-}
-
-// === Helper: Safe fetch with column check ===
+// === Helper function to safely fetch data from tables that may not exist ===
 function safeFetch($db, $sql, $params = [], $limit = 6) {
     try {
         $stmt = $db->prepare($sql . " LIMIT " . $limit);
@@ -44,6 +28,22 @@ function safeFetch($db, $sql, $params = [], $limit = 6) {
     } catch (Exception $e) {
         return [];
     }
+}
+
+// === Helper: Get image with fallback ===
+function getImageSrc($row, $column) {
+    if (isset($row[$column]) && !empty($row[$column])) {
+        return SITE_URL . '/' . $row[$column];
+    }
+    return null;
+}
+
+// === Helper: Get text with fallback ===
+function getText($row, $column, $default = '') {
+    if (isset($row[$column]) && !empty($row[$column])) {
+        return htmlspecialchars(substr($row[$column], 0, 100)) . '...';
+    }
+    return $default;
 }
 
 // === Angella's Books ===
@@ -123,11 +123,9 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($angella_books as $book): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php 
-                                        $img = getImageSrc($book, 'cover_path');
-                                        if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-book"></i></div>
+                                        <?php $img = getImageSrc($book, 'cover_path'); ?>
+                                        <?php if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                                         <?php endif; ?>
@@ -156,11 +154,9 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($poems as $poem): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php 
-                                        $img = getImageSrc($poem, 'cover_image');
-                                        if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-pen"></i></div>
+                                        <?php $img = getImageSrc($poem, 'cover_image'); ?>
+                                        <?php if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pen"></i></div>
                                         <?php endif; ?>
@@ -189,11 +185,9 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($blog_posts as $post): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php 
-                                        $img = getImageSrc($post, 'featured_image');
-                                        if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-pen-fancy"></i></div>
+                                        <?php $img = getImageSrc($post, 'featured_image'); ?>
+                                        <?php if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pen-fancy"></i></div>
                                         <?php endif; ?>
@@ -222,12 +216,10 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($videos as $video): ?>
                                 <div class="content-card">
                                     <div class="content-cover video-thumb">
-                                        <?php 
-                                        $img = getImageSrc($video, 'thumbnail');
-                                        if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                        <?php $img = getImageSrc($video, 'thumbnail'); ?>
+                                        <?php if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
                                             <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
-                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-video"></i></div>
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-video"></i></div>
                                         <?php endif; ?>
@@ -256,11 +248,9 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($reflections as $reflection): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php 
-                                        $img = getImageSrc($reflection, 'image_path');
-                                        if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-pray"></i></div>
+                                        <?php $img = getImageSrc($reflection, 'image_path'); ?>
+                                        <?php if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pray"></i></div>
                                         <?php endif; ?>
