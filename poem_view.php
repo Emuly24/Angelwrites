@@ -66,7 +66,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) &&
         exit;
     }
 }
-
+if (isLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $poem_id = (int)$_GET['id'];
+    $stmt = $db->prepare("INSERT OR IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
+    $stmt->execute([$user_id, $poem_id]);
+}
 // Increment view count
 $stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
 $stmt->execute([$id]);

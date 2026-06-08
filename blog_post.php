@@ -47,6 +47,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_prayer']) && 
     header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
     exit;
 }
+// ===== TRACKING: User read this blog post =====
+if (isLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $blog_post_id = $post['id'];
+    $stmt = $db->prepare("INSERT OR IGNORE INTO blog_reads (user_id, blog_post_id) VALUES (?, ?)");
+    $stmt->execute([$user_id, $blog_post_id]);
+}
 
 // ===== HANDLE ADMIN REPLY =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) && isAdmin()) {
