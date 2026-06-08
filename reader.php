@@ -25,7 +25,6 @@ $stmt->execute([$book_id]);
 $processed_content = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $has_processed = !empty($processed_content) && $processed_content['is_processed'] == 1;
-$is_angella_book = $has_processed && $processed_content['is_angella_book'] == 1;
 
 // User Progress
 $user_progress = null;
@@ -61,7 +60,7 @@ if ($has_processed) {
 
 // === PAGE PAGINATION LOGIC FOR HTML READER ===
 $pages = [];
-$total_pages = 1;
+$total_pages = 0;
 $current_page = 0;
 
 if ($has_processed) {
@@ -147,6 +146,8 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                         <button id="increase-size" aria-label="Increase font size"><i class="fas fa-font" style="font-size: 1.2rem;"></i></button>
                     </div>
                 </div>
+                
+                <?php if ($has_processed && $total_pages > 1): ?>
                 <div class="control-group">
                     <label>Reading Mode</label>
                     <div class="mode-options">
@@ -158,6 +159,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -166,7 +168,6 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
             <?php if ($has_processed): ?>
                 <!-- HTML Reader -->
                 <div class="html-reader" id="reader-text" data-book-id="<?php echo $book_id; ?>" data-initial-offset="<?php echo $position_offset; ?>" data-total-pages="<?php echo $total_pages; ?>" data-current-page="<?php echo $current_page; ?>">
-                    <!-- All pages are rendered but controlled by JS -->
                     <?php for ($i = 0; $i < $total_pages; $i++): ?>
                         <div class="page-content" data-page-index="<?php echo $i; ?>" style="<?php echo ($i == $current_page) ? 'display:block;' : 'display:none;'; ?>">
                             <?php echo $pages[$i]; ?>
@@ -299,106 +300,110 @@ document.addEventListener('DOMContentLoaded', function() {
     applySize(currentSizeIndex);
 
     // ---- Reading Mode (Scroll vs Page Flip) ----
-    const modeBtns = document.querySelectorAll('.mode-btn');
-    const pageNavControls = document.getElementById('pageNavControls');
     const readerText = document.getElementById('reader-text');
-    const totalPages = parseInt(readerText.dataset.totalPages);
-    let currentPage = parseInt(readerText.dataset.currentPage) || 0;
-    const prevBtn = document.getElementById('prev-page-btn');
-    const nextBtn = document.getElementById('next-page-btn');
-    const pageIndicator = document.getElementById('page-indicator');
+    if (readerText) {
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const pageNavControls = document.getElementById('pageNavControls');
+        const totalPages = parseInt(readerText.dataset.totalPages);
+        let currentPage = parseInt(readerText.dataset.currentPage) || 0;
+        const prevBtn = document.getElementById('prev-page-btn');
+        const nextBtn = document.getElementById('next-page-btn');
+        const pageIndicator = document.getElementById('page-indicator');
 
-    function setMode(mode) {
-        readerApp.dataset.mode = mode;
-        document.cookie = 'reading_mode=' + mode + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-        
-        // Show/hide page navigation
-        if (mode === 'page' && totalPages > 1) {
-            pageNavControls.style.display = 'flex';
-            updatePageDisplay();
-        } else {
-            pageNavControls.style.display = 'none';
-            // Show all content for scroll mode
+        function setMode(mode) {
+            readerApp.dataset.mode = mode;
+            document.cookie = 'reading_mode=' + mode + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+            
+            // Show/hide page navigation
+            if (mode === 'page' && totalPages > 1) {
+                pageNavControls.style.display = 'flex';
+                updatePageDisplay();
+            } else {
+                pageNavControls.style.display = 'none';
+                // Show all content for scroll mode
+                document.querySelectorAll('.page-content').forEach(el => {
+                    el.style.display = 'block';
+                });
+            }
+            modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+        }
+
+        function updatePageDisplay() {
+            // Hide all pages
             document.querySelectorAll('.page-content').forEach(el => {
-                el.style.display = 'block';
+                el.style.display = 'none';
+            });
+            // Show current page
+            const currentPageEl = document.querySelector(`.page-content[data-page-index="${currentPage}"]`);
+            if (currentPageEl) {
+                currentPageEl.style.display = 'block';
+            }
+            // Update indicator
+            pageIndicator.textContent = `Page ${currentPage + 1} of ${totalPages}`;
+            prevBtn.disabled = (currentPage === 0);
+            nextBtn.disabled = (currentPage === totalPages - 1);
+            
+            // Save progress for page mode
+            savePagePosition();
+        }
+
+        function savePagePosition() {
+            <?php if (isLoggedIn()): ?>
+            const bookId = readerText.dataset.bookId;
+            const formData = new FormData();
+            formData.append('save_position', '1');
+            formData.append('offset', 0);
+            formData.append('section', 'page_' + (currentPage + 1));
+            formData.append('percent', Math.round(((currentPage + 1) / totalPages) * 100));
+            fetch('<?php echo SITE_URL; ?>/reader.php?id=' + bookId, {
+                method: 'POST',
+                body: formData
+            }).then(r => r.json()).then(data => {
+                if (data.success) {
+                    const progressDisplay = document.querySelector('.progress-display');
+                    if (progressDisplay) {
+                        progressDisplay.textContent = Math.round(((currentPage + 1) / totalPages) * 100) + '%';
+                    }
+                }
+            });
+            <?php endif; ?>
+        }
+
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                setMode(this.dataset.mode);
+            });
+            if (btn.dataset.mode === readerApp.dataset.mode) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Initialize mode based on cookie
+        setMode(readerApp.dataset.mode);
+
+        // Page navigation buttons
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function() {
+                if (currentPage > 0) {
+                    currentPage--;
+                    updatePageDisplay();
+                }
             });
         }
-        modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-    }
-
-    function updatePageDisplay() {
-        // Hide all pages
-        document.querySelectorAll('.page-content').forEach(el => {
-            el.style.display = 'none';
-        });
-        // Show current page
-        const currentPageEl = document.querySelector(`.page-content[data-page-index="${currentPage}"]`);
-        if (currentPageEl) {
-            currentPageEl.style.display = 'block';
-        }
-        // Update indicator
-        pageIndicator.textContent = `Page ${currentPage + 1} of ${totalPages}`;
-        prevBtn.disabled = (currentPage === 0);
-        nextBtn.disabled = (currentPage === totalPages - 1);
-        
-        // Save progress for page mode
-        savePagePosition();
-    }
-
-    function savePagePosition() {
-        if (!isLoggedIn) return;
-        const bookId = readerText.dataset.bookId;
-        const formData = new FormData();
-        formData.append('save_position', '1');
-        formData.append('offset', 0);
-        formData.append('section', 'page_' + (currentPage + 1));
-        formData.append('percent', Math.round(((currentPage + 1) / totalPages) * 100));
-        fetch('<?php echo SITE_URL; ?>/reader.php?id=' + bookId, {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                const progressDisplay = document.querySelector('.progress-display');
-                if (progressDisplay) {
-                    progressDisplay.textContent = Math.round(((currentPage + 1) / totalPages) * 100) + '%';
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function() {
+                if (currentPage < totalPages - 1) {
+                    currentPage++;
+                    updatePageDisplay();
                 }
-            }
-        });
-    }
-
-    modeBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            setMode(this.dataset.mode);
-        });
-        if (btn.dataset.mode === readerApp.dataset.mode) {
-            btn.classList.add('active');
+            });
         }
-    });
-
-    // Initialize mode based on cookie
-    setMode(readerApp.dataset.mode);
-
-    // Page navigation buttons
-    if (prevBtn) {
-        prevBtn.addEventListener('click', function() {
-            if (currentPage > 0) {
-                currentPage--;
-                updatePageDisplay();
-            }
-        });
-    }
-    if (nextBtn) {
-        nextBtn.addEventListener('click', function() {
-            if (currentPage < totalPages - 1) {
-                currentPage++;
-                updatePageDisplay();
-            }
-        });
     }
 
     // ---- Scroll Position Saving (only in Scroll Mode) ----
     let saveTimeout;
     function saveScrollPosition() {
+        <?php if (isLoggedIn()): ?>
         const scrollTop = window.scrollY;
         const docHeight = document.documentElement.scrollHeight;
         const winHeight = window.innerHeight;
@@ -419,6 +424,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (progressDisplay) progressDisplay.textContent = percent + '%';
             }
         });
+        <?php endif; ?>
     }
 
     // Only bind scroll saving if in scroll mode
