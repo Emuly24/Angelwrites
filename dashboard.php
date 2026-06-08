@@ -19,7 +19,40 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// === Helper function to safely fetch data from tables that may not exist ===
+// === DEBUG: Check which columns exist ===
+function debugColumns($db, $table) {
+    try {
+        $stmt = $db->prepare("PRAGMA table_info($table)");
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+$debug = [];
+$tables = ['books', 'poems', 'blog_posts', 'videos', 'reflections', 'questions', 'sessions', 'notifications', 'connections', 'user_tags'];
+foreach ($tables as $table) {
+    $debug[$table] = debugColumns($db, $table);
+}
+
+// === Helper: Get image with fallback ===
+function getImageSrc($row, $column, $placeholder = 'fas fa-image') {
+    if (isset($row[$column]) && !empty($row[$column])) {
+        return SITE_URL . '/' . $row[$column];
+    }
+    return null;
+}
+
+// === Helper: Get text with fallback ===
+function getText($row, $column, $default = 'No description available.') {
+    if (isset($row[$column]) && !empty($row[$column])) {
+        return htmlspecialchars(substr($row[$column], 0, 100)) . '...';
+    }
+    return $default;
+}
+
+// === Helper: Safe fetch with column check ===
 function safeFetch($db, $sql, $params = [], $limit = 6) {
     try {
         $stmt = $db->prepare($sql . " LIMIT " . $limit);
@@ -87,6 +120,23 @@ $pageTitle = 'My Dashboard';
 
 <div class="user-dashboard">
     <div class="container">
+        <!-- DEBUG INFO (Remove this section after fixes) -->
+        <div class="debug-section" style="background:#f8f9fa; padding:16px; border-radius:8px; margin-bottom:24px; border:1px solid #ddd;">
+            <h3 style="margin-top:0;">🔍 Database Column Check</h3>
+            <p>If images aren't showing, check these columns:</p>
+            <ul style="columns:2; column-gap:30px;">
+                <?php foreach ($debug as $table => $columns): ?>
+                    <li><strong><?php echo $table; ?>:</strong> 
+                        <?php 
+                        $col_names = array_column($columns, 'name');
+                        echo empty($col_names) ? '❌ Table missing' : implode(', ', $col_names);
+                        ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+            <p style="font-size:0.9rem; color:#666;">To fix missing columns, use phpLiteAdmin to add them.</p>
+        </div>
+
         <div class="dashboard-header">
             <h1>Welcome Back, <?php echo htmlspecialchars($user['name']); ?>! 🌿</h1>
             <p>Explore the latest from AngelWrites and manage your activity below.</p>
@@ -107,17 +157,18 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($angella_books as $book): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php if ($book['cover_path']): ?>
-                                            <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
+                                        <?php 
+                                        $img = getImageSrc($book, 'cover_path');
+                                        if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-book"></i></div>
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                        <?php if (isset($book['description'])): ?>
-                                            <p class="content-description"><?php echo htmlspecialchars(substr($book['description'], 0, 100)) . '...'; ?></p>
-                                        <?php endif; ?>
+                                        <p class="content-description"><?php echo getText($book, 'description', 'A beautiful book by Angella.'); ?></p>
                                         <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">View Book</a>
                                     </div>
                                 </div>
@@ -139,17 +190,18 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($poems as $poem): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php if (isset($poem['cover_image'])): ?>
-                                            <img src="<?php echo SITE_URL . '/' . $poem['cover_image']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
+                                        <?php 
+                                        $img = getImageSrc($poem, 'cover_image');
+                                        if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-feather-alt"></i></div>
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-feather-alt"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                                        <?php if (isset($poem['purpose'])): ?>
-                                            <p class="content-description"><?php echo htmlspecialchars(substr($poem['purpose'], 0, 80)) . '...'; ?></p>
-                                        <?php endif; ?>
+                                        <p class="content-description"><?php echo getText($poem, 'purpose', 'A heartfelt poem from Angella.'); ?></p>
                                         <a href="<?php echo SITE_URL; ?>/poem.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">Read Poem</a>
                                     </div>
                                 </div>
@@ -171,17 +223,18 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($blog_posts as $post): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php if (isset($post['featured_image'])): ?>
-                                            <img src="<?php echo SITE_URL . '/' . $post['featured_image']; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
+                                        <?php 
+                                        $img = getImageSrc($post, 'featured_image');
+                                        if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-pen-fancy"></i></div>
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pen-fancy"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($post['title']); ?></h3>
-                                        <?php if (isset($post['excerpt'])): ?>
-                                            <p class="content-description"><?php echo htmlspecialchars(substr($post['excerpt'], 0, 80)) . '...'; ?></p>
-                                        <?php endif; ?>
+                                        <p class="content-description"><?php echo getText($post, 'excerpt', 'A thoughtful post from Angella.'); ?></p>
                                         <a href="<?php echo SITE_URL; ?>/blog_post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Read Post</a>
                                     </div>
                                 </div>
@@ -203,18 +256,19 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($videos as $video): ?>
                                 <div class="content-card">
                                     <div class="content-cover video-thumb">
-                                        <?php if (isset($video['thumbnail'])): ?>
-                                            <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
+                                        <?php 
+                                        $img = getImageSrc($video, 'thumbnail');
+                                        if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
                                             <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
+                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-video"></i></div>
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-video"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($video['title']); ?></h3>
-                                        <?php if (isset($video['description'])): ?>
-                                            <p class="content-description"><?php echo htmlspecialchars(substr($video['description'], 0, 60)) . '...'; ?></p>
-                                        <?php endif; ?>
+                                        <p class="content-description"><?php echo getText($video, 'description', 'A short video from Angella.'); ?></p>
                                         <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch Video</a>
                                     </div>
                                 </div>
@@ -236,17 +290,18 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($reflections as $reflection): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php if (isset($reflection['image_path'])): ?>
-                                            <img src="<?php echo SITE_URL . '/' . $reflection['image_path']; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>">
+                                        <?php 
+                                        $img = getImageSrc($reflection, 'image_path');
+                                        if ($img): ?>
+                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-pray"></i></div>
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pray"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
-                                        <?php if (isset($reflection['excerpt'])): ?>
-                                            <p class="content-description"><?php echo htmlspecialchars(substr($reflection['excerpt'], 0, 80)) . '...'; ?></p>
-                                        <?php endif; ?>
+                                        <p class="content-description"><?php echo getText($reflection, 'excerpt', 'A reflection from Angella.'); ?></p>
                                         <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="btn btn-sm btn-primary">Read Reflection</a>
                                     </div>
                                 </div>
