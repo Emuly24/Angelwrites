@@ -88,7 +88,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 
 <div class="reader-app" data-theme="<?php echo $reader_theme; ?>" data-font="<?php echo $reader_font; ?>" data-font-size="<?php echo $reader_font_size; ?>" data-mode="<?php echo $reading_mode; ?>">
     
-    <!-- ===== READER HEADER (STICKY) ===== -->
+    <!-- ===== READER HEADER (FIXED) ===== -->
     <div class="reader-header">
         <div class="reader-header-left">
             <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>" class="back-link">
@@ -107,7 +107,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
         </div>
     </div>
 
-    <!-- ===== SETTINGS PANEL (STICKY) ===== -->
+    <!-- ===== SETTINGS PANEL ===== -->
     <div class="reader-settings" id="reader-settings">
         <div class="settings-content">
             <div class="control-group">
@@ -160,7 +160,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
         </div>
     </div>
 
-    <!-- ===== MAIN CONTENT AREA (SCROLLABLE - FIXED FOR MOBILE) ===== -->
+    <!-- ===== MAIN CONTENT AREA (SCROLLABLE - FORCED) ===== -->
     <div class="reader-content-area">
         <?php if ($has_processed): ?>
             <!-- HTML READER -->
@@ -183,7 +183,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
             <div class="fallback-reader">
                 <?php if ($book['file_type'] === 'pdf'): ?>
                     <div class="pdf-container">
-                        <iframe src="<?php echo SITE_URL . '/' . $book['file_path']; ?>" width="100%" height="700" frameborder="0" allowfullscreen></iframe>
+                        <iframe src="<?php echo SITE_URL . '/' . $book['file_path']; ?>" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>
                     </div>
                 <?php elseif ($book['file_type'] === 'epub'): ?>
                     <div class="epub-container">
@@ -203,7 +203,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                             const prevBtn = document.getElementById('epub-prev');
                             const nextBtn = document.getElementById('epub-next');
                             const currentLabel = document.getElementById('epub-current');
-                            let rendition = book.renderTo(viewer, { width: '100%', height: '600px', spread: 'none' });
+                            let rendition = book.renderTo(viewer, { width: '100%', height: '100%', spread: 'none' });
                             rendition.display();
                             rendition.on('relocated', function(location) {
                                 currentLabel.textContent = 'Page ' + (location.start.displayedPage || 1);
@@ -227,11 +227,42 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // =============================================
+    // MOBILE DETECTION & SPECIAL READER SETUP
+    // =============================================
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+        document.querySelector('.reader-app').classList.add('mobile-mode');
+        
+        // On mobile, we need to ensure the content area takes full available height
+        const header = document.querySelector('.reader-header');
+        const settings = document.querySelector('.reader-settings');
+        const contentArea = document.querySelector('.reader-content-area');
+        
+        function adjustMobileHeight() {
+            const headerHeight = header.offsetHeight;
+            const settingsHeight = settings.classList.contains('open') ? settings.offsetHeight : 0;
+            const windowHeight = window.innerHeight;
+            const availableHeight = windowHeight - headerHeight - settingsHeight - 20; // 20px for padding
+            contentArea.style.height = availableHeight + 'px';
+        }
+        
+        // Adjust on load, resize, and settings toggle
+        adjustMobileHeight();
+        window.addEventListener('resize', adjustMobileHeight);
+        document.getElementById('settings-toggle').addEventListener('click', function() {
+            setTimeout(adjustMobileHeight, 300);
+        });
+    }
+
     // ---- Settings Toggle ----
     const settingsToggle = document.getElementById('settings-toggle');
     const settingsPanel = document.getElementById('reader-settings');
     settingsToggle.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
+        if (isMobile) {
+            setTimeout(adjustMobileHeight, 300);
+        }
     });
 
     // ---- Theme ----
@@ -443,22 +474,20 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-/* ===== RESET & VARIABLES ===== */
+/* ===== BASE ===== */
 .reader-app {
-    display: flex;
-    flex-direction: column;
-    /* Uses 100dvh instead of 100vh to handle mobile address bar */
-    height: 100dvh; 
     background: var(--vanilla);
     color: var(--text);
     transition: all 0.3s ease;
     padding: 0;
-    position: relative;
-    /* This ensures that on mobile the address bar doesn't interfere */
-    min-height: 100dvh;
+    /* Default desktop layout using flex */
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
 }
 
-/* ===== READER HEADER (STICKY) ===== */
+/* ===== DESKTOP (DEFAULT) ===== */
 .reader-header {
     flex-shrink: 0;
     display: flex;
@@ -478,7 +507,6 @@ document.addEventListener('DOMContentLoaded', function() {
 .settings-btn { background: transparent; border: none; font-size: 1.2rem; color: var(--text); cursor: pointer; transition: transform 0.2s, color 0.2s; }
 .settings-btn:hover { transform: rotate(45deg); color: var(--rose); }
 
-/* ===== SETTINGS PANEL ===== */
 .reader-settings {
     flex-shrink: 0;
     display: none;
@@ -502,7 +530,6 @@ document.addEventListener('DOMContentLoaded', function() {
 .size-controls button:hover { border-color: var(--rose); color: var(--rose); }
 .size-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ===== CONTENT AREA (SCROLLABLE) ===== */
 .reader-content-area {
     flex-grow: 1;
     overflow-y: auto;
@@ -511,9 +538,68 @@ document.addEventListener('DOMContentLoaded', function() {
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
-    /* Force it to be scrollable */
-    height: 0; /* Forces it to take up remaining space */
+    /* Ensures it takes remaining space */
+    height: 0;
     min-height: 0;
+}
+
+/* ===== MOBILE MODE (DETECTED BY JS) ===== */
+.reader-app.mobile-mode {
+    /* Fixed header/footer layout */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    display: block;
+}
+
+.reader-app.mobile-mode .reader-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 100;
+    background: var(--vanilla);
+    padding: 12px 16px;
+    height: auto;
+    min-height: 50px;
+}
+
+.reader-app.mobile-mode .reader-settings {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    width: 100%;
+    z-index: 99;
+    margin: 0;
+    border-radius: 0;
+    border-top: none;
+    border-bottom: 1px solid var(--rose-light);
+    padding: 12px 16px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.reader-app.mobile-mode .reader-content-area {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    width: 100%;
+    padding: 16px 16px 80px 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: calc(100vh - 60px);
+    height: calc(100dvh - 60px);
+    /* Default desktop flex no longer applies */
+    display: block;
+}
+
+.reader-app.mobile-mode .reader-settings.open + .reader-content-area {
+    /* Adjust for settings panel */
+    top: 60px; /* settings panel overlaps content, we adjust via JS */
 }
 
 /* ===== PAGE NAVIGATION CONTROLS ===== */
@@ -559,7 +645,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .reader-app[data-font-size="large"] #reader-text { font-size: 1.4rem; line-height: 1.9; }
 .reader-app[data-font-size="xlarge"] #reader-text { font-size: 1.8rem; line-height: 2.0; }
 
-/* ===== SCROLL MODE CONTENT ===== */
+/* ===== SCROLL MODE ===== */
 .reader-app[data-mode="scroll"] .html-reader {
     height: auto;
     overflow: visible;
@@ -572,7 +658,7 @@ document.addEventListener('DOMContentLoaded', function() {
     border: none;
 }
 
-/* ===== PAGE FLIP MODE CONTENT ===== */
+/* ===== PAGE FLIP MODE ===== */
 .reader-app[data-mode="page"] .html-reader {
     height: 100%;
     overflow: hidden;
@@ -609,14 +695,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
-    .reader-header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
-    .reader-header-left, .reader-header-right { width: auto; }
-    .reader-header-center { order: 3; width: 100%; text-align: center; }
-    .reader-book-title { font-size: 1.1rem; }
-    .reader-settings { margin: 0 16px 12px 16px; }
-    .settings-content { flex-direction: column; }
-    .reader-content-area { padding: 0 16px 40px 16px; }
-    .page-nav-controls { flex-wrap: wrap; }
+    /* Mobile specific overrides already handled by .mobile-mode class */
 }
 </style>
 
