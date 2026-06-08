@@ -19,7 +19,8 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// === Helper function to safely fetch data from tables that may not exist ===
+// --- SINGLE DEFINITION OF HELPER FUNCTIONS ---
+
 function safeFetch($db, $sql, $params = [], $limit = 6) {
     try {
         $stmt = $db->prepare($sql . " LIMIT " . $limit);
@@ -30,7 +31,6 @@ function safeFetch($db, $sql, $params = [], $limit = 6) {
     }
 }
 
-// === Helper: Get image with fallback ===
 function getImageSrc($row, $column) {
     if (isset($row[$column]) && !empty($row[$column])) {
         return SITE_URL . '/' . $row[$column];
@@ -38,30 +38,13 @@ function getImageSrc($row, $column) {
     return null;
 }
 
-// === Helper: Get text with fallback ===
-function getText($row, $column, $default = '') {
-    if (isset($row[$column]) && !empty($row[$column])) {
-        return htmlspecialchars(substr($row[$column], 0, 100)) . '...';
-    }
-    return $default;
-}
+// --- FETCH DATA ---
 
-// === Angella's Books ===
 $angella_books = safeFetch($db, "SELECT * FROM books WHERE is_angella_book = 1 ORDER BY created_at DESC", [], 6);
-
-// === Poems ===
 $poems = safeFetch($db, "SELECT * FROM poems ORDER BY created_at DESC", [], 6);
-
-// === Blog Posts ===
 $blog_posts = safeFetch($db, "SELECT * FROM blog_posts ORDER BY published_at DESC", [], 6);
-
-// === Short Videos ===
 $videos = safeFetch($db, "SELECT * FROM videos WHERE type = 'short' ORDER BY created_at DESC", [], 6);
-
-// === Christian Reflections ===
 $reflections = safeFetch($db, "SELECT * FROM reflections ORDER BY created_at DESC", [], 6);
-
-// === Community Q&A ===
 $community_questions = safeFetch($db, "
     SELECT q.*, u.name AS author_name, COUNT(a.id) AS answer_count 
     FROM questions q
@@ -70,11 +53,7 @@ $community_questions = safeFetch($db, "
     WHERE q.status = 'approved'
     GROUP BY q.id
     ORDER BY q.created_at DESC", [], 5);
-
-// === User Sessions ===
 $my_sessions = safeFetch($db, "SELECT * FROM sessions WHERE user_id = ? ORDER BY date DESC, time DESC", [$user_id], 10);
-
-// === User Questions ===
 $my_questions = safeFetch($db, "
     SELECT q.*, COUNT(a.id) AS answer_count 
     FROM questions q
@@ -82,19 +61,13 @@ $my_questions = safeFetch($db, "
     WHERE q.user_id = ?
     GROUP BY q.id
     ORDER BY q.created_at DESC", [$user_id], 10);
-
-// === Notifications ===
 $notifications = safeFetch($db, "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC", [$user_id], 10);
-
-// === Connections ===
 $connections = safeFetch($db, "
     SELECT c.*, u.name AS sender_name, u.email AS sender_email 
     FROM connections c
     JOIN users u ON c.sender_id = u.id
     WHERE c.receiver_id = ? OR c.sender_id = ?
     ORDER BY c.created_at DESC", [$user_id, $user_id], 10);
-
-// === Tags ===
 $tags = safeFetch($db, "SELECT * FROM user_tags WHERE user_id = ?", [$user_id], 20);
 
 $pageTitle = 'My Dashboard';
@@ -109,7 +82,7 @@ $pageTitle = 'My Dashboard';
         </div>
 
         <div class="dashboard-grid">
-            <!-- ===== MAIN CONTENT (LEFT COLUMN) ===== -->
+            <!-- MAIN CONTENT -->
             <div class="dashboard-main">
                 
                 <!-- Angella's Books -->
@@ -132,7 +105,15 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                        <p class="content-description"><?php echo getText($book, 'description', 'A beautiful book by Angella.'); ?></p>
+                                        <p class="content-description">
+                                            <?php 
+                                            if (isset($book['description']) && !empty($book['description'])) {
+                                                echo htmlspecialchars(substr($book['description'], 0, 100)) . '...';
+                                            } else {
+                                                echo 'A beautiful book by Angella.';
+                                            }
+                                            ?>
+                                        </p>
                                         <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">View Book</a>
                                     </div>
                                 </div>
@@ -143,7 +124,7 @@ $pageTitle = 'My Dashboard';
                     <?php endif; ?>
                 </section>
 
-                <!-- Poems (Pen Icon) -->
+                <!-- Poems (PEN ICON) -->
                 <section class="dashboard-section" id="poems">
                     <div class="section-header">
                         <h2><i class="fas fa-pen" style="color: var(--rose);"></i> Poems</h2>
@@ -154,7 +135,7 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($poems as $poem): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php $img = getImageSrc($poem, 'cover_image'); ?>
+                                        <?php $img = getImageSrc($poem, 'image_path'); ?>
                                         <?php if ($img): ?>
                                             <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
                                         <?php else: ?>
@@ -163,7 +144,15 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                                        <p class="content-description"><?php echo getText($poem, 'purpose', 'A heartfelt poem from Angella.'); ?></p>
+                                        <p class="content-description">
+                                            <?php 
+                                            if (isset($poem['purpose']) && !empty($poem['purpose'])) {
+                                                echo htmlspecialchars(substr($poem['purpose'], 0, 80)) . '...';
+                                            } else {
+                                                echo 'A heartfelt poem from Angella.';
+                                            }
+                                            ?>
+                                        </p>
                                         <a href="<?php echo SITE_URL; ?>/poem.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">Read Poem</a>
                                     </div>
                                 </div>
@@ -194,7 +183,15 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($post['title']); ?></h3>
-                                        <p class="content-description"><?php echo getText($post, 'excerpt', 'A thoughtful post from Angella.'); ?></p>
+                                        <p class="content-description">
+                                            <?php 
+                                            if (isset($post['excerpt']) && !empty($post['excerpt'])) {
+                                                echo htmlspecialchars(substr($post['excerpt'], 0, 80)) . '...';
+                                            } else {
+                                                echo 'A thoughtful post from Angella.';
+                                            }
+                                            ?>
+                                        </p>
                                         <a href="<?php echo SITE_URL; ?>/blog_post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Read Post</a>
                                     </div>
                                 </div>
@@ -226,7 +223,15 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($video['title']); ?></h3>
-                                        <p class="content-description"><?php echo getText($video, 'description', 'A short video from Angella.'); ?></p>
+                                        <p class="content-description">
+                                            <?php 
+                                            if (isset($video['description']) && !empty($video['description'])) {
+                                                echo htmlspecialchars(substr($video['description'], 0, 60)) . '...';
+                                            } else {
+                                                echo 'A short video from Angella.';
+                                            }
+                                            ?>
+                                        </p>
                                         <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch Video</a>
                                     </div>
                                 </div>
@@ -257,7 +262,15 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
-                                        <p class="content-description"><?php echo getText($reflection, 'excerpt', 'A reflection from Angella.'); ?></p>
+                                        <p class="content-description">
+                                            <?php 
+                                            if (isset($reflection['excerpt']) && !empty($reflection['excerpt'])) {
+                                                echo htmlspecialchars(substr($reflection['excerpt'], 0, 80)) . '...';
+                                            } else {
+                                                echo 'A reflection from Angella.';
+                                            }
+                                            ?>
+                                        </p>
                                         <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="btn btn-sm btn-primary">Read Reflection</a>
                                     </div>
                                 </div>
@@ -298,7 +311,7 @@ $pageTitle = 'My Dashboard';
 
             </div>
 
-            <!-- ===== SIDEBAR (RIGHT COLUMN) ===== -->
+            <!-- SIDEBAR -->
             <div class="dashboard-sidebar">
                 
                 <!-- Profile Summary -->
