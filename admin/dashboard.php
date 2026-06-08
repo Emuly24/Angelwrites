@@ -114,7 +114,7 @@ $pageTitle = 'Admin Dashboard';
 
             <div class="stat-card">
                 <div class="stat-icon" style="background: rgba(155, 89, 182, 0.15); color: #9b59b6;">
-                    <i class="fas fa-feather-alt"></i>
+                    <i class="fas fa-pen"></i>
                 </div>
                 <div class="stat-content">
                     <span class="stat-number"><?php echo $stats['total_poems']; ?></span>
@@ -170,7 +170,7 @@ $pageTitle = 'Admin Dashboard';
                 <span>Manage Books</span>
             </a>
             <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="action-card">
-                <i class="fas fa-feather-alt"></i>
+                <i class="fas fa-pen"></i>
                 <span>Manage Poems</span>
             </a>
             <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="action-card">

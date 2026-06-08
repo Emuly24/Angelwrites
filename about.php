@@ -94,7 +94,7 @@ $pageTitle = 'About Angella Bottoman';
                     <i class="fas fa-book"></i> Read Books
                 </a>
                 <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline">
-                    <i class="fas fa-feather-alt"></i> Read Poetry
+                    <i class="fas fa-pen"></i> Read Poetry
                 </a>
                 <a href="<?php echo SITE_URL; ?>/contact.php" class="btn btn-secondary">
                     <i class="fas fa-envelope"></i> Contact

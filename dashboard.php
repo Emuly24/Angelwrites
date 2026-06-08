@@ -19,23 +19,6 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// === DEBUG: Check which columns exist ===
-function debugColumns($db, $table) {
-    try {
-        $stmt = $db->prepare("PRAGMA table_info($table)");
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        return [];
-    }
-}
-
-$debug = [];
-$tables = ['books', 'poems', 'blog_posts', 'videos', 'reflections', 'questions', 'sessions', 'notifications', 'connections', 'user_tags'];
-foreach ($tables as $table) {
-    $debug[$table] = debugColumns($db, $table);
-}
-
 // === Helper: Get image with fallback ===
 function getImageSrc($row, $column, $placeholder = 'fas fa-image') {
     if (isset($row[$column]) && !empty($row[$column])) {
@@ -120,23 +103,6 @@ $pageTitle = 'My Dashboard';
 
 <div class="user-dashboard">
     <div class="container">
-        <!-- DEBUG INFO (Remove this section after fixes) -->
-        <div class="debug-section" style="background:#f8f9fa; padding:16px; border-radius:8px; margin-bottom:24px; border:1px solid #ddd;">
-            <h3 style="margin-top:0;">🔍 Database Column Check</h3>
-            <p>If images aren't showing, check these columns:</p>
-            <ul style="columns:2; column-gap:30px;">
-                <?php foreach ($debug as $table => $columns): ?>
-                    <li><strong><?php echo $table; ?>:</strong> 
-                        <?php 
-                        $col_names = array_column($columns, 'name');
-                        echo empty($col_names) ? '❌ Table missing' : implode(', ', $col_names);
-                        ?>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-            <p style="font-size:0.9rem; color:#666;">To fix missing columns, use phpLiteAdmin to add them.</p>
-        </div>
-
         <div class="dashboard-header">
             <h1>Welcome Back, <?php echo htmlspecialchars($user['name']); ?>! 🌿</h1>
             <p>Explore the latest from AngelWrites and manage your activity below.</p>
@@ -179,10 +145,10 @@ $pageTitle = 'My Dashboard';
                     <?php endif; ?>
                 </section>
 
-                <!-- Poems -->
+                <!-- Poems (Pen Icon) -->
                 <section class="dashboard-section" id="poems">
                     <div class="section-header">
-                        <h2><i class="fas fa-feather-alt" style="color: var(--rose);"></i> Poems</h2>
+                        <h2><i class="fas fa-pen" style="color: var(--rose);"></i> Poems</h2>
                         <a href="<?php echo SITE_URL; ?>/poems.php" class="btn btn-sm btn-outline">Browse →</a>
                     </div>
                     <?php if (count($poems) > 0): ?>
@@ -194,9 +160,9 @@ $pageTitle = 'My Dashboard';
                                         $img = getImageSrc($poem, 'cover_image');
                                         if ($img): ?>
                                             <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-feather-alt"></i></div>
+                                            <div class="placeholder-cover" style="display:none;"><i class="fas fa-pen"></i></div>
                                         <?php else: ?>
-                                            <div class="placeholder-cover"><i class="fas fa-feather-alt"></i></div>
+                                            <div class="placeholder-cover"><i class="fas fa-pen"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="content-info">
