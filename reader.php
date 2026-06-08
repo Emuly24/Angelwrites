@@ -160,7 +160,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
         </div>
     </div>
 
-    <!-- ===== MAIN CONTENT AREA (SCROLLABLE) ===== -->
+    <!-- ===== MAIN CONTENT AREA (SCROLLABLE - FIXED FOR MOBILE) ===== -->
     <div class="reader-content-area">
         <?php if ($has_processed): ?>
             <!-- HTML READER -->
@@ -225,23 +225,16 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
     </div>
 </div>
 
-<!-- ============================================================ -->
-<!-- ===== JAVASCRIPT ===== -->
-<!-- ============================================================ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // -------------------------------------
-    // SETTINGS TOGGLE
-    // -------------------------------------
+    // ---- Settings Toggle ----
     const settingsToggle = document.getElementById('settings-toggle');
     const settingsPanel = document.getElementById('reader-settings');
     settingsToggle.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
     });
 
-    // -------------------------------------
-    // THEME
-    // -------------------------------------
+    // ---- Theme ----
     const themeBtns = document.querySelectorAll('.theme-btn');
     const readerApp = document.querySelector('.reader-app');
     themeBtns.forEach(btn => {
@@ -257,9 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // -------------------------------------
-    // FONT
-    // -------------------------------------
+    // ---- Font ----
     const fontBtns = document.querySelectorAll('.font-btn');
     fontBtns.forEach(btn => {
         btn.addEventListener('click', function() {
@@ -274,9 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // -------------------------------------
-    // FONT SIZE
-    // -------------------------------------
+    // ---- Font Size ----
     const decreaseBtn = document.getElementById('decrease-size');
     const increaseBtn = document.getElementById('increase-size');
     const sizeLabel = document.getElementById('size-label');
@@ -306,9 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     applySize(currentSizeIndex);
 
-    // -------------------------------------
-    // READING MODE
-    // -------------------------------------
+    // ---- Reading Mode ----
     const readerText = document.getElementById('reader-text');
     let bookId = readerText ? readerText.dataset.bookId : null;
     const totalPages = readerText ? parseInt(readerText.dataset.totalPages) : 0;
@@ -365,7 +352,6 @@ document.addEventListener('DOMContentLoaded', function() {
         pageIndicator.textContent = `Page ${currentPage + 1} of ${totalPages}`;
         prevBtn.disabled = (currentPage === 0);
         nextBtn.disabled = (currentPage === totalPages - 1);
-        // Save page position without scroll fraction for resume
         savePagePosition(Math.round(((currentPage) / totalPages) * 100));
     }
 
@@ -414,9 +400,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // -------------------------------------
-    // SCROLL POSITION SAVING (SCROLL MODE)
-    // -------------------------------------
+    // ---- SCROLL POSITION SAVING (SCROLL MODE) ----
     let saveTimeout;
     function saveScrollPosition() {
         <?php if (isLoggedIn()): ?>
@@ -428,7 +412,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (docHeight > winHeight) {
             percent = Math.min(100, Math.round((scrollTop / (docHeight - winHeight)) * 100));
         }
-        // Update display immediately
         const progressDisplay = document.querySelector('.progress-display');
         if (progressDisplay) {
             progressDisplay.textContent = percent + '%';
@@ -459,19 +442,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- ============================================================ -->
-<!-- ===== STYLES ===== -->
-<!-- ============================================================ -->
 <style>
 /* ===== RESET & VARIABLES ===== */
 .reader-app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    /* Uses 100dvh instead of 100vh to handle mobile address bar */
+    height: 100dvh; 
     background: var(--vanilla);
     color: var(--text);
     transition: all 0.3s ease;
     padding: 0;
+    position: relative;
+    /* This ensures that on mobile the address bar doesn't interfere */
+    min-height: 100dvh;
 }
 
 /* ===== READER HEADER (STICKY) ===== */
@@ -494,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .settings-btn { background: transparent; border: none; font-size: 1.2rem; color: var(--text); cursor: pointer; transition: transform 0.2s, color 0.2s; }
 .settings-btn:hover { transform: rotate(45deg); color: var(--rose); }
 
-/* ===== SETTINGS PANEL (STICKY) ===== */
+/* ===== SETTINGS PANEL ===== */
 .reader-settings {
     flex-shrink: 0;
     display: none;
@@ -527,6 +511,9 @@ document.addEventListener('DOMContentLoaded', function() {
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
+    /* Force it to be scrollable */
+    height: 0; /* Forces it to take up remaining space */
+    min-height: 0;
 }
 
 /* ===== PAGE NAVIGATION CONTROLS ===== */
@@ -540,6 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
     border-radius: 12px;
     border: 1px solid var(--rose-light);
     margin-top: 20px;
+    flex-shrink: 0;
 }
 .page-nav-controls .nav-btn {
     background: var(--rose);
