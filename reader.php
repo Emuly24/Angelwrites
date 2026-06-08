@@ -82,7 +82,7 @@ if ($has_processed) {
 $reader_theme = $_COOKIE['reader_theme'] ?? 'paper';
 $reader_font = $_COOKIE['reader_font'] ?? 'serif';
 $reader_font_size = $_COOKIE['reader_font_size'] ?? 'medium';
-$reading_mode = $_COOKIE['reading_mode'] ?? 'scroll'; // 'scroll' or 'page'
+$reading_mode = $_COOKIE['reading_mode'] ?? 'scroll';
 
 $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 ?>
@@ -182,7 +182,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                     <button id="next-page-btn" class="nav-btn">Next <i class="fas fa-chevron-right"></i></button>
                 </div>
             <?php else: ?>
-                <!-- Fallback to PDF/EPUB -->
+                <!-- Fallback to PDF/EPUB with Branded Styling -->
                 <div class="fallback-reader">
                     <?php if ($book['file_type'] === 'pdf'): ?>
                         <div class="pdf-container">
@@ -550,14 +550,18 @@ document.addEventListener('DOMContentLoaded', function() {
 #page-indicator { font-weight: 600; color: var(--text); }
 
 /* ===== CONTENT AREA ===== */
-.reader-content-area { max-width: 800px; margin: 0 auto; }
+.reader-content-area {
+    max-width: 1200px; /* WIDER: Matches toolbar width */
+    margin: 0 auto;
+    padding: 0 20px;
+}
 
 /* ===== SCROLL MODE FIXES ===== */
 .reader-app[data-mode="scroll"] .html-reader {
     height: auto !important;
     overflow: visible !important;
     display: block !important;
-    padding: 0 20px;
+    padding: 0;
 }
 .reader-app[data-mode="scroll"] .page-content {
     display: block !important;
@@ -565,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
     max-height: none !important;
     overflow: visible !important;
     padding: 0;
-    margin-bottom: 20px;
+    margin-bottom: 32px;
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
@@ -584,9 +588,9 @@ document.addEventListener('DOMContentLoaded', function() {
     display: none;
     max-height: 70vh;
     overflow-y: auto;
-    padding: 20px;
+    padding: 30px;
     background: var(--card-bg);
-    border-radius: 12px;
+    border-radius: 16px;
     box-shadow: var(--shadow-hover);
     border: 1px solid var(--rose-light);
     width: 100%;
@@ -599,17 +603,80 @@ document.addEventListener('DOMContentLoaded', function() {
     margin-top: 0;
 }
 .reader-app[data-mode="page"] .page-content p {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     line-height: 1.8;
 }
 
-/* ===== FALLBACK READER ===== */
-.fallback-reader { padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }
-.epub-controls { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; }
-.epub-controls .nav-btn { background: var(--rose); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; transition: background 0.2s; }
-.epub-controls .nav-btn:hover { background: var(--rose-dark); }
-.unsupported-message { text-align: center; padding: 40px 20px; color: var(--text-light); }
-.unsupported-message i { font-size: 3rem; color: var(--rose); display: block; margin-bottom: 16px; }
+/* ===== FALLBACK READER (PDF/EPUB) ===== */
+.fallback-reader {
+    padding: 20px;
+    background: var(--card-bg);
+    border-radius: 16px;
+    border: 1px solid var(--rose-light);
+    box-shadow: var(--shadow-hover);
+}
+.fallback-reader iframe {
+    border-radius: 8px;
+    border: none;
+}
+.pdf-container {
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--vanilla);
+}
+.pdf-container iframe {
+    display: block;
+    width: 100%;
+    height: 700px;
+}
+
+.epub-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 16px;
+    background: var(--vanilla);
+    padding: 12px;
+    border-radius: 30px;
+}
+.epub-controls .nav-btn {
+    background: var(--rose);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+.epub-controls .nav-btn:hover {
+    background: var(--rose-dark);
+    transform: scale(1.05);
+}
+.epub-controls .nav-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+#epub-current {
+    font-weight: 600;
+    color: var(--text);
+    min-width: 80px;
+    text-align: center;
+}
+
+.unsupported-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-light);
+}
+.unsupported-message i {
+    font-size: 3.5rem;
+    color: var(--rose);
+    display: block;
+    margin-bottom: 16px;
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
