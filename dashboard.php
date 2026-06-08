@@ -19,91 +19,67 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// ===== FETCH ANGELLA'S BOOKS =====
-$stmt = $db->prepare("SELECT * FROM books WHERE is_angella_book = 1 ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$angella_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === Helper function to safely fetch data from tables that may not exist ===
+function safeFetch($db, $sql, $params = [], $limit = 6) {
+    try {
+        $stmt = $db->prepare($sql . " LIMIT " . $limit);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        return [];
+    }
+}
 
-// ===== FETCH POEMS =====
-$stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === Angella's Books ===
+$angella_books = safeFetch($db, "SELECT * FROM books WHERE is_angella_book = 1 ORDER BY created_at DESC", [], 6);
 
-// ===== FETCH BLOG POSTS =====
-$stmt = $db->prepare("SELECT * FROM blog_posts ORDER BY published_at DESC LIMIT 6");
-$stmt->execute();
-$blog_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === Poems ===
+$poems = safeFetch($db, "SELECT * FROM poems ORDER BY created_at DESC", [], 6);
 
-// ===== FETCH SHORT VIDEOS =====
-$stmt = $db->prepare("SELECT * FROM videos WHERE type = 'short' ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === Blog Posts ===
+$blog_posts = safeFetch($db, "SELECT * FROM blog_posts ORDER BY published_at DESC", [], 6);
 
-// ===== FETCH CHRISTIAN REFLECTIONS =====
-$stmt = $db->prepare("SELECT * FROM reflections ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === Short Videos ===
+$videos = safeFetch($db, "SELECT * FROM videos WHERE type = 'short' ORDER BY created_at DESC", [], 6);
 
-// ===== FETCH COMMUNITY QUESTIONS =====
-$stmt = $db->prepare("
+// === Christian Reflections ===
+$reflections = safeFetch($db, "SELECT * FROM reflections ORDER BY created_at DESC", [], 6);
+
+// === Community Q&A ===
+$community_questions = safeFetch($db, "
     SELECT q.*, u.name AS author_name, COUNT(a.id) AS answer_count 
     FROM questions q
     JOIN users u ON q.user_id = u.id
     LEFT JOIN answers a ON q.id = a.question_id
     WHERE q.status = 'approved'
     GROUP BY q.id
-    ORDER BY q.created_at DESC
-    LIMIT 5
-");
-$stmt->execute();
-$community_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    ORDER BY q.created_at DESC", [], 5);
 
-// ===== FETCH USER SESSIONS =====
-$stmt = $db->prepare("
-    SELECT * FROM sessions 
-    WHERE user_id = ? 
-    ORDER BY date DESC, time DESC
-");
-$stmt->execute([$user_id]);
-$my_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === User Sessions ===
+$my_sessions = safeFetch($db, "SELECT * FROM sessions WHERE user_id = ? ORDER BY date DESC, time DESC", [$user_id], 10);
 
-// ===== FETCH USER QUESTIONS =====
-$stmt = $db->prepare("
+// === User Questions ===
+$my_questions = safeFetch($db, "
     SELECT q.*, COUNT(a.id) AS answer_count 
     FROM questions q
     LEFT JOIN answers a ON q.id = a.question_id
     WHERE q.user_id = ?
     GROUP BY q.id
-    ORDER BY q.created_at DESC
-");
-$stmt->execute([$user_id]);
-$my_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    ORDER BY q.created_at DESC", [$user_id], 10);
 
-// ===== FETCH NOTIFICATIONS =====
-$stmt = $db->prepare("
-    SELECT * FROM notifications 
-    WHERE user_id = ? 
-    ORDER BY created_at DESC 
-    LIMIT 10
-");
-$stmt->execute([$user_id]);
-$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === Notifications ===
+$notifications = safeFetch($db, "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC", [$user_id], 10);
 
-// ===== FETCH CONNECTIONS =====
-$stmt = $db->prepare("
+// === Connections ===
+$connections = safeFetch($db, "
     SELECT c.*, u.name AS sender_name, u.email AS sender_email 
     FROM connections c
     JOIN users u ON c.sender_id = u.id
     WHERE c.receiver_id = ? OR c.sender_id = ?
-    ORDER BY c.created_at DESC
-");
-$stmt->execute([$user_id, $user_id]);
-$connections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    ORDER BY c.created_at DESC", [$user_id, $user_id], 10);
 
-// ===== FETCH TAGS =====
-$stmt = $db->prepare("SELECT * FROM user_tags WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// === Tags ===
+$tags = safeFetch($db, "SELECT * FROM user_tags WHERE user_id = ?", [$user_id], 20);
 
 $pageTitle = 'My Dashboard';
 ?>
@@ -113,7 +89,7 @@ $pageTitle = 'My Dashboard';
     <div class="container">
         <div class="dashboard-header">
             <h1>Welcome Back, <?php echo htmlspecialchars($user['name']); ?>! 🌿</h1>
-            <p>Explore the latest from AngellaWrites and manage your activity below.</p>
+            <p>Explore the latest from AngelWrites and manage your activity below.</p>
         </div>
 
         <div class="dashboard-grid">
@@ -139,10 +115,10 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                        <?php if ($book['description']): ?>
+                                        <?php if (isset($book['description'])): ?>
                                             <p class="content-description"><?php echo htmlspecialchars(substr($book['description'], 0, 100)) . '...'; ?></p>
                                         <?php endif; ?>
-                                        <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Read Book</a>
+                                        <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">View Book</a>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -163,7 +139,7 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($poems as $poem): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php if ($poem['cover_image']): ?>
+                                        <?php if (isset($poem['cover_image'])): ?>
                                             <img src="<?php echo SITE_URL . '/' . $poem['cover_image']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-feather-alt"></i></div>
@@ -171,7 +147,7 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                                        <?php if ($poem['purpose']): ?>
+                                        <?php if (isset($poem['purpose'])): ?>
                                             <p class="content-description"><?php echo htmlspecialchars(substr($poem['purpose'], 0, 80)) . '...'; ?></p>
                                         <?php endif; ?>
                                         <a href="<?php echo SITE_URL; ?>/poem.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">Read Poem</a>
@@ -195,7 +171,7 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($blog_posts as $post): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php if ($post['featured_image']): ?>
+                                        <?php if (isset($post['featured_image'])): ?>
                                             <img src="<?php echo SITE_URL . '/' . $post['featured_image']; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pen-fancy"></i></div>
@@ -203,7 +179,7 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($post['title']); ?></h3>
-                                        <?php if ($post['excerpt']): ?>
+                                        <?php if (isset($post['excerpt'])): ?>
                                             <p class="content-description"><?php echo htmlspecialchars(substr($post['excerpt'], 0, 80)) . '...'; ?></p>
                                         <?php endif; ?>
                                         <a href="<?php echo SITE_URL; ?>/blog_post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Read Post</a>
@@ -227,7 +203,7 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($videos as $video): ?>
                                 <div class="content-card">
                                     <div class="content-cover video-thumb">
-                                        <?php if ($video['thumbnail']): ?>
+                                        <?php if (isset($video['thumbnail'])): ?>
                                             <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
                                             <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
                                         <?php else: ?>
@@ -236,7 +212,7 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($video['title']); ?></h3>
-                                        <?php if ($video['description']): ?>
+                                        <?php if (isset($video['description'])): ?>
                                             <p class="content-description"><?php echo htmlspecialchars(substr($video['description'], 0, 60)) . '...'; ?></p>
                                         <?php endif; ?>
                                         <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch Video</a>
@@ -260,7 +236,7 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($reflections as $reflection): ?>
                                 <div class="content-card">
                                     <div class="content-cover">
-                                        <?php if ($reflection['image_path']): ?>
+                                        <?php if (isset($reflection['image_path'])): ?>
                                             <img src="<?php echo SITE_URL . '/' . $reflection['image_path']; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pray"></i></div>
@@ -268,7 +244,7 @@ $pageTitle = 'My Dashboard';
                                     </div>
                                     <div class="content-info">
                                         <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
-                                        <?php if ($reflection['excerpt']): ?>
+                                        <?php if (isset($reflection['excerpt'])): ?>
                                             <p class="content-description"><?php echo htmlspecialchars(substr($reflection['excerpt'], 0, 80)) . '...'; ?></p>
                                         <?php endif; ?>
                                         <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="btn btn-sm btn-primary">Read Reflection</a>
@@ -298,8 +274,8 @@ $pageTitle = 'My Dashboard';
                                         <span class="qa-author">— <?php echo htmlspecialchars($q['author_name']); ?></span>
                                     </div>
                                     <div class="qa-meta">
-                                        <span><?php echo date('M j, Y', strtotime($q['created_at'])); ?></span>
-                                        <span class="answer-count"><?php echo $q['answer_count']; ?> answer(s)</span>
+                                        <span><?php echo isset($q['created_at']) ? date('M j, Y', strtotime($q['created_at'])) : ''; ?></span>
+                                        <span class="answer-count"><?php echo $q['answer_count'] ?? 0; ?> answer(s)</span>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -338,8 +314,8 @@ $pageTitle = 'My Dashboard';
                             <?php foreach ($my_sessions as $session): ?>
                                 <div class="mini-item">
                                     <strong><?php echo htmlspecialchars($session['date']); ?></strong> at <?php echo htmlspecialchars($session['time']); ?>
-                                    <span class="status-badge <?php echo $session['status']; ?>"><?php echo ucfirst($session['status']); ?></span>
-                                    <?php if ($session['message']): ?>
+                                    <span class="status-badge <?php echo $session['status'] ?? 'pending'; ?>"><?php echo ucfirst($session['status'] ?? 'pending'); ?></span>
+                                    <?php if (isset($session['message'])): ?>
                                         <p class="session-message"><?php echo htmlspecialchars($session['message']); ?></p>
                                     <?php endif; ?>
                                 </div>
@@ -363,8 +339,8 @@ $pageTitle = 'My Dashboard';
                                         </a>
                                     </div>
                                     <div class="question-meta">
-                                        <span><?php echo date('M j, Y', strtotime($q['created_at'])); ?></span>
-                                        <span><?php echo $q['answer_count']; ?> answer(s)</span>
+                                        <span><?php echo isset($q['created_at']) ? date('M j, Y', strtotime($q['created_at'])) : ''; ?></span>
+                                        <span><?php echo $q['answer_count'] ?? 0; ?> answer(s)</span>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -380,10 +356,10 @@ $pageTitle = 'My Dashboard';
                     <?php if (count($notifications) > 0): ?>
                         <div class="mini-list">
                             <?php foreach ($notifications as $notif): ?>
-                                <div class="mini-item <?php echo $notif['is_read'] ? 'read' : 'unread'; ?>">
+                                <div class="mini-item <?php echo isset($notif['is_read']) && $notif['is_read'] ? 'read' : 'unread'; ?>">
                                     <div class="notif-title"><?php echo htmlspecialchars($notif['title']); ?></div>
                                     <div class="notif-message"><?php echo htmlspecialchars($notif['message']); ?></div>
-                                    <div class="notif-date"><?php echo date('M j, Y g:i a', strtotime($notif['created_at'])); ?></div>
+                                    <div class="notif-date"><?php echo isset($notif['created_at']) ? date('M j, Y g:i a', strtotime($notif['created_at'])) : ''; ?></div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -434,7 +410,6 @@ $pageTitle = 'My Dashboard';
 </div>
 
 <style>
-/* ---- Dashboard Layout ---- */
 .user-dashboard { padding: 32px 0 60px; }
 .dashboard-header { text-align: center; margin-bottom: 32px; }
 .dashboard-header h1 { font-size: 2.2rem; color: var(--text); }
@@ -442,12 +417,10 @@ $pageTitle = 'My Dashboard';
 
 .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; }
 
-/* ---- Section Styling ---- */
 .dashboard-section { margin-bottom: 48px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .section-header h2 { font-size: 1.5rem; margin: 0; display: flex; align-items: center; gap: 8px; }
 
-/* ---- Content Grid (Cards) ---- */
 .content-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
 .content-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); transition: transform 0.2s; }
 .content-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
@@ -460,7 +433,6 @@ $pageTitle = 'My Dashboard';
 .content-info h3 { font-size: 1.05rem; margin: 0 0 6px 0; }
 .content-description { font-size: 0.9rem; color: var(--text-light); margin-bottom: 10px; }
 
-/* ---- Q&A List ---- */
 .qa-list { display: flex; flex-direction: column; gap: 8px; }
 .qa-item { background: var(--bg); padding: 14px; border-radius: 8px; border: 1px solid var(--border); }
 .qa-title a { color: var(--text); font-weight: 500; }
@@ -468,7 +440,6 @@ $pageTitle = 'My Dashboard';
 .qa-author { font-size: 0.85rem; color: var(--text-light); margin-left: 6px; }
 .qa-meta { display: flex; gap: 12px; font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }
 
-/* ---- Sidebar Cards ---- */
 .dashboard-sidebar { display: flex; flex-direction: column; gap: 20px; }
 .dashboard-card { background: var(--card-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border); }
 .dashboard-card h4 { margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 1rem; }
@@ -486,7 +457,6 @@ $pageTitle = 'My Dashboard';
 .question-title a:hover { color: var(--rose); }
 .question-meta { display: flex; gap: 12px; font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }
 
-/* ---- Profile Summary ---- */
 .profile-summary { text-align: center; padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }
 .profile-pic { width: 90px; height: 90px; border-radius: 50%; margin: 0 auto 10px; overflow: hidden; background: var(--vanilla); display: flex; align-items: center; justify-content: center; }
 .profile-pic img { width: 100%; height: 100%; object-fit: cover; }
@@ -495,7 +465,6 @@ $pageTitle = 'My Dashboard';
 .user-email { color: var(--text-light); font-size: 0.9rem; }
 .user-bio { color: var(--text); font-size: 0.9rem; margin-top: 8px; line-height: 1.5; }
 
-/* ---- Tags & Connections ---- */
 .connection-list { list-style: none; padding: 0; margin: 0; }
 .connection-list li { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
 .connection-list li:last-child { border-bottom: none; }
@@ -503,25 +472,18 @@ $pageTitle = 'My Dashboard';
 .tags-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag-pill { background: var(--vanilla); padding: 4px 12px; border-radius: 14px; font-size: 0.8rem; color: var(--text); }
 
-/* ---- Status Badges ---- */
 .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
-.status-badge.currently\ reading { background: var(--rose); color: white; }
-.status-badge.want\ to\ read { background: #3498db; color: white; }
-.status-badge.finished { background: #27ae60; color: white; }
-.status-badge.none { background: var(--border); color: var(--text-light); }
 .status-badge.pending { background: #f1c40f; color: white; }
 .status-badge.confirmed { background: #2ecc71; color: white; }
 .status-badge.completed { background: #3498db; color: white; }
 .status-badge.cancelled { background: #e74c3c; color: white; }
 
-/* ---- Utilities ---- */
 .no-items { color: var(--text-light); padding: 8px 0; text-align: center; font-size: 0.9rem; }
 .no-items a { color: var(--rose); }
 .btn-sm { padding: 6px 14px; font-size: 0.85rem; }
 .btn-outline { background: transparent; border: 1px solid var(--rose); color: var(--rose); }
 .btn-outline:hover { background: var(--rose); color: white; }
 
-/* ---- Responsive ---- */
 @media (max-width: 1024px) {
     .dashboard-grid { grid-template-columns: 1fr; }
     .dashboard-sidebar { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
