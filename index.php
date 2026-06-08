@@ -27,14 +27,16 @@ require_once 'includes/auth.php';
     </div>
 </section>
 
-<!-- FEATURED BOOKS -->
+<!-- FEATURED BOOKS (UPDATED STYLE) -->
 <section class="featured-books section-padding">
     <div class="container">
         <div class="section-header">
             <h2>Featured <span class="rose-text">Books</span></h2>
             <p>Explore Angella's latest writings and download free or purchase.</p>
         </div>
-        <div class="book-grid">
+
+        <!-- Book Grid with New Style -->
+        <div class="books-grid">
             <?php
             $stmt = $db->prepare("SELECT * FROM books ORDER BY created_at DESC LIMIT 3");
             $stmt->execute();
@@ -43,11 +45,14 @@ require_once 'includes/auth.php';
                 foreach ($books as $book):
             ?>
             <div class="book-card">
-                <div class="book-cover">
+                <!-- Book Cover (Centered) -->
+                <div class="book-cover-wrapper">
                     <?php if ($book['cover_path']): ?>
                         <img src="<?php echo $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
                     <?php else: ?>
-                        <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
+                        <div class="placeholder-cover">
+                            <i class="fas fa-book"></i>
+                        </div>
                     <?php endif; ?>
                     <?php if ($book['is_free']): ?>
                         <span class="badge free">Free</span>
@@ -55,17 +60,36 @@ require_once 'includes/auth.php';
                         <span class="badge sale">Sale</span>
                     <?php endif; ?>
                 </div>
-                <div class="book-info">
+
+                <!-- Book Details -->
+                <div class="book-details">
                     <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                     <p class="book-author">by Angella Bottoman</p>
-                    <p class="book-desc"><?php echo htmlspecialchars(substr($book['description'], 0, 80)); ?>...</p>
-                    <div class="book-actions">
-                        <a href="/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Read</a>
-                        <?php if ($book['price'] > 0): ?>
-                            <span class="book-price">$<?php echo number_format($book['price'], 2); ?></span>
-                        <?php else: ?>
-                            <span class="book-price free-text">Free</span>
+
+                    <!-- Full Description (Justified) -->
+                    <div class="book-description-wrapper">
+                        <div class="book-description" id="desc-<?php echo $book['id']; ?>">
+                            <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
+                        </div>
+                        <?php if (strlen($book['description'] ?? '') > 400): ?>
+                            <button class="toggle-desc-btn" data-id="<?php echo $book['id']; ?>">Read More</button>
                         <?php endif; ?>
+                    </div>
+
+                    <!-- Bottom: Price & Action -->
+                    <div class="book-bottom">
+                        <div class="book-price">
+                            <?php if ($book['is_free']): ?>
+                                <span class="free-text">Free</span>
+                            <?php elseif ($book['is_sale']): ?>
+                                <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
+                            <?php else: ?>
+                                <span>MWK <?php echo number_format($book['price'], 2); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <a href="/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
+                            <i class="fas fa-book-open"></i> Read
+                        </a>
                     </div>
                 </div>
             </div>
@@ -231,9 +255,154 @@ require_once 'includes/auth.php';
     </div>
 </section>
 
-<?php require_once 'includes/footer.php'; ?>
+<!-- ===== CUSTOM STYLES ===== -->
 <style>
-    /* ===== POEM CARD WITH IMAGE ===== */
+/* ===== FEATURED BOOKS (NEW STYLE) ===== */
+.featured-books .books-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+    max-width: 600px;
+    margin: 0 auto;
+    justify-content: center;
+}
+
+@media (min-width: 768px) {
+    .featured-books .books-grid {
+        grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+        max-width: 1000px;
+    }
+}
+
+.featured-books .book-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--border);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+.featured-books .book-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.10);
+}
+
+.featured-books .book-cover-wrapper {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    overflow: hidden;
+    background: var(--vanilla);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.featured-books .book-cover-wrapper img {
+    width: auto;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    max-width: 100%;
+}
+.featured-books .placeholder-cover {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    color: var(--rose);
+    background: var(--vanilla);
+}
+
+.featured-books .badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: white;
+}
+.featured-books .badge.free { background: #27ae60; }
+.featured-books .badge.sale { background: #e74c3c; }
+
+.featured-books .book-details {
+    padding: 28px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.featured-books .book-details h3 {
+    font-size: 1.6rem;
+    margin: 0 0 4px 0;
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+    color: var(--text);
+}
+.featured-books .book-author {
+    text-align: center;
+    color: var(--text-light);
+    font-size: 1rem;
+    margin-bottom: 16px;
+}
+.featured-books .book-description-wrapper {
+    flex: 1;
+}
+.featured-books .book-description {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: var(--text);
+    text-align: justify;
+    margin-bottom: 12px;
+    max-height: 200px;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+}
+.featured-books .book-description.expanded {
+    max-height: none;
+}
+.featured-books .toggle-desc-btn {
+    background: none;
+    border: none;
+    color: var(--rose);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 12px;
+}
+.featured-books .toggle-desc-btn:hover {
+    text-decoration: underline;
+}
+
+.featured-books .book-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+.featured-books .book-price {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--text);
+}
+.featured-books .free-text { color: #27ae60; }
+.featured-books .sale-text { color: #e74c3c; }
+.featured-books .book-bottom .btn {
+    padding: 10px 28px;
+    border-radius: 30px;
+    font-size: 0.95rem;
+}
+
+/* ===== POEM CARD ===== */
 .poem-card {
     background: var(--card-bg);
     border-radius: 12px;
@@ -244,41 +413,34 @@ require_once 'includes/auth.php';
     display: flex;
     flex-direction: column;
 }
-
 .poem-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-hover);
 }
-
 .poem-thumbnail {
     width: 100%;
     height: 180px;
     overflow: hidden;
 }
-
 .poem-thumbnail img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transition: transform 0.4s ease;
 }
-
 .poem-card:hover .poem-thumbnail img {
     transform: scale(1.05);
 }
-
 .poem-content {
     padding: 20px;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
-
 .poem-content h3 {
     font-size: 1.2rem;
     margin-bottom: 6px;
 }
-
 .poem-intro-preview {
     background: var(--vanilla);
     padding: 8px 12px;
@@ -286,7 +448,6 @@ require_once 'includes/auth.php';
     margin: 6px 0 10px;
     border-left: 3px solid var(--rose);
 }
-
 .poem-intro-preview .intro-label {
     display: block;
     font-size: 0.7rem;
@@ -296,7 +457,6 @@ require_once 'includes/auth.php';
     color: var(--rose);
     margin-bottom: 2px;
 }
-
 .poem-excerpt {
     color: var(--text-light);
     font-size: 0.95rem;
@@ -304,19 +464,18 @@ require_once 'includes/auth.php';
     margin-bottom: 12px;
     flex: 1;
 }
-
 .poem-audio {
     margin-top: auto;
     padding-top: 12px;
     border-top: 1px solid var(--border);
 }
+
 /* ===== BLOG CARDS ===== */
 .blog-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 24px;
 }
-
 .blog-card {
     background: var(--card-bg);
     border-radius: 12px;
@@ -327,37 +486,31 @@ require_once 'includes/auth.php';
     display: flex;
     flex-direction: column;
 }
-
 .blog-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-hover);
 }
-
 .blog-thumbnail {
     width: 100%;
     height: 180px;
     overflow: hidden;
     background: var(--vanilla);
 }
-
 .blog-thumbnail img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transition: transform 0.4s ease;
 }
-
 .blog-card:hover .blog-thumbnail img {
     transform: scale(1.05);
 }
-
 .blog-content {
     padding: 20px;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
-
 .blog-meta {
     display: flex;
     justify-content: space-between;
@@ -366,7 +519,6 @@ require_once 'includes/auth.php';
     font-size: 0.85rem;
     color: var(--text-light);
 }
-
 .blog-category {
     background: var(--vanilla);
     padding: 2px 10px;
@@ -374,12 +526,10 @@ require_once 'includes/auth.php';
     font-weight: 500;
     color: var(--text);
 }
-
 .blog-content h3 {
     font-size: 1.15rem;
     margin-bottom: 6px;
 }
-
 .blog-excerpt {
     color: var(--text-light);
     font-size: 0.95rem;
@@ -387,7 +537,6 @@ require_once 'includes/auth.php';
     margin-bottom: 12px;
     flex: 1;
 }
-
 .placeholder-card {
     background: var(--card-bg);
     border-radius: 12px;
@@ -397,20 +546,39 @@ require_once 'includes/auth.php';
     box-shadow: var(--shadow);
     grid-column: 1 / -1;
 }
-
 .placeholder-icon {
     font-size: 2.5rem;
     color: var(--rose);
     margin-bottom: 12px;
 }
-
 .placeholder-card h3 {
     font-size: 1.2rem;
     margin-bottom: 4px;
 }
-
 .placeholder-card p {
     color: var(--text-light);
     margin-bottom: 16px;
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle description for featured books
+    const toggleBtns = document.querySelectorAll('.featured-books .toggle-desc-btn');
+    toggleBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const desc = document.getElementById('desc-' + id);
+            if (desc.classList.contains('expanded')) {
+                desc.classList.remove('expanded');
+                this.textContent = 'Read More';
+            } else {
+                desc.classList.add('expanded');
+                this.textContent = 'Show Less';
+            }
+        });
+    });
+});
+</script>
+
+<?php require_once 'includes/footer.php'; ?>
