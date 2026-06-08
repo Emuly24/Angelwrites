@@ -108,8 +108,9 @@ $pageTitle = 'Books';
 /* ===== GRID ===== */
 .books-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
     gap: 40px;
+    justify-content: center;
 }
 
 /* ===== CARD ===== */
@@ -132,7 +133,7 @@ $pageTitle = 'Books';
 .book-cover-wrapper {
     position: relative;
     width: 100%;
-    height: 320px;
+    height: 400px;
     overflow: hidden;
     background: var(--vanilla);
     display: flex;
@@ -175,13 +176,13 @@ $pageTitle = 'Books';
 
 /* ===== DETAILS ===== */
 .book-details {
-    padding: 24px;
+    padding: 28px;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 .book-details h3 {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
     margin: 0 0 4px 0;
     text-align: center;
     font-family: 'Playfair Display', serif;
@@ -190,8 +191,8 @@ $pageTitle = 'Books';
 .book-author {
     text-align: center;
     color: var(--text-light);
-    font-size: 0.95rem;
-    margin-bottom: 12px;
+    font-size: 1rem;
+    margin-bottom: 16px;
 }
 
 /* ===== DESCRIPTION (JUSTIFIED) ===== */
@@ -199,7 +200,7 @@ $pageTitle = 'Books';
     flex: 1;
 }
 .book-description {
-    font-size: 0.95rem;
+    font-size: 1rem;
     line-height: 1.8;
     color: var(--text);
     text-align: justify;
@@ -215,7 +216,7 @@ $pageTitle = 'Books';
     background: none;
     border: none;
     color: var(--rose);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     padding: 0;
@@ -236,15 +237,15 @@ $pageTitle = 'Books';
 }
 .book-price {
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: var(--text);
 }
 .free-text { color: #27ae60; }
 .sale-text { color: #e74c3c; }
 .book-bottom .btn {
-    padding: 8px 24px;
+    padding: 10px 28px;
     border-radius: 30px;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
 }
 
 /* ===== EMPTY STATE ===== */
@@ -259,12 +260,13 @@ $pageTitle = 'Books';
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
-    .books-grid { grid-template-columns: 1fr; max-width: 450px; margin: 0 auto; }
-    .book-cover-wrapper { height: 260px; }
+    .books-grid { grid-template-columns: 1fr; max-width: 600px; margin: 0 auto; }
+    .book-cover-wrapper { height: 300px; }
 }
 @media (max-width: 480px) {
-    .book-cover-wrapper { height: 200px; }
-    .book-details { padding: 16px; }
+    .book-cover-wrapper { height: 240px; }
+    .book-details { padding: 20px; }
+    .book-details h3 { font-size: 1.3rem; }
 }
 </style>
 
