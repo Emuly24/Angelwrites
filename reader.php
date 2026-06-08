@@ -324,6 +324,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('.page-content').forEach(el => {
                     el.style.display = 'block';
                 });
+                
+                // When switching to Scroll Mode, trigger the saved scroll restoration
+                if (mode === 'scroll') {
+                    const initialOffset = parseInt(readerText.dataset.initialOffset || '0');
+                    if (initialOffset > 0) {
+                        setTimeout(() => {
+                            window.scrollTo({ top: initialOffset, behavior: 'smooth' });
+                        }, 100);
+                    }
+                }
             }
             modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
         }
@@ -542,16 +552,56 @@ document.addEventListener('DOMContentLoaded', function() {
 /* ===== CONTENT AREA ===== */
 .reader-content-area { max-width: 800px; margin: 0 auto; }
 
-/* Scroll Mode */
-.reader-app[data-mode="scroll"] .page-content { display: block !important; }
-.reader-app[data-mode="scroll"] .page-content[data-page-index] { display: block; }
+/* ===== SCROLL MODE FIXES ===== */
+.reader-app[data-mode="scroll"] .html-reader {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    padding: 0 20px;
+}
+.reader-app[data-mode="scroll"] .page-content {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0;
+    margin-bottom: 20px;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
 
-/* Page Mode */
-.reader-app[data-mode="page"] .html-reader { height: 70vh; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 0 20px; }
-.reader-app[data-mode="page"] .page-content { display: none; max-height: 70vh; overflow-y: auto; padding: 20px; background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow-hover); border: 1px solid var(--rose-light); width: 100%; }
-.reader-app[data-mode="page"] .page-content:first-child { display: block; }
-.reader-app[data-mode="page"] .page-content h1 { font-size: 1.8rem; margin-top: 0; }
-.reader-app[data-mode="page"] .page-content p { margin-bottom: 12px; line-height: 1.8; }
+/* ===== PAGE MODE ===== */
+.reader-app[data-mode="page"] .html-reader {
+    height: 70vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+}
+.reader-app[data-mode="page"] .page-content {
+    display: none;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 20px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: var(--shadow-hover);
+    border: 1px solid var(--rose-light);
+    width: 100%;
+}
+.reader-app[data-mode="page"] .page-content:first-child {
+    display: block;
+}
+.reader-app[data-mode="page"] .page-content h1 {
+    font-size: 1.8rem;
+    margin-top: 0;
+}
+.reader-app[data-mode="page"] .page-content p {
+    margin-bottom: 12px;
+    line-height: 1.8;
+}
 
 /* ===== FALLBACK READER ===== */
 .fallback-reader { padding: 20px; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); }
