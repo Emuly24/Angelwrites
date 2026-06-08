@@ -226,7 +226,14 @@ document.addEventListener('DOMContentLoaded', function() {
 .book-description-section { margin-top: 30px; }
 .book-title { font-size: 2.4rem; text-align: center; margin-bottom: 20px; font-family: 'Playfair Display', serif; color: var(--text); }
 
-.book-description { font-size: 1.05rem; line-height: 1.9; color: var(--text); margin-bottom: 32px; }
+/* ===== UPDATED CSS: Justified Text ===== */
+.book-description { 
+    text-align: justify; 
+    font-size: 1.05rem; 
+    line-height: 1.9; 
+    color: var(--text); 
+    margin-bottom: 32px; 
+}
 .book-description .description-content { transition: max-height 0.5s ease; }
 .read-more-btn { margin-top: 12px; border-radius: 30px; }
 
