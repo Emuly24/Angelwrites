@@ -1,7 +1,16 @@
 <?php
+require_once '../includes/admin_mail_helper.php';
+
+// Example: Send an admin notification
+if (sendAdminEmail('user@example.com', 'Admin Update', '<h1>Important Notice</h1>')) {
+    echo "Email sent successfully from admin@angelwrites.gt.tc";
+} else {
+    echo "Email failed.";
+}
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
 
@@ -37,20 +46,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['broadcast'])) {
         $error = 'Subject and message are required.';
     } else {
         // Fetch all active subscribers
-        $stmt = $db->prepare("SELECT email FROM newsletter WHERE is_active = 1");
+        $stmt = $db->prepare("SELECT email, unsubscribe_token FROM newsletter WHERE is_active = 1");
         $stmt->execute();
-        $subscribers = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        $count = 0;
-        foreach ($subscribers as $email) {
-            $headers = "From: " . SITE_NAME . " <admin@angelawrites.com>\r\n";
-            $headers .= "Reply-To: admin@angelawrites.com\r\n";
-            $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-            if (mail($email, $subject, $message, $headers)) {
-                $count++;
+        $sent_count = 0;
+        $failed_count = 0;
+        
+        foreach ($subscribers as $sub) {
+            // Add unsubscribe link to the message
+            $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $sub['unsubscribe_token'];
+            $full_message = $message . "\n\n---\n" .
+                "<p>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>" .
+                "<p>Or copy this link into your browser: $unsubscribe_link</p>";
+            
+            // Use your mail helper (Gmail SMTP)
+            if (sendEmail($sub['email'], $subject, $full_message, 'no-reply@angelwrites.gt.tc', 'AngelWrites Newsletter')) {
+                $sent_count++;
+            } else {
+                $failed_count++;
             }
+            // Rate limit: 0.5 seconds between emails to avoid Gmail throttling
+            usleep(500000);
         }
-        $success = "Broadcast sent to $count active subscribers.";
+        $success = "Broadcast sent. Sent: $sent_count, Failed: $failed_count.";
     }
 }
 
@@ -169,9 +188,6 @@ $pageTitle = 'Newsletter';
         toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
         content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
         forced_root_block: 'p',
-        init_instance_callback: function(editor) {
-            // Set initial content if any
-        },
         setup: function(editor) {
             editor.on('change', function () {
                 tinymce.triggerSave();
@@ -181,56 +197,12 @@ $pageTitle = 'Newsletter';
 </script>
 
 <style>
-    /* ===== BROADCAST FORM STYLING ===== */
-    .admin-form .form-group {
-        margin-bottom: 16px;
-    }
-
-    .admin-form label {
-        display: block;
-        font-weight: 600;
-        margin-bottom: 6px;
-        color: var(--text);
-        font-size: 0.95rem;
-    }
-
-    .admin-form input[type="text"],
-    .admin-form textarea,
-    .admin-form select {
-        width: 100%;
-        padding: 12px 16px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font-size: 1rem;
-        background: var(--input-bg);
-        color: var(--text);
-        transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    .admin-form input[type="text"]:focus,
-    .admin-form textarea:focus,
-    .admin-form select:focus {
-        outline: none;
-        border-color: var(--rose);
-        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-    }
-
-    .admin-form textarea {
-        resize: vertical;
-        min-height: 120px;
-    }
-
-    /* Ensure the button looks good under the inputs */
-    .admin-form .form-actions {
-        margin-top: 16px;
-    }
-
-    .admin-form .btn-block {
-        width: 100%;
-        justify-content: center;
-    }
-
-    /* ===== ADMIN TABLE ===== */
+    .admin-form .form-group { margin-bottom: 16px; }
+    .admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
+    .admin-form input[type="text"], .admin-form textarea, .admin-form select { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; background: var(--input-bg); color: var(--text); }
+    .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+    .admin-form textarea { resize: vertical; min-height: 120px; }
+    .admin-form .btn-block { width: 100%; justify-content: center; }
     .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
     .admin-table thead { background: var(--vanilla); }
     .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -238,11 +210,9 @@ $pageTitle = 'Newsletter';
     .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
     .admin-table tbody tr:last-child td { border-bottom: none; }
     .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
-
     .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
     .status-badge.active { background: #27ae60; color: #fff; }
     .status-badge.inactive { background: #95a5a6; color: #fff; }
-
     .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 </style>
 

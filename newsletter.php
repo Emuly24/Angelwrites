@@ -1,4 +1,12 @@
 <?php
+require_once 'includes/mail_helper.php';
+
+// Then call it like this:
+if (sendEmail($to, $subject, $message)) {
+    echo "Email sent!";
+} else {
+    echo "Email failed.";
+}
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 
@@ -16,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please enter a valid email address.';
     } else {
         // Check if email already exists
-        $stmt = $db->prepare("SELECT id, is_active FROM newsletter WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, is_active, unsubscribe_token FROM newsletter WHERE email = ?");
         $stmt->execute([$email]);
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -30,9 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = 'Your subscription has been reactivated. Welcome back!';
             }
         } else {
+            // Generate unique unsubscribe token
+            $token = bin2hex(random_bytes(32));
+
             // Insert new subscriber
-            $stmt = $db->prepare("INSERT INTO newsletter (email, name, is_active) VALUES (?, ?, 1)");
-            if ($stmt->execute([$email, $name])) {
+            $stmt = $db->prepare("INSERT INTO newsletter (email, name, is_active, unsubscribe_token) VALUES (?, ?, 1, ?)");
+            if ($stmt->execute([$email, $name, $token])) {
                 $success = 'Thank you for subscribing! You will receive updates from Angella.';
             } else {
                 $error = 'Something went wrong. Please try again.';
@@ -42,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ===== DETERMINE WHERE TO REDIRECT =====
-// If the request came from a specific page, redirect back there
 $redirect = isset($_POST['redirect']) ? $_POST['redirect'] : '/index.php';
 
 // Store message in session to display after redirect

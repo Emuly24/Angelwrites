@@ -37,6 +37,13 @@ function getImageSrc($row, $column) {
     return null;
 }
 
+// === STATS QUERIES ===
+$books_finished = safeFetch($db, "SELECT COUNT(*) as count FROM reading_status WHERE user_id = ? AND status = 'finished'", [$user_id])[0]['count'] ?? 0;
+$poems_read = safeFetch($db, "SELECT COUNT(*) as count FROM poem_reads WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
+$videos_watched = safeFetch($db, "SELECT COUNT(*) as count FROM video_watches WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
+$questions_asked = safeFetch($db, "SELECT COUNT(*) as count FROM questions WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
+$sessions_booked = safeFetch($db, "SELECT COUNT(*) as count FROM sessions WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
+
 // === 1. Books you have reading status ===
 $my_books = safeFetch($db, "
     SELECT b.*, rs.status, rs.progress 
@@ -131,6 +138,35 @@ $pageTitle = 'My Dashboard';
                         <p class="user-bio"><?php echo htmlspecialchars($user['bio']); ?></p>
                     <?php endif; ?>
                 </div>
+            </div>
+        </div>
+
+        <!-- ===== STATS ROW ===== -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-book"></i></div>
+                <div class="stat-number"><?php echo $books_finished; ?></div>
+                <div class="stat-label">Books Finished</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-feather-alt"></i></div>
+                <div class="stat-number"><?php echo $poems_read; ?></div>
+                <div class="stat-label">Poems Read</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-video"></i></div>
+                <div class="stat-number"><?php echo $videos_watched; ?></div>
+                <div class="stat-label">Videos Watched</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+                <div class="stat-number"><?php echo $questions_asked; ?></div>
+                <div class="stat-label">Questions Asked</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                <div class="stat-number"><?php echo $sessions_booked; ?></div>
+                <div class="stat-label">Sessions Booked</div>
             </div>
         </div>
 
@@ -442,6 +478,27 @@ $pageTitle = 'My Dashboard';
 .profile-details .user-email { color: var(--text-light); font-size: 0.9rem; margin: 2px 0 4px; }
 .profile-details .user-bio { color: var(--text); font-size: 0.9rem; line-height: 1.4; margin: 0; }
 
+/* ===== STATS ROW ===== */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+}
+.stat-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+.stat-icon { font-size: 2rem; color: var(--rose); margin-bottom: 4px; }
+.stat-number { font-size: 1.8rem; font-weight: 700; color: var(--text); }
+.stat-label { font-size: 0.8rem; color: var(--text-light); }
+
 /* ===== GRID LAYOUT ===== */
 .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; }
 .main-content { display: flex; flex-direction: column; gap: 32px; }
@@ -562,6 +619,7 @@ $pageTitle = 'My Dashboard';
     .dashboard-hero { flex-direction: column; text-align: center; }
     .hero-profile { flex-direction: column; text-align: center; }
     .book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .stats-row { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 }
 </style>
 

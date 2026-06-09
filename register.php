@@ -1,4 +1,12 @@
 <?php
+require_once 'includes/mail_helper.php';
+
+// Then call it like this:
+if (sendEmail($to, $subject, $message)) {
+    echo "Email sent!";
+} else {
+    echo "Email failed.";
+}
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -16,16 +24,65 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
+// List of all countries with their phone codes
+$countries = [
+    'Afghanistan' => '+93', 'Albania' => '+355', 'Algeria' => '+213', 'Andorra' => '+376', 'Angola' => '+244',
+    'Antigua and Barbuda' => '+1', 'Argentina' => '+54', 'Armenia' => '+374', 'Australia' => '+61', 'Austria' => '+43',
+    'Azerbaijan' => '+994', 'Bahamas' => '+1', 'Bahrain' => '+973', 'Bangladesh' => '+880', 'Barbados' => '+1',
+    'Belarus' => '+375', 'Belgium' => '+32', 'Belize' => '+501', 'Benin' => '+229', 'Bhutan' => '+975',
+    'Bolivia' => '+591', 'Bosnia and Herzegovina' => '+387', 'Botswana' => '+267', 'Brazil' => '+55', 'Brunei' => '+673',
+    'Bulgaria' => '+359', 'Burkina Faso' => '+226', 'Burundi' => '+257', 'Cabo Verde' => '+238', 'Cambodia' => '+855',
+    'Cameroon' => '+237', 'Canada' => '+1', 'Central African Republic' => '+236', 'Chad' => '+235', 'Chile' => '+56',
+    'China' => '+86', 'Colombia' => '+57', 'Comoros' => '+269', 'Congo (DRC)' => '+243', 'Congo (Republic)' => '+242',
+    'Costa Rica' => '+506', 'Croatia' => '+385', 'Cuba' => '+53', 'Cyprus' => '+357', 'Czech Republic' => '+420',
+    'Denmark' => '+45', 'Djibouti' => '+253', 'Dominica' => '+1', 'Dominican Republic' => '+1', 'Ecuador' => '+593',
+    'Egypt' => '+20', 'El Salvador' => '+503', 'Equatorial Guinea' => '+240', 'Eritrea' => '+291', 'Estonia' => '+372',
+    'Eswatini' => '+268', 'Ethiopia' => '+251', 'Fiji' => '+679', 'Finland' => '+358', 'France' => '+33',
+    'Gabon' => '+241', 'Gambia' => '+220', 'Georgia' => '+995', 'Germany' => '+49', 'Ghana' => '+233',
+    'Greece' => '+30', 'Grenada' => '+1', 'Guatemala' => '+502', 'Guinea' => '+224', 'Guinea-Bissau' => '+245',
+    'Guyana' => '+592', 'Haiti' => '+509', 'Honduras' => '+504', 'Hungary' => '+36', 'Iceland' => '+354',
+    'India' => '+91', 'Indonesia' => '+62', 'Iran' => '+98', 'Iraq' => '+964', 'Ireland' => '+353',
+    'Israel' => '+972', 'Italy' => '+39', 'Ivory Coast' => '+225', 'Jamaica' => '+1', 'Japan' => '+81',
+    'Jordan' => '+962', 'Kazakhstan' => '+7', 'Kenya' => '+254', 'Kiribati' => '+686', 'Kuwait' => '+965',
+    'Kyrgyzstan' => '+996', 'Laos' => '+856', 'Latvia' => '+371', 'Lebanon' => '+961', 'Lesotho' => '+266',
+    'Liberia' => '+231', 'Libya' => '+218', 'Liechtenstein' => '+423', 'Lithuania' => '+370', 'Luxembourg' => '+352',
+    'Madagascar' => '+261', 'Malawi' => '+265', 'Malaysia' => '+60', 'Maldives' => '+960', 'Mali' => '+223',
+    'Malta' => '+356', 'Marshall Islands' => '+692', 'Mauritania' => '+222', 'Mauritius' => '+230', 'Mexico' => '+52',
+    'Micronesia' => '+691', 'Moldova' => '+373', 'Monaco' => '+377', 'Mongolia' => '+976', 'Montenegro' => '+382',
+    'Morocco' => '+212', 'Mozambique' => '+258', 'Myanmar' => '+95', 'Namibia' => '+264', 'Nauru' => '+674',
+    'Nepal' => '+977', 'Netherlands' => '+31', 'New Zealand' => '+64', 'Nicaragua' => '+505', 'Niger' => '+227',
+    'Nigeria' => '+234', 'North Korea' => '+850', 'North Macedonia' => '+389', 'Norway' => '+47', 'Oman' => '+968',
+    'Pakistan' => '+92', 'Palau' => '+680', 'Palestine' => '+970', 'Panama' => '+507', 'Papua New Guinea' => '+675',
+    'Paraguay' => '+595', 'Peru' => '+51', 'Philippines' => '+63', 'Poland' => '+48', 'Portugal' => '+351',
+    'Qatar' => '+974', 'Romania' => '+40', 'Russia' => '+7', 'Rwanda' => '+250', 'Saint Kitts and Nevis' => '+1',
+    'Saint Lucia' => '+1', 'Saint Vincent' => '+1', 'Samoa' => '+685', 'San Marino' => '+378', 'Sao Tome and Principe' => '+239',
+    'Saudi Arabia' => '+966', 'Senegal' => '+221', 'Serbia' => '+381', 'Seychelles' => '+248', 'Sierra Leone' => '+232',
+    'Singapore' => '+65', 'Slovakia' => '+421', 'Slovenia' => '+386', 'Solomon Islands' => '+677', 'Somalia' => '+252',
+    'South Africa' => '+27', 'South Korea' => '+82', 'South Sudan' => '+211', 'Spain' => '+34', 'Sri Lanka' => '+94',
+    'Sudan' => '+249', 'Suriname' => '+597', 'Sweden' => '+46', 'Switzerland' => '+41', 'Syria' => '+963',
+    'Taiwan' => '+886', 'Tajikistan' => '+992', 'Tanzania' => '+255', 'Thailand' => '+66', 'Timor-Leste' => '+670',
+    'Togo' => '+228', 'Tonga' => '+676', 'Trinidad and Tobago' => '+1', 'Tunisia' => '+216', 'Turkey' => '+90',
+    'Turkmenistan' => '+993', 'Tuvalu' => '+688', 'Uganda' => '+256', 'Ukraine' => '+380', 'United Arab Emirates' => '+971',
+    'United Kingdom' => '+44', 'United States' => '+1', 'Uruguay' => '+598', 'Uzbekistan' => '+998', 'Vanuatu' => '+678',
+    'Vatican City' => '+379', 'Venezuela' => '+58', 'Vietnam' => '+84', 'Yemen' => '+967', 'Zambia' => '+260',
+    'Zimbabwe' => '+263'
+];
+
 // Handle registration form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim($_POST['name']);
+    $username = trim($_POST['username']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
+    $gender = $_POST['gender'] ?? '';
+    $country = $_POST['country'] ?? '';
+    $contact = trim($_POST['contact']);
 
     // Validation
-    if (empty($name) || empty($email) || empty($password) || empty($confirm_password)) {
+    if (empty($username) || empty($email) || empty($password) || empty($confirm_password) || empty($gender) || empty($country) || empty($contact)) {
         $error = 'Please fill in all fields.';
+    } elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
+        $error = 'Username must be 3-20 characters (letters, numbers, underscore only).';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } elseif (strlen($password) < 8) {
@@ -37,16 +94,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
         $stmt->execute([$email]);
         if ($stmt->fetch()) {
-            $error = 'This email is already registered. Please <a href="login.php">login</a> instead.';
+            $error = 'This email is already registered. You already have an account. Please <a href="login.php">go to login</a>.';
         } else {
-            // Create new user (default role: reader)
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $db->prepare("INSERT INTO users (name, email, password, role, created_at) VALUES (?, ?, ?, 'reader', CURRENT_TIMESTAMP)");
-            
-            if ($stmt->execute([$name, $email, $hashed_password])) {
-                $success = true;
+            // Check if username already exists
+            $stmt = $db->prepare("SELECT id FROM users WHERE username = ?");
+            $stmt->execute([$username]);
+            if ($stmt->fetch()) {
+                $error = 'This username is already taken. Please choose another.';
             } else {
-                $error = 'Something went wrong. Please try again.';
+                // Create new user
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $db->prepare("INSERT INTO users (username, email, password, gender, country, contact_number, role, created_at) VALUES (?, ?, ?, ?, ?, ?, 'reader', CURRENT_TIMESTAMP)");
+                if ($stmt->execute([$username, $email, $hashed_password, $gender, $country, $contact])) {
+                    $user_id = $db->lastInsertId();
+                    
+                    // Generate verification token
+                    $verification_token = bin2hex(random_bytes(32));
+                    $stmt = $db->prepare("UPDATE users SET verification_token = ? WHERE id = ?");
+                    $stmt->execute([$verification_token, $user_id]);
+
+                    // Generate referral code
+                    $ref_code = strtoupper(substr(md5($username . time()), 0, 8));
+                    $stmt = $db->prepare("UPDATE users SET referral_code = ? WHERE id = ?");
+                    $stmt->execute([$ref_code, $user_id]);
+
+                    // Send verification email
+                    $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
+                    $subject = "Verify your AngelWrites account";
+                    $message = "Hello $username,\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
+                    $headers = "From: no-reply@angelwrites.gt.tc\r\n";
+
+                    mail($email, $subject, $message, $headers);
+
+                    $success = true;
+                } else {
+                    $error = 'Something went wrong. Please try again.';
+                }
             }
         }
     }
@@ -61,7 +144,6 @@ $pageTitle = 'Sign Up';
         <div class="auth-wrapper">
             <div class="auth-card">
                 <?php if (!$success): ?>
-                    <!-- REGISTRATION FORM (Visible only if success is false) -->
                     <div class="auth-header">
                         <h1>Join AngelWrites</h1>
                         <p>Create your free account to access books, poems, and community.</p>
@@ -73,10 +155,10 @@ $pageTitle = 'Sign Up';
                         </div>
                     <?php endif; ?>
 
-                    <form method="POST" action="" class="auth-form">
+                    <form method="POST" action="" class="auth-form" id="registerForm">
                         <div class="form-group">
-                            <label for="name">Full Name</label>
-                            <input type="text" id="name" name="name" placeholder="Angella Bottoman" required autofocus>
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username" placeholder="Choose a username (3-20 chars)" required autofocus>
                         </div>
 
                         <div class="form-group">
@@ -86,13 +168,49 @@ $pageTitle = 'Sign Up';
 
                         <div class="form-group">
                             <label for="password">Password</label>
-                            <input type="password" id="password" name="password" placeholder="Must be at least 8 characters" required>
+                            <div class="password-wrapper" style="position: relative;">
+                                <input type="password" id="password" name="password" placeholder="Must be at least 8 characters" required>
+                                <button type="button" id="generatePassword" class="btn btn-sm btn-secondary" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
+                                    <i class="fas fa-sync-alt"></i> Suggest
+                                </button>
+                            </div>
                             <small class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</small>
                         </div>
 
                         <div class="form-group">
                             <label for="confirm_password">Confirm Password</label>
                             <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter your password" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="gender">Gender</label>
+                            <select id="gender" name="gender" required>
+                                <option value="">Select your gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                                <option value="prefer not to say">Prefer not to say</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <select id="country" name="country" required>
+                                <option value="">Select your country</option>
+                                <?php foreach ($countries as $name => $code): ?>
+                                    <option value="<?php echo htmlspecialchars($name); ?>" data-code="<?php echo htmlspecialchars($code); ?>">
+                                        <?php echo htmlspecialchars($name) . ' (' . htmlspecialchars($code) . ')'; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="contact">Contact Number</label>
+                            <div style="display: flex; gap: 4px;">
+                                <span id="countryCodeDisplay" style="padding: 10px 14px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; color: var(--text); min-width: 60px; display: flex; align-items: center;">+265</span>
+                                <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456" required style="flex: 1;">
+                            </div>
                         </div>
 
                         <div class="checkbox-group">
@@ -107,20 +225,30 @@ $pageTitle = 'Sign Up';
                         </button>
                     </form>
 
+                    <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
+                    <div class="social-login-section">
+                        <p>Or continue with:</p>
+                        <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
+                            <i class="fab fa-google"></i> Google
+                        </a>
+                        <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Facebook" class="btn btn-facebook">
+                            <i class="fab fa-facebook-f"></i> Facebook
+                        </a>
+                    </div>
+
                     <div class="auth-footer">
                         <p>Already have an account? <a href="<?php echo SITE_URL; ?>/login.php">Sign in here</a></p>
                     </div>
                 <?php else: ?>
-                    <!-- SUCCESS POPUP (Visible only when account is created) -->
                     <div class="success-popup">
                         <div class="success-icon">
                             <i class="fas fa-check-circle"></i>
                         </div>
                         <h2>Account Created! 🎉</h2>
-                        <p class="success-message">Welcome to the AngelWrites community! Your account is ready. You can now log in and start exploring.</p>
+                        <p class="success-message">Welcome to the AngelWrites community! A verification link has been sent to your email. Please verify your account before logging in.</p>
                         <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-primary btn-large btn-block">
                             <i class="fas fa-sign-in-alt"></i>
-                            Log In Now
+                            Go to Login
                         </a>
                         <p class="small-note">You will be redirected to the login page.</p>
                     </div>
@@ -130,52 +258,96 @@ $pageTitle = 'Sign Up';
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ---- Auto-generate strong password ----
+    const genBtn = document.getElementById('generatePassword');
+    const passwordInput = document.getElementById('password');
+    const confirmInput = document.getElementById('confirm_password');
+
+    function generateStrongPassword(length = 16) {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=';
+        let password = '';
+        for (let i = 0; i < length; i++) {
+            const randomIndex = Math.floor(Math.random() * chars.length);
+            password += chars[randomIndex];
+        }
+        return password;
+    }
+
+    genBtn.addEventListener('click', function() {
+        const newPassword = generateStrongPassword();
+        passwordInput.value = newPassword;
+        confirmInput.value = newPassword;
+        passwordInput.style.borderColor = '#27ae60';
+        setTimeout(() => { passwordInput.style.borderColor = ''; }, 1500);
+    });
+
+    // ---- Country Code Detection ----
+    const countrySelect = document.getElementById('country');
+    const codeDisplay = document.getElementById('countryCodeDisplay');
+
+    countrySelect.addEventListener('change', function() {
+        const selected = this.options[this.selectedIndex];
+        const code = selected.getAttribute('data-code');
+        if (code) {
+            codeDisplay.textContent = code;
+        }
+    });
+
+    // Trigger change event on page load to set default code
+    if (countrySelect.value) {
+        countrySelect.dispatchEvent(new Event('change'));
+    }
+});
+</script>
+
 <style>
-    /* Success Popup Styling */
-    .success-popup {
-        text-align: center;
-        padding: 30px 20px;
-        animation: fadeInUp 0.6s ease-out;
-    }
-    .success-icon {
-        font-size: 4rem;
-        color: #28a745;
-        margin-bottom: 15px;
-        animation: popIn 0.5s ease-out;
-    }
-    .success-icon i {
-        display: block;
-    }
-    .success-popup h2 {
-        margin-bottom: 10px;
-        color: var(--text);
-    }
-    .success-popup .success-message {
-        font-size: 1.1rem;
-        color: var(--text-light);
-        margin-bottom: 25px;
-        line-height: 1.6;
-    }
-    .success-popup .small-note {
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        margin-top: 15px;
-    }
-    .btn-block {
-        width: 100%;
-        justify-content: center;
-    }
-    
-    /* Animations */
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes popIn {
-        0% { transform: scale(0); }
-        80% { transform: scale(1.2); }
-        100% { transform: scale(1); }
-    }
+/* Auth Styles */
+.auth-page { padding: 40px 0; }
+.auth-wrapper { display: flex; justify-content: center; }
+.auth-card { max-width: 480px; width: 100%; background: var(--card-bg); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-hover); border: 1px solid var(--border); }
+.auth-header { text-align: center; margin-bottom: 24px; }
+.auth-header h1 { font-size: 1.8rem; margin: 0 0 4px; }
+.auth-header p { color: var(--text-light); }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 4px; }
+.form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+.field-hint { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--text-light); }
+
+.password-wrapper input { padding-right: 100px; }
+
+.checkbox-group { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; }
+.checkbox-group input[type="checkbox"] { margin-top: 4px; }
+.checkbox-group label { font-size: 0.9rem; color: var(--text); }
+.checkbox-group a { color: var(--rose); }
+
+.btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
+
+.social-login-section { text-align: center; margin: 20px 0; }
+.social-login-section .btn { display: inline-block; margin: 4px; padding: 10px 20px; border-radius: 6px; color: white; text-decoration: none; font-size: 0.95rem; }
+.btn-google { background: #DB4437; }
+.btn-facebook { background: #1877F2; }
+.btn-google:hover { background: #c23321; }
+.btn-facebook:hover { background: #1559c4; }
+
+.auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
+.auth-footer a { color: var(--rose); font-weight: 600; }
+
+.success-popup { text-align: center; padding: 30px 20px; animation: fadeInUp 0.6s ease-out; }
+.success-icon { font-size: 4rem; color: #28a745; margin-bottom: 15px; animation: popIn 0.5s ease-out; }
+.success-popup h2 { margin-bottom: 10px; color: var(--text); }
+.success-popup .success-message { font-size: 1.1rem; color: var(--text-light); margin-bottom: 25px; line-height: 1.6; }
+.success-popup .small-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; }
+
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes popIn { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+@media (max-width: 480px) {
+    .auth-card { padding: 20px; }
+}
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

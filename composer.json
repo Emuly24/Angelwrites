@@ -1,0 +1,6 @@
+{
+    "require": {
+        "hybridauth/hybridauth": "^3.13",
+        "phpmailer/phpmailer": "^6.8"
+    }
+}

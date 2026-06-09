@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) &&
         exit;
     }
 }
+
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
     $poem_id = (int)$_GET['id'];
