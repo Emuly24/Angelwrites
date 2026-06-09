@@ -160,7 +160,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
         </div>
     </div>
 
-    <!-- ===== MAIN CONTENT AREA (SCROLLABLE - FIXED FOR MOBILE) ===== -->
+    <!-- ===== MAIN CONTENT AREA (SCROLLABLE) ===== -->
     <div class="reader-content-area">
         <?php if ($has_processed): ?>
             <!-- HTML READER -->
@@ -179,48 +179,49 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                 <button id="next-page-btn" class="nav-btn">Next <i class="fas fa-chevron-right"></i></button>
             </div>
         <?php else: ?>
-            <!-- ===== UPDATED FALLBACK READER (COVERS FULL HEIGHT) ===== -->
+            <!-- ===== FALLBACK READER (WITH FIXED SCROLLING) ===== -->
             <div class="fallback-reader">
-                <?php if ($book['file_type'] === 'pdf'): ?>
-                    <div class="pdf-container">
-                        <!-- Removed fixed height="700" so it follows CSS height: 100% -->
-                        <iframe src="<?php echo SITE_URL . '/' . $book['file_path']; ?>" frameborder="0" allowfullscreen></iframe>
-                    </div>
-                <?php elseif ($book['file_type'] === 'epub'): ?>
-                    <div class="epub-container">
-                        <div id="epub-viewer"></div>
-                        <div class="epub-controls">
-                            <button id="epub-prev" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
-                            <span id="epub-current">Page 1</span>
-                            <button id="epub-next" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+                <div class="fallback-scroll-wrapper">
+                    <?php if ($book['file_type'] === 'pdf'): ?>
+                        <div class="pdf-container">
+                            <iframe src="<?php echo SITE_URL . '/' . $book['file_path']; ?>" frameborder="0" allowfullscreen></iframe>
                         </div>
-                    </div>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
-                    <script>
-                    document.addEventListener('DOMContentLoaded', function() {
-                        if (typeof ePub !== 'undefined') {
-                            const book = ePub("<?php echo SITE_URL . '/' . $book['file_path']; ?>");
-                            const viewer = document.getElementById('epub-viewer');
-                            const prevBtn = document.getElementById('epub-prev');
-                            const nextBtn = document.getElementById('epub-next');
-                            const currentLabel = document.getElementById('epub-current');
-                            let rendition = book.renderTo(viewer, { width: '100%', height: '100%', spread: 'none' });
-                            rendition.display();
-                            rendition.on('relocated', function(location) {
-                                currentLabel.textContent = 'Page ' + (location.start.displayedPage || 1);
-                            });
-                            prevBtn.addEventListener('click', function() { rendition.prev(); });
-                            nextBtn.addEventListener('click', function() { rendition.next(); });
-                        }
-                    });
-                    </script>
-                <?php else: ?>
-                    <div class="unsupported-message">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>This file format is not supported for online reading.</p>
-                        <a href="<?php echo SITE_URL . '/' . $book['file_path']; ?>" download class="btn btn-primary">Download to read</a>
-                    </div>
-                <?php endif; ?>
+                    <?php elseif ($book['file_type'] === 'epub'): ?>
+                        <div class="epub-container">
+                            <div id="epub-viewer"></div>
+                            <div class="epub-controls">
+                                <button id="epub-prev" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+                                <span id="epub-current">Page 1</span>
+                                <button id="epub-next" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            if (typeof ePub !== 'undefined') {
+                                const book = ePub("<?php echo SITE_URL . '/' . $book['file_path']; ?>");
+                                const viewer = document.getElementById('epub-viewer');
+                                const prevBtn = document.getElementById('epub-prev');
+                                const nextBtn = document.getElementById('epub-next');
+                                const currentLabel = document.getElementById('epub-current');
+                                let rendition = book.renderTo(viewer, { width: '100%', height: '100%', spread: 'none' });
+                                rendition.display();
+                                rendition.on('relocated', function(location) {
+                                    currentLabel.textContent = 'Page ' + (location.start.displayedPage || 1);
+                                });
+                                prevBtn.addEventListener('click', function() { rendition.prev(); });
+                                nextBtn.addEventListener('click', function() { rendition.next(); });
+                            }
+                        });
+                        </script>
+                    <?php else: ?>
+                        <div class="unsupported-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>This file format is not supported for online reading.</p>
+                            <a href="<?php echo SITE_URL . '/' . $book['file_path']; ?>" download class="btn btn-primary">Download to read</a>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         <?php endif; ?>
     </div>
@@ -448,15 +449,13 @@ document.addEventListener('DOMContentLoaded', function() {
 .reader-app {
     display: flex;
     flex-direction: column;
-    /* Uses 100dvh instead of 100vh to handle mobile address bar */
-    height: 100dvh; 
+    height: 100vh; /* Fallback for older browsers */
+    height: 100dvh;
     background: var(--vanilla);
     color: var(--text);
     transition: all 0.3s ease;
     padding: 0;
     position: relative;
-    /* This ensures that on mobile the address bar doesn't interfere */
-    min-height: 100dvh;
 }
 
 /* ===== READER HEADER (STICKY) ===== */
@@ -512,8 +511,8 @@ document.addEventListener('DOMContentLoaded', function() {
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
-    /* Force it to be scrollable */
-    height: 0; /* Forces it to take up remaining space */
+    /* THE FIX: Ensure the content area takes up remaining space */
+    height: 0; 
     min-height: 0;
 }
 
@@ -596,27 +595,36 @@ document.addEventListener('DOMContentLoaded', function() {
 .reader-app[data-mode="page"] .page-content h1 { font-size: 1.8rem; margin-top: 0; }
 .reader-app[data-mode="page"] .page-content p { margin-bottom: 16px; line-height: 1.8; }
 
-/* ===== FALLBACK READER (UPDATED - COVERS FULL HEIGHT) ===== */
+/* ===== FALLBACK READER (ENSURE PARENT SCROLLS) ===== */
 .fallback-reader {
     height: 100%;
     padding: 0;
+    margin: 0;
     border: none;
-    box-shadow: none;
     border-radius: 0;
+    box-shadow: none;
+    /* THE FIX: Allow the parent container to scroll */
     display: flex;
     flex-direction: column;
 }
-.pdf-container {
+
+.fallback-scroll-wrapper {
     flex-grow: 1;
     height: 100%;
-    display: flex;
-    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.pdf-container {
+    height: auto;
+    width: 100%;
 }
 .pdf-container iframe {
+    display: block;
     width: 100%;
-    height: 100%;
-    flex-grow: 1;
+    min-height: 100vh; /* Force a huge height so the parent will scroll */
     border: 0;
+    height: auto;
 }
 
 .epub-container {
