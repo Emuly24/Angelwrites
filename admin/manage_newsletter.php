@@ -1,4 +1,8 @@
 <?php
+require_once '../includes/config.php';
+require_once '../includes/db.php';
+require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php';
 require_once '../includes/admin_mail_helper.php';
 
 // Example: Send an admin notification
@@ -7,10 +11,6 @@ if (sendAdminEmail('user@example.com', 'Admin Update', '<h1>Important Notice</h1
 } else {
     echo "Email failed.";
 }
-require_once '../includes/config.php';
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
-require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
 

@@ -1,17 +1,11 @@
 <?php
-require_once 'includes/mail_helper.php';
-
-// Then call it like this:
-if (sendEmail($to, $subject, $message)) {
-    echo "Email sent!";
-} else {
-    echo "Email failed.";
-}
+// ===== LOAD CONFIGURATION FIRST =====
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php'; // Now safely loaded after config
 
-// If already logged in, redirect to appropriate page
+// ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
     if (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
@@ -24,7 +18,7 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
-// List of all countries with their phone codes
+// ===== LIST OF COUNTRIES WITH PHONE CODES =====
 $countries = [
     'Afghanistan' => '+93', 'Albania' => '+355', 'Algeria' => '+213', 'Andorra' => '+376', 'Angola' => '+244',
     'Antigua and Barbuda' => '+1', 'Argentina' => '+54', 'Armenia' => '+374', 'Australia' => '+61', 'Austria' => '+43',
@@ -68,7 +62,7 @@ $countries = [
     'Zimbabwe' => '+263'
 ];
 
-// Handle registration form submission
+// ===== HANDLE REGISTRATION FORM SUBMISSION =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
@@ -118,15 +112,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $db->prepare("UPDATE users SET referral_code = ? WHERE id = ?");
                     $stmt->execute([$ref_code, $user_id]);
 
-                    // Send verification email
+                    // ===== SEND VERIFICATION EMAIL =====
                     $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
                     $subject = "Verify your AngelWrites account";
                     $message = "Hello $username,\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
-                    $headers = "From: no-reply@angelwrites.gt.tc\r\n";
+                    
+                    // Use the mail helper function
+                    $emailSent = sendEmail($email, $subject, $message, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
 
-                    mail($email, $subject, $message, $headers);
-
-                    $success = true;
+                    if ($emailSent) {
+                        $success = true;
+                    } else {
+                        $error = 'Unable to send verification email. Please try again later.';
+                    }
                 } else {
                     $error = 'Something went wrong. Please try again.';
                 }

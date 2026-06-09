@@ -1,15 +1,22 @@
 <?php
-require_once 'includes/mail_helper.php';
-
-// Then call it like this:
-if (sendEmail($to, $subject, $message)) {
-    echo "Email sent!";
-} else {
-    echo "Email failed.";
-}
+// ===== LOAD CONFIGURATION FIRST =====
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php'; // Now safely loaded after config
+
+// ===== REDIRECT IF ALREADY LOGGED IN =====
+if (isLoggedIn()) {
+    if (isAdmin()) {
+        header('Location: ' . SITE_URL . '/admin/dashboard.php');
+    } else {
+        header('Location: ' . SITE_URL . '/library.php');
+    }
+    exit;
+}
+
+$error = '';
+$success = '';
 
 $token = isset($_GET['token']) ? trim($_GET['token']) : '';
 
