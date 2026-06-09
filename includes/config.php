@@ -1,8 +1,9 @@
 <?php
+require_once __DIR__ . '/load_env.php';
 // Site Configuration
-define('SITE_NAME', 'AngelWrites');
-define('SITE_URL', 'https://angelwrites.gt.tc');
-define('UPLOAD_PATH', __DIR__ . '/../assets/uploads/');
-define('BIBLE_PATH', __DIR__ . '/../assets/bible/kjv.json');
-define('ADMIN_EMAIL', 'admin@angelawrites.com');
+define('SITE_NAME', getenv('SITE_NAME'));
+define('SITE_URL', getenv('SITE_URL'));
+define('UPLOAD_PATH', getenv('UPLOAD_PATH'));
+define('BIBLE_PATH', getenv('BIBLE_PATH'));
+define('ADMIN_EMAIL', getenv('ADMIN_EMAIL'));
 ?>
