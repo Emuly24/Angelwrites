@@ -195,7 +195,54 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-/* ... your existing styles ... */
+.auth-page { padding: 40px 0; }
+.auth-wrapper { display: flex; justify-content: center; }
+.auth-card { max-width: 420px; width: 100%; background: var(--card-bg); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-hover); border: 1px solid var(--border); }
+.auth-header { text-align: center; margin-bottom: 24px; }
+.auth-header h1 { font-size: 1.8rem; margin: 0 0 4px; }
+.auth-header p { color: var(--text-light); }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 4px; }
+.form-group input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.form-group input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+
+.btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
+
+.social-login-section { text-align: center; margin: 20px 0; }
+.social-login-section .btn { display: inline-block; margin: 4px; padding: 10px 20px; border-radius: 6px; color: white; text-decoration: none; font-size: 0.95rem; }
+.btn-google { background: #DB4437; }
+.btn-facebook { background: #1877F2; }
+.btn-google:hover { background: #c23321; }
+.btn-facebook:hover { background: #1559c4; }
+
+.auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
+.auth-footer a { color: var(--rose); font-weight: 600; }
+
+/* ===== PASSWORD TOGGLE ===== */
+.input-group-wrapper {
+    position: relative;
+}
+.input-group-wrapper input {
+    padding-right: 40px;
+}
+.password-toggle {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-light);
+    z-index: 10;
+    transition: color 0.2s;
+}
+.password-toggle:hover {
+    color: var(--text);
+}
+
+@media (max-width: 480px) {
+    .auth-card { padding: 20px; }
+}
 </style>
 
 <?php require_once 'includes/footer.php'; ?>
