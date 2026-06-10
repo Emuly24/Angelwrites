@@ -36,12 +36,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subject = "Verify your AngelWrites account";
             $body = "Hello " . $user['username'] . ",\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
 
-            try {
-                sendEmail($email, $subject, $body, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
-                $message = "A new verification link has been sent to your email address. Please check your inbox and spam folder.";
-            } catch (Exception $e) {
-                $error = "We were unable to send the verification email. Please contact support.";
-            }
+            // Send the email
+try {
+    $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
+    $subject = "Verify your AngelWrites account";
+    $body = "Hello " . $user['username'] . ",\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
+
+    // Use your mail helper
+    $emailSent = sendEmail($email, $subject, $body, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
+
+    if ($emailSent) {
+        $message = "A new verification link has been sent to your email address. Please check your inbox and spam folder.";
+    } else {
+        $error = "The email system returned success, but the email was not delivered. This usually means your SMTP configuration is incorrect.";
+    }
+} catch (Exception $e) {
+    $error = "MAIL ERROR: " . $e->getMessage();
+} 
         }
     }
 }

@@ -88,8 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $country = $_POST['country'] ?? '';
     $contact = trim($_POST['contact']);
     $dob = trim($_POST['dob']);
-    $referral_source = $_POST['referral_source'] ?? '';
+    $referral_source = trim($_POST['referral_source'] ?? '');
 
+// If 'Other' is selected, use the custom input instead
+if ($referral_source === 'Other' && !empty(trim($_POST['other_referral']))) {
+    $referral_source = trim($_POST['other_referral']);
+}
     // Validation
     if (empty($first_name) || empty($last_name) || empty($username) || empty($email) || empty($password) || empty($confirm_password) || empty($gender) || empty($country) || empty($contact) || empty($dob) || empty($referral_source)) {
         $error = 'Please fill in all fields.';
@@ -249,14 +253,17 @@ $pageTitle = 'Sign Up';
 
                         <div class="form-group">
                             <label for="referral_source">How did you hear about AngelWrites?</label>
-                            <select id="referral_source" name="referral_source" required>
+                            <select id="referral_source" name="referral_source" required onchange="toggleOtherField()">
                                 <option value="">Select a source</option>
                                 <?php foreach ($referral_sources as $source): ?>
                                     <option value="<?php echo htmlspecialchars($source); ?>"><?php echo htmlspecialchars($source); ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <div id="otherReferralWrapper" style="display: none; margin-top: 8px;">
+                                <label for="other_referral">Please specify:</label>
+                                <input type="text" id="other_referral" name="other_referral" placeholder="Where did you hear about us?" class="form-control">
+                            </div>
                         </div>
-
                         <div class="checkbox-group">
                             <input type="checkbox" name="terms" id="terms" required>
                             <label for="terms">
@@ -364,6 +371,20 @@ document.addEventListener('DOMContentLoaded', function() {
             this.querySelector('i').classList.toggle('fa-eye-slash');
         });
     }
+    function toggleOtherField() {
+    const dropdown = document.getElementById('referral_source');
+    const otherWrapper = document.getElementById('otherReferralWrapper');
+    const otherInput = document.getElementById('other_referral');
+    
+    if (dropdown.value === 'Other') {
+        otherWrapper.style.display = 'block';
+        otherInput.setAttribute('required', 'required');
+    } else {
+        otherWrapper.style.display = 'none';
+        otherInput.removeAttribute('required');
+        otherInput.value = '';
+    }
+}
 });
 </script>
 

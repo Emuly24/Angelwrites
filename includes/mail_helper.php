@@ -23,6 +23,12 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         $mail->send();
         return true;
     } catch (Exception $e) {
-        return false;
+        // DIE WITH THE REAL ERROR
+        die('<div style="background:#fee2e2; color:#991b1b; padding:20px; border-radius:8px; max-width:600px; margin:40px auto;">' .
+            '<h3>🔥 SMTP Error</h3>' .
+            '<p><strong>Message:</strong> ' . $e->getMessage() . '</p>' .
+            '<p><strong>File:</strong> ' . $e->getFile() . '</p>' .
+            '<p><strong>Line:</strong> ' . $e->getLine() . '</p>' .
+            '</div>');
     }
 }
