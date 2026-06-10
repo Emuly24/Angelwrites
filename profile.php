@@ -18,8 +18,9 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    $address = trim($_POST['address']);
+    $gender = $_POST['gender'] ?? '';
+    $country = trim($_POST['country']);
+    $contact_number = trim($_POST['contact_number']);
     $bio = trim($_POST['bio']);
 
     if (empty($name) || empty($email)) {
@@ -51,10 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             // Update database
             $stmt = $db->prepare("
                 UPDATE users SET 
-                    name = ?, email = ?, phone = ?, address = ?, bio = ?, profile_pic = ?, updated_at = CURRENT_TIMESTAMP
+                    name = ?, email = ?, gender = ?, country = ?, contact_number = ?, bio = ?, profile_pic = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
-            $stmt->execute([$name, $email, $phone, $address, $bio, $profile_pic, $user_id]);
+            $stmt->execute([$name, $email, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
             $_SESSION['name'] = $name;
             $success = 'Profile updated successfully!';
         }
@@ -113,6 +114,7 @@ $pageTitle = 'My Profile';
                 </div>
                 <h3><?php echo htmlspecialchars($user['name']); ?></h3>
                 <p class="user-email"><?php echo htmlspecialchars($user['email']); ?></p>
+                <p class="user-username"><strong>Username:</strong> <?php echo htmlspecialchars($user['username']); ?></p>
                 <?php if ($user['bio']): ?>
                     <p class="user-bio"><?php echo htmlspecialchars($user['bio']); ?></p>
                 <?php endif; ?>
@@ -132,12 +134,22 @@ $pageTitle = 'My Profile';
                         <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($user['email']); ?>" required>
                     </div>
                     <div class="form-group">
-                        <label for="phone">Phone Number</label>
-                        <input type="text" id="phone" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
+                        <label for="gender">Gender</label>
+                        <select id="gender" name="gender">
+                            <option value="" <?php echo empty($user['gender']) ? 'selected' : ''; ?>>Select your gender</option>
+                            <option value="male" <?php echo ($user['gender'] ?? '') === 'male' ? 'selected' : ''; ?>>Male</option>
+                            <option value="female" <?php echo ($user['gender'] ?? '') === 'female' ? 'selected' : ''; ?>>Female</option>
+                            <option value="other" <?php echo ($user['gender'] ?? '') === 'other' ? 'selected' : ''; ?>>Other</option>
+                            <option value="prefer not to say" <?php echo ($user['gender'] ?? '') === 'prefer not to say' ? 'selected' : ''; ?>>Prefer not to say</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label for="address">Address</label>
-                        <input type="text" id="address" name="address" value="<?php echo htmlspecialchars($user['address'] ?? ''); ?>">
+                        <label for="country">Country</label>
+                        <input type="text" id="country" name="country" value="<?php echo htmlspecialchars($user['country'] ?? ''); ?>" placeholder="Enter your country">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_number">Contact Number</label>
+                        <input type="text" id="contact_number" name="contact_number" value="<?php echo htmlspecialchars($user['contact_number'] ?? ''); ?>" placeholder="e.g. +265 999 123 456">
                     </div>
                     <div class="form-group">
                         <label for="bio">Bio</label>
@@ -192,6 +204,7 @@ $pageTitle = 'My Profile';
 .profile-pic i { font-size: 5rem; color: var(--rose); }
 .profile-card h3 { text-align: center; margin-bottom: 4px; }
 .user-email { text-align: center; color: var(--text-light); font-size: 0.9rem; }
+.user-username { text-align: center; color: var(--text); font-size: 0.95rem; font-weight: 500; margin-top: 4px; }
 .user-bio { text-align: center; color: var(--text); font-size: 0.9rem; margin-top: 8px; line-height: 1.5; }
 
 .profile-form .form-group, .password-form .form-group { margin-bottom: 12px; }

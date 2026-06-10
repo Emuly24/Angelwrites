@@ -2,13 +2,14 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php'; // Make sure your mail helper is here
 
 // If already logged in, redirect to appropriate page
 if (isLoggedIn()) {
     if (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
     } else {
-        header('Location: ' . SITE_URL . '/library.php');
+        header('Location: ' . SITE_URL . '/dashboard.php');
     }
     exit;
 }
@@ -18,37 +19,70 @@ $success = '';
 
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $password = $_POST['password'];
+    if (isset($_POST['login_submit'])) {
+        $login = trim($_POST['login']);
+        $password = $_POST['password'];
 
-    if (empty($username) || empty($password)) {
-        $error = 'Please fill in all fields.';
-    } else {
-        // Fetch user by username
-        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified FROM users WHERE username = ?");
-        $stmt->execute([$username]);
+        if (empty($login) || empty($password)) {
+            $error = 'Please fill in all fields.';
+        } else {
+            $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified FROM users WHERE username = ? OR email = ?");
+            $stmt->execute([$login, $login]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && password_verify($password, $user['password'])) {
+                if ($user['is_verified'] == 0) {
+                    $error = 'Please verify your email address before logging in. <a href="#" onclick="document.getElementById(\'resend-form\').submit(); return false;">Resend verification email</a>';
+                } else {
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['role'] = $user['role'];
+
+                    $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$user['id']]);
+
+                    if ($user['role'] === 'admin') {
+                        header('Location: ' . SITE_URL . '/admin/dashboard.php');
+                    } else {
+                        header('Location: ' . SITE_URL . '/dashboard.php');
+                    }
+                    exit;
+                }
+            } else {
+                $error = 'Invalid username/email or password.';
+            }
+        }
+    }
+
+    // Handle Resend Verification Email
+    if (isset($_POST['resend_verification'])) {
+        $login = trim($_POST['resend_login']);
+        
+        $stmt = $db->prepare("SELECT id, username, email, is_verified FROM users WHERE username = ? OR email = ?");
+        $stmt->execute([$login, $login]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user && password_verify($password, $user['password'])) {
-            if ($user['is_verified'] == 0) {
-                $error = 'Please verify your email address before logging in.';
+        if ($user && $user['is_verified'] == 0) {
+            // Generate a new verification token
+            $verification_token = bin2hex(random_bytes(32));
+            $stmt = $db->prepare("UPDATE users SET verification_token = ? WHERE id = ?");
+            $stmt->execute([$verification_token, $user['id']]);
+
+            // Send new verification email
+            $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
+            $subject = "Verify your AngelWrites account";
+            $message = "Hello " . $user['username'] . ",\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
+            
+            // Use your mail helper
+            $emailSent = sendEmail($user['email'], $subject, $message, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
+
+            if ($emailSent) {
+                $success = 'A new verification link has been sent to your email address. Please check your inbox.';
             } else {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-
-                $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
-                $stmt->execute([$user['id']]);
-
-                if ($user['role'] === 'admin') {
-                    header('Location: ' . SITE_URL . '/admin/dashboard.php');
-                } else {
-                    header('Location: ' . SITE_URL . '/dashboard.php');
-                }
-                exit;
+                $error = 'Failed to send verification email. Please try again later.';
             }
         } else {
-            $error = 'Invalid username or password.';
+            $error = 'No unverified account found with that email/username.';
         }
     }
 }
@@ -81,23 +115,34 @@ $pageTitle = 'Sign In';
 
                 <form method="POST" action="" class="auth-form">
                     <div class="form-group">
-                        <label for="username">Username</label>
-                        <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+                        <label for="login">Username or Email</label>
+                        <input type="text" id="login" name="login" placeholder="Enter your username or email" required autofocus>
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                        <div class="input-group-wrapper">
+                            <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                            <span class="password-toggle" id="togglePassword">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
                     </div>
 
                     <div class="form-group">
                         <a href="<?php echo SITE_URL; ?>/forgot_password.php" style="font-size: 0.9rem; color: var(--rose);">Forgot password?</a>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-block">
+                    <button type="submit" name="login_submit" class="btn btn-primary btn-block">
                         <i class="fas fa-sign-in-alt"></i>
                         Sign In
                     </button>
+                </form>
+
+                <!-- Hidden form to handle resend verification -->
+                <form id="resend-form" method="POST" style="display: none;">
+                    <input type="hidden" name="resend_verification" value="1">
+                    <input type="hidden" name="resend_login" id="resend-login-input" value="">
                 </form>
 
                 <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
@@ -119,35 +164,38 @@ $pageTitle = 'Sign In';
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Password toggle
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    if (togglePassword && passwordInput) {
+        togglePassword.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+    }
+
+    // Resend verification: fill the hidden form with the current login input
+    const resendForm = document.getElementById('resend-form');
+    const resendInput = document.getElementById('resend-login-input');
+    const loginInput = document.getElementById('login');
+    
+    // When a user clicks the "Resend verification email" link in the error message
+    // we pre-fill the hidden form with whatever they typed in the login field
+    document.querySelector('.alert-error a')?.addEventListener('click', function() {
+        if (loginInput) {
+            resendInput.value = loginInput.value;
+            resendForm.submit();
+        }
+    });
+});
+</script>
+
 <style>
-/* Auth Styles */
-.auth-page { padding: 40px 0; }
-.auth-wrapper { display: flex; justify-content: center; }
-.auth-card { max-width: 420px; width: 100%; background: var(--card-bg); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-hover); border: 1px solid var(--border); }
-.auth-header { text-align: center; margin-bottom: 24px; }
-.auth-header h1 { font-size: 1.8rem; margin: 0 0 4px; }
-.auth-header p { color: var(--text-light); }
-
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-weight: 600; margin-bottom: 4px; }
-.form-group input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-.form-group input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-
-.btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
-
-.social-login-section { text-align: center; margin: 20px 0; }
-.social-login-section .btn { display: inline-block; margin: 4px; padding: 10px 20px; border-radius: 6px; color: white; text-decoration: none; font-size: 0.95rem; }
-.btn-google { background: #DB4437; }
-.btn-facebook { background: #1877F2; }
-.btn-google:hover { background: #c23321; }
-.btn-facebook:hover { background: #1559c4; }
-
-.auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
-.auth-footer a { color: var(--rose); font-weight: 600; }
-
-@media (max-width: 480px) {
-    .auth-card { padding: 20px; }
-}
+/* ... your existing styles ... */
 </style>
 
 <?php require_once 'includes/footer.php'; ?>
