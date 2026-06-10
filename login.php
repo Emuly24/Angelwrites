@@ -17,71 +17,37 @@ $error = '';
 $success = '';
 
 // Handle login form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['login_submit'])) {
-        $login = trim($_POST['login']);
-        $password = $_POST['password'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
+    $login = trim($_POST['login']);
+    $password = $_POST['password'];
 
-        if (empty($login) || empty($password)) {
-            $error = 'Please fill in all fields.';
-        } else {
-            $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified FROM users WHERE username = ? OR email = ?");
-            $stmt->execute([$login, $login]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($user && password_verify($password, $user['password'])) {
-                if ($user['is_verified'] == 0) {
-                    $error = 'Please verify your email address before logging in. <a href="#" onclick="document.getElementById(\'resend-form\').submit(); return false;">Resend verification email</a>';
-                } else {
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['username'] = $user['username'];
-                    $_SESSION['role'] = $user['role'];
-
-                    $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
-                    $stmt->execute([$user['id']]);
-
-                    if ($user['role'] === 'admin') {
-                        header('Location: ' . SITE_URL . '/admin/dashboard.php');
-                    } else {
-                        header('Location: ' . SITE_URL . '/dashboard.php');
-                    }
-                    exit;
-                }
-            } else {
-                $error = 'Invalid username/email or password.';
-            }
-        }
-    }
-
-    // Handle Resend Verification Email
-    if (isset($_POST['resend_verification'])) {
-        $login = trim($_POST['resend_login']);
-        
-        $stmt = $db->prepare("SELECT id, username, email, is_verified FROM users WHERE username = ? OR email = ?");
+    if (empty($login) || empty($password)) {
+        $error = 'Please fill in all fields.';
+    } else {
+        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified FROM users WHERE username = ? OR email = ?");
         $stmt->execute([$login, $login]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user && $user['is_verified'] == 0) {
-            // Generate a new verification token
-            $verification_token = bin2hex(random_bytes(32));
-            $stmt = $db->prepare("UPDATE users SET verification_token = ? WHERE id = ?");
-            $stmt->execute([$verification_token, $user['id']]);
-
-            // Send new verification email
-            $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
-            $subject = "Verify your AngelWrites account";
-            $message = "Hello " . $user['username'] . ",\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
-            
-            // Use your mail helper
-            $emailSent = sendEmail($user['email'], $subject, $message, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
-
-            if ($emailSent) {
-                $success = 'A new verification link has been sent to your email address. Please check your inbox.';
+        if ($user && password_verify($password, $user['password'])) {
+            if ($user['is_verified'] == 0) {
+                $error = 'Please verify your email address before logging in. <a href="resend_verification.php">Resend verification email</a>';
             } else {
-                $error = 'Failed to send verification email. Please try again later.';
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+
+                $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$user['id']]);
+
+                if ($user['role'] === 'admin') {
+                    header('Location: ' . SITE_URL . '/admin/dashboard.php');
+                } else {
+                    header('Location: ' . SITE_URL . '/dashboard.php');
+                }
+                exit;
             }
         } else {
-            $error = 'No unverified account found with that email/username.';
+            $error = 'Invalid username/email or password.';
         }
     }
 }
