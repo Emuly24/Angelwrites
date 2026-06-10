@@ -2,8 +2,9 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php'; 
+require_once 'includes/mail_helper.php';
 
+// ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
     if (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
@@ -16,10 +17,11 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
-// Handle login form submission
+// ===== HANDLE LOGIN FORM SUBMISSION =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
     $login = trim($_POST['login']);
     $password = $_POST['password'];
+    $remember_me = isset($_POST['remember_me']) ? true : false;
 
     if (empty($login) || empty($password)) {
         $error = 'Please fill in all fields.';
@@ -32,13 +34,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
             if ($user['is_verified'] == 0) {
                 $error = 'Please verify your email address before logging in. <a href="resend_verification.php">Resend verification email</a>';
             } else {
+                // Set session
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'];
 
+                // ===== REMEMBER ME LOGIC =====
+                if ($remember_me) {
+                    // Generate a secure token
+                    $token = bin2hex(random_bytes(32));
+                    $expires = time() + (30 * 24 * 60 * 60); // 30 days
+
+                    // Store token in database (create remember_tokens table if not exists)
+                    try {
+                        $db->exec("
+                            CREATE TABLE IF NOT EXISTS remember_tokens (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                user_id INTEGER NOT NULL,
+                                token TEXT NOT NULL UNIQUE,
+                                expires_at DATETIME NOT NULL,
+                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                            )
+                        ");
+                    } catch (Exception $e) {
+                        // Table already exists or other error — continue
+                    }
+
+                    // Insert the token
+                    $expiry_date = date('Y-m-d H:i:s', $expires);
+                    $stmt = $db->prepare("INSERT INTO remember_tokens (user_id, token, expires_at) VALUES (?, ?, ?)");
+                    $stmt->execute([$user['id'], $token, $expiry_date]);
+
+                    // Set the cookie
+                    setcookie('remember_token', $token, $expires, '/', '', false, true);
+                }
+
+                // Update last login timestamp
                 $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
                 $stmt->execute([$user['id']]);
 
+                // Redirect based on role
                 if ($user['role'] === 'admin') {
                     header('Location: ' . SITE_URL . '/admin/dashboard.php');
                 } else {
@@ -94,6 +130,11 @@ $pageTitle = 'Sign In';
                         </div>
                     </div>
 
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="remember_me" name="remember_me">
+                        <label for="remember_me">Remember me for 30 days</label>
+                    </div>
+
                     <div class="form-group">
                         <a href="<?php echo SITE_URL; ?>/forgot_password.php" style="font-size: 0.9rem; color: var(--rose);">Forgot password?</a>
                     </div>
@@ -102,12 +143,6 @@ $pageTitle = 'Sign In';
                         <i class="fas fa-sign-in-alt"></i>
                         Sign In
                     </button>
-                </form>
-
-                <!-- Hidden form to handle resend verification -->
-                <form id="resend-form" method="POST" style="display: none;">
-                    <input type="hidden" name="resend_verification" value="1">
-                    <input type="hidden" name="resend_login" id="resend-login-input" value="">
                 </form>
 
                 <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
@@ -131,35 +166,23 @@ $pageTitle = 'Sign In';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Password toggle
+    // ===== PASSWORD TOGGLE =====
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
+
     if (togglePassword && passwordInput) {
-        togglePassword.addEventListener('click', function () {
+        togglePassword.addEventListener('click', function() {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
             this.classList.toggle('fa-eye');
             this.classList.toggle('fa-eye-slash');
         });
     }
-
-    // Resend verification: fill the hidden form with the current login input
-    const resendForm = document.getElementById('resend-form');
-    const resendInput = document.getElementById('resend-login-input');
-    const loginInput = document.getElementById('login');
-    
-    // When a user clicks the "Resend verification email" link in the error message
-    // we pre-fill the hidden form with whatever they typed in the login field
-    document.querySelector('.alert-error a')?.addEventListener('click', function() {
-        if (loginInput) {
-            resendInput.value = loginInput.value;
-            resendForm.submit();
-        }
-    });
 });
 </script>
 
 <style>
+/* ===== AUTH PAGE ===== */
 .auth-page { padding: 40px 0; }
 .auth-wrapper { display: flex; justify-content: center; }
 .auth-card { max-width: 420px; width: 100%; background: var(--card-bg); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-hover); border: 1px solid var(--border); }
@@ -167,13 +190,38 @@ document.addEventListener('DOMContentLoaded', function() {
 .auth-header h1 { font-size: 1.8rem; margin: 0 0 4px; }
 .auth-header p { color: var(--text-light); }
 
+/* ===== FORM ===== */
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-weight: 600; margin-bottom: 4px; }
 .form-group input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .form-group input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 
+/* ===== PASSWORD TOGGLE ===== */
+.input-group-wrapper { position: relative; }
+.input-group-wrapper input { padding-right: 40px; }
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-light);
+    z-index: 10;
+    transition: color 0.2s;
+    background: transparent;
+    padding: 4px;
+}
+.password-toggle:hover { color: var(--text); }
+
+/* ===== CHECKBOX ===== */
+.checkbox-group { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; }
+.checkbox-group input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; }
+.checkbox-group label { font-size: 0.95rem; color: var(--text); cursor: pointer; margin: 0; }
+
+/* ===== BUTTON ===== */
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
 
+/* ===== SOCIAL LOGIN ===== */
 .social-login-section { text-align: center; margin: 20px 0; }
 .social-login-section .btn { display: inline-block; margin: 4px; padding: 10px 20px; border-radius: 6px; color: white; text-decoration: none; font-size: 0.95rem; }
 .btn-google { background: #DB4437; }
@@ -181,30 +229,17 @@ document.addEventListener('DOMContentLoaded', function() {
 .btn-google:hover { background: #c23321; }
 .btn-facebook:hover { background: #1559c4; }
 
+/* ===== FOOTER ===== */
 .auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
 .auth-footer a { color: var(--rose); font-weight: 600; }
 
-/* ===== PASSWORD TOGGLE ===== */
-.input-group-wrapper {
-    position: relative;
-}
-.input-group-wrapper input {
-    padding-right: 40px;
-}
-.password-toggle {
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-    color: var(--text-light);
-    z-index: 10;
-    transition: color 0.2s;
-}
-.password-toggle:hover {
-    color: var(--text);
-}
+/* ===== ALERTS ===== */
+.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+.alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+.alert-success { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
+.alert-error a { color: #991b1b; font-weight: 600; text-decoration: underline; }
 
+/* ===== RESPONSIVE ===== */
 @media (max-width: 480px) {
     .auth-card { padding: 20px; }
 }

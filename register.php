@@ -62,8 +62,24 @@ $countries = [
     'Zimbabwe' => '+263'
 ];
 
+// ===== LIST OF REFERRAL SOURCES =====
+$referral_sources = [
+    'Friend/Family',
+    'Google Search',
+    'Facebook',
+    'WhatsApp',
+    'TikTok',
+    'Instagram',
+    'Twitter/X',
+    'Angella (direct referral)',
+    'Event/Conference',
+    'Other'
+];
+
 // ===== HANDLE REGISTRATION FORM SUBMISSION =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $first_name = trim($_POST['first_name']);
+    $last_name = trim($_POST['last_name']);
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
@@ -71,9 +87,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $gender = $_POST['gender'] ?? '';
     $country = $_POST['country'] ?? '';
     $contact = trim($_POST['contact']);
+    $dob = trim($_POST['dob']);
+    $referral_source = $_POST['referral_source'] ?? '';
 
     // Validation
-    if (empty($username) || empty($email) || empty($password) || empty($confirm_password) || empty($gender) || empty($country) || empty($contact)) {
+    if (empty($first_name) || empty($last_name) || empty($username) || empty($email) || empty($password) || empty($confirm_password) || empty($gender) || empty($country) || empty($contact) || empty($dob) || empty($referral_source)) {
         $error = 'Please fill in all fields.';
     } elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
         $error = 'Username must be 3-20 characters (letters, numbers, underscore only).';
@@ -98,8 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // Create new user
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $db->prepare("INSERT INTO users (username, email, password, gender, country, contact_number, role, created_at) VALUES (?, ?, ?, ?, ?, ?, 'reader', CURRENT_TIMESTAMP)");
-                if ($stmt->execute([$username, $email, $hashed_password, $gender, $country, $contact])) {
+                $stmt = $db->prepare("INSERT INTO users (first_name, last_name, username, email, password, gender, country, contact_number, date_of_birth, referral_source, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reader', CURRENT_TIMESTAMP)");
+                if ($stmt->execute([$first_name, $last_name, $username, $email, $hashed_password, $gender, $country, $contact, $dob, $referral_source])) {
                     $user_id = $db->lastInsertId();
                     
                     // Generate verification token
@@ -115,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // ===== SEND VERIFICATION EMAIL =====
                     $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
                     $subject = "Verify your AngelWrites account";
-                    $message = "Hello $username,\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
+                    $message = "Hello $first_name,\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
                     
                     // Use the mail helper function
                     $emailSent = sendEmail($email, $subject, $message, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
@@ -155,8 +173,18 @@ $pageTitle = 'Sign Up';
 
                     <form method="POST" action="" class="auth-form" id="registerForm">
                         <div class="form-group">
+                            <label for="first_name">First Name</label>
+                            <input type="text" id="first_name" name="first_name" placeholder="Enter your first name" required autofocus>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="last_name">Surname / Last Name</label>
+                            <input type="text" id="last_name" name="last_name" placeholder="Enter your last name" required>
+                        </div>
+
+                        <div class="form-group">
                             <label for="username">Username</label>
-                            <input type="text" id="username" name="username" placeholder="Choose a username (3-20 chars)" required autofocus>
+                            <input type="text" id="username" name="username" placeholder="Choose a username (3-20 chars)" required>
                         </div>
 
                         <div class="form-group">
@@ -166,12 +194,12 @@ $pageTitle = 'Sign Up';
 
                         <div class="form-group">
                             <label for="password">Password</label>
-                            <div class="password-wrapper" style="position: relative;">
+                                <div class="password-wrapper" style="position: relative;">
                                 <input type="password" id="password" name="password" placeholder="Must be at least 8 characters" required>
-                                <button type="button" id="generatePassword" class="btn btn-sm btn-secondary" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
+                                <button type="button" id="generatePassword" class="btn btn-sm btn-secondary" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 2; padding: 4px 8px; font-size: 0.7rem;">
                                     <i class="fas fa-sync-alt"></i> Suggest
                                 </button>
-                                <span class="password-toggle" id="togglePassword" style="position: absolute; right: 60px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-light); z-index: 10;">
+                                <span class="password-toggle" id="togglePassword" style="position: absolute; right: 110px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; z-index: 1; background: var(--input-bg); padding: 4px; border-radius: 4px;">
                                     <i class="fas fa-eye"></i>
                                 </span>
                             </div>
@@ -195,6 +223,11 @@ $pageTitle = 'Sign Up';
                         </div>
 
                         <div class="form-group">
+                            <label for="dob">Date of Birth</label>
+                            <input type="date" id="dob" name="dob" required>
+                        </div>
+
+                        <div class="form-group">
                             <label for="country">Country</label>
                             <select id="country" name="country" required>
                                 <option value="">Select your country</option>
@@ -212,6 +245,16 @@ $pageTitle = 'Sign Up';
                                 <span id="countryCodeDisplay" style="padding: 10px 14px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; color: var(--text); min-width: 60px; display: flex; align-items: center;">+265</span>
                                 <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456" required style="flex: 1;">
                             </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="referral_source">How did you hear about AngelWrites?</label>
+                            <select id="referral_source" name="referral_source" required>
+                                <option value="">Select a source</option>
+                                <?php foreach ($referral_sources as $source): ?>
+                                    <option value="<?php echo htmlspecialchars($source); ?>"><?php echo htmlspecialchars($source); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
 
                         <div class="checkbox-group">
@@ -339,8 +382,18 @@ document.addEventListener('DOMContentLoaded', function() {
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .field-hint { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--text-light); }
 
-.password-wrapper input { 
-    padding-right: 130px; 
+.password-wrapper input {
+    padding-right: 160px; /* Make room for button + icon */
+}
+.password-toggle {
+    color: #888 !important; /* Always visible grey */
+}
+.password-toggle:hover {
+    color: #333 !important;
+}
+.password-toggle i {
+    font-size: 1.1rem;
+    transition: color 0.2s;
 }
 
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
