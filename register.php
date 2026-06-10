@@ -3,7 +3,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php'; // Now safely loaded after config
+require_once 'includes/mail_helper.php';
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
@@ -171,6 +171,9 @@ $pageTitle = 'Sign Up';
                                 <button type="button" id="generatePassword" class="btn btn-sm btn-secondary" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
                                     <i class="fas fa-sync-alt"></i> Suggest
                                 </button>
+                                <span class="password-toggle" id="togglePassword" style="position: absolute; right: 60px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-light); z-index: 10;">
+                                    <i class="fas fa-eye"></i>
+                                </span>
                             </div>
                             <small class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</small>
                         </div>
@@ -238,17 +241,27 @@ $pageTitle = 'Sign Up';
                         <p>Already have an account? <a href="<?php echo SITE_URL; ?>/login.php">Sign in here</a></p>
                     </div>
                 <?php else: ?>
+                    <!-- SUCCESS POPUP -->
                     <div class="success-popup">
                         <div class="success-icon">
                             <i class="fas fa-check-circle"></i>
                         </div>
                         <h2>Account Created! 🎉</h2>
-                        <p class="success-message">Welcome to the AngelWrites community! A verification link has been sent to your email. Please verify your account before logging in.</p>
-                        <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-primary btn-large btn-block">
-                            <i class="fas fa-sign-in-alt"></i>
-                            Go to Login
-                        </a>
-                        <p class="small-note">You will be redirected to the login page.</p>
+                        <p class="success-message">
+                            Welcome to the AngelWrites community! 
+                            <strong>A verification link has been sent to your email address.</strong>
+                            Please check your inbox and click the link to verify your account before logging in.
+                        </p>
+                        <div class="success-actions">
+                            <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-primary btn-large btn-block">
+                                <i class="fas fa-sign-in-alt"></i>
+                                Go to Login
+                            </a>
+                            <p class="small-note" style="margin-top: 12px; color: var(--text-muted);">
+                                📧 Didn't receive the email? Check your spam folder or 
+                                <a href="#" onclick="alert('Please contact support or request a new verification link on the login page.')">contact support</a>.
+                            </p>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -297,6 +310,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (countrySelect.value) {
         countrySelect.dispatchEvent(new Event('change'));
     }
+
+    // ---- Show/Hide Password Toggle ----
+    const togglePassword = document.getElementById('togglePassword');
+    if (togglePassword && passwordInput) {
+        togglePassword.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+    }
 });
 </script>
 
@@ -315,12 +339,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .field-hint { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--text-light); }
 
-.password-wrapper input { padding-right: 100px; }
-
-.checkbox-group { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; }
-.checkbox-group input[type="checkbox"] { margin-top: 4px; }
-.checkbox-group label { font-size: 0.9rem; color: var(--text); }
-.checkbox-group a { color: var(--rose); }
+.password-wrapper input { 
+    padding-right: 130px; 
+}
 
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
 

@@ -2,9 +2,8 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php'; // Make sure your mail helper is here
+require_once 'includes/mail_helper.php'; 
 
-// If already logged in, redirect to appropriate page
 if (isLoggedIn()) {
     if (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
