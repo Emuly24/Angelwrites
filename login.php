@@ -52,8 +52,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
-            if ($user['is_verified'] == 0) {
+            // ===== FIX: Bypass verification for admin and Test User =====
+            if (($user['username'] === 'admin' || $user['username'] === 'Test User') && $user['is_verified'] == 0) {
+                // Allow login without verification for these accounts
+                // Proceed as if verified
+            } elseif ($user['is_verified'] == 0) {
                 $error = 'Please verify your email address before logging in. <a href="resend_verification.php">Resend verification email</a>';
+            } else {
+                // Normal verified account – proceed
+            }
+
+            // If error is set, stop here and show the error
+            if ($error) {
+                // No need to continue – the error will be shown
             } else {
                 // Reset login attempts on success
                 if (file_exists($attempts_file)) {
