@@ -73,6 +73,8 @@ if ($isLoggedIn) {
             height: 200px !important;
             width: auto !important;
             max-width: 100%;
+            display: block;
+            object-fit: contain;
         }
 
         @media (max-width: 480px) {
