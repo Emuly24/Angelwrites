@@ -69,24 +69,21 @@ if ($isLoggedIn) {
         }
         .skip-link:focus { top: 0; }
 
-        /* ===== LOGO - BALANCED SIZE ===== */
-        .logo {
-            display: flex;
-            flex-shrink: 0;
+       
     /* ===== MOVE LOGO TO FAR LEFT ===== */
-.container.nav-container {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    gap: 0 !important;
-}
-.logo {
-    margin-left: 0 !important;
-    padding-left: 0 !important;
-}
-            
+        .container.nav-container {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            gap: 0 !important;
         }
+        .logo {
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+            flex-shrink: 0;
+        }
+            
         .logo-img {
-            height: 180px !important; 
+            height: 160px !important; 
             width: auto !important;
             max-width: 100%;
             display: block;
