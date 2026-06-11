@@ -37,7 +37,17 @@ $stats['total_questions'] = $stmt->fetchColumn();
 $stmt = $db->query("SELECT COUNT(*) FROM newsletter WHERE is_active = 1");
 $stats['total_subscribers'] = $stmt->fetchColumn();
 
-// Recent sessions (pending)
+// Total reflections
+$stmt = $db->query("SELECT COUNT(*) FROM reflections");
+$stats['total_reflections'] = $stmt->fetchColumn();
+
+// Total videos
+$stmt = $db->query("SELECT COUNT(*) FROM videos");
+$stats['total_videos'] = $stmt->fetchColumn();
+
+// --- RECENT ITEMS ---
+
+// Pending sessions
 $stmt = $db->prepare("
     SELECT s.*, u.name AS user_name, u.email 
     FROM sessions s 
@@ -49,7 +59,7 @@ $stmt = $db->prepare("
 $stmt->execute();
 $recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Recent contact messages
+// Unread contact messages
 $stmt = $db->prepare("
     SELECT * FROM contact_messages 
     WHERE is_read = 0 
@@ -59,7 +69,7 @@ $stmt = $db->prepare("
 $stmt->execute();
 $recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Recent book uploads
+// Recent books
 $stmt = $db->prepare("
     SELECT * FROM books 
     ORDER BY created_at DESC 
@@ -67,6 +77,51 @@ $stmt = $db->prepare("
 ");
 $stmt->execute();
 $recent_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Recent poems
+$stmt = $db->prepare("
+    SELECT * FROM poems 
+    ORDER BY created_at DESC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Recent blog posts
+$stmt = $db->prepare("
+    SELECT * FROM blog_posts 
+    ORDER BY created_at DESC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Recent reflections
+$stmt = $db->prepare("
+    SELECT * FROM reflections 
+    ORDER BY created_at DESC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Recent questions
+$stmt = $db->prepare("
+    SELECT * FROM questions 
+    ORDER BY created_at DESC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Recent users
+$stmt = $db->prepare("
+    SELECT * FROM users 
+    ORDER BY created_at DESC 
+    LIMIT 5
+");
+$stmt->execute();
+$recent_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Admin Dashboard';
 ?>
@@ -82,10 +137,16 @@ $pageTitle = 'Admin Dashboard';
             </div>
             <div class="dashboard-header-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-primary">
-                    <i class="fa-pen-fancy"></i> New Book
+                    <i class="fas fa-book"></i> New Book
                 </a>
-                <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-secondary">
-                    <i class="fa-pen-fancy"></i> New Poem
+                <a href="<?php echo SITE_URL; ?>/admin/poem_editor.php" class="btn btn-secondary">
+                    <i class="fas fa-pen"></i> New Poem
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/editor.php" class="btn btn-secondary">
+                    <i class="fas fa-blog"></i> New Blog
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/reflection_editor.php" class="btn btn-secondary">
+                    <i class="fas fa-church"></i> New Reflection
                 </a>
             </div>
         </div>
@@ -161,6 +222,26 @@ $pageTitle = 'Admin Dashboard';
                     <span class="stat-label">Newsletter Subscribers</span>
                 </div>
             </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(75, 192, 192, 0.15); color: #4bc0c0;">
+                    <i class="fas fa-church"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_reflections']; ?></span>
+                    <span class="stat-label">Reflections</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(255, 159, 64, 0.15); color: #ff9f40;">
+                    <i class="fas fa-video"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-number"><?php echo $stats['total_videos']; ?></span>
+                    <span class="stat-label">Videos</span>
+                </div>
+            </div>
         </div>
 
         <!-- ===== QUICK ACTIONS ===== -->
@@ -197,12 +278,16 @@ $pageTitle = 'Admin Dashboard';
                 <i class="fas fa-envelope"></i>
                 <span>Manage Messages</span>
             </a>
+            <a href="<?php echo SITE_URL; ?>/admin/manage_videos.php" class="action-card">
+                <i class="fas fa-video"></i>
+                <span>Manage Videos</span>
+            </a>
             <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php" class="action-card">
                 <i class="fas fa-newspaper"></i>
                 <span>Manage Newsletter</span>
             </a>
-            <a href= "<?php echo SITE_URL; ?>/admin/send_newsletter.php" class="action-card">
-                <i class="fas fa-users"></i>
+            <a href="<?php echo SITE_URL; ?>/admin/send_newsletter.php" class="action-card">
+                <i class="fas fa-paper-plane"></i>
                 <span>Send Newsletter</span>
             </a>
             <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="action-card">
@@ -211,8 +296,8 @@ $pageTitle = 'Admin Dashboard';
             </a>
         </div>
 
-        <!-- ===== DASHBOARD SECTIONS ===== -->
-        <div class="dashboard-grid">
+        <!-- ===== DASHBOARD SECTIONS GRID ===== -->
+        <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
 
             <!-- Pending Sessions -->
             <div class="dashboard-section-card">
@@ -292,11 +377,146 @@ $pageTitle = 'Admin Dashboard';
                 </div>
             </div>
 
+            <!-- Recently Added Poems -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-pen"></i> Recently Added Poems</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_poems) > 0): ?>
+                        <?php foreach ($recent_poems as $poem): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($poem['title']); ?></strong>
+                                    <small><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></small>
+                                </div>
+                                <span class="status-badge available">Added</span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-pen"></i>
+                            <p>No poems added yet</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Recent Blog Posts -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-blog"></i> Recent Blog Posts</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_posts) > 0): ?>
+                        <?php foreach ($recent_posts as $post): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($post['title']); ?></strong>
+                                    <small><?php echo htmlspecialchars($post['category'] ?? 'Uncategorized'); ?></small>
+                                </div>
+                                <span class="status-badge <?php echo $post['status'] === 'published' ? 'available' : 'pending'; ?>">
+                                    <?php echo ucfirst($post['status']); ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-blog"></i>
+                            <p>No blog posts yet</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Recent Reflections -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-church"></i> Recent Reflections</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_reflections.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_reflections) > 0): ?>
+                        <?php foreach ($recent_reflections as $reflection): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($reflection['title']); ?></strong>
+                                    <small><?php echo date('M j, Y', strtotime($reflection['created_at'])); ?></small>
+                                </div>
+                                <span class="status-badge available">Published</span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-church"></i>
+                            <p>No reflections yet</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Recent Questions -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-question-circle"></i> Recent Questions</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_questions) > 0): ?>
+                        <?php foreach ($recent_questions as $question): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($question['title']); ?></strong>
+                                    <small><?php echo date('M j, Y', strtotime($question['created_at'])); ?></small>
+                                </div>
+                                <span class="status-badge <?php echo $question['is_answered'] ? 'available' : 'pending'; ?>">
+                                    <?php echo $question['is_answered'] ? 'Answered' : 'Open'; ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-question-circle"></i>
+                            <p>No questions yet</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Recent Users -->
+            <div class="dashboard-section-card">
+                <div class="dashboard-section-header">
+                    <h3><i class="fas fa-users"></i> Newest Users</h3>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="view-all-link">View All &rarr;</a>
+                </div>
+                <div class="dashboard-list-body">
+                    <?php if (count($recent_users) > 0): ?>
+                        <?php foreach ($recent_users as $user): ?>
+                            <div class="dashboard-list-item">
+                                <div class="dashboard-list-item-info">
+                                    <strong><?php echo htmlspecialchars($user['name']); ?></strong>
+                                    <small><?php echo htmlspecialchars($user['email']); ?></small>
+                                </div>
+                                <span class="status-badge <?php echo $user['role'] === 'admin' ? 'pending' : 'available'; ?>">
+                                    <?php echo ucfirst($user['role'] ?? 'User'); ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state-card">
+                            <i class="fas fa-users"></i>
+                            <p>No users yet</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
-<!-- ===== INLINE STYLES ===== -->
 <style>
     /* ===== STATS CARDS ===== */
     .stats-grid {
@@ -391,7 +611,6 @@ $pageTitle = 'Admin Dashboard';
         border-radius: 12px;
         border-left: 6px solid var(--rose);
         box-shadow: var(--shadow);
-        margin-bottom: 16px;
         overflow: hidden;
     }
     .dashboard-section-header {
@@ -539,6 +758,9 @@ $pageTitle = 'Admin Dashboard';
         .dashboard-header-actions .btn {
             flex: 1;
             justify-content: center;
+        }
+        .dashboard-grid {
+            grid-template-columns: 1fr !important;
         }
     }
     @media (max-width: 480px) {

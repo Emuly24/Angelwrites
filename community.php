@@ -2,10 +2,19 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php';
 
 $error = '';
 $success = '';
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : null;
+
+// ===== ADDED: PAGINATION, SEARCH, FILTER =====
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$limit = 10;
+$offset = ($page - 1) * $limit;
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$filter = isset($_GET['filter']) ? $_GET['filter'] : 'all'; // all, answered, unanswered
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'newest'; // newest, oldest, most_views, most_answers
 
 // ===== HANDLE NEW QUESTION =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_question'])) {
@@ -23,6 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_question'])) {
             $stmt = $db->prepare("INSERT INTO questions (user_id, title, body) VALUES (?, ?, ?)");
             if ($stmt->execute([$user_id, $title, $body])) {
                 $success = 'Your question has been posted!';
+                
+                // ===== ADDED: Admin email notification =====
+                $admin_email = 'angelwrites@zohomail.com';
+                $subject = 'New Community Question: ' . $title;
+                $body_msg = "A new question has been posted.\n\nTitle: $title\nBody: $body\n\nView question: " . SITE_URL . "/community.php?id=" . $db->lastInsertId();
+                sendEmail($admin_email, $subject, $body_msg, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
             } else {
                 $error = 'Something went wrong. Please try again.';
             }
@@ -47,6 +62,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                 $stmt = $db->prepare("UPDATE questions SET answers_count = answers_count + 1 WHERE id = ?");
                 $stmt->execute([$question_id]);
                 $success = 'Your answer has been posted!';
+                
+                // ===== ADDED: Admin email notification =====
+                $admin_email = 'angelwrites@zohomail.com';
+                $subject = 'New Answer to Question #' . $question_id;
+                // Fetch question title
+                $stmt = $db->prepare("SELECT title, user_id FROM questions WHERE id = ?");
+                $stmt->execute([$question_id]);
+                $question = $stmt->fetch(PDO::FETCH_ASSOC);
+                $body_msg = "A new answer was posted.\n\nQuestion: " . $question['title'] . "\nAnswer: $body\n\nView question: " . SITE_URL . "/community.php?id=" . $question_id;
+                sendEmail($admin_email, $subject, $body_msg, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
+                
+                // ===== ADDED: Email notification to question author =====
+                if ($question && $question['user_id'] != $user_id) {
+                    $stmt = $db->prepare("SELECT email, name FROM users WHERE id = ?");
+                    $stmt->execute([$question['user_id']]);
+                    $author = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($author) {
+                        $user_subject = 'Your question got an answer!';
+                        $user_body = "Hello " . $author['name'] . ",\n\nYour question \"" . $question['title'] . "\" has received a new answer.\n\nAnswer: $body\n\nView answer: " . SITE_URL . "/community.php?id=" . $question_id;
+                        sendEmail($author['email'], $user_subject, $user_body, 'angelwrites@zohomail.com', SITE_NAME . ' Community');
+                    }
+                }
             } else {
                 $error = 'Something went wrong. Please try again.';
             }
@@ -73,26 +110,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscribe_newsletter'])) {
     $email = trim($_POST['email']);
     if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        try {
-            $stmt = $db->prepare("INSERT INTO newsletter (email) VALUES (?)");
-            $stmt->execute([$email]);
-            $success = 'You have been subscribed to the newsletter!';
-        } catch (PDOException $e) {
-            $error = 'This email is already subscribed.';
+        // Check if email already exists
+        $stmt = $db->prepare("SELECT id, is_active FROM newsletter WHERE email = ?");
+        $stmt->execute([$email]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existing) {
+            if ($existing['is_active'] == 1) {
+                $error = 'This email is already subscribed.';
+            } else {
+                // Reactivate
+                $stmt = $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$existing['id']]);
+                $success = 'Your subscription has been reactivated!';
+            }
+        } else {
+            $token = bin2hex(random_bytes(32));
+            $stmt = $db->prepare("INSERT INTO newsletter (email, is_active, unsubscribe_token) VALUES (?, 1, ?)");
+            if ($stmt->execute([$email, $token])) {
+                $success = 'You have been subscribed to the newsletter!';
+            } else {
+                $error = 'Could not subscribe. Please try again.';
+            }
         }
     } else {
         $error = 'Please enter a valid email address.';
     }
 }
 
-// ===== FETCH ALL QUESTIONS =====
-$stmt = $db->prepare("
+// ===== FETCH ALL QUESTIONS (WITH SEARCH, FILTER, PAGINATION) =====
+$sql = "
     SELECT q.*, u.name AS author_name, u.avatar 
     FROM questions q
     JOIN users u ON q.user_id = u.id
-    ORDER BY q.created_at DESC
-");
-$stmt->execute();
+    WHERE 1=1
+";
+$count_sql = "SELECT COUNT(*) FROM questions q WHERE 1=1";
+$params = [];
+
+if ($search) {
+    $sql .= " AND (q.title LIKE ? OR q.body LIKE ?)";
+    $count_sql .= " AND (q.title LIKE ? OR q.body LIKE ?)";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+}
+
+if ($filter === 'answered') {
+    $sql .= " AND q.is_answered = 1";
+    $count_sql .= " AND q.is_answered = 1";
+} elseif ($filter === 'unanswered') {
+    $sql .= " AND q.is_answered = 0";
+    $count_sql .= " AND q.is_answered = 0";
+}
+
+// Sorting
+switch ($sort) {
+    case 'oldest':
+        $sql .= " ORDER BY q.created_at ASC";
+        break;
+    case 'most_views':
+        $sql .= " ORDER BY q.views DESC";
+        break;
+    case 'most_answers':
+        $sql .= " ORDER BY q.answers_count DESC";
+        break;
+    default: // newest
+        $sql .= " ORDER BY q.created_at DESC";
+        break;
+}
+
+// Pagination
+$stmt = $db->prepare($count_sql);
+$stmt->execute($params);
+$total_questions = $stmt->fetchColumn();
+$total_pages = ceil($total_questions / $limit);
+
+$sql .= " LIMIT ? OFFSET ?";
+$params[] = $limit;
+$params[] = $offset;
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
 $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH SINGLE QUESTION WITH ANSWERS =====
@@ -255,6 +353,26 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
             <div class="questions-layout">
                 <!-- Main Questions List -->
                 <div class="questions-main">
+                    <!-- ===== ADDED: Search & Filter Bar ===== -->
+                    <div class="search-filter-bar">
+                        <form method="GET" action="<?php echo SITE_URL; ?>/community.php" class="filter-form">
+                            <input type="text" name="search" placeholder="Search questions..." value="<?php echo htmlspecialchars($search); ?>">
+                            <select name="filter">
+                                <option value="all" <?php echo $filter === 'all' ? 'selected' : ''; ?>>All</option>
+                                <option value="answered" <?php echo $filter === 'answered' ? 'selected' : ''; ?>>Answered</option>
+                                <option value="unanswered" <?php echo $filter === 'unanswered' ? 'selected' : ''; ?>>Unanswered</option>
+                            </select>
+                            <select name="sort">
+                                <option value="newest" <?php echo $sort === 'newest' ? 'selected' : ''; ?>>Newest</option>
+                                <option value="oldest" <?php echo $sort === 'oldest' ? 'selected' : ''; ?>>Oldest</option>
+                                <option value="most_views" <?php echo $sort === 'most_views' ? 'selected' : ''; ?>>Most Views</option>
+                                <option value="most_answers" <?php echo $sort === 'most_answers' ? 'selected' : ''; ?>>Most Answers</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Filter</button>
+                            <a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-outline btn-sm">Clear</a>
+                        </form>
+                    </div>
+
                     <!-- Ask Question Button -->
                     <?php if ($user_id): ?>
                         <div class="ask-question-container">
@@ -334,6 +452,30 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                                 </div>
                             <?php endforeach; ?>
                         </div>
+                        
+                        <!-- ===== ADDED: Pagination ===== -->
+                        <?php if ($total_pages > 1): ?>
+                            <div class="pagination">
+                                <?php if ($page > 1): ?>
+                                    <a href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&filter=<?php echo $filter; ?>&sort=<?php echo $sort; ?>" class="page-link">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                                    <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&filter=<?php echo $filter; ?>&sort=<?php echo $sort; ?>" class="page-link <?php echo $i === $page ? 'active' : ''; ?>">
+                                        <?php echo $i; ?>
+                                    </a>
+                                <?php endfor; ?>
+                                
+                                <?php if ($page < $total_pages): ?>
+                                    <a href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&filter=<?php echo $filter; ?>&sort=<?php echo $sort; ?>" class="page-link">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                        
                     <?php else: ?>
                         <div class="empty-state">
                             <i class="fas fa-comments" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
@@ -370,348 +512,103 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
 
 <!-- ===== STYLES ===== -->
 <style>
-.community-page {
-    padding: 32px 0 60px;
-}
+.community-page { padding: 32px 0 60px; }
+.community-header { text-align: center; margin-bottom: 32px; }
+.community-header h1 { font-size: 2.4rem; margin-bottom: 4px; }
+.community-header p { color: var(--text-light); font-size: 1.05rem; }
 
-.community-header {
-    text-align: center;
-    margin-bottom: 32px;
-}
-.community-header h1 {
-    font-size: 2.4rem;
-    margin-bottom: 4px;
-}
-.community-header p {
-    color: var(--text-light);
-    font-size: 1.05rem;
-}
+/* ===== ADDED: Search & Filter Bar ===== */
+.search-filter-bar { margin-bottom: 20px; }
+.filter-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filter-form input, .filter-form select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
+.filter-form input:focus, .filter-form select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+.filter-form input { flex: 1; min-width: 160px; }
+.filter-form .btn-sm { padding: 8px 16px; }
 
-/* ===== Single Question View ===== */
-.single-question {
-    max-width: 800px;
-    margin: 0 auto;
-}
+/* ===== ADDED: Pagination ===== */
+.pagination { display: flex; justify-content: center; gap: 6px; margin-top: 24px; flex-wrap: wrap; }
+.page-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); font-size: 0.9rem; transition: all 0.2s; min-width: 36px; text-decoration: none; }
+.page-link:hover { border-color: var(--rose); }
+.page-link.active { background: var(--rose); color: white; border-color: var(--rose); }
 
-.question-detail {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 24px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    margin-bottom: 24px;
-}
-.question-detail h2 {
-    font-size: 1.8rem;
-    margin-bottom: 8px;
-}
-.question-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    color: var(--text-light);
-    font-size: 0.9rem;
-    margin-bottom: 16px;
-}
-.question-meta span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.question-body {
-    line-height: 1.7;
-    color: var(--text);
-}
+/* ... (rest of your original styles remain unchanged) ... */
+.single-question { max-width: 800px; margin: 0 auto; }
+.question-detail { background: var(--card-bg); border-radius: 12px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 24px; }
+.question-detail h2 { font-size: 1.8rem; margin-bottom: 8px; }
+.question-meta { display: flex; flex-wrap: wrap; gap: 16px; color: var(--text-light); font-size: 0.9rem; margin-bottom: 16px; }
+.question-meta span { display: flex; align-items: center; gap: 4px; }
+.question-body { line-height: 1.7; color: var(--text); }
 
-.answers-section {
-    margin-top: 24px;
-}
-.answers-section h3 {
-    font-size: 1.4rem;
-    margin-bottom: 16px;
-}
+.answers-section { margin-top: 24px; }
+.answers-section h3 { font-size: 1.4rem; margin-bottom: 16px; }
+.answers-list { display: flex; flex-direction: column; gap: 16px; }
+.answer-item { background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.answer-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.answer-header .author { font-weight: 500; }
+.answer-header .date { font-size: 0.85rem; color: var(--text-light); }
+.answer-body { line-height: 1.7; color: var(--text); margin-bottom: 12px; }
+.answer-footer { display: flex; justify-content: flex-end; }
+.upvote-form { display: inline; }
+.upvote-btn { background: transparent; border: 1px solid var(--border); border-radius: 20px; padding: 4px 14px; cursor: pointer; font-size: 0.85rem; transition: all var(--transition); display: inline-flex; align-items: center; gap: 4px; color: var(--text); }
+.upvote-btn:hover { background: var(--rose); border-color: var(--rose); color: white; }
+.upvote-btn i { margin-right: 2px; }
 
-.answers-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-.answer-item {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-}
-.answer-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-.answer-header .author {
-    font-weight: 500;
-}
-.answer-header .date {
-    font-size: 0.85rem;
-    color: var(--text-light);
-}
-.answer-body {
-    line-height: 1.7;
-    color: var(--text);
-    margin-bottom: 12px;
-}
-.answer-footer {
-    display: flex;
-    justify-content: flex-end;
-}
+.answer-form-container { margin-top: 24px; background: var(--vanilla); border-radius: 12px; padding: 20px; }
+.answer-form-container h4 { margin-bottom: 12px; }
+.answer-form textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 80px; background: var(--input-bg); color: var(--text); }
+.answer-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.login-prompt { background: var(--vanilla); border-radius: 12px; padding: 16px; text-align: center; margin: 16px 0; }
+.login-prompt a { font-weight: 600; }
+.login-prompt a:hover { text-decoration: underline; }
 
-.upvote-form {
-    display: inline;
-}
-.upvote-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 4px 14px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: all var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--text);
-}
-.upvote-btn:hover {
-    background: var(--rose);
-    border-color: var(--rose);
-    color: white;
-}
-.upvote-btn i {
-    margin-right: 2px;
-}
+.back-link-container { margin-top: 24px; }
+.back-link { color: var(--text-light); transition: color var(--transition); }
+.back-link:hover { color: var(--rose); }
+.back-link i { margin-right: 6px; }
 
-.answer-form-container {
-    margin-top: 24px;
-    background: var(--vanilla);
-    border-radius: 12px;
-    padding: 20px;
-}
-.answer-form-container h4 {
-    margin-bottom: 12px;
-}
-.answer-form textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    resize: vertical;
-    min-height: 80px;
-    background: var(--input-bg);
-    color: var(--text);
-}
-.answer-form textarea:focus {
-    outline: none;
-    border-color: var(--rose);
-    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-}
+.questions-layout { display: grid; grid-template-columns: 1fr 300px; gap: 32px; }
+.ask-question-container { margin-bottom: 20px; }
+.ask-form-wrapper { margin-bottom: 24px; }
+.ask-form .form-group { margin-bottom: 16px; }
+.ask-form input, .ask-form textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
+.ask-form input:focus, .ask-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.ask-form textarea { resize: vertical; min-height: 80px; }
 
-.login-prompt {
-    background: var(--vanilla);
-    border-radius: 12px;
-    padding: 16px;
-    text-align: center;
-    margin: 16px 0;
-}
-.login-prompt a {
-    font-weight: 600;
-}
-.login-prompt a:hover {
-    text-decoration: underline;
-}
+.questions-list { display: flex; flex-direction: column; gap: 16px; }
+.question-card { background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); transition: transform var(--transition), box-shadow var(--transition); }
+.question-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.question-card-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.question-card-header h3 { font-size: 1.15rem; }
+.question-card-header h3 a { color: var(--text); transition: color var(--transition); }
+.question-card-header h3 a:hover { color: var(--rose); }
+.question-author { font-size: 0.85rem; color: var(--text-light); }
+.question-card-body { color: var(--text-light); font-size: 0.95rem; margin-bottom: 12px; line-height: 1.5; }
+.question-card-footer { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 0.85rem; color: var(--text-light); }
+.question-card-footer .q-meta { display: flex; align-items: center; gap: 4px; }
 
-.back-link-container {
-    margin-top: 24px;
-}
-.back-link {
-    color: var(--text-light);
-    transition: color var(--transition);
-}
-.back-link:hover {
-    color: var(--rose);
-}
-.back-link i {
-    margin-right: 6px;
-}
+.community-sidebar .card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
+.community-sidebar .card-header { background: var(--vanilla); padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.community-sidebar .card-header h4 { margin: 0; font-size: 1.05rem; }
+.community-sidebar .card-body { padding: 20px; }
+.sidebar-newsletter-form input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: var(--input-bg); color: var(--text); }
+.sidebar-newsletter-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.sidebar-newsletter-form .btn-block { width: 100%; }
+.sidebar-newsletter-form small { display: block; text-align: center; margin-top: 8px; color: var(--text-light); font-size: 0.8rem; }
 
-/* ===== Questions List ===== */
-.questions-layout {
-    display: grid;
-    grid-template-columns: 1fr 300px;
-    gap: 32px;
-}
-
-.ask-question-container {
-    margin-bottom: 20px;
-}
-.ask-form-wrapper {
-    margin-bottom: 24px;
-}
-.ask-form .form-group {
-    margin-bottom: 16px;
-}
-.ask-form input, .ask-form textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--input-bg);
-    color: var(--text);
-}
-.ask-form input:focus, .ask-form textarea:focus {
-    outline: none;
-    border-color: var(--rose);
-    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-}
-.ask-form textarea {
-    resize: vertical;
-    min-height: 80px;
-}
-
-.questions-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-.question-card {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    transition: transform var(--transition), box-shadow var(--transition);
-}
-.question-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
-}
-.question-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-.question-card-header h3 {
-    font-size: 1.15rem;
-}
-.question-card-header h3 a {
-    color: var(--text);
-    transition: color var(--transition);
-}
-.question-card-header h3 a:hover {
-    color: var(--rose);
-}
-.question-author {
-    font-size: 0.85rem;
-    color: var(--text-light);
-}
-.question-card-body {
-    color: var(--text-light);
-    font-size: 0.95rem;
-    margin-bottom: 12px;
-    line-height: 1.5;
-}
-.question-card-footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    font-size: 0.85rem;
-    color: var(--text-light);
-}
-.question-card-footer .q-meta {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* ===== Sidebar ===== */
-.community-sidebar .card {
-    background: var(--card-bg);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-}
-.community-sidebar .card-header {
-    background: var(--vanilla);
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-}
-.community-sidebar .card-header h4 {
-    margin: 0;
-    font-size: 1.05rem;
-}
-.community-sidebar .card-body {
-    padding: 20px;
-}
-.sidebar-newsletter-form input {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 12px;
-    background: var(--input-bg);
-    color: var(--text);
-}
-.sidebar-newsletter-form input:focus {
-    outline: none;
-    border-color: var(--rose);
-    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-}
-.sidebar-newsletter-form .btn-block {
-    width: 100%;
-}
-.sidebar-newsletter-form small {
-    display: block;
-    text-align: center;
-    margin-top: 8px;
-    color: var(--text-light);
-    font-size: 0.8rem;
-}
-
-.empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-light);
-}
-.empty-state h3 {
-    font-size: 1.3rem;
-    margin-bottom: 6px;
-}
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
+.empty-state h3 { font-size: 1.3rem; margin-bottom: 6px; }
 
 @media (max-width: 768px) {
-    .questions-layout {
-        grid-template-columns: 1fr;
-    }
-    .community-sidebar {
-        order: -1;
-    }
-    .question-card-header {
-        flex-direction: column;
-    }
-    .question-card-footer {
-        flex-direction: column;
-        align-items: flex-start;
-    }
+    .questions-layout { grid-template-columns: 1fr; }
+    .community-sidebar { order: -1; }
+    .question-card-header { flex-direction: column; }
+    .question-card-footer { flex-direction: column; align-items: flex-start; }
+    .filter-form { flex-direction: column; align-items: stretch; }
+    .filter-form input, .filter-form select { width: 100%; }
 }
 </style>
 
-<!-- ===== INLINE JAVASCRIPT ===== -->
+<!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const showAskBtn = document.getElementById('showAskForm');

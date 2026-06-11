@@ -3,11 +3,10 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
-$video_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// Fetch video
 $stmt = $db->prepare("SELECT * FROM videos WHERE id = ?");
-$stmt->execute([$video_id]);
+$stmt->execute([$id]);
 $video = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$video) {
@@ -15,18 +14,18 @@ if (!$video) {
     exit;
 }
 
-// Increment view count
+// Increment views
 $stmt = $db->prepare("UPDATE videos SET views = views + 1 WHERE id = ?");
-$stmt->execute([$video_id]);
+$stmt->execute([$id]);
 
-// ===== TRACKING: User watched this video =====
+// Track watch if logged in
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
     $stmt = $db->prepare("INSERT OR IGNORE INTO video_watches (user_id, video_id) VALUES (?, ?)");
-    $stmt->execute([$user_id, $video_id]);
+    $stmt->execute([$user_id, $id]);
 }
 
-$pageTitle = htmlspecialchars($video['title']) . ' — Video';
+$pageTitle = htmlspecialchars($video['title']);
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -44,13 +43,11 @@ $pageTitle = htmlspecialchars($video['title']) . ' — Video';
 
         <div class="video-player">
             <?php if ($video['video_url']): ?>
-                <!-- If hosted on YouTube/Vimeo, use embed -->
                 <?php if (strpos($video['video_url'], 'youtube') !== false || strpos($video['video_url'], 'youtu.be') !== false): ?>
                     <iframe src="<?php echo str_replace('watch?v=', 'embed/', $video['video_url']); ?>" width="100%" height="500" frameborder="0" allowfullscreen></iframe>
                 <?php elseif (strpos($video['video_url'], 'vimeo') !== false): ?>
                     <iframe src="<?php echo str_replace('vimeo.com/', 'player.vimeo.com/video/', $video['video_url']); ?>" width="100%" height="500" frameborder="0" allowfullscreen></iframe>
                 <?php else: ?>
-                    <!-- Local video file -->
                     <video controls width="100%" poster="<?php echo SITE_URL . '/' . ($video['thumbnail'] ?? ''); ?>">
                         <source src="<?php echo SITE_URL . '/' . $video['video_url']; ?>" type="video/mp4">
                         Your browser does not support the video tag.
@@ -67,22 +64,21 @@ $pageTitle = htmlspecialchars($video['title']) . ' — Video';
         <!-- Share Section -->
         <div class="video-share">
             <span>Share:</span>
-            <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/video_watch.php?id=' . $video_id); ?>" target="_blank" class="share-btn facebook"><i class="fab fa-facebook-f"></i></a>
-            <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode('Watch this video by Angella: ' . $video['title']); ?>&url=<?php echo urlencode(SITE_URL . '/video_watch.php?id=' . $video_id); ?>" target="_blank" class="share-btn twitter"><i class="fab fa-twitter"></i></a>
-            <a href="https://api.whatsapp.com/send?text=<?php echo urlencode('Watch this video: ' . SITE_URL . '/video_watch.php?id=' . $video_id); ?>" target="_blank" class="share-btn whatsapp"><i class="fab fa-whatsapp"></i></a>
+            <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/video_watch.php?id=' . $id); ?>" target="_blank" class="share-btn facebook"><i class="fab fa-facebook-f"></i></a>
+            <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode('Watch this video by Angella: ' . $video['title']); ?>&url=<?php echo urlencode(SITE_URL . '/video_watch.php?id=' . $id); ?>" target="_blank" class="share-btn twitter"><i class="fab fa-twitter"></i></a>
+            <a href="https://api.whatsapp.com/send?text=<?php echo urlencode('Watch this video: ' . SITE_URL . '/video_watch.php?id=' . $id); ?>" target="_blank" class="share-btn whatsapp"><i class="fab fa-whatsapp"></i></a>
         </div>
     </div>
 </div>
 
 <style>
 .video-watch-page { padding: 32px 0 60px; }
+.back-link { color: var(--text-light); font-size: 0.95rem; text-decoration: none; display: inline-block; margin-bottom: 12px; }
+.back-link:hover { color: var(--rose); }
 .video-header { margin-bottom: 24px; }
-.video-header .back-link { color: var(--text-light); font-size: 0.95rem; text-decoration: none; display: inline-block; margin-bottom: 12px; }
-.video-header .back-link:hover { color: var(--rose); }
 .video-header h1 { font-size: 2rem; margin: 0 0 8px; }
 .video-description { color: var(--text-light); font-size: 1.05rem; line-height: 1.6; margin-bottom: 0; }
 .video-player { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 20px; }
-.video-player video, .video-player iframe { display: block; width: 100%; }
 .video-unavailable { text-align: center; padding: 60px 20px; color: var(--text-light); }
 .video-unavailable i { font-size: 3rem; color: var(--rose); display: block; margin-bottom: 12px; }
 .video-share { display: flex; align-items: center; gap: 10px; }

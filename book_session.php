@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php'; // Added for Zoho SMTP
 
 // Only logged-in users can book a session
 redirectIfNotLoggedIn();
@@ -9,6 +10,21 @@ redirectIfNotLoggedIn();
 $error = '';
 $success = '';
 $user_id = $_SESSION['user_id'];
+
+// Fetch user name for the email
+$stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+$user_name = $user['name'] ?? 'A user';
+
+// ===== FETCH USER'S EXISTING SESSIONS (for display) =====
+$stmt = $db->prepare("
+    SELECT * FROM sessions 
+    WHERE user_id = ? AND date >= DATE('now') AND status IN ('pending', 'confirmed')
+    ORDER BY date ASC, time ASC
+");
+$stmt->execute([$user_id]);
+$my_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== HANDLE BOOKING SUBMISSION =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -42,15 +58,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->execute([$user_id, $date, $time, $duration, $message])) {
                 $success = 'Your session has been booked successfully! Angella will confirm it soon.';
                 
-                // Optional: Send email notification to admin (using PHP mail)
-                $to = 'admin@angelawrites.com'; // Change to Angella's email
-                $subject = 'New Session Booking';
-                $email_body = "A new session has been booked by {$_SESSION['name']} ({$_SESSION['email']}).\n\n";
-                $email_body .= "Date: $date\nTime: $time\nDuration: $duration min\n";
-                $email_body .= "Message: $message\n\n";
-                $email_body .= "Login to the admin panel to manage this session.";
-                $headers = "From: " . SITE_NAME . " <no-reply@angelawrites.com>";
-                mail($to, $subject, $email_body, $headers);
+                // ===== SEND ADMIN NOTIFICATION VIA ZOHO SMTP =====
+                $admin_email = 'angelwrites@zohomail.com';
+                $subject = '📅 New Session Booking';
+                $email_body = "<h2>New Session Booking</h2>";
+                $email_body .= "<p><strong>Client:</strong> {$user_name}</p>";
+                $email_body .= "<p><strong>Date:</strong> {$date}</p>";
+                $email_body .= "<p><strong>Time:</strong> {$time}</p>";
+                $email_body .= "<p><strong>Duration:</strong> {$duration} min</p>";
+                if (!empty($message)) {
+                    $email_body .= "<p><strong>Message:</strong><br>" . nl2br(htmlspecialchars($message)) . "</p>";
+                }
+                $email_body .= "<p><a href='" . SITE_URL . "/admin/manage_sessions.php'>Login to the admin panel</a> to manage this session.</p>";
+
+                $emailSent = sendEmail($admin_email, $subject, $email_body, 'angelwrites@zohomail.com', 'AngelWrites');
+                
+                // ===== SEND CONFIRMATION EMAIL TO USER =====
+                $user_subject = "✅ Session Booking Confirmation – AngelWrites";
+                $user_body = "Hello {$user_name},\n\nThank you for booking a session with Angella.\n\nHere are your session details:\n\n";
+                $user_body .= "Date: {$date}\n";
+                $user_body .= "Time: {$time}\n";
+                $user_body .= "Duration: {$duration} min\n";
+                if (!empty($message)) {
+                    $user_body .= "Your message: {$message}\n\n";
+                }
+                $user_body .= "Angella will confirm your session within 24 hours. You will receive another email with the meeting link once confirmed.\n\n";
+                $user_body .= "If you need to reschedule or cancel, please contact us directly at angelwrites@zohomail.com.\n\n";
+                $user_body .= "Blessings,\nAngella Bottoman\nAngelWrites";
+                
+                $userEmailSent = sendEmail($email, $user_subject, $user_body, 'angelwrites@zohomail.com', 'AngelWrites');
+                
+                if (!$emailSent) {
+                    // Log error but booking is still valid
+                    error_log("Failed to send session booking notification for user $user_id");
+                }
             } else {
                 $error = 'Something went wrong. Please try again.';
             }
@@ -59,8 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ===== FETCH AVAILABLE TIME SLOTS (sample) =====
-// In a real system, you might have a table of available slots.
-// For now, we'll generate a list of common time slots.
 $time_slots = [
     '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
     '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
@@ -91,6 +130,25 @@ $pageTitle = 'Book a Session';
                 <h1>Book a 1-on-1 Session</h1>
                 <p>Connect with Angella for guidance, encouragement, or a conversation about faith, writing, or life's journey.</p>
             </div>
+
+            <!-- ===== ADDED: Display User's Existing Sessions ===== -->
+            <?php if (count($my_sessions) > 0): ?>
+                <div class="my-sessions-section">
+                    <h3>Your Upcoming Sessions</h3>
+                    <div class="my-sessions-list">
+                        <?php foreach ($my_sessions as $s): ?>
+                            <div class="my-session-item">
+                                <span class="session-date"><?php echo htmlspecialchars($s['date']); ?></span>
+                                <span class="session-time"><?php echo htmlspecialchars($s['time']); ?></span>
+                                <span class="session-status <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span>
+                                <?php if (!empty($s['message'])): ?>
+                                    <p class="session-message"><?php echo htmlspecialchars($s['message']); ?></p>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
 
             <!-- Alert Messages -->
             <?php if ($error): ?>
@@ -184,134 +242,47 @@ $pageTitle = 'Book a Session';
 
 <!-- ===== STYLES ===== -->
 <style>
-.session-page {
-    padding: 32px 0 60px;
-}
+.session-page { padding: 32px 0 60px; }
+.session-wrapper { max-width: 600px; margin: 0 auto; }
+.session-header { text-align: center; margin-bottom: 32px; }
+.session-header h1 { font-size: 2.4rem; margin-bottom: 8px; }
+.session-header p { color: var(--text-light); font-size: 1.05rem; }
 
-.session-wrapper {
-    max-width: 600px;
-    margin: 0 auto;
-}
+/* ===== ADDED: My Sessions Section ===== */
+.my-sessions-section { background: var(--vanilla); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; border-left: 4px solid var(--rose); }
+.my-sessions-section h3 { font-size: 1.05rem; margin-bottom: 12px; }
+.my-sessions-list { display: flex; flex-direction: column; gap: 8px; }
+.my-session-item { background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.my-session-item .session-date, .my-session-item .session-time { font-weight: 500; font-size: 0.9rem; }
+.my-session-item .session-status { padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.my-session-item .session-status.pending { background: #f1c40f; color: white; }
+.my-session-item .session-status.confirmed { background: #2ecc71; color: white; }
+.my-session-item .session-message { width: 100%; font-size: 0.85rem; color: var(--text-light); margin: 4px 0 0; }
 
-.session-header {
-    text-align: center;
-    margin-bottom: 32px;
-}
-.session-header h1 {
-    font-size: 2.4rem;
-    margin-bottom: 8px;
-}
-.session-header p {
-    color: var(--text-light);
-    font-size: 1.05rem;
-}
+.session-form-container { background: var(--card-bg); border-radius: 16px; padding: 32px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.session-form .form-group { margin-bottom: 20px; }
+.session-form label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+.session-form input, .session-form select, .session-form textarea { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--input-bg); color: var(--text); transition: border-color var(--transition), box-shadow var(--transition); font-family: inherit; }
+.session-form input:focus, .session-form select:focus, .session-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.session-form textarea { resize: vertical; min-height: 100px; }
+.field-hint { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--text-light); }
+.session-form .btn-block { width: 100%; padding: 14px; font-size: 1.05rem; justify-content: center; }
 
-.session-form-container {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 32px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-}
+.booking-success-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+.booking-success-actions .btn { padding: 10px 28px; border-radius: 30px; }
 
-.session-form .form-group {
-    margin-bottom: 20px;
-}
-.session-form label {
-    display: block;
-    font-weight: 500;
-    margin-bottom: 6px;
-    color: var(--text);
-}
-.session-form input,
-.session-form select,
-.session-form textarea {
-    width: 100%;
-    padding: 12px 16px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    font-size: 1rem;
-    background: var(--input-bg);
-    color: var(--text);
-    transition: border-color var(--transition), box-shadow var(--transition);
-    font-family: inherit;
-}
-.session-form input:focus,
-.session-form select:focus,
-.session-form textarea:focus {
-    outline: none;
-    border-color: var(--rose);
-    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-}
-.session-form textarea {
-    resize: vertical;
-    min-height: 100px;
-}
-.field-hint {
-    display: block;
-    margin-top: 4px;
-    font-size: 0.8rem;
-    color: var(--text-light);
-}
-
-.session-form .btn-block {
-    width: 100%;
-    padding: 14px;
-    font-size: 1.05rem;
-    justify-content: center;
-}
-
-.booking-success-actions {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-top: 24px;
-}
-
-.session-info {
-    background: var(--vanilla);
-    border-radius: 12px;
-    padding: 24px;
-    margin-top: 32px;
-}
-.session-info h3 {
-    font-size: 1.1rem;
-    margin-bottom: 12px;
-    color: var(--text);
-}
-.session-info ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-.session-info ul li {
-    padding: 6px 0;
-    color: var(--text);
-    font-size: 0.95rem;
-    line-height: 1.6;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-}
-.session-info ul li:last-child {
-    border-bottom: none;
-}
-.session-info ul li strong {
-    color: var(--dark);
-}
+.session-info { background: var(--vanilla); border-radius: 12px; padding: 24px; margin-top: 32px; }
+.session-info h3 { font-size: 1.1rem; margin-bottom: 12px; color: var(--text); }
+.session-info ul { list-style: none; padding: 0; margin: 0; }
+.session-info ul li { padding: 6px 0; color: var(--text); font-size: 0.95rem; line-height: 1.6; border-bottom: 1px solid rgba(0,0,0,0.05); }
+.session-info ul li:last-child { border-bottom: none; }
+.session-info ul li strong { color: var(--dark); }
 
 @media (max-width: 480px) {
-    .session-form-container {
-        padding: 20px;
-    }
-    .session-header h1 {
-        font-size: 1.8rem;
-    }
-    .booking-success-actions {
-        flex-direction: column;
-    }
-    .booking-success-actions .btn {
-        width: 100%;
-    }
+    .session-form-container { padding: 20px; }
+    .session-header h1 { font-size: 1.8rem; }
+    .booking-success-actions { flex-direction: column; }
+    .booking-success-actions .btn { width: 100%; }
 }
 </style>
 

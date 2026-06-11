@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php';
 
 // Only admin can access
 redirectIfNotAdmin();
@@ -82,6 +83,18 @@ $sql .= " ORDER BY q.created_at DESC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== SEND EMAIL NOTIFICATION FOR NEW QUESTIONS (Optional) =====
+
+function notifyAdminNewQuestion($question_id, $title, $author_name) {
+    $admin_email = 'angelwrites@zohomail.com';
+    $subject = '❓ New Community Question: ' . $title;
+    $body = "<h2>New Question Posted</h2>";
+    $body .= "<p><strong>Title:</strong> " . $title . "</p>";
+    $body .= "<p><strong>Author:</strong> " . $author_name . "</p>";
+    $body .= "<p><a href='" . SITE_URL . "/community.php?id=" . $question_id . "'>View Question</a></p>";
+    return sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+}
 
 $pageTitle = 'Manage Questions';
 ?>
@@ -189,28 +202,28 @@ $pageTitle = 'Manage Questions';
 </div>
 
 <style>
-    .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-    .admin-table thead { background: var(--vanilla); }
-    .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
-    .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
-    .admin-table tbody tr:last-child td { border-bottom: none; }
-    .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
+.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.admin-table thead { background: var(--vanilla); }
+.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
+.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+.table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
 
-    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-    .badge.free { background: #2ecc71; color: white; }
-    .badge.sale { background: #e67e22; color: white; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.badge.free { background: #2ecc71; color: white; }
+.badge.sale { background: #e67e22; color: white; }
 
-    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-    .status-badge.draft { background: #f1c40f; color: #fff; }
-    .status-badge.published { background: #27ae60; color: #fff; }
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+.status-badge.draft { background: #f1c40f; color: #fff; }
+.status-badge.published { background: #27ae60; color: #fff; }
 
-    .search-form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-    .search-form input[type="text"] { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-    .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-    .search-form select { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
-    .search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
-    .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+.search-form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.search-form input[type="text"] { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.search-form select { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
+.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
+.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

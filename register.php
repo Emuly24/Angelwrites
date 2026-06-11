@@ -1,5 +1,4 @@
 <?php
-// ===== LOAD CONFIGURATION FIRST =====
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -16,7 +15,15 @@ if (isLoggedIn()) {
 }
 
 $error = '';
-$success = '';
+$success = false;
+
+// ===== RATE LIMITING =====
+$ip = $_SERVER['REMOTE_ADDR'];
+$limit_key = 'register_attempts_' . $ip;
+$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
+    $error = 'Please wait 5 minutes before trying to register again.';
+}
 
 // ===== LIST OF COUNTRIES WITH PHONE CODES =====
 $countries = [
@@ -77,7 +84,7 @@ $referral_sources = [
 ];
 
 // ===== HANDLE REGISTRATION FORM SUBMISSION =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $first_name = trim($_POST['first_name']);
     $last_name = trim($_POST['last_name']);
     $username = trim($_POST['username']);
@@ -90,10 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dob = trim($_POST['dob']);
     $referral_source = trim($_POST['referral_source'] ?? '');
 
-// If 'Other' is selected, use the custom input instead
-if ($referral_source === 'Other' && !empty(trim($_POST['other_referral']))) {
-    $referral_source = trim($_POST['other_referral']);
-}
+    if ($referral_source === 'Other' && !empty(trim($_POST['other_referral']))) {
+        $referral_source = trim($_POST['other_referral']);
+    }
+
     // Validation
     if (empty($first_name) || empty($last_name) || empty($username) || empty($email) || empty($password) || empty($confirm_password) || empty($gender) || empty($country) || empty($contact) || empty($dob) || empty($referral_source)) {
         $error = 'Please fill in all fields.';
@@ -124,26 +131,38 @@ if ($referral_source === 'Other' && !empty(trim($_POST['other_referral']))) {
                 if ($stmt->execute([$first_name, $last_name, $username, $email, $hashed_password, $gender, $country, $contact, $dob, $referral_source])) {
                     $user_id = $db->lastInsertId();
                     
-                    // Generate verification token
-                    $verification_token = bin2hex(random_bytes(32));
-                    $stmt = $db->prepare("UPDATE users SET verification_token = ? WHERE id = ?");
-                    $stmt->execute([$verification_token, $user_id]);
+                    // Generate 6-digit verification code
+                    $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                    $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+                    $stmt = $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?");
+                    $stmt->execute([$code, $expiry, $user_id]);
 
                     // Generate referral code
                     $ref_code = strtoupper(substr(md5($username . time()), 0, 8));
                     $stmt = $db->prepare("UPDATE users SET referral_code = ? WHERE id = ?");
                     $stmt->execute([$ref_code, $user_id]);
 
-                    // ===== SEND VERIFICATION EMAIL =====
-                    $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
+                    // ===== SEND VERIFICATION EMAIL WITH 6-DIGIT CODE (via Zoho SMTP) =====
                     $subject = "Verify your AngelWrites account";
-                    $message = "Hello $first_name,\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
+                    $body = "Hello $first_name,\n\nYour verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not create an account, please ignore this email.\n\n— AngelWrites Team";
                     
-                    // Use the mail helper function
-                    $emailSent = sendEmail($email, $subject, $message, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
-
-                    if ($emailSent) {
+                    if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
                         $success = true;
+                        
+                        // ===== SEND ADMIN NOTIFICATION =====
+                        $admin_email = 'angelwrites@zohomail.com';
+                        $admin_subject = '📝 New User Registration';
+                        $admin_body = "A new user has registered on AngelWrites.\n\n";
+                        $admin_body .= "Name: $first_name $last_name\n";
+                        $admin_body .= "Username: $username\n";
+                        $admin_body .= "Email: $email\n";
+                        $admin_body .= "Country: $country\n";
+                        $admin_body .= "Referred by: $referral_source\n\n";
+                        $admin_body .= "View user in admin panel: " . SITE_URL . "/admin/manage_users.php";
+                        sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
+                        
+                        // Set rate limit
+                        file_put_contents($attempts_file, time());
                     } else {
                         $error = 'Unable to send verification email. Please try again later.';
                     }
@@ -198,7 +217,7 @@ $pageTitle = 'Sign Up';
 
                         <div class="form-group">
                             <label for="password">Password</label>
-                                <div class="password-wrapper" style="position: relative;">
+                            <div class="password-wrapper" style="position: relative;">
                                 <input type="password" id="password" name="password" placeholder="Must be at least 8 characters" required>
                                 <button type="button" id="generatePassword" class="btn btn-sm btn-secondary" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 2; padding: 4px 8px; font-size: 0.7rem;">
                                     <i class="fas fa-sync-alt"></i> Suggest
@@ -276,14 +295,11 @@ $pageTitle = 'Sign Up';
                         </button>
                     </form>
 
-                    <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
+                    <!-- ===== SOCIAL LOGIN BUTTONS (Google only) ===== -->
                     <div class="social-login-section">
                         <p>Or continue with:</p>
                         <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
                             <i class="fab fa-google"></i> Google
-                        </a>
-                        <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Facebook" class="btn btn-facebook">
-                            <i class="fab fa-facebook-f"></i> Facebook
                         </a>
                     </div>
 
@@ -299,17 +315,17 @@ $pageTitle = 'Sign Up';
                         <h2>Account Created! 🎉</h2>
                         <p class="success-message">
                             Welcome to the AngelWrites community! 
-                            <strong>A verification link has been sent to your email address.</strong>
-                            Please check your inbox and click the link to verify your account before logging in.
+                            <strong>A 6-digit verification code has been sent to your email address.</strong>
+                            Please check your inbox, enter the code on the verification page to activate your account.
                         </p>
                         <div class="success-actions">
-                            <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-primary btn-large btn-block">
+                            <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary btn-large btn-block">
                                 <i class="fas fa-sign-in-alt"></i>
-                                Go to Login
+                                Go to Verification
                             </a>
                             <p class="small-note" style="margin-top: 12px; color: var(--text-muted);">
                                 📧 Didn't receive the email? Check your spam folder or 
-                                <a href="#" onclick="alert('Please contact support or request a new verification link on the login page.')">contact support</a>.
+                                <a href="<?php echo SITE_URL; ?>/resend_verification.php">Request a new code</a>.
                             </p>
                         </div>
                     </div>
@@ -371,20 +387,22 @@ document.addEventListener('DOMContentLoaded', function() {
             this.querySelector('i').classList.toggle('fa-eye-slash');
         });
     }
-    function toggleOtherField() {
-    const dropdown = document.getElementById('referral_source');
-    const otherWrapper = document.getElementById('otherReferralWrapper');
-    const otherInput = document.getElementById('other_referral');
-    
-    if (dropdown.value === 'Other') {
-        otherWrapper.style.display = 'block';
-        otherInput.setAttribute('required', 'required');
-    } else {
-        otherWrapper.style.display = 'none';
-        otherInput.removeAttribute('required');
-        otherInput.value = '';
-    }
-}
+
+    // ---- Toggle 'Other' Referral Field ----
+    window.toggleOtherField = function() {
+        const dropdown = document.getElementById('referral_source');
+        const otherWrapper = document.getElementById('otherReferralWrapper');
+        const otherInput = document.getElementById('other_referral');
+        
+        if (dropdown.value === 'Other') {
+            otherWrapper.style.display = 'block';
+            otherInput.setAttribute('required', 'required');
+        } else {
+            otherWrapper.style.display = 'none';
+            otherInput.removeAttribute('required');
+            otherInput.value = '';
+        }
+    };
 });
 </script>
 
@@ -422,9 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .social-login-section { text-align: center; margin: 20px 0; }
 .social-login-section .btn { display: inline-block; margin: 4px; padding: 10px 20px; border-radius: 6px; color: white; text-decoration: none; font-size: 0.95rem; }
 .btn-google { background: #DB4437; }
-.btn-facebook { background: #1877F2; }
 .btn-google:hover { background: #c23321; }
-.btn-facebook:hover { background: #1559c4; }
 
 .auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
 .auth-footer a { color: var(--rose); font-weight: 600; }

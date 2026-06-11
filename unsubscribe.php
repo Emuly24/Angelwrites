@@ -25,6 +25,12 @@ if (isset($_GET['token'])) {
         if ($stmt->execute([$subscriber['id']])) {
             $success = 'You have been successfully unsubscribed from the newsletter. We\'re sorry to see you go, but we respect your decision.';
             $email = $subscriber['email']; // For display
+            
+            // ===== SEND ADMIN NOTIFICATION =====
+            $admin_email = 'angelwrites@zohomail.com';
+            $admin_subject = 'User Unsubscribed from Newsletter';
+            $admin_body = "A user has unsubscribed from the newsletter.\n\nEmail: $email";
+            sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
         } else {
             $error = 'Something went wrong. Please try again.';
         }
@@ -60,6 +66,9 @@ $pageTitle = 'Unsubscribe';
                     <div class="success-actions">
                         <a href="<?php echo SITE_URL; ?>/index.php" class="btn btn-primary">
                             <i class="fas fa-home"></i> Return Home
+                        </a>
+                        <a href="<?php echo SITE_URL; ?>/subscribe.php" class="btn btn-outline">
+                            <i class="fas fa-undo"></i> Resubscribe
                         </a>
                     </div>
                 </div>
@@ -120,9 +129,9 @@ $pageTitle = 'Unsubscribe';
 .unsubscribe-footer a { color: var(--text-light); transition: color var(--transition); font-size: 0.95rem; }
 .unsubscribe-footer a:hover { color: var(--rose); }
 .unsubscribe-footer a i { margin-right: 4px; }
-.success-actions { margin-top: 16px; }
+.success-actions { margin-top: 16px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .alert-success .success-actions .btn { margin-top: 8px; }
-@media (max-width: 480px) { .unsubscribe-form-container { padding: 20px; } .unsubscribe-header h1 { font-size: 1.8rem; } }
+@media (max-width: 480px) { .unsubscribe-form-container { padding: 20px; } .unsubscribe-header h1 { font-size: 1.8rem; } .success-actions { flex-direction: column; align-items: center; } .success-actions .btn { width: 100%; } }
 </style>
 
-<?php require_once 'includes/footer.php'; ?> 
+<?php require_once 'includes/footer.php'; ?>

@@ -1,5 +1,4 @@
 <?php
-// reset_password.php
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -11,7 +10,7 @@ $success = '';
 
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
-$limit_key = 'reset_password_attempts_' . $ip;
+$limit_key = 'verify_attempts_' . $ip;
 $attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
 $attempts = 0;
 $last_attempt = 0;
@@ -27,41 +26,38 @@ if (file_exists($attempts_file)) {
 
 // If more than 5 attempts in 15 minutes, block
 if ($attempts >= 5 && (time() - $last_attempt < 900)) {
-    $error = 'Too many failed reset attempts. Please wait 15 minutes and try again.';
+    $error = 'Too many failed verification attempts. Please wait 15 minutes and try again.';
 }
 
+// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $email = trim($_POST['email']);
     $code = trim($_POST['code']);
-    $password = $_POST['password'];
-    $confirm = $_POST['confirm_password'];
 
-    if (empty($email) || empty($code) || empty($password) || empty($confirm)) {
+    if (empty($email) || empty($code)) {
         $error = 'Please fill in all fields.';
-    } elseif (strlen($password) < 8) {
-        $error = 'Password must be at least 8 characters.';
-    } elseif ($password !== $confirm) {
-        $error = 'Passwords do not match.';
     } else {
-        $stmt = $db->prepare("SELECT id, reset_code, reset_code_expiry, name FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, verification_code, verification_code_expiry, is_verified, name FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
             $error = 'No account found with that email address.';
-        } elseif ($user['reset_code'] !== $code) {
-            $error = 'Invalid reset code. Please try again.';
+        } elseif ($user['is_verified'] == 1) {
+            $success = 'Your account is already verified. You can <a href="login.php">log in</a>.';
+        } elseif ($user['verification_code'] !== $code) {
+            $error = 'Invalid verification code. Please try again.';
             // Increment failed attempts
             $attempts++;
             $last_attempt = time();
             file_put_contents($attempts_file, $attempts . '|' . $last_attempt);
-        } elseif (strtotime($user['reset_code_expiry']) < time()) {
-            $error = 'Reset code has expired. Please request a new code.';
+        } elseif (strtotime($user['verification_code_expiry']) < time()) {
+            $error = 'Verification code has expired. Please request a new code.';
         } else {
-            $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $db->prepare("UPDATE users SET password = ?, reset_code = NULL, reset_code_expiry = NULL WHERE id = ?");
-            $stmt->execute([$hashed, $user['id']]);
-            $success = 'Password reset successfully! You can now <a href="login.php">log in</a>.';
+            // Mark account as verified
+            $stmt = $db->prepare("UPDATE users SET is_verified = 1, verification_code = NULL, verification_code_expiry = NULL WHERE id = ?");
+            $stmt->execute([$user['id']]);
+            $success = 'Account verified successfully! You can now <a href="login.php">log in</a>.';
             
             // Reset attempts on success
             if (file_exists($attempts_file)) {
@@ -70,14 +66,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             
             // ===== SEND ADMIN NOTIFICATION =====
             $admin_email = 'angelwrites@zohomail.com';
-            $admin_subject = '🔐 Password Reset Completed';
-            $admin_body = "A user has reset their password.\n\nEmail: $email\nName: " . $user['name'];
+            $admin_subject = '✅ Account Verified';
+            $admin_body = "A user has verified their account.\n\nEmail: $email\nName: " . $user['name'];
             sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
         }
     }
 }
 
-$pageTitle = 'Reset Password';
+$pageTitle = 'Verify Account';
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -86,8 +82,8 @@ $pageTitle = 'Reset Password';
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
-                    <h1>Reset Password</h1>
-                    <p>Enter the 6-digit code sent to your email and set a new password.</p>
+                    <h1>Verify Your Account</h1>
+                    <p>Enter the 6-digit code sent to your email address.</p>
                 </div>
 
                 <?php if ($error): ?>
@@ -103,24 +99,14 @@ $pageTitle = 'Reset Password';
                         <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="you@example.com" required>
                     </div>
                     <div class="form-group">
-                        <label for="code">Reset Code</label>
+                        <label for="code">Verification Code</label>
                         <input type="text" id="code" name="code" placeholder="Enter 6-digit code" pattern="[0-9]{6}" maxlength="6" required>
                     </div>
-                    <div class="form-group">
-                        <label for="password">New Password</label>
-                        <input type="password" id="password" name="password" placeholder="At least 8 characters" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirm_password">Confirm New Password</label>
-                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter your password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block">
-                        <i class="fas fa-save"></i> Reset Password
-                    </button>
+                    <button type="submit" class="btn btn-primary btn-block">Verify Account</button>
                 </form>
 
                 <div class="auth-footer">
-                    <p><a href="<?php echo SITE_URL; ?>/forgot_password.php">Request a new code</a></p>
+                    <p>Didn't receive a code? <a href="resend_verification.php">Resend code</a></p>
                 </div>
             </div>
         </div>

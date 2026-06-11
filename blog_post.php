@@ -2,74 +2,9 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php';
 
-// ===== HANDLE COMMENT SUBMISSION =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isLoggedIn()) {
-    $reflection_id = (int)$_POST['reflection_id'];
-    $comment = trim($_POST['comment']);
-    
-    if (!empty($comment)) {
-        $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment) VALUES (?, ?, ?)");
-        $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment]);
-        $success = 'Your comment has been posted!';
-        header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
-        exit;
-    }
-}
-
-// ===== HANDLE VOICE COMMENT SUBMISSION =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment']) && isLoggedIn()) {
-    $reflection_id = (int)$_POST['reflection_id'];
-    if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/uploads/voice_comments/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $filename = 'voice_' . time() . '.webm';
-        $target = $upload_dir . $filename;
-        if (move_uploaded_file($_FILES['voice_file']['tmp_name'], $target)) {
-            $voice_path = 'assets/uploads/voice_comments/' . $filename;
-            $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, voice_path) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$reflection_id, $_SESSION['user_id'], '🎙️ Voice comment', $voice_path]);
-            $success = 'Voice comment posted!';
-            header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
-            exit;
-        }
-    }
-}
-
-// ===== HANDLE PRAYER REQUEST =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_prayer']) && isLoggedIn()) {
-    $reflection_id = (int)$_POST['reflection_id'];
-    $message = trim($_POST['message'] ?? 'I would like prayer for this reflection.');
-    
-    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, reflection_id, request_type, message) VALUES (?, ?, 'prayer', ?)");
-    $stmt->execute([$_SESSION['user_id'], $reflection_id, $message]);
-    $success = 'Your prayer request has been sent!';
-    header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
-    exit;
-}
-// ===== TRACKING: User read this blog post =====
-if (isLoggedIn()) {
-    $user_id = $_SESSION['user_id'];
-    $blog_post_id = $post['id'];
-    $stmt = $db->prepare("INSERT OR IGNORE INTO blog_reads (user_id, blog_post_id) VALUES (?, ?)");
-    $stmt->execute([$user_id, $blog_post_id]);
-}
-
-// ===== HANDLE ADMIN REPLY =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) && isAdmin()) {
-    $reflection_id = (int)$_POST['reflection_id'];
-    $reply = trim($_POST['admin_reply']);
-    
-    if (!empty($reply)) {
-        $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, is_admin_reply) VALUES (?, ?, ?, 1)");
-        $stmt->execute([$reflection_id, $_SESSION['user_id'], $reply]);
-        $success = 'Admin reply posted!';
-        header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
-        exit;
-    }
-}
-
-// ===== FETCH POST =====
+// ===== FETCH POST FIRST =====
 $slug = isset($_GET['slug']) ? trim($_GET['slug']) : '';
 
 if (empty($slug)) {
@@ -90,10 +25,144 @@ if (!$post) {
 $stmt = $db->prepare("UPDATE blog_posts SET views = views + 1 WHERE id = ?");
 $stmt->execute([$post['id']]);
 
-// Fetch related posts
-$stmt = $db->prepare("SELECT id, title, slug, created_at FROM blog_posts WHERE category = ? AND id != ? AND status = 'published' ORDER BY created_at DESC LIMIT 3");
+// ===== TRACKING: User read this blog post =====
+if (isLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $stmt = $db->prepare("INSERT OR IGNORE INTO blog_reads (user_id, blog_post_id) VALUES (?, ?)");
+    $stmt->execute([$user_id, $post['id']]);
+}
+
+// ===== HANDLE COMMENT SUBMISSION =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isLoggedIn()) {
+    $reflection_id = (int)$_POST['reflection_id'];
+    $comment = trim($_POST['comment']);
+    
+    if (!empty($comment)) {
+        $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment) VALUES (?, ?, ?)");
+        $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment]);
+        
+        // Send email notification to admin
+        $user_id = $_SESSION['user_id'];
+        $user_stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+        $user_stmt->execute([$user_id]);
+        $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+        $user_name = $user['name'] ?? 'A user';
+        
+        $admin_email = 'angelwrites@zohomail.com';
+        $subject = '💬 New Comment on: ' . $post['title'];
+        $body = "<h2>New Comment Posted</h2>";
+        $body .= "<p><strong>Post:</strong> " . $post['title'] . "</p>";
+        $body .= "<p><strong>User:</strong> " . $user_name . "</p>";
+        $body .= "<p><strong>Comment:</strong><br>" . nl2br(htmlspecialchars($comment)) . "</p>";
+        $body .= "<p><a href='" . SITE_URL . "/blog_post.php?slug=" . $slug . "'>View Post</a></p>";
+        
+        sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+        
+        $success = 'Your comment has been posted!';
+        header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
+        exit;
+    }
+}
+
+// ===== HANDLE VOICE COMMENT SUBMISSION =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment']) && isLoggedIn()) {
+    $reflection_id = (int)$_POST['reflection_id'];
+    if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../assets/uploads/voice_comments/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+        $filename = 'voice_' . time() . '.webm';
+        $target = $upload_dir . $filename;
+        if (move_uploaded_file($_FILES['voice_file']['tmp_name'], $target)) {
+            $voice_path = 'assets/uploads/voice_comments/' . $filename;
+            $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, voice_path) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$reflection_id, $_SESSION['user_id'], '🎙️ Voice comment', $voice_path]);
+            
+            // Send email notification to admin
+            $user_id = $_SESSION['user_id'];
+            $user_stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+            $user_stmt->execute([$user_id]);
+            $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+            $user_name = $user['name'] ?? 'A user';
+            
+            $admin_email = 'angelwrites@zohomail.com';
+            $subject = '🎙️ New Voice Comment on: ' . $post['title'];
+            $body = "<h2>New Voice Comment Posted</h2>";
+            $body .= "<p><strong>Post:</strong> " . $post['title'] . "</p>";
+            $body .= "<p><strong>User:</strong> " . $user_name . "</p>";
+            $body .= "<p><a href='" . SITE_URL . "/blog_post.php?slug=" . $slug . "'>View Post</a></p>";
+            
+            sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+            
+            $success = 'Voice comment posted!';
+            header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
+            exit;
+        }
+    }
+}
+
+// ===== HANDLE PRAYER REQUEST =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_prayer']) && isLoggedIn()) {
+    $reflection_id = (int)$_POST['reflection_id'];
+    $message = trim($_POST['message'] ?? 'I would like prayer for this reflection.');
+    
+    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, reflection_id, request_type, message) VALUES (?, ?, 'prayer', ?)");
+    $stmt->execute([$_SESSION['user_id'], $reflection_id, $message]);
+    
+    // Send email notification to admin
+    $user_id = $_SESSION['user_id'];
+    $user_stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+    $user_stmt->execute([$user_id]);
+    $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+    $user_name = $user['name'] ?? 'A user';
+    
+    $admin_email = 'angelwrites@zohomail.com';
+    $subject = '🙏 New Prayer Request on: ' . $post['title'];
+    $body = "<h2>New Prayer Request Submitted</h2>";
+    $body .= "<p><strong>Post:</strong> " . $post['title'] . "</p>";
+    $body .= "<p><strong>User:</strong> " . $user_name . "</p>";
+    $body .= "<p><strong>Message:</strong><br>" . nl2br(htmlspecialchars($message)) . "</p>";
+    $body .= "<p><a href='" . SITE_URL . "/blog_post.php?slug=" . $slug . "'>View Post</a></p>";
+    
+    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+    
+    $success = 'Your prayer request has been sent!';
+    header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
+    exit;
+}
+
+// ===== HANDLE ADMIN REPLY =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) && isAdmin()) {
+    $reflection_id = (int)$_POST['reflection_id'];
+    $reply = trim($_POST['admin_reply']);
+    
+    if (!empty($reply)) {
+        $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, is_admin_reply) VALUES (?, ?, ?, 1)");
+        $stmt->execute([$reflection_id, $_SESSION['user_id'], $reply]);
+        $success = 'Admin reply posted!';
+        header('Location: ' . SITE_URL . '/blog_post.php?slug=' . $slug);
+        exit;
+    }
+}
+
+// ===== FETCH RELATED POSTS =====
+$stmt = $db->prepare("
+    SELECT id, title, slug, created_at FROM blog_posts 
+    WHERE category = ? AND id != ? AND status = 'published' 
+    ORDER BY created_at DESC LIMIT 3
+");
 $stmt->execute([$post['category'], $post['id']]);
 $related_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== FETCH COMMENTS =====
+$stmt = $db->prepare("
+    SELECT c.*, u.name AS author_name 
+    FROM reflection_comments c
+    JOIN users u ON c.user_id = u.id
+    WHERE c.reflection_id = ?
+    ORDER BY c.created_at DESC
+");
+$stmt->execute([$post['id']]);
+$comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 ?>
@@ -128,7 +197,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                 <?php endif; ?>
             </header>
 
-            <!-- Post Content (Rich Editor Support) -->
+            <!-- Post Content -->
             <div class="post-content">
                 <?php echo $post['content']; ?>
             </div>
@@ -188,22 +257,9 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
             </section>
         <?php endif; ?>
 
-        <!-- Comments Section (with Voice & Admin Reply) -->
+        <!-- Comments Section -->
         <section class="reflection-comments">
             <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Questions</h3>
-            
-            <?php
-            // Fetch existing comments
-            $stmt = $db->prepare("
-                SELECT c.*, u.name AS author_name 
-                FROM reflection_comments c
-                JOIN users u ON c.user_id = u.id
-                WHERE c.reflection_id = ?
-                ORDER BY c.created_at DESC
-            ");
-            $stmt->execute([$post['id']]);
-            $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            ?>
             
             <?php if (count($comments) > 0): ?>
                 <div class="comments-list">
@@ -233,7 +289,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                 <p class="no-comments">No comments yet. Share your thoughts or ask a question.</p>
             <?php endif; ?>
 
-            <!-- Comment Form (Text + Voice) -->
+            <!-- Comment Form -->
             <?php if (isLoggedIn()): ?>
                 <div class="comment-form-container">
                     <h4>Add a Comment</h4>
@@ -266,7 +322,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                 </div>
             <?php endif; ?>
 
-            <!-- Admin Reply Form (Only for Admin) -->
+            <!-- Admin Reply Form -->
             <?php if (isAdmin()): ?>
                 <div class="admin-reply-container">
                     <h4>🛡️ Angella's Reply</h4>
@@ -411,7 +467,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (recordBtn) {
         recordBtn.addEventListener('click', async function() {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
-                // Stop recording
                 mediaRecorder.stop();
                 recordingStatus.style.display = 'none';
                 recordBtn.textContent = '⏹️ Stopped';

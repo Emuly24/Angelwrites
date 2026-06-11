@@ -41,6 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                 $stmt->execute([$existing['id']]);
                 $success = 'Your subscription has been reactivated. Welcome back!';
+                
+                // ===== SEND REACTIVATION NOTIFICATION TO ADMIN =====
+                $admin_email = 'angelwrites@zohomail.com';
+                $admin_subject = 'Newsletter Subscription Reactivated';
+                $admin_body = "A user has reactivated their newsletter subscription.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
+                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
             }
         } else {
             // Generate unique unsubscribe token
@@ -50,6 +56,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare("INSERT INTO newsletter (email, name, is_active, unsubscribe_token) VALUES (?, ?, 1, ?)");
             if ($stmt->execute([$email, $name, $token])) {
                 $success = 'Thank you for subscribing! You will receive updates from Angella.';
+                
+                // ===== SEND CONFIRMATION EMAIL TO USER =====
+                $user_subject = "Welcome to AngelWrites Newsletter!";
+                $user_body = "Hello " . ($name ?: 'Subscriber') . ",\n\nThank you for subscribing to the AngelWrites newsletter!\n\nYou will now receive updates about new books, poems, reflections, and community events.\n\nTo unsubscribe at any time, click here: " . SITE_URL . "/unsubscribe.php?token={$token}\n\nBlessings,\nAngella Bottoman\nAngelWrites";
+                sendEmail($email, $user_subject, $user_body, 'angelwrites@zohomail.com', 'AngelWrites');
+                
+                // ===== SEND ADMIN NOTIFICATION =====
+                $admin_email = 'angelwrites@zohomail.com';
+                $admin_subject = 'New Newsletter Subscriber';
+                $admin_body = "A new user has subscribed to the newsletter.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
+                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
             } else {
                 $error = 'Something went wrong. Please try again.';
             }

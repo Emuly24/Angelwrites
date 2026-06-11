@@ -17,8 +17,29 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
+// ===== RATE LIMITING =====
+$ip = $_SERVER['REMOTE_ADDR'];
+$limit_key = 'login_attempts_' . $ip;
+$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$attempts = 0;
+$last_attempt = 0;
+
+if (file_exists($attempts_file)) {
+    $data = file_get_contents($attempts_file);
+    if ($data) {
+        list($attempts, $last_attempt) = explode('|', $data);
+        $attempts = (int)$attempts;
+        $last_attempt = (int)$last_attempt;
+    }
+}
+
+// If more than 5 attempts in 15 minutes, block
+if ($attempts >= 5 && (time() - $last_attempt < 900)) {
+    $error = 'Too many failed login attempts. Please wait 15 minutes and try again.';
+}
+
 // ===== HANDLE LOGIN FORM SUBMISSION =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$error) {
     $login = trim($_POST['login']);
     $password = $_POST['password'];
     $remember_me = isset($_POST['remember_me']) ? true : false;
@@ -26,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
     if (empty($login) || empty($password)) {
         $error = 'Please fill in all fields.';
     } else {
-        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified FROM users WHERE username = ? OR email = ?");
+        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name FROM users WHERE username = ? OR email = ?");
         $stmt->execute([$login, $login]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -34,9 +55,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
             if ($user['is_verified'] == 0) {
                 $error = 'Please verify your email address before logging in. <a href="resend_verification.php">Resend verification email</a>';
             } else {
+                // Reset login attempts on success
+                if (file_exists($attempts_file)) {
+                    unlink($attempts_file);
+                }
+
                 // Set session
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
+                $_SESSION['name'] = $user['name'];
                 $_SESSION['role'] = $user['role'];
 
                 // ===== REMEMBER ME LOGIC =====
@@ -83,7 +110,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
                 exit;
             }
         } else {
+            // Increment failed attempts
+            $attempts++;
+            $last_attempt = time();
+            file_put_contents($attempts_file, $attempts . '|' . $last_attempt);
+            
             $error = 'Invalid username/email or password.';
+            
+            // ===== SEND ADMIN NOTIFICATION FOR SUSPICIOUS ACTIVITY =====
+            if ($attempts >= 3) {
+                $admin_email = 'angelwrites@zohomail.com';
+                $admin_subject = '⚠️ Multiple Failed Login Attempts';
+                $admin_body = "There have been $attempts failed login attempts for IP: $ip\n\nLogin attempted: $login\n\nTime: " . date('Y-m-d H:i:s');
+                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites Admin');
+            }
         }
     }
 }
@@ -132,7 +172,7 @@ $pageTitle = 'Sign In';
 
                     <div class="checkbox-group">
                         <input type="checkbox" id="remember_me" name="remember_me">
-                        <label for="remember_me">Remember me for 30 days</label>
+                        <label for="remember_me">Remember me</label>
                     </div>
 
                     <div class="form-group">
@@ -150,9 +190,6 @@ $pageTitle = 'Sign In';
                     <p>Or continue with:</p>
                     <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
                         <i class="fab fa-google"></i> Google
-                    </a>
-                    <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Facebook" class="btn btn-facebook">
-                        <i class="fab fa-facebook-f"></i> Facebook
                     </a>
                 </div>
 

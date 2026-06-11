@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
@@ -67,12 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) &&
     }
 }
 
+// ===== TRACKING: User read this poem =====
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
-    $poem_id = (int)$_GET['id'];
     $stmt = $db->prepare("INSERT OR IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
-    $stmt->execute([$user_id, $poem_id]);
+    $stmt->execute([$user_id, $id]);
 }
+
 // Increment view count
 $stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
 $stmt->execute([$id]);
@@ -301,6 +303,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     </div>
 </div>
 
+<!-- ===== STYLES ===== -->
 <style>
 /* ===== POEM VIEW PAGE ===== */
 .poem-view-page { padding: 32px 0 60px; }

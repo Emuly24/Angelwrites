@@ -3,70 +3,38 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
-require_once '../includes/admin_mail_helper.php';
-
-// Example: Send an admin notification
-if (sendAdminEmail('user@example.com', 'Admin Update', '<h1>Important Notice</h1>')) {
-    echo "Email sent successfully from admin@angelwrites.gt.tc";
-} else {
-    echo "Email failed.";
-}
 
 redirectIfNotAdmin();
 
 $error = '';
 $success = '';
 
-// ===== HANDLE DELETE =====
-if (isset($_GET['delete'])) {
-    $id = (int)$_GET['delete'];
-    $stmt = $db->prepare("DELETE FROM newsletter WHERE id = ?");
-    $stmt->execute([$id]);
-    $success = 'Subscriber removed.';
-    header('Location: ' . SITE_URL . '/admin/manage_newsletter.php');
-    exit;
-}
-
-// ===== HANDLE UNSUBSCRIBE =====
-if (isset($_GET['unsubscribe'])) {
-    $id = (int)$_GET['unsubscribe'];
-    $stmt = $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP WHERE id = ?");
-    $stmt->execute([$id]);
-    $success = 'Subscriber unsubscribed.';
-    header('Location: ' . SITE_URL . '/admin/manage_newsletter.php');
-    exit;
-}
-
-// ===== HANDLE BROADCAST EMAIL =====
+// ===== HANDLE BROADCAST =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['broadcast'])) {
     $subject = trim($_POST['subject']);
-    $message = trim($_POST['message']);
-    
-    if (empty($subject) || empty($message)) {
+    $content = trim($_POST['content']);
+    $send_to = $_POST['send_to'] ?? 'all';
+
+    if (empty($subject) || empty($content)) {
         $error = 'Subject and message are required.';
     } else {
-        // Fetch all active subscribers
+        $sent_count = 0;
+        $failed_count = 0;
+
+        // Fetch active subscribers
         $stmt = $db->prepare("SELECT email, unsubscribe_token FROM newsletter WHERE is_active = 1");
         $stmt->execute();
         $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $sent_count = 0;
-        $failed_count = 0;
-        
+
         foreach ($subscribers as $sub) {
-            // Add unsubscribe link to the message
             $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $sub['unsubscribe_token'];
-            $full_message = $message . "\n\n---\n" .
-                "<p>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>" .
-                "<p>Or copy this link into your browser: $unsubscribe_link</p>";
-            
-            // Use your mail helper (Gmail SMTP)
-            if (sendEmail($sub['email'], $subject, $full_message, 'no-reply@angelwrites.gt.tc', 'AngelWrites Newsletter')) {
+            $full_message = $content . "\n\n---\n<p>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
+
+            if (sendEmail($sub['email'], $subject, $full_message, 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
                 $sent_count++;
             } else {
                 $failed_count++;
             }
-            // Rate limit: 0.5 seconds between emails to avoid Gmail throttling
             usleep(500000);
         }
         $success = "Broadcast sent. Sent: $sent_count, Failed: $failed_count.";

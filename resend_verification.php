@@ -1,9 +1,4 @@
 <?php
-// resend_verification.php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/mail_helper.php';
@@ -11,13 +6,21 @@ require_once 'includes/mail_helper.php';
 $message = '';
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// ===== RATE LIMITING =====
+$ip = $_SERVER['REMOTE_ADDR'];
+$limit_key = 'resend_attempts_' . $ip;
+$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
+    $error = 'Please wait 5 minutes before requesting another code.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $email = trim($_POST['email']);
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
-        $stmt = $db->prepare("SELECT id, username, is_verified FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, first_name, is_verified FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -26,33 +29,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($user['is_verified'] == 1) {
             $error = 'This account is already verified. You can log in now.';
         } else {
-            // Generate a new verification token
-            $verification_token = bin2hex(random_bytes(32));
-            $stmt = $db->prepare("UPDATE users SET verification_token = ? WHERE id = ?");
-            $stmt->execute([$verification_token, $user['id']]);
+            // Generate new 6-digit code
+            $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+            $stmt = $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?");
+            $stmt->execute([$code, $expiry, $user['id']]);
 
-            // Send the email
-            $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
-            $subject = "Verify your AngelWrites account";
-            $body = "Hello " . $user['username'] . ",\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
+            $subject = "Your AngelWrites verification code";
+            $body = "Hello " . $user['first_name'] . ",\n\nYour new verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.";
 
-            // Send the email
-try {
-    $verify_link = SITE_URL . '/verify.php?token=' . $verification_token;
-    $subject = "Verify your AngelWrites account";
-    $body = "Hello " . $user['username'] . ",\n\nPlease click the link below to verify your email address:\n\n$verify_link\n\nIf you did not create an account, please ignore this email.";
-
-    // Use your mail helper
-    $emailSent = sendEmail($email, $subject, $body, 'no-reply@angelwrites.gt.tc', 'AngelWrites');
-
-    if ($emailSent) {
-        $message = "A new verification link has been sent to your email address. Please check your inbox and spam folder.";
-    } else {
-        $error = "The email system returned success, but the email was not delivered. This usually means your SMTP configuration is incorrect.";
-    }
-} catch (Exception $e) {
-    $error = "MAIL ERROR: " . $e->getMessage();
-} 
+            if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
+                $message = "A new verification code has been sent to your email address. Please check your inbox and spam folder.";
+                // Set rate limit
+                file_put_contents($attempts_file, time());
+                
+                // ===== SEND ADMIN NOTIFICATION =====
+                $admin_email = 'angelwrites@zohomail.com';
+                $admin_subject = '🔄 Verification Code Resent';
+                $admin_body = "A user requested a new verification code.\n\nEmail: $email\nName: " . $user['first_name'];
+                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
+            } else {
+                $error = "Failed to send verification code. Please try again later.";
+            }
         }
     }
 }
@@ -66,8 +64,8 @@ $pageTitle = 'Resend Verification';
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
-                    <h1>Resend Verification</h1>
-                    <p>Enter the email address you used to sign up.</p>
+                    <h1>Resend Verification Code</h1>
+                    <p>Enter your email address and we'll send you a new 6-digit verification code.</p>
                 </div>
 
                 <?php if ($error): ?>
@@ -75,6 +73,9 @@ $pageTitle = 'Resend Verification';
                 <?php endif; ?>
                 <?php if ($message): ?>
                     <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
+                    <div class="success-actions" style="text-align: center; margin-top: 16px;">
+                        <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary">Go to Verification</a>
+                    </div>
                 <?php endif; ?>
 
                 <form method="POST" action="" class="auth-form">
@@ -83,9 +84,13 @@ $pageTitle = 'Resend Verification';
                         <input type="email" id="email" name="email" placeholder="you@example.com" required>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block">
-                        <i class="fas fa-paper-plane"></i> Send Verification Link
+                        <i class="fas fa-paper-plane"></i> Resend Code
                     </button>
                 </form>
+
+                <div class="auth-footer">
+                    <p><a href="<?php echo SITE_URL; ?>/login.php">Back to Login</a></p>
+                </div>
             </div>
         </div>
     </div>
@@ -103,9 +108,9 @@ $pageTitle = 'Resend Verification';
 .form-group input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .form-group input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
-.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
-.alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
-.alert-success { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
+.auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
+.auth-footer a { color: var(--rose); font-weight: 600; }
+.success-actions .btn { padding: 10px 24px; border-radius: 30px; }
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

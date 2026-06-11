@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php'; // Added for Zoho SMTP
 
 redirectIfNotLoggedIn();
 
@@ -58,6 +59,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             $stmt->execute([$name, $email, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
             $_SESSION['name'] = $name;
             $success = 'Profile updated successfully!';
+
+            // ===== ZOHO SMTP NOTIFICATION =====
+            if ($email !== $user['email']) {
+                // Notify admin about email change
+                $admin_email = 'angelwrites@zohomail.com';
+                $subject = 'User Email Changed';
+                $body = "User {$name} (ID: {$user_id}) changed their email from {$user['email']} to {$email}.";
+                sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
+                
+                // Mark email as unverified until they verify OTP
+                // (Generate and send OTP logic can be added here)
+            }
         }
     }
 }

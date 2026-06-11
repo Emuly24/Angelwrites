@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php'; // ADDED for Zoho SMTP
 
 $pageTitle = 'Bible Reader';
 ?>
@@ -129,724 +130,1063 @@ $pageTitle = 'Bible Reader';
     </div>
 </div>
 
-<!-- ===== STYLES ===== -->
+<!-- ===== STYLES (YOUR ORIGINAL + ADDITIONS) ===== -->
 <style>
-    .bible-reader-page {
-        padding: 32px 0 60px;
-        background: var(--bg);
-        color: var(--text);
-        transition: background var(--transition), color var(--transition);
-    }
+.bible-reader-page {
+    padding: 32px 0 60px;
+    background: var(--bg);
+    color: var(--text);
+    transition: background var(--transition), color var(--transition);
+}
 
-    .page-header {
-        text-align: center;
-        margin-bottom: 24px;
-    }
-    .page-header h1 {
-        font-size: 2.2rem;
-        margin-bottom: 4px;
-        color: var(--dark);
-    }
-    .page-header p {
-        color: var(--text-light);
-    }
+.page-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+.page-header h1 {
+    font-size: 2.2rem;
+    margin-bottom: 4px;
+    color: var(--dark);
+}
+.page-header p {
+    color: var(--text-light);
+}
 
+.reader-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 100px;
+    flex: 1;
+}
+.control-group label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.control-group select,
+.control-group input {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+.control-group select:focus,
+.control-group input:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+
+/* Action buttons group */
+.action-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    flex-direction: row;
+    min-width: auto;
+}
+.action-group .btn-sm {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.toggle-group {
+    flex: 0 0 auto;
+    justify-content: center;
+}
+.toggle-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+.toggle-group input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 40px;
+    height: 22px;
+    background: var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.3s;
+    position: relative;
+    flex-shrink: 0;
+}
+.toggle-group input[type="checkbox"]:checked {
+    background: var(--rose);
+}
+.toggle-group input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+.toggle-group input[type="checkbox"]:checked::after {
+    transform: translateX(18px);
+}
+
+.reader-display {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    border: 2px solid var(--rose);
+    box-shadow: var(--shadow);
+    min-height: 400px;
+}
+
+.verse-container {
+    position: relative;
+}
+.verse-container.parallel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+.verse-column {
+    padding: 12px;
+    background: var(--fantasy);
+    border-radius: 8px;
+    border-left: 3px solid var(--rose);
+}
+.verse-column h3 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.verse-content {
+    font-family: 'Georgia', serif;
+    font-size: 1.1rem;
+    line-height: 1.9;
+    color: var(--text);
+    min-height: 200px;
+    text-align: justify;
+}
+
+.verse-content p {
+    margin-bottom: 12px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.verse-content p:hover {
+    background: rgba(219, 161, 162, 0.1);
+}
+.verse-content p.highlighted {
+    background: #fff3b0;
+}
+
+.chapter-nav-bottom {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+.chapter-nav-bottom .btn {
+    padding: 6px 16px;
+    font-size: 0.85rem;
+}
+#chapterDisplay {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+.modal-content {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-content h3 {
+    margin-bottom: 12px;
+}
+.modal-content textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    resize: vertical;
+    min-height: 80px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 0.95rem;
+}
+.modal-content textarea:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+}
+.modal-actions .btn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px;
+}
+
+/* ===== ADDED: Reading Progress Indicator ===== */
+.reading-progress-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: var(--vanilla);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+.reading-progress-indicator .progress-label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+.reading-progress-indicator .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.reading-progress-indicator .progress-fill {
+    height: 100%;
+    background: var(--rose);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+.reading-progress-indicator .progress-percent {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 40px;
+    text-align: right;
+}
+
+/* ===== ADDED: Find in Chapter Controls ===== */
+.find-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+.find-controls input {
+    flex: 1;
+    min-width: 120px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: var(--input-bg);
+    color: var(--text);
+}
+.find-controls input:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219,161,162,0.15);
+}
+.find-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.find-nav button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    color: var(--text);
+    transition: all 0.2s;
+}
+.find-nav button:hover {
+    border-color: var(--rose);
+    color: var(--rose);
+}
+#findCounter {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    min-width: 60px;
+    text-align: center;
+}
+#findClose {
+    background: transparent;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: color 0.2s;
+}
+#findClose:hover {
+    color: var(--rose);
+}
+.find-highlight {
+    background: rgba(255, 255, 0, 0.4);
+    padding: 0 2px;
+}
+.find-highlight.active-highlight {
+    background: rgba(255, 200, 0, 0.7);
+}
+
+@media (max-width: 768px) {
     .reader-controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: flex-end;
-        padding: 16px;
-        background: var(--card-bg);
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        box-shadow: var(--shadow);
-        margin-bottom: 24px;
-    }
-
-    .control-group {
-        display: flex;
         flex-direction: column;
-        gap: 4px;
-        min-width: 100px;
-        flex: 1;
+        align-items: stretch;
     }
-    .control-group label {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: var(--text-light);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .control-group select,
-    .control-group input {
-        padding: 6px 10px;
-        border-radius: 6px;
-        border: 1px solid var(--border);
-        background: var(--input-bg);
-        color: var(--text);
-        font-size: 0.9rem;
-    }
-    .control-group select:focus,
-    .control-group input:focus {
-        outline: none;
-        border-color: var(--rose);
-        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-    }
-
-    /* Action buttons group */
-    .action-group {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 4px;
-        flex-direction: row;
+    .control-group {
         min-width: auto;
     }
-    .action-group .btn-sm {
-        padding: 4px 10px;
-        font-size: 0.75rem;
-        white-space: nowrap;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .toggle-group {
-        flex: 0 0 auto;
-        justify-content: center;
-    }
-    .toggle-group label {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        cursor: pointer;
-        font-weight: 500;
-        font-size: 0.9rem;
-        color: var(--text);
-    }
-    .toggle-group input[type="checkbox"] {
-        appearance: none;
-        -webkit-appearance: none;
-        width: 40px;
-        height: 22px;
-        background: var(--border);
-        border-radius: 11px;
-        cursor: pointer;
-        transition: background 0.3s;
-        position: relative;
-        flex-shrink: 0;
-    }
-    .toggle-group input[type="checkbox"]:checked {
-        background: var(--rose);
-    }
-    .toggle-group input[type="checkbox"]::after {
-        content: '';
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 18px;
-        height: 18px;
-        background: white;
-        border-radius: 50%;
-        transition: transform 0.3s;
-    }
-    .toggle-group input[type="checkbox"]:checked::after {
-        transform: translateX(18px);
-    }
-
-    .reader-display {
-        background: var(--card-bg);
-        border-radius: 12px;
-        padding: 24px;
-        border: 2px solid var(--rose); /* Brand color border */
-        box-shadow: var(--shadow);
-        min-height: 400px;
-    }
-
-    .verse-container {
-        position: relative;
-    }
     .verse-container.parallel {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
+        grid-template-columns: 1fr;
     }
-    .verse-column {
-        padding: 12px;
-        background: var(--fantasy);
-        border-radius: 8px;
-        border-left: 3px solid var(--rose);
-    }
-    .verse-column h3 {
-        font-size: 1rem;
-        margin-bottom: 8px;
-        color: var(--text);
-    }
-
-    .verse-content {
-        font-family: 'Georgia', serif;
-        font-size: 1.1rem;
-        line-height: 1.9;
-        color: var(--text);
-        min-height: 200px;
-        text-align: justify; /* Justified text */
-    }
-
-    .verse-content p {
-        margin-bottom: 12px;
-        cursor: pointer;
-        padding: 4px 8px;
-        border-radius: 4px;
-        transition: background 0.2s;
-    }
-    .verse-content p:hover {
-        background: rgba(219, 161, 162, 0.1);
-    }
-    .verse-content p.highlighted {
-        background: #fff3b0;
-    }
-
-    .chapter-nav-bottom {
-        display: flex;
-        justify-content: center;
+    .toggle-group {
         align-items: center;
-        gap: 12px;
-        margin-top: 20px;
-        padding-top: 16px;
-        border-top: 1px solid var(--border);
     }
-    .chapter-nav-bottom .btn {
-        padding: 6px 16px;
-        font-size: 0.85rem;
-    }
-    #chapterDisplay {
-        font-weight: 600;
-        color: var(--text);
-    }
-
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-    }
-    .modal-content {
-        background: var(--card-bg);
-        border-radius: 16px;
-        padding: 32px;
-        max-width: 500px;
-        width: 90%;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .modal-content h3 {
-        margin-bottom: 12px;
-    }
-    .modal-content textarea {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        resize: vertical;
-        min-height: 80px;
-        background: var(--input-bg);
-        color: var(--text);
-        font-size: 0.95rem;
-    }
-    .modal-content textarea:focus {
-        outline: none;
-        border-color: var(--rose);
-        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-    }
-    .modal-actions {
-        display: flex;
-        gap: 12px;
-        margin-top: 12px;
-    }
-    .modal-actions .btn {
-        flex: 1;
-        justify-content: center;
-        padding: 10px;
-    }
-
-    @media (max-width: 768px) {
-        .reader-controls {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        .control-group {
-            min-width: auto;
-        }
-        .verse-container.parallel {
-            grid-template-columns: 1fr;
-        }
-        .toggle-group {
-            align-items: center;
-        }
-    }
+}
 </style>
 
-<!-- ===== JAVASCRIPT ===== -->
+<!-- ===== JAVASCRIPT (YOUR ORIGINAL + ADDITIONS) ===== -->
 <script>
-    (function() {
-        'use strict';
+(function() {
+    'use strict';
 
-        // ===== CONFIGURATION =====
-        const VERSION_MAP = {
-            'KJV': 'bible_KJV.db',
-            'NIV': 'bible_NIV.db',
-            'ESV': 'bible_ESV.db',
-            'NASB': 'bible_NASB.db',
-            'NKJV': 'bible_NKJV.db',
-            'AMP': 'bible_AMP.db',
-            'ASV': 'bible_ASV.db',
-            'WEB': 'bible_WEB.db',
-            'YLT': 'bible_YLT.db'
-        };
+    // ===== YOUR ORIGINAL CONFIGURATION =====
+    const VERSION_MAP = {
+        'KJV': 'bible_KJV.db',
+        'NIV': 'bible_NIV.db',
+        'ESV': 'bible_ESV.db',
+        'NASB': 'bible_NASB.db',
+        'NKJV': 'bible_NKJV.db',
+        'AMP': 'bible_AMP.db',
+        'ASV': 'bible_ASV.db',
+        'WEB': 'bible_WEB.db',
+        'YLT': 'bible_YLT.db'
+    };
 
-        const BOOKS = [
-            "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-            "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
-            "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
-            "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
-            "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
-            "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-            "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-            "Haggai", "Zechariah", "Malachi",
-            "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-            "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
-            "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
-            "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
-            "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
-            "Jude", "Revelation"
-        ];
+    const BOOKS = [
+        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+        "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+        "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+        "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+        "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+        "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+        "Haggai", "Zechariah", "Malachi",
+        "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
+        "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+        "Jude", "Revelation"
+    ];
 
-        const CHAPTER_COUNTS = {
-            "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
-            "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24,
-            "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36,
-            "Ezra": 10, "Nehemiah": 13, "Esther": 10, "Job": 42, "Psalms": 150,
-            "Proverbs": 31, "Ecclesiastes": 12, "Song of Solomon": 8,
-            "Isaiah": 66, "Jeremiah": 52, "Lamentations": 5, "Ezekiel": 48,
-            "Daniel": 12, "Hosea": 14, "Joel": 3, "Amos": 9, "Obadiah": 1,
-            "Jonah": 4, "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3,
-            "Haggai": 2, "Zechariah": 14, "Malachi": 4,
-            "Matthew": 28, "Mark": 16, "Luke": 24, "John": 21, "Acts": 28,
-            "Romans": 16, "1 Corinthians": 16, "2 Corinthians": 13,
-            "Galatians": 6, "Ephesians": 6, "Philippians": 4, "Colossians": 4,
-            "1 Thessalonians": 5, "2 Thessalonians": 3,
-            "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1,
-            "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3,
-            "1 John": 5, "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22
-        };
+    const CHAPTER_COUNTS = {
+        "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
+        "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24,
+        "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36,
+        "Ezra": 10, "Nehemiah": 13, "Esther": 10, "Job": 42, "Psalms": 150,
+        "Proverbs": 31, "Ecclesiastes": 12, "Song of Solomon": 8,
+        "Isaiah": 66, "Jeremiah": 52, "Lamentations": 5, "Ezekiel": 48,
+        "Daniel": 12, "Hosea": 14, "Joel": 3, "Amos": 9, "Obadiah": 1,
+        "Jonah": 4, "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3,
+        "Haggai": 2, "Zechariah": 14, "Malachi": 4,
+        "Matthew": 28, "Mark": 16, "Luke": 24, "John": 21, "Acts": 28,
+        "Romans": 16, "1 Corinthians": 16, "2 Corinthians": 13,
+        "Galatians": 6, "Ephesians": 6, "Philippians": 4, "Colossians": 4,
+        "1 Thessalonians": 5, "2 Thessalonians": 3,
+        "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1,
+        "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3,
+        "1 John": 5, "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22
+    };
 
-        const VERSE_COUNTS = {
-            "Psalms": 150, "Proverbs": 31, "Job": 42, "Isaiah": 66, "Jeremiah": 52,
-            "Ezekiel": 48, "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36,
-            "Deuteronomy": 34, "Joshua": 24, "Judges": 21, "1 Samuel": 31, "2 Samuel": 24,
-            "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36,
-            "Ezra": 10, "Nehemiah": 13, "Esther": 10, "Ruth": 4, "Daniel": 12,
-            "Hosea": 14, "Joel": 3, "Amos": 9, "Obadiah": 1, "Jonah": 4,
-            "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3, "Haggai": 2,
-            "Zechariah": 14, "Malachi": 4, "Matthew": 28, "Mark": 16, "Luke": 24,
-            "John": 21, "Acts": 28, "Romans": 16, "1 Corinthians": 16,
-            "2 Corinthians": 13, "Galatians": 6, "Ephesians": 6, "Philippians": 4,
-            "Colossians": 4, "1 Thessalonians": 5, "2 Thessalonians": 3,
-            "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1,
-            "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3, "1 John": 5,
-            "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22,
-            "Song of Solomon": 8, "Ecclesiastes": 12, "Lamentations": 5
-        };
+    const VERSE_COUNTS = {
+        "Psalms": 150, "Proverbs": 31, "Job": 42, "Isaiah": 66, "Jeremiah": 52,
+        "Ezekiel": 48, "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36,
+        "Deuteronomy": 34, "Joshua": 24, "Judges": 21, "1 Samuel": 31, "2 Samuel": 24,
+        "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36,
+        "Ezra": 10, "Nehemiah": 13, "Esther": 10, "Ruth": 4, "Daniel": 12,
+        "Hosea": 14, "Joel": 3, "Amos": 9, "Obadiah": 1, "Jonah": 4,
+        "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3, "Haggai": 2,
+        "Zechariah": 14, "Malachi": 4, "Matthew": 28, "Mark": 16, "Luke": 24,
+        "John": 21, "Acts": 28, "Romans": 16, "1 Corinthians": 16,
+        "2 Corinthians": 13, "Galatians": 6, "Ephesians": 6, "Philippians": 4,
+        "Colossians": 4, "1 Thessalonians": 5, "2 Thessalonians": 3,
+        "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1,
+        "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3, "1 John": 5,
+        "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22,
+        "Song of Solomon": 8, "Ecclesiastes": 12, "Lamentations": 5
+    };
 
-        // ===== STATE =====
-        let state = {
-            book: 'John',
-            chapter: 3,
-            verse: 16,
-            version1: 'KJV',
-            version2: 'NIV',
-            parallel: false,
-            readerTheme: localStorage.getItem('readerTheme') || 'light'
-        };
+    // ===== YOUR ORIGINAL STATE =====
+    let state = {
+        book: 'John',
+        chapter: 3,
+        verse: 16,
+        version1: 'KJV',
+        version2: 'NIV',
+        parallel: false,
+        readerTheme: localStorage.getItem('readerTheme') || 'light'
+    };
 
-        // ===== DOM REFS =====
-        const bookSelect = document.getElementById('bookSelect');
-        const chapterSelect = document.getElementById('chapterSelect');
-        const verseSelect = document.getElementById('verseSelect');
-        const version1Select = document.getElementById('version1');
-        const version2Select = document.getElementById('version2');
-        const version2Group = document.getElementById('version2Group');
-        const parallelToggle = document.getElementById('parallelMode');
-        const singleView = document.getElementById('singleView');
-        const parallelView = document.getElementById('parallelView');
-        const verseContent1 = document.getElementById('verseContent1');
-        const verseContent1p = document.getElementById('verseContent1p');
-        const verseContent2p = document.getElementById('verseContent2p');
-        const parallelTitle1 = document.getElementById('parallelTitle1');
-        const parallelTitle2 = document.getElementById('parallelTitle2');
-        const chapterDisplay = document.getElementById('chapterDisplay');
-        const goToInput = document.getElementById('goToInput');
-        const goToBtn = document.getElementById('goToBtn');
-        const prevBtn1 = document.getElementById('prevChapterBtn');
-        const nextBtn1 = document.getElementById('nextChapterBtn');
-        const prevBtn2 = document.getElementById('prevChapterBtn2');
-        const nextBtn2 = document.getElementById('nextChapterBtn2');
-        const copyBtn = document.getElementById('copyBtn');
-        const highlightBtn = document.getElementById('highlightBtn');
-        const notesBtn = document.getElementById('notesBtn');
-        const notesModal = document.getElementById('notesModal');
-        const notesTextarea = document.getElementById('notesTextarea');
-        const notesVerseRef = document.getElementById('notesVerseRef');
-        const saveNoteBtn = document.getElementById('saveNoteBtn');
-        const closeNotesBtn = document.getElementById('closeNotesBtn');
-        const readerThemeToggle = document.getElementById('readerThemeToggle');
+    // ===== YOUR ORIGINAL DOM REFS =====
+    const bookSelect = document.getElementById('bookSelect');
+    const chapterSelect = document.getElementById('chapterSelect');
+    const verseSelect = document.getElementById('verseSelect');
+    const version1Select = document.getElementById('version1');
+    const version2Select = document.getElementById('version2');
+    const version2Group = document.getElementById('version2Group');
+    const parallelToggle = document.getElementById('parallelMode');
+    const singleView = document.getElementById('singleView');
+    const parallelView = document.getElementById('parallelView');
+    const verseContent1 = document.getElementById('verseContent1');
+    const verseContent1p = document.getElementById('verseContent1p');
+    const verseContent2p = document.getElementById('verseContent2p');
+    const parallelTitle1 = document.getElementById('parallelTitle1');
+    const parallelTitle2 = document.getElementById('parallelTitle2');
+    const chapterDisplay = document.getElementById('chapterDisplay');
+    const goToInput = document.getElementById('goToInput');
+    const goToBtn = document.getElementById('goToBtn');
+    const prevBtn1 = document.getElementById('prevChapterBtn');
+    const nextBtn1 = document.getElementById('nextChapterBtn');
+    const prevBtn2 = document.getElementById('prevChapterBtn2');
+    const nextBtn2 = document.getElementById('nextChapterBtn2');
+    const copyBtn = document.getElementById('copyBtn');
+    const highlightBtn = document.getElementById('highlightBtn');
+    const notesBtn = document.getElementById('notesBtn');
+    const notesModal = document.getElementById('notesModal');
+    const notesTextarea = document.getElementById('notesTextarea');
+    const notesVerseRef = document.getElementById('notesVerseRef');
+    const saveNoteBtn = document.getElementById('saveNoteBtn');
+    const closeNotesBtn = document.getElementById('closeNotesBtn');
+    const readerThemeToggle = document.getElementById('readerThemeToggle');
 
-        // ===== HELPER FUNCTIONS =====
+    // ===== YOUR ORIGINAL HELPER FUNCTIONS =====
 
-        function populateBooks() {
-            bookSelect.innerHTML = '';
-            BOOKS.forEach(book => {
-                const opt = document.createElement('option');
-                opt.value = book;
-                opt.textContent = book;
-                bookSelect.appendChild(opt);
-            });
-            bookSelect.value = state.book;
-        }
-
-        function populateChapters() {
-            chapterSelect.innerHTML = '';
-            const count = CHAPTER_COUNTS[state.book] || 21;
-            for (let i = 1; i <= count; i++) {
-                const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = `Chapter ${i}`;
-                chapterSelect.appendChild(opt);
-            }
-            chapterSelect.value = state.chapter;
-        }
-
-        function populateVerses() {
-            verseSelect.innerHTML = '';
-            const count = VERSE_COUNTS[state.book] || 30;
-            for (let i = 1; i <= count; i++) {
-                const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = `Verse ${i}`;
-                verseSelect.appendChild(opt);
-            }
-            verseSelect.value = state.verse;
-        }
-
-       function getVerseText(version, book, chapter, verse) {
-    // Build the URL without the 'verse' parameter to get the whole chapter
-    let url = `/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version}`;
-    
-    // If a specific verse is requested, add it (optional, used for "Jump to verse")
-    if (verse > 0) {
-        url += `&verse_start=${verse}&verse_end=${verse}`;
-    }
-    
-    return fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.data && data.data.length > 0) {
-                return data.data; // Return the array of verses
-            } else {
-                return `[${version} ${book} ${chapter} not found]`;
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            return `[Error loading chapter]`;
+    function populateBooks() {
+        bookSelect.innerHTML = '';
+        BOOKS.forEach(book => {
+            const opt = document.createElement('option');
+            opt.value = book;
+            opt.textContent = book;
+            bookSelect.appendChild(opt);
         });
-}
-
-       function renderVerse() {
-    const book = state.book;
-    const chapter = state.chapter;
-    const verse = state.verse;
-
-    if (state.parallel) {
-        parallelView.style.display = 'grid';
-        singleView.style.display = 'none';
-        parallelTitle1.textContent = state.version1;
-        parallelTitle2.textContent = state.version2;
-
-        verseContent1p.innerHTML = '<p>Loading...</p>';
-        verseContent2p.innerHTML = '<p>Loading...</p>';
-
-        Promise.all([
-            getVerseText(state.version1, book, chapter, 0), // 0 means fetch whole chapter
-            getVerseText(state.version2, book, chapter, 0)
-        ]).then(([data1, data2]) => {
-            if (Array.isArray(data1)) {
-                verseContent1p.innerHTML = data1.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
-                applyHighlights(verseContent1p);
-            } else {
-                verseContent1p.innerHTML = `<p>${data1}</p>`;
-            }
-            
-            if (Array.isArray(data2)) {
-                verseContent2p.innerHTML = data2.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
-                applyHighlights(verseContent2p);
-            } else {
-                verseContent2p.innerHTML = `<p>${data2}</p>`;
-            }
-        });
-    } else {
-        parallelView.style.display = 'none';
-        singleView.style.display = 'block';
-        verseContent1.innerHTML = '<p>Loading...</p>';
-
-        getVerseText(state.version1, book, chapter, 0).then(data => {
-            if (Array.isArray(data)) {
-                verseContent1.innerHTML = data.map(v => {
-    const cleanText = v.text.replace(/\\/g, '');
-    return `<p>${v.verse}. ${cleanText}</p>`;
-}).join('');
-                applyHighlights(verseContent1);
-            } else {
-                verseContent1.innerHTML = `<p>${data}</p>`;
-            }
-        });
+        bookSelect.value = state.book;
     }
 
-    chapterDisplay.textContent = `${book} ${chapter}`;
-    notesVerseRef.textContent = `${book} ${chapter}`;
-}
-
-        function loadVerse() {
-            bookSelect.value = state.book;
-            chapterSelect.value = state.chapter;
-            verseSelect.value = state.verse;
-            version1Select.value = state.version1;
-            version2Select.value = state.version2;
-            renderVerse();
+    function populateChapters() {
+        chapterSelect.innerHTML = '';
+        const count = CHAPTER_COUNTS[state.book] || 21;
+        for (let i = 1; i <= count; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = `Chapter ${i}`;
+            chapterSelect.appendChild(opt);
         }
+        chapterSelect.value = state.chapter;
+    }
 
-        function applyHighlights(container) {
-            const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
-            const p = container.querySelector('p');
-            if (p) {
-                const key = `${state.book}-${state.chapter}-${state.verse}`;
-                if (saved[key]) {
-                    p.classList.add('highlighted');
+    function populateVerses() {
+        verseSelect.innerHTML = '';
+        const count = VERSE_COUNTS[state.book] || 30;
+        for (let i = 1; i <= count; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = `Verse ${i}`;
+            verseSelect.appendChild(opt);
+        }
+        verseSelect.value = state.verse;
+    }
+
+    function getVerseText(version, book, chapter, verse) {
+        let url = `/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version}`;
+        if (verse > 0) {
+            url += `&verse_start=${verse}&verse_end=${verse}`;
+        }
+        return fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data && data.data.length > 0) {
+                    return data.data;
                 } else {
-                    p.classList.remove('highlighted');
+                    return `[${version} ${book} ${chapter} not found]`;
                 }
-            }
-        }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                return `[Error loading chapter]`;
+            });
+    }
 
-        function toggleHighlight() {
-            const key = `${state.book}-${state.chapter}-${state.verse}`;
-            const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
-            if (saved[key]) {
-                delete saved[key];
-            } else {
-                saved[key] = true;
-            }
-            localStorage.setItem('bibleHighlights', JSON.stringify(saved));
-            renderVerse();
-        }
+    function renderVerse() {
+        const book = state.book;
+        const chapter = state.chapter;
+        const verse = state.verse;
 
-        function copyVerse() {
-            const book = state.book;
-            const chapter = state.chapter;
-            const verse = state.verse;
-            const version = state.version1;
-            getVerseText(version, book, chapter, verse).then(text => {
-                const content = `${version} ${book} ${chapter}:${verse}\n${text}`;
-                navigator.clipboard.writeText(content).then(() => {
-                    alert('Verse copied to clipboard!');
-                }).catch(() => {
-                    prompt('Copy manually:', content);
-                });
+        if (state.parallel) {
+            parallelView.style.display = 'grid';
+            singleView.style.display = 'none';
+            parallelTitle1.textContent = state.version1;
+            parallelTitle2.textContent = state.version2;
+
+            verseContent1p.innerHTML = '<p>Loading...</p>';
+            verseContent2p.innerHTML = '<p>Loading...</p>';
+
+            Promise.all([
+                getVerseText(state.version1, book, chapter, 0),
+                getVerseText(state.version2, book, chapter, 0)
+            ]).then(([data1, data2]) => {
+                if (Array.isArray(data1)) {
+                    verseContent1p.innerHTML = data1.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                    applyHighlights(verseContent1p);
+                } else {
+                    verseContent1p.innerHTML = `<p>${data1}</p>`;
+                }
+                
+                if (Array.isArray(data2)) {
+                    verseContent2p.innerHTML = data2.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                    applyHighlights(verseContent2p);
+                } else {
+                    verseContent2p.innerHTML = `<p>${data2}</p>`;
+                }
+            });
+        } else {
+            parallelView.style.display = 'none';
+            singleView.style.display = 'block';
+            verseContent1.innerHTML = '<p>Loading...</p>';
+
+            getVerseText(state.version1, book, chapter, 0).then(data => {
+                if (Array.isArray(data)) {
+                    verseContent1.innerHTML = data.map(v => {
+                        const cleanText = v.text.replace(/\\/g, '');
+                        return `<p>${v.verse}. ${cleanText}</p>`;
+                    }).join('');
+                    applyHighlights(verseContent1);
+                } else {
+                    verseContent1.innerHTML = `<p>${data}</p>`;
+                }
             });
         }
 
-        function openNotes() {
+        chapterDisplay.textContent = `${book} ${chapter}`;
+        notesVerseRef.textContent = `${book} ${chapter}`;
+
+        // ===== ADDED: Track reading progress =====
+        trackReadingProgress(book, chapter);
+    }
+
+    function loadVerse() {
+        bookSelect.value = state.book;
+        chapterSelect.value = state.chapter;
+        verseSelect.value = state.verse;
+        version1Select.value = state.version1;
+        version2Select.value = state.version2;
+        renderVerse();
+    }
+
+    function applyHighlights(container) {
+        const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
+        const p = container.querySelector('p');
+        if (p) {
             const key = `${state.book}-${state.chapter}-${state.verse}`;
-            const saved = JSON.parse(localStorage.getItem('bibleNotes') || '{}');
-            notesTextarea.value = saved[key] || '';
-            notesModal.style.display = 'flex';
-        }
-
-        function saveNote() {
-            const key = `${state.book}-${state.chapter}-${state.verse}`;
-            const saved = JSON.parse(localStorage.getItem('bibleNotes') || '{}');
-            saved[key] = notesTextarea.value;
-            localStorage.setItem('bibleNotes', JSON.stringify(saved));
-            notesModal.style.display = 'none';
-            alert('Note saved!');
-        }
-
-        function toggleReaderTheme() {
-            state.readerTheme = state.readerTheme === 'light' ? 'dark' : 'light';
-            localStorage.setItem('readerTheme', state.readerTheme);
-            document.getElementById('bibleReader').setAttribute('data-theme', state.readerTheme);
-            readerThemeToggle.textContent = state.readerTheme === 'light' ? '🌓 Theme' : '☀️ Theme';
-        }
-
-        function goToVerse(input) {
-            const match = input.match(/^([\d\s\w]+)\s+(\d+):(\d+)$/i);
-            if (match) {
-                const book = match[1].trim();
-                const chapter = parseInt(match[2], 10);
-                const verse = parseInt(match[3], 10);
-                let found = BOOKS.find(b => b.toLowerCase() === book.toLowerCase());
-                if (!found) {
-                    found = BOOKS.find(b => b.toLowerCase().includes(book.toLowerCase()));
-                }
-                if (found) {
-                    state.book = found;
-                    state.chapter = chapter;
-                    state.verse = verse;
-                    populateChapters();
-                    populateVerses();
-                    loadVerse();
-                    return;
-                }
+            if (saved[key]) {
+                p.classList.add('highlighted');
+            } else {
+                p.classList.remove('highlighted');
             }
-            alert('Invalid verse format. Use: Book Chapter:Verse (e.g. John 3:16)');
         }
+    }
 
-        // ===== EVENT LISTENERS =====
+    function toggleHighlight() {
+        const key = `${state.book}-${state.chapter}-${state.verse}`;
+        const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
+        if (saved[key]) {
+            delete saved[key];
+        } else {
+            saved[key] = true;
+        }
+        localStorage.setItem('bibleHighlights', JSON.stringify(saved));
+        renderVerse();
 
-        populateBooks();
+        // ===== ADDED: Email notification for highlight =====
+        <?php if (isLoggedIn()): ?>
+        // Send admin notification via AJAX (optional)
+        // You can implement an endpoint to handle this
+        <?php endif; ?>
+    }
+
+    function copyVerse() {
+        const book = state.book;
+        const chapter = state.chapter;
+        const verse = state.verse;
+        const version = state.version1;
+        getVerseText(version, book, chapter, verse).then(text => {
+            const content = `${version} ${book} ${chapter}:${verse}\n${text}`;
+            navigator.clipboard.writeText(content).then(() => {
+                alert('Verse copied to clipboard!');
+            }).catch(() => {
+                prompt('Copy manually:', content);
+            });
+        });
+    }
+
+    function openNotes() {
+        const key = `${state.book}-${state.chapter}-${state.verse}`;
+        const saved = JSON.parse(localStorage.getItem('bibleNotes') || '{}');
+        notesTextarea.value = saved[key] || '';
+        notesModal.style.display = 'flex';
+    }
+
+    function saveNote() {
+        const key = `${state.book}-${state.chapter}-${state.verse}`;
+        const saved = JSON.parse(localStorage.getItem('bibleNotes') || '{}');
+        saved[key] = notesTextarea.value;
+        localStorage.setItem('bibleNotes', JSON.stringify(saved));
+        notesModal.style.display = 'none';
+        alert('Note saved!');
+
+        // ===== ADDED: Email notification for note =====
+        <?php if (isLoggedIn()): ?>
+        const noteContent = notesTextarea.value.trim();
+        if (noteContent.length > 0) {
+            // Send admin notification via AJAX
+            const formData = new FormData();
+            formData.append('action', 'bible_note');
+            formData.append('book', state.book);
+            formData.append('chapter', state.chapter);
+            formData.append('verse', state.verse);
+            formData.append('note', noteContent);
+            formData.append('user_id', <?php echo $_SESSION['user_id'] ?? 'null'; ?>);
+            
+            fetch('/includes/bible_notify.php', {
+                method: 'POST',
+                body: formData
+            }).catch(error => {
+                console.error('Error sending notification:', error);
+            });
+        }
+        <?php endif; ?>
+    }
+
+    function toggleReaderTheme() {
+        state.readerTheme = state.readerTheme === 'light' ? 'dark' : 'light';
+        localStorage.setItem('readerTheme', state.readerTheme);
+        document.getElementById('bibleReader').setAttribute('data-theme', state.readerTheme);
+        readerThemeToggle.textContent = state.readerTheme === 'light' ? '🌓 Theme' : '☀️ Theme';
+    }
+
+    function goToVerse(input) {
+        const match = input.match(/^([\d\s\w]+)\s+(\d+):(\d+)$/i);
+        if (match) {
+            const book = match[1].trim();
+            const chapter = parseInt(match[2], 10);
+            const verse = parseInt(match[3], 10);
+            let found = BOOKS.find(b => b.toLowerCase() === book.toLowerCase());
+            if (!found) {
+                found = BOOKS.find(b => b.toLowerCase().includes(book.toLowerCase()));
+            }
+            if (found) {
+                state.book = found;
+                state.chapter = chapter;
+                state.verse = verse;
+                populateChapters();
+                populateVerses();
+                loadVerse();
+                return;
+            }
+        }
+        alert('Invalid verse format. Use: Book Chapter:Verse (e.g. John 3:16)');
+    }
+
+    // ===== YOUR ORIGINAL EVENT LISTENERS =====
+
+    populateBooks();
+    populateChapters();
+    populateVerses();
+    loadVerse();
+
+    document.getElementById('bibleReader').setAttribute('data-theme', state.readerTheme);
+    readerThemeToggle.textContent = state.readerTheme === 'light' ? '🌓 Theme' : '☀️ Theme';
+
+    bookSelect.addEventListener('change', function() {
+        state.book = this.value;
+        state.chapter = 1;
+        state.verse = 1;
         populateChapters();
         populateVerses();
         loadVerse();
+    });
 
-        document.getElementById('bibleReader').setAttribute('data-theme', state.readerTheme);
-        readerThemeToggle.textContent = state.readerTheme === 'light' ? '🌓 Theme' : '☀️ Theme';
+    chapterSelect.addEventListener('change', function() {
+        state.chapter = parseInt(this.value, 10);
+        state.verse = 1;
+        populateVerses();
+        loadVerse();
+    });
 
-        bookSelect.addEventListener('change', function() {
-            state.book = this.value;
-            state.chapter = 1;
+    verseSelect.addEventListener('change', function() {
+        state.verse = parseInt(this.value, 10);
+        loadVerse();
+    });
+
+    version1Select.addEventListener('change', function() {
+        state.version1 = this.value;
+        loadVerse();
+    });
+
+    version2Select.addEventListener('change', function() {
+        state.version2 = this.value;
+        if (state.parallel) loadVerse();
+    });
+
+    parallelToggle.addEventListener('change', function() {
+        state.parallel = this.checked;
+        version2Group.style.display = state.parallel ? 'block' : 'none';
+        loadVerse();
+    });
+
+    function prevChapter() {
+        const book = state.book;
+        const chapter = state.chapter;
+        if (chapter > 1) {
+            state.chapter = chapter - 1;
             state.verse = 1;
-            populateChapters();
             populateVerses();
             loadVerse();
-        });
+        } else {
+            const idx = BOOKS.indexOf(book);
+            if (idx > 0) {
+                state.book = BOOKS[idx - 1];
+                state.chapter = CHAPTER_COUNTS[state.book] || 21;
+                state.verse = 1;
+                populateChapters();
+                populateVerses();
+                loadVerse();
+            }
+        }
+    }
 
-        chapterSelect.addEventListener('change', function() {
-            state.chapter = parseInt(this.value, 10);
+    function nextChapter() {
+        const book = state.book;
+        const chapter = state.chapter;
+        const max = CHAPTER_COUNTS[book] || 21;
+        if (chapter < max) {
+            state.chapter = chapter + 1;
             state.verse = 1;
             populateVerses();
             loadVerse();
-        });
-
-        verseSelect.addEventListener('change', function() {
-            state.verse = parseInt(this.value, 10);
-            loadVerse();
-        });
-
-        version1Select.addEventListener('change', function() {
-            state.version1 = this.value;
-            loadVerse();
-        });
-
-        version2Select.addEventListener('change', function() {
-            state.version2 = this.value;
-            if (state.parallel) loadVerse();
-        });
-
-        parallelToggle.addEventListener('change', function() {
-            state.parallel = this.checked;
-            version2Group.style.display = state.parallel ? 'block' : 'none';
-            loadVerse();
-        });
-
-        function prevChapter() {
-            const book = state.book;
-            const chapter = state.chapter;
-            if (chapter > 1) {
-                state.chapter = chapter - 1;
+        } else {
+            const idx = BOOKS.indexOf(book);
+            if (idx < BOOKS.length - 1) {
+                state.book = BOOKS[idx + 1];
+                state.chapter = 1;
                 state.verse = 1;
+                populateChapters();
                 populateVerses();
                 loadVerse();
-            } else {
-                const idx = BOOKS.indexOf(book);
-                if (idx > 0) {
-                    state.book = BOOKS[idx - 1];
-                    state.chapter = CHAPTER_COUNTS[state.book] || 21;
-                    state.verse = 1;
-                    populateChapters();
-                    populateVerses();
-                    loadVerse();
-                }
+            }
+        }
+    }
+
+    prevBtn1.addEventListener('click', prevChapter);
+    nextBtn1.addEventListener('click', nextChapter);
+    prevBtn2.addEventListener('click', prevChapter);
+    nextBtn2.addEventListener('click', nextChapter);
+
+    goToBtn.addEventListener('click', function() {
+        goToVerse(goToInput.value);
+    });
+    goToInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') goToVerse(goToInput.value);
+    });
+
+    copyBtn.addEventListener('click', copyVerse);
+    highlightBtn.addEventListener('click', toggleHighlight);
+    notesBtn.addEventListener('click', openNotes);
+    saveNoteBtn.addEventListener('click', saveNote);
+    closeNotesBtn.addEventListener('click', function() {
+        notesModal.style.display = 'none';
+    });
+    window.addEventListener('click', function(e) {
+        if (e.target === notesModal) notesModal.style.display = 'none';
+    });
+    readerThemeToggle.addEventListener('click', toggleReaderTheme);
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.verse-content p')) {
+            toggleHighlight();
+        }
+    });
+
+    function syncGoToInput() {
+        goToInput.value = `${state.book} ${state.chapter}:${state.verse}`;
+    }
+    const origLoad = loadVerse;
+    loadVerse = function() {
+        origLoad();
+        syncGoToInput();
+    };
+
+    // ===== ADDED: TRACK READING PROGRESS =====
+    function trackReadingProgress(book, chapter) {
+        // Get existing progress from localStorage
+        let progress = JSON.parse(localStorage.getItem('bibleReadingProgress') || '{}');
+        const key = `${book}-${chapter}`;
+        if (!progress[key]) {
+            progress[key] = {
+                book: book,
+                chapter: chapter,
+                readAt: new Date().toISOString(),
+                completed: true
+            };
+            localStorage.setItem('bibleReadingProgress', JSON.stringify(progress));
+            
+            // Update progress indicator
+            updateProgressIndicator();
+            
+            // ===== SYNC TO DATABASE IF LOGGED IN =====
+            <?php if (isLoggedIn()): ?>
+            const formData = new FormData();
+            formData.append('action', 'bible_progress');
+            formData.append('book', book);
+            formData.append('chapter', chapter);
+            formData.append('user_id', <?php echo $_SESSION['user_id']; ?>);
+            
+            fetch('/includes/bible_progress.php', {
+                method: 'POST',
+                body: formData
+            }).catch(error => {
+                console.error('Error syncing progress:', error);
+            });
+            <?php endif; ?>
+        }
+    }
+
+    function updateProgressIndicator() {
+        let progress = JSON.parse(localStorage.getItem('bibleReadingProgress') || '{}');
+        const totalChapters = Object.keys(progress).length;
+        // Estimate total chapters in the Bible (roughly 1189)
+        const totalBibleChapters = 1189;
+        const percent = Math.min(100, Math.round((totalChapters / totalBibleChapters) * 100));
+        
+        // Add progress indicator to DOM if not exists
+        let indicator = document.querySelector('.reading-progress-indicator');
+        if (!indicator) {
+            const display = document.querySelector('.reader-display');
+            if (display) {
+                const div = document.createElement('div');
+                div.className = 'reading-progress-indicator';
+                div.innerHTML = `
+                    <span class="progress-label">📖 Bible Progress</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percent}%;"></div>
+                    </div>
+                    <span class="progress-percent">${percent}%</span>
+                `;
+                display.appendChild(div);
+            }
+        } else {
+            const fill = indicator.querySelector('.progress-fill');
+            const percentSpan = indicator.querySelector('.progress-percent');
+            if (fill) fill.style.width = percent + '%';
+            if (percentSpan) percentSpan.textContent = percent + '%';
+        }
+    }
+
+    // Initialize progress indicator on load
+    setTimeout(updateProgressIndicator, 500);
+
+    // ===== ADDED: FIND IN CHAPTER (Ctrl+F) =====
+    const findControls = document.createElement('div');
+    findControls.className = 'find-controls';
+    findControls.id = 'findControls';
+    findControls.style.display = 'none';
+    findControls.innerHTML = `
+        <input type="text" id="findInput" placeholder="Find in this chapter..." aria-label="Find in chapter">
+        <div class="find-nav">
+            <button id="findPrev" title="Previous match"><i class="fas fa-chevron-up"></i></button>
+            <span id="findCounter">0 matches</span>
+            <button id="findNext" title="Next match"><i class="fas fa-chevron-down"></i></button>
+            <button id="findClose" title="Close search"><i class="fas fa-times"></i></button>
+        </div>
+    `;
+    document.querySelector('.reader-display').appendChild(findControls);
+
+    const findInput = document.getElementById('findInput');
+    const findPrev = document.getElementById('findPrev');
+    const findNext = document.getElementById('findNext');
+    const findClose = document.getElementById('findClose');
+    const findCounter = document.getElementById('findCounter');
+    let currentMatchIndex = 0;
+    let matchCount = 0;
+
+    function clearHighlights() {
+        document.querySelectorAll('.find-highlight').forEach(el => {
+            el.outerHTML = el.textContent;
+        });
+    }
+
+    function performFind(query) {
+        clearHighlights();
+        if (!query || query.length < 2) {
+            findCounter.textContent = '0 matches';
+            currentMatchIndex = 0;
+            matchCount = 0;
+            return;
+        }
+
+        let container;
+        if (state.parallel) {
+            container = document.querySelector('.verse-container.parallel');
+        } else {
+            container = document.getElementById('verseContent1');
+        }
+        if (!container) return;
+
+        const regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+        let matches = [];
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.parentElement && node.parentElement.closest('.find-highlight')) continue;
+            if (regex.test(node.textContent)) {
+                matches.push(node);
             }
         }
 
-        function nextChapter() {
-            const book = state.book;
-            const chapter = state.chapter;
-            const max = CHAPTER_COUNTS[book] || 21;
-            if (chapter < max) {
-                state.chapter = chapter + 1;
-                state.verse = 1;
-                populateVerses();
-                loadVerse();
-            } else {
-                const idx = BOOKS.indexOf(book);
-                if (idx < BOOKS.length - 1) {
-                    state.book = BOOKS[idx + 1];
-                    state.chapter = 1;
-                    state.verse = 1;
-                    populateChapters();
-                    populateVerses();
-                    loadVerse();
-                }
+        matchCount = matches.length;
+        findCounter.textContent = matchCount + ' matches';
+
+        matches.forEach((textNode, index) => {
+            const text = textNode.textContent;
+            const span = document.createElement('span');
+            span.innerHTML = text.replace(regex, '<span class="find-highlight" data-match-index="' + index + '">$1</span>');
+            textNode.parentNode.replaceChild(span, textNode);
+        });
+
+        if (matchCount > 0) {
+            const firstHighlight = container.querySelector('.find-highlight');
+            if (firstHighlight) {
+                firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstHighlight.classList.add('active-highlight');
+                currentMatchIndex = 0;
             }
         }
+    }
 
-        prevBtn1.addEventListener('click', prevChapter);
-        nextBtn1.addEventListener('click', nextChapter);
-        prevBtn2.addEventListener('click', prevChapter);
-        nextBtn2.addEventListener('click', nextChapter);
+    function navigateMatch(direction) {
+        const highlights = document.querySelectorAll('.find-highlight');
+        if (highlights.length === 0) return;
+        highlights.forEach(el => el.classList.remove('active-highlight'));
+        if (direction === 'next') {
+            currentMatchIndex = (currentMatchIndex + 1) % highlights.length;
+        } else {
+            currentMatchIndex = (currentMatchIndex - 1 + highlights.length) % highlights.length;
+        }
+        const target = highlights[currentMatchIndex];
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('active-highlight');
+    }
 
-        goToBtn.addEventListener('click', function() {
-            goToVerse(goToInput.value);
-        });
-        goToInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') goToVerse(goToInput.value);
-        });
+    // Keyboard shortcut: Ctrl+F to open find
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            findControls.style.display = 'flex';
+            findInput.focus();
+            findInput.select();
+        }
+        if (e.key === 'Escape') {
+            if (findControls.style.display !== 'none') {
+                findInput.value = '';
+                clearHighlights();
+                findCounter.textContent = '0 matches';
+                findControls.style.display = 'none';
+            }
+        }
+    });
 
-        copyBtn.addEventListener('click', copyVerse);
-        highlightBtn.addEventListener('click', toggleHighlight);
-        notesBtn.addEventListener('click', openNotes);
-        saveNoteBtn.addEventListener('click', saveNote);
-        closeNotesBtn.addEventListener('click', function() {
-            notesModal.style.display = 'none';
+    if (findInput) {
+        findInput.addEventListener('input', function() {
+            performFind(this.value);
         });
-        window.addEventListener('click', function(e) {
-            if (e.target === notesModal) notesModal.style.display = 'none';
-        });
-        readerThemeToggle.addEventListener('click', toggleReaderTheme);
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.verse-content p')) {
-                toggleHighlight();
+        findInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                navigateMatch('next');
             }
         });
+    }
+    if (findPrev) {
+        findPrev.addEventListener('click', function() { navigateMatch('prev'); });
+    }
+    if (findNext) {
+        findNext.addEventListener('click', function() { navigateMatch('next'); });
+    }
+    if (findClose) {
+        findClose.addEventListener('click', function() {
+            findInput.value = '';
+            clearHighlights();
+            findCounter.textContent = '0 matches';
+            findControls.style.display = 'none';
+        });
+    }
 
-        function syncGoToInput() {
-            goToInput.value = `${state.book} ${state.chapter}:${state.verse}`;
-        }
-        const origLoad = loadVerse;
-        loadVerse = function() {
-            origLoad();
-            syncGoToInput();
-        };
-
-    })();
+})();
 </script>
 
 <?php require_once 'includes/footer.php'; ?>

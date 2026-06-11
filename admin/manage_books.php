@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php';
 
 // Only admin can access
 redirectIfNotAdmin();
@@ -9,13 +10,29 @@ redirectIfNotAdmin();
 $error = '';
 $success = '';
 $edit_book = null;
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    $stmt = $db->prepare("DELETE FROM books WHERE id = ?");
+    $stmt = $db->prepare("SELECT cover_path, file_path FROM books WHERE id = ?");
     $stmt->execute([$id]);
-    $success = 'Book deleted successfully.';
+    $book = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($book) {
+        $doc_root = $_SERVER['DOCUMENT_ROOT'];
+        if (!empty($book['cover_path']) && file_exists($doc_root . '/' . $book['cover_path'])) {
+            @unlink($doc_root . '/' . $book['cover_path']);
+        }
+        if (!empty($book['file_path']) && file_exists($doc_root . '/' . $book['file_path'])) {
+            @unlink($doc_root . '/' . $book['file_path']);
+        }
+        $stmt = $db->prepare("DELETE FROM books WHERE id = ?");
+        $stmt->execute([$id]);
+        $success = 'Book deleted successfully.';
+    } else {
+        $error = 'Book not found.';
+    }
     header('Location: ' . SITE_URL . '/admin/manage_books.php');
     exit;
 }
@@ -140,6 +157,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $db->prepare("INSERT INTO books (title, author, description, price, is_free, is_sale, cover_path, file_path, file_type, file_size, file_author, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$title, $author, $description, $price, $is_free, $is_sale, $cover_path, $file_path, $file_type, $file_size, $file_author, $release_date]);
                 $success = 'Book added successfully.';
+                
+                // Admin notification via Zoho SMTP
+                $admin_email = 'angelwrites@zohomail.com';
+                $subject = '📚 New Book Added: ' . $title;
+                $body = "<h2>New Book Added to AngelWrites</h2>";
+                $body .= "<p><strong>Title:</strong> " . $title . "</p>";
+                $body .= "<p><strong>Author:</strong> " . $author . "</p>";
+                $body .= "<p><a href='" . SITE_URL . "/admin/manage_books.php'>View all books</a></p>";
+                sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
             }
             header('Location: ' . SITE_URL . '/admin/manage_books.php');
             exit;
@@ -147,8 +173,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ===== FETCH ALL BOOKS FOR LISTING =====
-$stmt = $db->query("SELECT * FROM books ORDER BY created_at DESC");
+// ===== FETCH ALL BOOKS WITH SEARCH =====
+$sql = "SELECT * FROM books";
+$params = [];
+if (!empty($search)) {
+    $sql .= " WHERE title LIKE ? OR author LIKE ? OR description LIKE ?";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+}
+$sql .= " ORDER BY created_at DESC";
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
 $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Manage Books';
@@ -161,7 +198,7 @@ $pageTitle = 'Manage Books';
             <h1>Manage Books</h1>
             <div class="admin-actions">
                 <button id="showAddForm" class="btn btn-primary">
-                    <i class="fa-pen-fancy"></i> Add New Book
+                    <i class="fas fa-plus"></i> Add New Book
                 </button>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
@@ -175,6 +212,17 @@ $pageTitle = 'Manage Books';
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
+
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <form method="GET" class="search-form">
+                <input type="text" name="search" placeholder="Search books by title, author, or description..." value="<?php echo htmlspecialchars($search); ?>">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <?php if (!empty($search)): ?>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-outline btn-sm">Clear</a>
+                <?php endif; ?>
+            </form>
+        </div>
 
         <!-- Book Form (hidden by default) -->
         <div class="book-form-container" id="bookFormContainer" style="display: <?php echo ($edit_book || isset($_GET['edit'])) ? 'block' : 'none'; ?>;">
@@ -267,7 +315,7 @@ $pageTitle = 'Manage Books';
                                         <tr>
                                             <td>
                                                 <?php if ($book['cover_path']): ?>
-                                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" style="max-width: 50px;">
+                                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" style="max-width: 50px; max-height: 50px; object-fit: cover; border-radius: 6px;">
                                                 <?php else: ?>
                                                     <i class="fas fa-book" style="font-size: 1.5rem; color: var(--rose);"></i>
                                                 <?php endif; ?>
@@ -298,8 +346,8 @@ $pageTitle = 'Manage Books';
                                             <td class="actions">
                                                 <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary"><i class="fas fa-edit"></i></a>
                                                 <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-info"><i class="fas fa-cogs"></i> Process</a>
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this book?');"><i class="fas fa-trash"></i></a>
                                                 <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary" target="_blank"><i class="fas fa-eye"></i></a>
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this book?');"><i class="fas fa-trash"></i></a>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>

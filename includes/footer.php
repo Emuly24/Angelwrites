@@ -22,7 +22,81 @@ TOC NAVIGATOR (Appears on all pages after scrolling 400px)
     </div>
 </div>
 
-<!-- TOC Styles -->
+<!-- ============================================================
+FOOTER – Brand, Links, Social
+============================================================ -->
+<footer class="site-footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="<?php echo SITE_URL; ?>/index.php" class="logo">
+                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="logo-img">
+                </a>
+                <p class="footer-tagline">Writing with purpose, faith, and passion.</p>
+            </div>
+
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <?php if (isLoggedIn()): ?>
+                        <li><a href="<?php echo SITE_URL; ?>/dashboard.php">Dashboard</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/library.php">My Library</a></li>
+                    <?php else: ?>
+                        <li><a href="<?php echo SITE_URL; ?>/index.php">Home</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/books.php">Books</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/poetry.php">Poems</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/blog.php">Blog</a></li>
+                    <?php endif; ?>
+                    <li><a href="<?php echo SITE_URL; ?>/about.php">About</a></li>
+                    <li><a href="<?php echo SITE_URL; ?>/contact.php">Contact</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-social">
+                <h4>Connect</h4>
+                <div class="social-icons">
+                    <a href="<?php echo SITE_URL; ?>/facebook" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="<?php echo SITE_URL; ?>/instagram" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                    <a href="<?php echo SITE_URL; ?>/twitter" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="<?php echo SITE_URL; ?>/youtube" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
+                    <a href="<?php echo SITE_URL; ?>/pinterest" aria-label="Pinterest"><i class="fab fa-pinterest-p"></i></a>
+                </div>
+                <div class="footer-newsletter">
+                    <p>Get updates straight to your inbox.</p>
+                    <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="footer-newsletter-form">
+                        <input type="email" name="email" placeholder="Your email" required>
+                        <button type="submit" aria-label="Subscribe"><i class="fas fa-paper-plane"></i></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>
+                &copy; <?php echo date('Y'); ?> <?php echo SITE_NAME; ?>. All rights reserved.
+                <span class="footer-heart">Made with <i class="fas fa-heart" style="color: var(--rose);"></i> in Malawi.</span>
+            </p>
+            
+            <!-- ===== ADDED: Terms & Privacy Links ===== -->
+            <div class="footer-legal">
+                <a href="<?php echo SITE_URL; ?>/terms.php">Terms of Service</a>
+                <span>|</span>
+                <a href="<?php echo SITE_URL; ?>/privacy.php">Privacy Policy</a>
+                <span>|</span>
+                <a href="<?php echo SITE_URL; ?>/accessibility.php">Accessibility</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- ============================================================
+LOAD MAIN JAVASCRIPT
+============================================================ -->
+<script src="<?php echo SITE_URL; ?>/assets/js/main.js"></script>
+
+<!-- ============================================================
+ADDED: TOC Styles and JavaScript (already present - enhanced)
+============================================================ -->
 <style>
     /* ===== TOC FLOATING BUTTON ===== */
     #tocFloatingBtn {
@@ -172,7 +246,9 @@ TOC NAVIGATOR (Appears on all pages after scrolling 400px)
     }
 </style>
 
-<!-- TOC JavaScript -->
+<!-- ============================================================
+ADDED: TOC JavaScript (enhanced)
+============================================================ -->
 <script>
     (function() {
         'use strict';
@@ -292,67 +368,36 @@ TOC NAVIGATOR (Appears on all pages after scrolling 400px)
 </script>
 
 <!-- ============================================================
-FOOTER – Brand, Links, Social
+ADDED: Cookie Consent Banner (GDPR compliance)
 ============================================================ -->
-<footer class="site-footer">
-    <div class="container">
-        <div class="footer-grid">
-            <div class="footer-brand">
-                <a href="<?php echo SITE_URL; ?>/index.php" class="logo">
-                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="logo-img">
-                </a>
-                <p class="footer-tagline">Writing with purpose, faith, and passion.</p>
-            </div>
-
-            <div class="footer-links">
-                <h4>Quick Links</h4>
-                <ul>
-                    <?php if (isLoggedIn()): ?>
-                        <li><a href="<?php echo SITE_URL; ?>/dashboard.php">Dashboard</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/library.php">My Library</a></li>
-                    <?php else: ?>
-                        <li><a href="<?php echo SITE_URL; ?>/index.php">Home</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/books.php">Books</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/poetry.php">Poems</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/blog.php">Blog</a></li>
-                    <?php endif; ?>
-                    <li><a href="<?php echo SITE_URL; ?>/about.php">About</a></li>
-                    <li><a href="<?php echo SITE_URL; ?>/contact.php">Contact</a></li>
-                </ul>
-            </div>
-
-            <div class="footer-social">
-                <h4>Connect</h4>
-                <div class="social-icons">
-                    <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-                    <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
-                    <a href="#" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
-                    <a href="#" aria-label="Pinterest"><i class="fab fa-pinterest-p"></i></a>
-                </div>
-                <div class="footer-newsletter">
-                    <p>Get updates straight to your inbox.</p>
-                    <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="footer-newsletter-form">
-                        <input type="email" name="email" placeholder="Your email" required>
-                        <button type="submit" aria-label="Subscribe"><i class="fas fa-paper-plane"></i></button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="footer-bottom">
-            <p>
-                &copy; <?php echo date('Y'); ?> <?php echo SITE_NAME; ?>. All rights reserved.
-                <span class="footer-heart">Made with <i class="fas fa-heart" style="color: var(--rose);"></i> in Malawi.</span>
-            </p>
+<div id="cookieConsent" style="position:fixed;bottom:0;left:0;width:100%;background:var(--card-bg);padding:12px 20px;box-shadow:0 -4px 12px rgba(0,0,0,0.1);z-index:2000;display:none;border-top:2px solid var(--rose);">
+    <div class="container" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
+        <p style="margin:0;font-size:0.9rem;color:var(--text);">
+            <i class="fas fa-cookie-bite" style="color:var(--rose);margin-right:8px;"></i>
+            This site uses cookies to improve your experience. 
+            <a href="<?php echo SITE_URL; ?>/privacy.php" style="color:var(--rose);font-weight:600;">Learn more</a>.
+        </p>
+        <div style="display:flex;gap:8px;">
+            <button id="cookieAccept" class="btn btn-sm btn-primary">Accept</button>
+            <button id="cookieDecline" class="btn btn-sm btn-outline">Decline</button>
         </div>
     </div>
-</footer>
-
-<!-- ============================================================
-LOAD MAIN JAVASCRIPT
-============================================================ -->
-<script src="<?php echo SITE_URL; ?>/assets/js/main.js"></script>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (!localStorage.getItem('cookieConsent')) {
+        document.getElementById('cookieConsent').style.display = 'block';
+    }
+    document.getElementById('cookieAccept').addEventListener('click', function() {
+        localStorage.setItem('cookieConsent', 'accepted');
+        document.getElementById('cookieConsent').style.display = 'none';
+    });
+    document.getElementById('cookieDecline').addEventListener('click', function() {
+        localStorage.setItem('cookieConsent', 'declined');
+        document.getElementById('cookieConsent').style.display = 'none';
+    });
+});
+</script>
 
 </body>
 </html>

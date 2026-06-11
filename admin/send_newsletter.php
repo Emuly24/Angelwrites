@@ -14,8 +14,8 @@ $message = '';
 $error = '';
 $subscribers = [];
 
-// Fetch all active subscribers
-$stmt = $db->query("SELECT id, email, name FROM subscribers WHERE is_active = 1 ORDER BY subscribed_at DESC");
+// Fetch all active subscribers (table is 'newsletter', not 'subscribers')
+$stmt = $db->query("SELECT id, email, name, unsubscribe_token FROM newsletter WHERE is_active = 1 ORDER BY subscribed_at DESC");
 $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Handle sending newsletter
@@ -34,12 +34,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($subscribers as $sub) {
                 $unsubscribe_link = SITE_URL . '/newsletter.php?unsubscribe=1&token=' . $sub['unsubscribe_token'];
                 $full_message = $content . "\n\n---\nTo unsubscribe, click here: " . $unsubscribe_link;
-                if (sendEmail($sub['email'], $subject, $full_message, 'no-reply@angelwrites.gt.tc', 'AngelWrites Newsletter')) {
+                // Use sendEmail() from mail_helper.php (Zoho SMTP)
+                if (sendEmail($sub['email'], $subject, $full_message, 'no-reply@angelwrites.gt.tc', SITE_NAME . ' Newsletter')) {
                     $sent_count++;
                 } else {
                     $failed_count++;
                 }
-                // Rate limiting – sleep 0.5 seconds to avoid hitting Gmail limits too fast
+                // Rate limiting – sleep 0.5 seconds to avoid hitting Zoho limits
                 usleep(500000);
             }
         } else {
@@ -48,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $unsubscribe_link = SITE_URL . '/newsletter.php?unsubscribe=1&token=' . bin2hex(random_bytes(32));
                 $full_message = $content . "\n\n---\nTo unsubscribe, click here: " . $unsubscribe_link;
-                if (sendEmail($email, $subject, $full_message, 'no-reply@angelwrites.gt.tc', 'AngelWrites Newsletter')) {
+                if (sendEmail($email, $subject, $full_message, 'no-reply@angelwrites.gt.tc', SITE_NAME . ' Newsletter')) {
                     $sent_count = 1;
                 } else {
                     $failed_count = 1;

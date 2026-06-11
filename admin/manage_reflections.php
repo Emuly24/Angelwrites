@@ -2,11 +2,13 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
 
 $error = '';
 $success = '';
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
@@ -18,25 +20,19 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// ===== FETCH ALL REFLECTIONS =====
-// Get category ID first
-$stmt = $db->prepare("SELECT id FROM blog_categories WHERE name = ?");
-$stmt->execute(['Christian Reflections']);
-$cat_id = $stmt->fetchColumn();
-
-if (!$cat_id) {
-    $reflections = [];
-} else {
-    $stmt = $db->prepare("
-        SELECT p.*, c.name AS category_name
-        FROM blog_posts p
-        LEFT JOIN blog_categories c ON p.category_id = c.id
-        WHERE p.category_id = ?
-        ORDER BY p.created_at DESC
-    ");
-    $stmt->execute([$cat_id]);
-    $reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// ===== FETCH REFLECTIONS =====
+$sql = "SELECT * FROM blog_posts WHERE category = 'Christian Reflections'";
+$params = [];
+if (!empty($search)) {
+    $sql .= " AND (title LIKE ? OR content LIKE ?)";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
 }
+$sql .= " ORDER BY created_at DESC";
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
+$reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Manage Reflections';
 ?>
@@ -48,7 +44,7 @@ $pageTitle = 'Manage Reflections';
             <h1>Manage Christian Reflections</h1>
             <div class="admin-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=reflection" class="btn btn-primary">
-                    <i class="fa-pen-fancy"></i> New Reflection
+                    <i class="fas fa-plus"></i> New Reflection
                 </a>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
@@ -63,6 +59,17 @@ $pageTitle = 'Manage Reflections';
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <form method="GET" class="search-form">
+                <input type="text" name="search" placeholder="Search reflections by title or content..." value="<?php echo htmlspecialchars($search); ?>">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <?php if (!empty($search)): ?>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_reflections.php" class="btn btn-outline btn-sm">Clear</a>
+                <?php endif; ?>
+            </form>
+        </div>
+
         <div class="card">
             <div class="card-header">
                 <h2>All Reflections (<?php echo count($reflections); ?>)</h2>
@@ -74,9 +81,9 @@ $pageTitle = 'Manage Reflections';
                             <thead>
                                 <tr>
                                     <th>Title</th>
-                                    <th>Category</th>
                                     <th>Status</th>
                                     <th>Views</th>
+                                    <th>Created</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -87,13 +94,13 @@ $pageTitle = 'Manage Reflections';
                                             <strong><?php echo htmlspecialchars($post['title']); ?></strong>
                                             <br><small><?php echo date('M j, Y', strtotime($post['created_at'])); ?></small>
                                         </td>
-                                        <td><?php echo htmlspecialchars($post['category_name'] ?? 'Christian Reflections'); ?></td>
                                         <td>
                                             <span class="status-badge <?php echo $post['status']; ?>">
                                                 <?php echo ucfirst($post['status']); ?>
                                             </span>
                                         </td>
                                         <td><?php echo number_format($post['views'] ?? 0); ?></td>
+                                        <td><?php echo date('M j, Y', strtotime($post['created_at'])); ?></td>
                                         <td class="actions">
                                             <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=reflection&id=<?php echo $post['id']; ?>" class="btn btn-sm btn-secondary">
                                                 <i class="fas fa-edit"></i>
@@ -101,9 +108,11 @@ $pageTitle = 'Manage Reflections';
                                             <a href="<?php echo SITE_URL; ?>/admin/manage_reflections.php?delete=<?php echo $post['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this reflection?');">
                                                 <i class="fas fa-trash"></i>
                                             </a>
-                                            <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo $post['slug']; ?>" class="btn btn-sm btn-primary" target="_blank">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
+                                            <?php if ($post['status'] === 'published'): ?>
+                                                <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo $post['slug']; ?>" class="btn btn-sm btn-primary" target="_blank">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -119,6 +128,17 @@ $pageTitle = 'Manage Reflections';
 </div>
 
 <style>
+.admin-page { padding: 32px 0 60px; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.admin-header h1 { font-size: 2rem; margin: 0; }
+.admin-actions { display: flex; gap: 12px; }
+
+.search-bar { margin-bottom: 24px; }
+.search-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
+
 .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
 .admin-table thead { background: var(--vanilla); }
 .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -127,9 +147,14 @@ $pageTitle = 'Manage Reflections';
 .admin-table tbody tr:last-child td { border-bottom: none; }
 .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+.status-badge.draft { background: #f1c40f; color: #fff; }
+.status-badge.published { background: #27ae60; color: #fff; }
+.status-badge.archived { background: #e74c3c; color: #fff; }
+
 .actions { display: flex; gap: 6px; }
-.status-badge.draft { color: #f39c12; background: rgba(243,156,18,0.1); padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; }
-.status-badge.published { color: #27ae60; background: rgba(39,174,96,0.1); padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; }
+.btn-sm { padding: 4px 10px; font-size: 0.8rem; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

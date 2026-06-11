@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/mail_helper.php'; // ADDED: Zoho SMTP email
 
 $book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
@@ -52,6 +53,65 @@ if (isLoggedIn()) {
     $stmt->execute([$user_id, $book_id]);
 }
 
+// ===== HANDLE AJAX PROGRESS SAVE (from JavaScript) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_position']) && isLoggedIn()) {
+    $offset = (int)$_POST['offset'];
+    $section = $_POST['section'] ?? '';
+    $percent = (int)$_POST['percent'];
+    
+    // Update progress
+    $stmt = $db->prepare("UPDATE reading_progress SET position_offset = ?, position_section = ?, progress_percent = ?, last_accessed_at = CURRENT_TIMESTAMP WHERE user_id = ? AND book_id = ?");
+    $stmt->execute([$offset, $section, $percent, $user_id, $book_id]);
+    
+    // ===== EMAIL NOTIFICATION WHEN BOOK IS COMPLETED =====
+    if ($percent >= 100) {
+        // Check if we have already sent a completion email for this user/book
+        $stmt = $db->prepare("SELECT completion_email_sent FROM reading_progress WHERE user_id = ? AND book_id = ?");
+        $stmt->execute([$user_id, $book_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $already_sent = $row['completion_email_sent'] ?? 0;
+        
+        if (!$already_sent) {
+            // Mark as sent
+            $stmt = $db->prepare("UPDATE reading_progress SET completion_email_sent = 1 WHERE user_id = ? AND book_id = ?");
+            $stmt->execute([$user_id, $book_id]);
+            
+            // Send admin email via Zoho SMTP
+            $admin_email = 'angelwrites@zohomail.com';
+            $subject = 'Reader Completed Book: ' . $book['title'];
+            $body = "User ID: $user_id\nBook: " . $book['title'] . "\nProgress: 100%\n\nCongratulations to the reader!";
+            sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
+        }
+    }
+    
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ===== HANDLE BOOKMARK TOGGLE (AJAX) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_bookmark']) && isLoggedIn()) {
+    $section = $_POST['section'] ?? '';
+    $action = $_POST['action'] ?? 'add'; // 'add' or 'remove'
+    
+    if ($action === 'add') {
+        $stmt = $db->prepare("INSERT OR IGNORE INTO bookmarks (user_id, book_id, section) VALUES (?, ?, ?)");
+        $stmt->execute([$user_id, $book_id, $section]);
+    } else {
+        $stmt = $db->prepare("DELETE FROM bookmarks WHERE user_id = ? AND book_id = ? AND section = ?");
+        $stmt->execute([$user_id, $book_id, $section]);
+    }
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ===== FETCH USER BOOKMARKS =====
+$bookmarks = [];
+if (isLoggedIn()) {
+    $stmt = $db->prepare("SELECT section FROM bookmarks WHERE user_id = ? AND book_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$user_id, $book_id]);
+    $bookmarks = $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
 // Parse TOC
 $toc = [];
 if ($has_processed) {
@@ -94,6 +154,12 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
             <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>" class="back-link">
                 <i class="fas fa-arrow-left"></i> Back to Book
             </a>
+            <!-- ADDED: Download button for free books -->
+            <?php if ($book['is_free'] && !$has_processed): ?>
+                <a href="<?php echo SITE_URL . '/' . $book['file_path']; ?>" download class="download-link" style="margin-left:12px; color:var(--rose);">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            <?php endif; ?>
         </div>
         <div class="reader-header-center">
             <h1 class="reader-book-title"><?php echo htmlspecialchars($book['title']); ?></h1>
@@ -101,6 +167,10 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
         </div>
         <div class="reader-header-right">
             <span class="progress-display"><?php echo $progress_percent; ?>%</span>
+            <!-- ADDED: Bookmark button -->
+            <button id="bookmark-btn" class="bookmark-btn" aria-label="Bookmark this page" data-bookmarked="<?php echo in_array('page_' . ($current_page + 1), $bookmarks) ? 'true' : 'false'; ?>">
+                <i class="fas fa-bookmark"></i>
+            </button>
             <button id="settings-toggle" class="settings-btn" aria-label="Settings">
                 <i class="fas fa-cog"></i>
             </button>
@@ -157,6 +227,22 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                 </div>
             </div>
             <?php endif; ?>
+            
+            <!-- ADDED: Find in page -->
+            <?php if ($has_processed): ?>
+            <div class="control-group">
+                <label>Find in Page</label>
+                <div class="find-controls">
+                    <input type="text" id="find-input" placeholder="Search within book..." aria-label="Find in page">
+                    <div class="find-nav">
+                        <button id="find-prev" aria-label="Previous match"><i class="fas fa-chevron-up"></i></button>
+                        <span id="find-counter">0 matches</span>
+                        <button id="find-next" aria-label="Next match"><i class="fas fa-chevron-down"></i></button>
+                    </div>
+                    <button id="find-close" aria-label="Close search"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -166,7 +252,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
             <!-- HTML READER -->
             <div class="html-reader" id="reader-text" data-book-id="<?php echo $book_id; ?>" data-initial-offset="<?php echo $position_offset; ?>" data-total-pages="<?php echo $total_pages; ?>" data-current-page="<?php echo $current_page; ?>">
                 <?php for ($i = 0; $i < $total_pages; $i++): ?>
-                    <div class="page-content" data-page-index="<?php echo $i; ?>" style="<?php echo ($i == $current_page) ? 'display:block;' : 'display:none;'; ?>">
+                    <div class="page-content" data-page-index="<?php echo $i; ?>" data-page-id="page_<?php echo $i + 1; ?>" style="<?php echo ($i == $current_page) ? 'display:block;' : 'display:none;'; ?>">
                         <?php echo $pages[$i]; ?>
                     </div>
                 <?php endfor; ?>
@@ -178,6 +264,18 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                 <span id="page-indicator">Page 1 of <?php echo $total_pages; ?></span>
                 <button id="next-page-btn" class="nav-btn">Next <i class="fas fa-chevron-right"></i></button>
             </div>
+
+            <!-- ADDED: Bookmarked pages list -->
+            <?php if (count($bookmarks) > 0): ?>
+            <div class="bookmarks-list" id="bookmarksList">
+                <h4>📌 Bookmarked Pages</h4>
+                <ul>
+                    <?php foreach ($bookmarks as $bm): ?>
+                        <li><a href="#" data-section="<?php echo $bm; ?>" class="bookmark-jump"><?php echo str_replace('page_', 'Page ', $bm); ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <?php endif; ?>
         <?php else: ?>
             <!-- ===== FALLBACK READER (WITH FIXED SCROLLING) ===== -->
             <div class="fallback-reader">
@@ -441,6 +539,202 @@ document.addEventListener('DOMContentLoaded', function() {
             saveScrollPosition();
         });
     }
+
+    // ---- KEYBOARD SHORTCUTS ----
+    document.addEventListener('keydown', function(e) {
+        // Left arrow = previous page (only in page mode)
+        if (e.key === 'ArrowLeft' && readerApp.dataset.mode === 'page' && totalPages > 1) {
+            e.preventDefault();
+            if (currentPage > 0) {
+                currentPage--;
+                updatePageDisplay();
+            }
+        }
+        // Right arrow = next page (only in page mode)
+        if (e.key === 'ArrowRight' && readerApp.dataset.mode === 'page' && totalPages > 1) {
+            e.preventDefault();
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                updatePageDisplay();
+            }
+        }
+        // Ctrl+F = focus find input
+        if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            const findInput = document.getElementById('find-input');
+            if (findInput) {
+                findInput.focus();
+                findInput.select();
+            }
+        }
+        // Escape = close find
+        if (e.key === 'Escape') {
+            const findInput = document.getElementById('find-input');
+            if (findInput && findInput.value) {
+                findInput.value = '';
+                clearHighlights();
+                document.getElementById('find-counter').textContent = '0 matches';
+            }
+        }
+    });
+
+    // ---- BOOKMARK TOGGLE ----
+    const bookmarkBtn = document.getElementById('bookmark-btn');
+    if (bookmarkBtn) {
+        bookmarkBtn.addEventListener('click', function() {
+            if (!bookId) return;
+            const isBookmarked = this.dataset.bookmarked === 'true';
+            const action = isBookmarked ? 'remove' : 'add';
+            const section = 'page_' + (currentPage + 1);
+            
+            const formData = new FormData();
+            formData.append('toggle_bookmark', '1');
+            formData.append('section', section);
+            formData.append('action', action);
+            
+            fetch('<?php echo SITE_URL; ?>/reader.php?id=' + bookId, {
+                method: 'POST',
+                body: formData
+            }).then(r => r.json()).then(data => {
+                if (data.success) {
+                    this.dataset.bookmarked = isBookmarked ? 'false' : 'true';
+                    // Update icon
+                    const icon = this.querySelector('i');
+                    if (isBookmarked) {
+                        icon.className = 'far fa-bookmark';
+                    } else {
+                        icon.className = 'fas fa-bookmark';
+                    }
+                    // Reload page to refresh bookmarks list (or dynamically update)
+                    location.reload();
+                }
+            });
+        });
+    }
+
+    // ---- BOOKMARK JUMP ----
+    document.querySelectorAll('.bookmark-jump').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const section = this.dataset.section;
+            if (section && section.startsWith('page_')) {
+                const pageNum = parseInt(section.replace('page_', ''));
+                if (pageNum >= 1 && pageNum <= totalPages) {
+                    currentPage = pageNum - 1;
+                    updatePageDisplay();
+                }
+            }
+        });
+    });
+
+    // ---- FIND IN PAGE ----
+    const findInput = document.getElementById('find-input');
+    const findPrev = document.getElementById('find-prev');
+    const findNext = document.getElementById('find-next');
+    const findClose = document.getElementById('find-close');
+    const findCounter = document.getElementById('find-counter');
+    let currentMatchIndex = 0;
+    let matchCount = 0;
+
+    function clearHighlights() {
+        document.querySelectorAll('.find-highlight').forEach(el => {
+            el.outerHTML = el.textContent;
+        });
+    }
+
+    function performFind(query) {
+        clearHighlights();
+        if (!query || query.length < 2) {
+            findCounter.textContent = '0 matches';
+            currentMatchIndex = 0;
+            matchCount = 0;
+            return;
+        }
+
+        // Get the current visible page content
+        let container;
+        if (readerApp.dataset.mode === 'page' && totalPages > 1) {
+            const pageEl = document.querySelector(`.page-content[data-page-index="${currentPage}"]`);
+            container = pageEl ? pageEl : document.querySelector('.html-reader');
+        } else {
+            container = document.querySelector('.html-reader');
+        }
+
+        if (!container) return;
+
+        // Find text nodes containing the query (case-insensitive)
+        const regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+        let matches = [];
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.parentElement && node.parentElement.closest('.find-highlight')) continue;
+            if (regex.test(node.textContent)) {
+                matches.push(node);
+            }
+        }
+
+        matchCount = matches.length;
+        findCounter.textContent = matchCount + ' matches';
+
+        // Highlight matches
+        matches.forEach((textNode, index) => {
+            const text = textNode.textContent;
+            const span = document.createElement('span');
+            span.innerHTML = text.replace(regex, '<span class="find-highlight" data-match-index="' + index + '">$1</span>');
+            textNode.parentNode.replaceChild(span, textNode);
+        });
+
+        // Scroll to first match
+        if (matchCount > 0) {
+            const firstHighlight = container.querySelector('.find-highlight');
+            if (firstHighlight) {
+                firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstHighlight.classList.add('active-highlight');
+                currentMatchIndex = 0;
+            }
+        }
+    }
+
+    function navigateMatch(direction) {
+        const highlights = document.querySelectorAll('.find-highlight');
+        if (highlights.length === 0) return;
+        
+        highlights.forEach(el => el.classList.remove('active-highlight'));
+        if (direction === 'next') {
+            currentMatchIndex = (currentMatchIndex + 1) % highlights.length;
+        } else {
+            currentMatchIndex = (currentMatchIndex - 1 + highlights.length) % highlights.length;
+        }
+        const target = highlights[currentMatchIndex];
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('active-highlight');
+    }
+
+    if (findInput) {
+        findInput.addEventListener('input', function() {
+            performFind(this.value);
+        });
+        findInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                navigateMatch('next');
+            }
+        });
+    }
+    if (findPrev) {
+        findPrev.addEventListener('click', function() { navigateMatch('prev'); });
+    }
+    if (findNext) {
+        findNext.addEventListener('click', function() { navigateMatch('next'); });
+    }
+    if (findClose) {
+        findClose.addEventListener('click', function() {
+            findInput.value = '';
+            clearHighlights();
+            findCounter.textContent = '0 matches';
+        });
+    }
 });
 </script>
 
@@ -449,7 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .reader-app {
     display: flex;
     flex-direction: column;
-    height: 100vh; /* Fallback for older browsers */
+    height: 100vh;
     height: 100dvh;
     background: var(--vanilla);
     color: var(--text);
@@ -478,6 +772,11 @@ document.addEventListener('DOMContentLoaded', function() {
 .settings-btn { background: transparent; border: none; font-size: 1.2rem; color: var(--text); cursor: pointer; transition: transform 0.2s, color 0.2s; }
 .settings-btn:hover { transform: rotate(45deg); color: var(--rose); }
 
+/* ADDED: Bookmark button */
+.bookmark-btn { background: transparent; border: none; font-size: 1.2rem; color: var(--text); cursor: pointer; transition: color 0.2s; }
+.bookmark-btn:hover { color: var(--rose); }
+.bookmark-btn[data-bookmarked="true"] { color: var(--rose); }
+
 /* ===== SETTINGS PANEL ===== */
 .reader-settings {
     flex-shrink: 0;
@@ -502,6 +801,18 @@ document.addEventListener('DOMContentLoaded', function() {
 .size-controls button:hover { border-color: var(--rose); color: var(--rose); }
 .size-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ADDED: Find controls */
+.find-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.find-controls input { flex: 1; min-width: 120px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+.find-nav { display: flex; align-items: center; gap: 4px; }
+.find-nav button { background: transparent; border: 1px solid var(--border); border-radius: 4px; width: 28px; height: 28px; cursor: pointer; color: var(--text); transition: all 0.2s; }
+.find-nav button:hover { border-color: var(--rose); color: var(--rose); }
+#find-counter { font-size: 0.8rem; color: var(--text-light); min-width: 60px; text-align: center; }
+#find-close { background: transparent; border: none; font-size: 1rem; cursor: pointer; color: var(--text-light); transition: color 0.2s; }
+#find-close:hover { color: var(--rose); }
+.find-highlight { background: rgba(255, 255, 0, 0.4); padding: 0 2px; }
+.find-highlight.active-highlight { background: rgba(255, 200, 0, 0.7); }
+
 /* ===== CONTENT AREA (SCROLLABLE) ===== */
 .reader-content-area {
     flex-grow: 1;
@@ -511,7 +822,6 @@ document.addEventListener('DOMContentLoaded', function() {
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
-    /* THE FIX: Ensure the content area takes up remaining space */
     height: 0; 
     min-height: 0;
 }
@@ -541,6 +851,19 @@ document.addEventListener('DOMContentLoaded', function() {
 .page-nav-controls .nav-btn:hover { background: var(--rose-dark); transform: scale(1.02); }
 .page-nav-controls .nav-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 #page-indicator { font-weight: 600; color: var(--text); }
+
+/* ADDED: Bookmarks list */
+.bookmarks-list {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--rose-light);
+}
+.bookmarks-list h4 { margin: 0 0 8px 0; font-size: 0.9rem; }
+.bookmarks-list ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.bookmarks-list li a { display: block; padding: 4px 12px; background: var(--vanilla); border-radius: 6px; color: var(--text); text-decoration: none; font-size: 0.8rem; transition: background 0.2s; }
+.bookmarks-list li a:hover { background: var(--rose); color: white; }
 
 /* ===== THEMES ===== */
 .reader-app[data-theme="paper"] { background: var(--vanilla); color: var(--text); }
@@ -595,7 +918,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .reader-app[data-mode="page"] .page-content h1 { font-size: 1.8rem; margin-top: 0; }
 .reader-app[data-mode="page"] .page-content p { margin-bottom: 16px; line-height: 1.8; }
 
-/* ===== FALLBACK READER (ENSURE PARENT SCROLLS) ===== */
+/* ===== FALLBACK READER ===== */
 .fallback-reader {
     height: 100%;
     padding: 0;
@@ -603,7 +926,6 @@ document.addEventListener('DOMContentLoaded', function() {
     border: none;
     border-radius: 0;
     box-shadow: none;
-    /* THE FIX: Allow the parent container to scroll */
     display: flex;
     flex-direction: column;
 }
@@ -622,7 +944,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .pdf-container iframe {
     display: block;
     width: 100%;
-    min-height: 100vh; /* Force a huge height so the parent will scroll */
+    min-height: 100vh;
     border: 0;
     height: auto;
 }

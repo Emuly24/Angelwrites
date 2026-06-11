@@ -2,11 +2,13 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
 
 $error = '';
 $success = '';
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
@@ -15,11 +17,13 @@ if (isset($_GET['delete'])) {
     try {
         $db->beginTransaction();
         
+        // Fetch poem to get file paths
         $stmt = $db->prepare("SELECT image_path, audio_path FROM poems WHERE id = ?");
         $stmt->execute([$id]);
         $poem = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($poem) {
+            // Delete files from server
             $doc_root = $_SERVER['DOCUMENT_ROOT'];
             if (!empty($poem['image_path']) && file_exists($doc_root . '/' . $poem['image_path'])) {
                 @unlink($doc_root . '/' . $poem['image_path']);
@@ -27,6 +31,8 @@ if (isset($_GET['delete'])) {
             if (!empty($poem['audio_path']) && file_exists($doc_root . '/' . $poem['audio_path'])) {
                 @unlink($doc_root . '/' . $poem['audio_path']);
             }
+            
+            // Delete related records
             $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?");
             $stmt->execute([$id]);
             $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?");
@@ -48,8 +54,82 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// ===== FETCH ALL POEMS =====
-$stmt = $db->query("SELECT * FROM poems ORDER BY created_at DESC");
+// ===== HANDLE ADD/EDIT POEM =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
+    $id = isset($_POST['poem_id']) ? (int)$_POST['poem_id'] : 0;
+    $title = trim($_POST['title']);
+    $intro = trim($_POST['intro']);
+    $content = trim($_POST['content']);
+    
+    if (empty($title) || empty($content)) {
+        $error = 'Title and content are required.';
+    } else {
+        // Handle image upload
+        $image_path = null;
+        if (!empty($_FILES['image']['name'])) {
+            $upload_dir = '../assets/uploads/poems/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $filename = 'poem_' . time() . '.' . $ext;
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $filename)) {
+                $image_path = 'assets/uploads/poems/' . $filename;
+            }
+        }
+        
+        // Handle audio upload
+        $audio_path = null;
+        if (!empty($_FILES['audio']['name'])) {
+            $upload_dir = '../assets/uploads/audio/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($_FILES['audio']['name'], PATHINFO_EXTENSION);
+            $filename = 'audio_' . time() . '.' . $ext;
+            if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $filename)) {
+                $audio_path = 'assets/uploads/audio/' . $filename;
+            }
+        }
+        
+        if ($id > 0) {
+            // Update existing poem
+            $stmt = $db->prepare("
+                UPDATE poems SET title = ?, intro = ?, content = ?, image_path = COALESCE(?, image_path), audio_path = COALESCE(?, audio_path)
+                WHERE id = ?
+            ");
+            $stmt->execute([$title, $intro, $content, $image_path, $audio_path, $id]);
+            $success = 'Poem updated successfully!';
+        } else {
+            // Insert new poem
+            $stmt = $db->prepare("
+                INSERT INTO poems (title, intro, content, image_path, audio_path) 
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$title, $intro, $content, $image_path, $audio_path]);
+            $success = 'Poem added successfully!';
+        }
+        
+        // Admin notification (optional)
+        // $admin_email = 'angelwrites@zohomail.com';
+        // $subject = '📝 New Poem Added: ' . $title;
+        // $body = "<p>A new poem has been added to the site.</p>";
+        // sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+        
+        header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+        exit;
+    }
+}
+
+// ===== FETCH POEMS WITH SEARCH =====
+$sql = "SELECT * FROM poems";
+$params = [];
+if (!empty($search)) {
+    $sql .= " WHERE title LIKE ? OR intro LIKE ? OR content LIKE ?";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+}
+$sql .= " ORDER BY created_at DESC";
+
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
 $poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Manage Poems';
@@ -62,7 +142,7 @@ $pageTitle = 'Manage Poems';
             <h1>Manage Poems</h1>
             <div class="admin-actions">
                 <button id="showAddModal" class="btn btn-primary">
-                    <i class="fa-pen-fancy"></i> Add New Poem
+                    <i class="fas fa-plus"></i> Add New Poem
                 </button>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
@@ -77,84 +157,18 @@ $pageTitle = 'Manage Poems';
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- ===== ADD POEM MODAL ===== -->
-        <div id="addPoemModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width: 700px;">
-                <div class="modal-header">
-                    <h2>Add New Poem</h2>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <form method="POST" enctype="multipart/form-data" class="admin-form">
-                    <input type="hidden" name="add_poem" value="1">
-                    
-                    <div class="form-group">
-                        <label for="modal_title">Title <span class="required">*</span></label>
-                        <input type="text" id="modal_title" name="title" required>
-                    </div>
-
-                    <!-- ===== AUTO-EXPANDING INTRODUCTION ===== -->
-                    <div class="form-group">
-                        <label for="modal_intro">Purpose / Introduction</label>
-                        <textarea id="modal_intro" name="intro" rows="3" placeholder="Write a short introduction explaining the purpose or inspiration behind this poem..." oninput="this.style.height='auto'; this.style.height=(this.scrollHeight)+'px';"></textarea>
-                        <small class="field-hint">This will appear before the poem. It auto-expands as you type.</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="modal_content">Content <span class="required">*</span></label>
-                        <textarea id="editor" name="content" rows="12"></textarea>
-                    </div>
-                    
-                    <!-- ===== DRAG & DROP IMAGE ZONE ===== -->
-                    <div class="form-group">
-                        <label>Poem Image (Drag & Drop or Click to Choose)</label>
-                        <div id="dropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                            <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block;"></i>
-                            <p style="margin: 0; color: var(--text-light);">Drag & drop your image here, or <strong>click to browse</strong></p>
-                            <input type="file" id="fileInput" name="image" accept="image/*" style="display: none;">
-                            <div id="previewContainer" style="display: none; margin-top: 12px;">
-                                <img id="previewImage" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ===== AUDIO UPLOAD ZONE ===== -->
-                    <div class="form-group">
-                        <label>Poem Audio (MP3 or WAV) – optional</label>
-                        <div id="audioDropZone" style="border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                            <i class="fas fa-music" style="font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block;"></i>
-                            <p style="margin: 0; color: var(--text-light);">Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
-                            <input type="file" id="audioInput" name="audio" accept="audio/*" style="display: none;">
-                            <div id="audioPreviewContainer" style="display: none; margin-top: 12px;">
-                                <audio controls id="audioPreview" style="width: 100%;"><source src="" type="audio/mpeg"></audio>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ===== AUDIO RECORDER SECTION ===== -->
-                    <div class="recorder-section">
-                        <h4>🎙️ Or Record Directly</h4>
-                        <div class="recorder-controls">
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
-                            <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        </div>
-                        <p class="field-hint">Record your poem directly in the browser. The recording will be saved when you submit the form.</p>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Save Poem</button>
-                        <button type="button" class="btn btn-outline modal-close">Cancel</button>
-                    </div>
-                </form>
-            </div>
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <form method="GET" class="search-form">
+                <input type="text" name="search" placeholder="Search poems by title, introduction, or content..." value="<?php echo htmlspecialchars($search); ?>">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <?php if (!empty($search)): ?>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-outline btn-sm">Clear</a>
+                <?php endif; ?>
+            </form>
         </div>
 
-        <!-- ===== POEMS TABLE ===== -->
+        <!-- Poems Table -->
         <div class="card">
             <div class="card-header">
                 <h2>All Poems (<?php echo count($poems); ?>)</h2>
@@ -170,6 +184,7 @@ $pageTitle = 'Manage Poems';
                                     <th>Introduction</th>
                                     <th>Audio</th>
                                     <th>Views</th>
+                                    <th>Created</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -205,10 +220,11 @@ $pageTitle = 'Manage Poems';
                                             <?php endif; ?>
                                         </td>
                                         <td><?php echo number_format($poem['view_count'] ?? 0); ?></td>
+                                        <td><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></td>
                                         <td class="actions">
-                                            <a href="<?php echo SITE_URL; ?>/admin/poem_editor.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-secondary">
+                                            <button class="btn btn-sm btn-secondary edit-btn" data-id="<?php echo $poem['id']; ?>" data-title="<?php echo htmlspecialchars($poem['title']); ?>" data-intro="<?php echo htmlspecialchars($poem['intro'] ?? ''); ?>" data-content="<?php echo htmlspecialchars($poem['content'] ?? ''); ?>">
                                                 <i class="fas fa-edit"></i>
-                                            </a>
+                                            </button>
                                             <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?delete=<?php echo $poem['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this poem?');">
                                                 <i class="fas fa-trash"></i>
                                             </a>
@@ -222,44 +238,118 @@ $pageTitle = 'Manage Poems';
                         </table>
                     </div>
                 <?php else: ?>
-                    <p class="no-items">No poems yet.</p>
+                    <p class="no-items">No poems yet. Click "Add New Poem" to get started.</p>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
+<!-- ===== ADD/EDIT POEM MODAL ===== -->
+<div id="poemModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h2 id="modalTitle">Add New Poem</h2>
+            <button class="modal-close">&times;</button>
+        </div>
+        <form method="POST" enctype="multipart/form-data" class="poem-form">
+            <input type="hidden" name="poem_id" id="poem_id" value="0">
+            <input type="hidden" name="save_poem" value="1">
+            
+            <div class="form-group">
+                <label for="title">Title <span class="required">*</span></label>
+                <input type="text" id="title" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="intro">Introduction / Purpose</label>
+                <textarea id="intro" name="intro" rows="3" placeholder="Write a short introduction explaining the purpose or inspiration behind this poem..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="content">Content <span class="required">*</span></label>
+                <textarea id="editor" name="content" rows="10"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Poem Image (Drag & Drop or Click to Choose)</label>
+                <div id="dropZone" class="upload-zone">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Drag & drop your image here, or <strong>click to browse</strong></p>
+                    <input type="file" id="fileInput" name="image" accept="image/*" style="display: none;">
+                    <div id="previewContainer" style="display: none; margin-top: 12px;">
+                        <img id="previewImage" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Poem Audio (MP3 or WAV) – optional</label>
+                <div id="audioDropZone" class="upload-zone">
+                    <i class="fas fa-music"></i>
+                    <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
+                    <input type="file" id="audioInput" name="audio" accept="audio/*" style="display: none;">
+                    <div id="audioPreviewContainer" style="display: none; margin-top: 12px;">
+                        <audio controls id="audioPreview" style="width: 100%;"><source src="" type="audio/mpeg"></audio>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Poem</button>
+                <button type="button" class="btn btn-outline modal-close">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- ===== TINYMCE & MODAL JAVASCRIPT ===== -->
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
     let editorInitialized = false;
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let recordedAudioBlob = null;
-
-    // ===== DOM REFS =====
-    const showModalBtn = document.getElementById('showAddModal');
-    const modal = document.getElementById('addPoemModal');
-    const closeButtons = document.querySelectorAll('.modal-close');
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const previewContainer = document.getElementById('previewContainer');
-    const previewImage = document.getElementById('previewImage');
-    const audioDropZone = document.getElementById('audioDropZone');
-    const audioInput = document.getElementById('audioInput');
-    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
-    const audioPreview = document.getElementById('audioPreview');
-    const recordBtn = document.getElementById('recordBtn');
-    const recordingStatus = document.getElementById('recordingStatus');
-    const recordingInput = document.getElementById('recordingInput');
-    const recordingPreviewContainer = document.getElementById('recordingPreviewContainer');
-    const recordingPreview = document.getElementById('recordingPreview');
+    let editingId = 0;
 
     // ===== MODAL LOGIC =====
-    showModalBtn.addEventListener('click', function() {
+    const modal = document.getElementById('poemModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const closeButtons = document.querySelectorAll('.modal-close');
+    const addBtn = document.getElementById('showAddModal');
+    const editBtns = document.querySelectorAll('.edit-btn');
+
+    function openModal(title, data) {
+        modalTitle.textContent = title;
         modal.style.display = 'flex';
         initTinyMCE();
+        if (data) {
+            document.getElementById('poem_id').value = data.id;
+            document.getElementById('title').value = data.title;
+            document.getElementById('intro').value = data.intro;
+            tinymce.get('editor').setContent(data.content);
+        } else {
+            document.getElementById('poem_id').value = 0;
+            document.getElementById('title').value = '';
+            document.getElementById('intro').value = '';
+            tinymce.get('editor').setContent('');
+        }
+    }
+
+    addBtn.addEventListener('click', function() {
+        editingId = 0;
+        openModal('Add New Poem', null);
+    });
+
+    editBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            editingId = this.dataset.id;
+            const data = {
+                id: this.dataset.id,
+                title: this.dataset.title,
+                intro: this.dataset.intro,
+                content: this.dataset.content
+            };
+            openModal('Edit Poem', data);
+        });
     });
 
     closeButtons.forEach(function(btn) {
@@ -286,7 +376,7 @@ $pageTitle = 'Manage Poems';
             content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
             forced_root_block: 'p',
             setup: function(editor) {
-                editor.on('change', function () {
+                editor.on('change', function() {
                     tinymce.triggerSave();
                 });
             }
@@ -294,7 +384,12 @@ $pageTitle = 'Manage Poems';
         editorInitialized = true;
     }
 
-    // ===== IMAGE DRAG & DROP =====
+    // ===== DRAG & DROP IMAGE =====
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImage = document.getElementById('previewImage');
+
     dropZone.addEventListener('click', function() { fileInput.click(); });
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) handleFile(e.target.files[0]);
@@ -325,14 +420,19 @@ $pageTitle = 'Manage Poems';
         reader.onload = function(e) {
             previewImage.src = e.target.result;
             previewContainer.style.display = 'block';
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            fileInput.files = dataTransfer.files;
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
         };
         reader.readAsDataURL(file);
     }
 
-    // ===== AUDIO DRAG & DROP =====
+    // ===== DRAG & DROP AUDIO =====
+    const audioDropZone = document.getElementById('audioDropZone');
+    const audioInput = document.getElementById('audioInput');
+    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
+    const audioPreview = document.getElementById('audioPreview');
+
     audioDropZone.addEventListener('click', function() { audioInput.click(); });
     audioInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) handleAudio(e.target.files[0]);
@@ -362,173 +462,65 @@ $pageTitle = 'Manage Poems';
         const url = URL.createObjectURL(file);
         audioPreview.src = url;
         audioPreviewContainer.style.display = 'block';
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        audioInput.files = dataTransfer.files;
-    }
-
-    // ===== AUDIO RECORDER (Fixed) =====
-    if (recordBtn) {
-        recordBtn.addEventListener('click', async function() {
-            // If currently recording, stop it
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                recordingStatus.style.display = 'none';
-                recordBtn.textContent = '🎙️ Start Recording';
-                recordBtn.classList.remove('btn-danger');
-                recordBtn.classList.add('btn-secondary');
-                return;
-            }
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = () => {
-                    recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-
-                    // Show the preview player with the recorded audio
-                    const url = URL.createObjectURL(recordedAudioBlob);
-                    recordingPreview.src = url;
-                    recordingPreview.load();
-                    recordingPreviewContainer.style.display = 'block';
-
-                    // Show confirmation controls
-                    document.getElementById('recordingForm').style.display = 'block';
-                    document.querySelector('.recorder-controls').innerHTML = `
-                        <audio controls src="${url}" style="width:100%;"></audio>
-                        <div style="display:flex; gap:12px; margin-top:10px;">
-                            <button type="button" id="confirmRecordingBtn" class="btn btn-success btn-sm">✅ Use This Recording</button>
-                            <button type="button" id="reRecordBtn" class="btn btn-warning btn-sm">🔄 Re-record</button>
-                        </div>
-                    `;
-
-                    // Attach confirm event
-                    document.getElementById('confirmRecordingBtn').addEventListener('click', function() {
-                        const dataTransfer = new DataTransfer();
-                        const file = new File([recordedAudioBlob], 'poem_recording.webm', { type: 'audio/webm' });
-                        dataTransfer.items.add(file);
-                        recordingInput.files = dataTransfer.files;
-                        recordingPreviewContainer.style.display = 'none';
-                        alert('Recording confirmed! It will be saved with the poem.');
-                        // Reset recorder UI
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
-                            <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        `;
-                        // Re-bind the record button
-                        location.reload(); // Simplest reset
-                    });
-
-                    // Attach re-record event
-                    document.getElementById('reRecordBtn').addEventListener('click', function() {
-                        recordedAudioBlob = null;
-                        recordingPreviewContainer.style.display = 'none';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
-                            <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        `;
-                        // Re-bind record button
-                        location.reload(); // Simplest reset
-                    });
-                };
-
-                mediaRecorder.start();
-                recordingStatus.style.display = 'inline';
-                recordBtn.textContent = '⏹️ Stop Recording';
-                recordBtn.classList.remove('btn-secondary');
-                recordBtn.classList.add('btn-danger');
-            } catch (error) {
-                alert('Microphone access denied or not available.');
-                console.error('Recording error:', error);
-            }
-        });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        audioInput.files = dt.files;
     }
 });
 </script>
 
 <style>
-    /* ===== MODAL STYLES ===== */
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-    }
-    .modal-content {
-        background: var(--card-bg);
-        border-radius: 16px;
-        padding: 32px;
-        width: 90%;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .modal-header h2 { margin: 0; }
-    .modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
-    .modal-close:hover { color: var(--rose); }
+/* ===== ADMIN PAGE ===== */
+.admin-page { padding: 32px 0 60px; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.admin-header h1 { font-size: 2rem; margin: 0; }
+.admin-actions { display: flex; gap: 12px; }
 
-    /* ===== ADMIN TABLE ===== */
-    .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-    .admin-table thead { background: var(--vanilla); }
-    .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
-    .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
-    .admin-table tbody tr:last-child td { border-bottom: none; }
-    .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
-    .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+/* ===== SEARCH BAR ===== */
+.search-bar { margin-bottom: 24px; }
+.search-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
 
-    /* ===== FORM STYLES ===== */
-    .admin-form .form-group { margin-bottom: 16px; }
-    .admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
-    .admin-form input[type="text"], .admin-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
-    .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-    .admin-form textarea { resize: vertical; min-height: 60px; }
+/* ===== TABLE ===== */
+.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.admin-table thead { background: var(--vanilla); }
+.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
+.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+.table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
+.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 
-    /* ===== RECORDER STYLES ===== */
-    .recorder-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .recorder-section .btn { padding: 8px 16px; }
-    #recordingStatus { font-weight: 600; color: #e74c3c; }
-    .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
+/* ===== UPLOAD ZONES ===== */
+.upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--fantasy); }
+.upload-zone i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block; }
+.upload-zone p { margin: 0; color: var(--text-light); }
+.upload-zone:hover { border-color: var(--rose); background: rgba(219, 161, 162, 0.05); }
 
-    .form-actions { display: flex; gap: 12px; margin-top: 16px; }
-    .form-actions .btn { min-width: 120px; justify-content: center; }
-    .btn-primary { background: var(--rose); color: white; }
-    .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
-    .btn-secondary { background: var(--dark); color: white; }
-    .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
-    .btn-danger { background: #e74c3c; color: white; }
-    .btn-danger:hover { background: #c0392b; }
+/* ===== MODAL ===== */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.modal-content { background: var(--card-bg); border-radius: 16px; padding: 32px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
+.modal-close:hover { color: var(--rose); }
+
+/* ===== FORM ===== */
+.poem-form .form-group { margin-bottom: 16px; }
+.poem-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.poem-form input, .poem-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.poem-form input:focus, .poem-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.poem-form textarea { resize: vertical; min-height: 60px; }
+.poem-form .form-actions { display: flex; gap: 12px; margin-top: 16px; }
+.poem-form .form-actions .btn { min-width: 120px; justify-content: center; }
+.required { color: #e74c3c; }
+
+@media (max-width: 480px) {
+    .modal-content { padding: 20px; }
+    .search-form { flex-direction: column; }
+    .search-form input { width: 100%; }
+}
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

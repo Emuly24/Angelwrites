@@ -2,11 +2,11 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php'; // Added for email
 
 // Only admin can access
 redirectIfNotAdmin();
 
-// ===== REDIRECT POEM REQUESTS TO POEM EDITOR =====
 if (isset($_GET['type']) && $_GET['type'] === 'poem') {
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     header('Location: ' . SITE_URL . '/admin/poem_editor.php' . ($id ? '?id=' . $id : ''));
@@ -17,7 +17,6 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $error = '';
 $success = '';
 
-// Fetch existing blog post
 $title = '';
 $intro = '';
 $content = '';
@@ -43,7 +42,6 @@ if ($id > 0) {
     }
 }
 
-// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
@@ -55,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $uploaded_featured_image = $featured_image;
 
-    // Handle featured image upload
     if (!empty($_FILES['featured_image']['name'])) {
         $upload_dir = '../assets/uploads/blog/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -67,27 +64,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Handle audio recording
     if (isset($_FILES['audio_recording']) && $_FILES['audio_recording']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/audio/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $rec_filename = 'rec_' . time() . '.webm';
         if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
             $uploaded_audio_path = 'assets/uploads/audio/' . $rec_filename;
-            // Store in a custom field or attach to the post
         } else {
             $error = 'Failed to upload recorded audio.';
         }
     }
 
-    // Handle video recording
     if (isset($_FILES['video_recording']) && $_FILES['video_recording']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/videos/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $video_filename = 'vid_' . time() . '.webm';
         if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
             $uploaded_video_path = 'assets/uploads/videos/' . $video_filename;
-            // Store in a custom field or attach to the post
         } else {
             $error = 'Failed to upload recorded video.';
         }
@@ -97,36 +90,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Title and content are required.';
     } else {
         if ($id > 0) {
-            // Update existing blog post
             $stmt = $db->prepare("UPDATE blog_posts SET title = ?, content = ?, excerpt = ?, category = ?, tags = ?, status = ?, featured_image = ? WHERE id = ?");
             $stmt->execute([$title, $content, $intro, $category, $tags, $status, $uploaded_featured_image, $id]);
             $success = 'Blog post updated successfully!';
         } else {
-            // Insert new blog post
             $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title)));
             $stmt = $db->prepare("INSERT INTO blog_posts (title, slug, content, excerpt, category, tags, status, featured_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$title, $slug, $content, $intro, $category, $tags, $status, $uploaded_featured_image]);
             $id = $db->lastInsertId();
             $success = 'Blog post created successfully!';
+
+            // ===== ADMIN NOTIFICATION (Zoho SMTP) =====
+            $admin_email = 'angelwrites@zohomail.com';
+            $subject = 'New Blog Post: ' . $title;
+            $body = "A new blog post has been added.\n\nTitle: $title\nCategory: $category\n\nView post: " . SITE_URL . "/blog.php?slug=" . $slug;
+            sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
         }
 
-        // ===== HANDLE NEWSLETTER BROADCAST =====
+        // ===== NEWSLETTER BROADCAST (using Zoho SMTP) =====
         if (isset($_POST['send_newsletter'])) {
             $subject = $title;
-            $message_body = nl2br($content);
-            $headers = "From: " . SITE_NAME . " <admin@angelawrites.com>\r\n";
-            $headers .= "Reply-To: admin@angelawrites.com\r\n";
-            $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+            // Build HTML email content
+            $full_message = "<html><body>";
+            $full_message .= "<h2>$title</h2>";
+            if (!empty($intro)) $full_message .= "<p><em>$intro</em></p>";
+            $full_message .= "<div>" . nl2br($content) . "</div>";
+            $full_message .= "<hr><p>Unsubscribe: " . SITE_URL . "/newsletter.php?unsubscribe=1&token=[TOKEN]</p>";
+            $full_message .= "</body></html>";
 
-            $stmt = $db->prepare("SELECT email FROM newsletter WHERE is_active = 1");
+            // Fetch all active subscribers
+            $stmt = $db->prepare("SELECT email, unsubscribe_token FROM newsletter WHERE is_active = 1");
             $stmt->execute();
-            $subscribers = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             $sent_count = 0;
-            foreach ($subscribers as $email) {
-                if (mail($email, $subject, $message_body, $headers)) {
+            foreach ($subscribers as $sub) {
+                // Replace token placeholder
+                $personalized_message = str_replace('[TOKEN]', $sub['unsubscribe_token'], $full_message);
+                if (sendEmail($sub['email'], $subject, $personalized_message, 'no-reply@angelwrites.gt.tc', SITE_NAME . ' Blog')) {
                     $sent_count++;
                 }
+                usleep(500000); // Rate limit
             }
             $success .= " Broadcast sent to $sent_count subscribers.";
         }

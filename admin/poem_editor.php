@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/mail_helper.php'; // Added for email
 
 redirectIfNotAdmin();
 
@@ -84,6 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$title, $intro, $content, $uploaded_image_path, $uploaded_audio_path]);
             $id = $db->lastInsertId();
             $success = 'Poem created successfully!';
+
+            // ===== ADMIN NOTIFICATION (Zoho SMTP) =====
+            $admin_email = 'angelwrites@zohomail.com'; // Or fetch from settings
+            $subject = 'New Poem Added: ' . $title;
+            $body = "A new poem has been added by admin.\n\nTitle: $title\nIntro: $intro\n\nView poem: " . SITE_URL . "/admin/preview_poem.php?id=$id";
+            sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
         }
 
         if ($action === 'save_and_continue') {
