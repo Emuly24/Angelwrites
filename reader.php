@@ -36,19 +36,22 @@ $current_page_index = 0;
 
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
+
+    // ===== SAFETY CHECK: Verify the user still exists =====
+    $stmtCheck = $db->prepare("SELECT id FROM users WHERE id = ?");
+    $stmtCheck->execute([$user_id]);
+    $userExists = $stmtCheck->fetch();
+
+    if (!$userExists) {
+        session_destroy();
+        header('Location: ' . SITE_URL . '/login.php');
+        exit;
+    }
+    // =============================================
+
     $stmt = $db->prepare("SELECT * FROM reading_progress WHERE user_id = ? AND book_id = ?");
     $stmt->execute([$user_id, $book_id]);
     $user_progress = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($user_progress) {
-        $position_offset = $user_progress['position_offset'] ?? 0;
-        $position_section = $user_progress['position_section'] ?? '';
-        $progress_percent = $user_progress['progress_percent'] ?? 0;
-    } else {
-        $stmt = $db->prepare("INSERT INTO reading_progress (user_id, book_id, position_offset, position_section, progress_percent) VALUES (?, ?, 0, '', 0)");
-        $stmt->execute([$user_id, $book_id]);
-    }
-    
     $stmt = $db->prepare("INSERT OR REPLACE INTO reading_status (user_id, book_id, status) VALUES (?, ?, 'currently reading')");
     $stmt->execute([$user_id, $book_id]);
 }

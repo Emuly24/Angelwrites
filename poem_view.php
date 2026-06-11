@@ -67,16 +67,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) &&
         exit;
     }
 }
-// ===== TRACKING: User read this poem =====
+/// ===== TRACKING: User read this poem =====
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
+
+    // ===== SAFETY CHECK: Verify the user still exists =====
+    $stmtCheck = $db->prepare("SELECT id FROM users WHERE id = ?");
+    $stmtCheck->execute([$user_id]);
+    $userExists = $stmtCheck->fetch();
+
+    if (!$userExists) {
+        // The session is stale. Force a logout and redirect.
+        session_destroy();
+        header('Location: ' . SITE_URL . '/login.php');
+        exit;
+    }
+    // =============================================
+
     $stmt = $db->prepare("INSERT OR IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
     $stmt->execute([$user_id, $id]);
 }
-
-// Increment view count
-$stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
-$stmt->execute([$id]);
 
 $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 ?>

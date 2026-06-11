@@ -14,14 +14,19 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     
-    $stmt = $db->prepare("SELECT thumbnail FROM videos WHERE id = ?");
+    $stmt = $db->prepare("SELECT thumbnail, video_file FROM videos WHERE id = ?");
     $stmt->execute([$id]);
     $video = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($video) {
         $doc_root = $_SERVER['DOCUMENT_ROOT'];
+        // Delete thumbnail
         if (!empty($video['thumbnail']) && file_exists($doc_root . '/' . $video['thumbnail'])) {
             @unlink($doc_root . '/' . $video['thumbnail']);
+        }
+        // Delete video file
+        if (!empty($video['video_file']) && file_exists($doc_root . '/' . $video['video_file'])) {
+            @unlink($doc_root . '/' . $video['video_file']);
         }
         $stmt = $db->prepare("DELETE FROM videos WHERE id = ?");
         $stmt->execute([$id]);
@@ -43,10 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_video'])) {
 
     if (empty($title)) {
         $error = 'Video title is required.';
-    } elseif (empty($video_url)) {
-        $error = 'Video URL is required.';
     } else {
         $thumbnail = null;
+        $video_file = null;
+
+        // Handle Thumbnail Upload
         if (!empty($_FILES['thumbnail']['name'])) {
             $upload_dir = '../assets/uploads/videos/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -56,13 +62,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_video'])) {
             }
         }
 
+        // Handle Video File Upload (Live Recording)
+        if (!empty($_FILES['video_file']['name'])) {
+            $upload_dir = '../assets/uploads/videos/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $file_extension = pathinfo($_FILES['video_file']['name'], PATHINFO_EXTENSION);
+            $new_filename = 'video_' . time() . '.' . $file_extension;
+            if (move_uploaded_file($_FILES['video_file']['tmp_name'], $upload_dir . $new_filename)) {
+                $video_file = 'assets/uploads/videos/' . $new_filename;
+            }
+        }
+
+        // Merge Data for Insert/Update
         if ($id > 0) {
-            $stmt = $db->prepare("UPDATE videos SET title = ?, description = ?, video_url = ?, type = ?, thumbnail = COALESCE(?, thumbnail) WHERE id = ?");
-            $stmt->execute([$title, $description, $video_url, $type, $thumbnail, $id]);
+            $stmt = $db->prepare("
+                UPDATE videos 
+                SET title = ?, description = ?, video_url = ?, type = ?, 
+                    thumbnail = COALESCE(?, thumbnail), 
+                    video_file = COALESCE(?, video_file) 
+                WHERE id = ?
+            ");
+            $stmt->execute([$title, $description, $video_url, $type, $thumbnail, $video_file, $id]);
             $success = 'Video updated successfully.';
         } else {
-            $stmt = $db->prepare("INSERT INTO videos (title, description, video_url, type, thumbnail) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$title, $description, $video_url, $type, $thumbnail]);
+            $stmt = $db->prepare("INSERT INTO videos (title, description, video_url, type, thumbnail, video_file) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$title, $description, $video_url, $type, $thumbnail, $video_file]);
             $success = 'Video added successfully.';
         }
         header('Location: ' . SITE_URL . '/admin/manage_videos.php');
@@ -126,35 +150,90 @@ $pageTitle = 'Manage Videos';
                     <h2>Add New Video</h2>
                 </div>
                 <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" class="admin-form">
+                    <form method="POST" enctype="multipart/form-data" class="admin-form" id="videoForm">
                         <input type="hidden" name="video_id" id="video_id" value="0">
                         <input type="hidden" name="save_video" value="1">
-                        <div class="form-group">
-                            <label for="title">Video Title <span class="required">*</span></label>
-                            <input type="text" id="title" name="title" required>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="title">Video Title <span class="required">*</span></label>
+                                <input type="text" id="title" name="title" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="type">Type</label>
+                                <select id="type" name="type">
+                                    <option value="short">Short</option>
+                                    <option value="full">Full</option>
+                                </select>
+                            </div>
                         </div>
+                        
                         <div class="form-group">
                             <label for="description">Description</label>
                             <textarea id="description" name="description" rows="3"></textarea>
                         </div>
-                        <div class="form-group">
-                            <label for="video_url">Video URL <span class="required">*</span></label>
-                            <input type="text" id="video_url" name="video_url" placeholder="https://www.youtube.com/watch?v=..." required>
+                        
+                        <!-- ===== VIDEO UPLOAD / RECORDER SECTION ===== -->
+                        <div class="video-upload-section">
+                            <h3>Video Source</h3>
+                            <div class="upload-tabs">
+                                <div class="tab-buttons">
+                                    <button type="button" class="tab-btn active" data-tab="url-tab">YouTube / Vimeo Link</button>
+                                    <button type="button" class="tab-btn" data-tab="upload-tab">Upload / Record Video</button>
+                                </div>
+                                
+                                <div id="url-tab" class="tab-content active">
+                                    <div class="form-group">
+                                        <label for="video_url">Video URL</label>
+                                        <input type="text" id="video_url" name="video_url" placeholder="https://www.youtube.com/watch?v=...">
+                                    </div>
+                                </div>
+                                
+                                <div id="upload-tab" class="tab-content">
+                                    <div class="recorder-wrapper">
+                                        <!-- Video Preview -->
+                                        <div class="video-preview-container">
+                                            <video id="videoPreview" autoplay muted></video>
+                                            <div class="video-placeholder" id="videoPlaceholder">
+                                                <i class="fas fa-video"></i>
+                                                <p>Camera preview will appear here.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Recording Controls -->
+                                        <div class="recorder-controls">
+                                            <div class="controls-left">
+                                                <button type="button" id="startRecordBtn" class="btn btn-primary btn-sm"><i class="fas fa-circle"></i> Start Recording</button>
+                                                <button type="button" id="stopRecordBtn" class="btn btn-danger btn-sm" disabled><i class="fas fa-stop"></i> Stop</button>
+                                            </div>
+                                            <div class="controls-right">
+                                                <button type="button" id="retakeBtn" class="btn btn-outline btn-sm" disabled><i class="fas fa-redo"></i> Retake</button>
+                                                <button type="button" id="confirmVideoBtn" class="btn btn-success btn-sm" disabled><i class="fas fa-check"></i> Use This Video</button>
+                                            </div>
+                                            <span id="recordingStatus" class="status-indicator">Ready</span>
+                                        </div>
+                                        
+                                        <!-- Hidden File Input -->
+                                        <div class="file-input-wrapper">
+                                            <label for="video_file" class="btn btn-outline btn-sm">
+                                                <i class="fas fa-upload"></i> Or Upload Video File
+                                            </label>
+                                            <input type="file" id="video_file" name="video_file" accept="video/*" style="display:none;">
+                                            <span id="fileChosen" class="file-status">No file chosen</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="type">Type</label>
-                            <select id="type" name="type">
-                                <option value="short">Short</option>
-                                <option value="full">Full</option>
-                            </select>
-                        </div>
+
                         <div class="form-group">
                             <label for="thumbnail">Thumbnail Image</label>
                             <input type="file" id="thumbnail" name="thumbnail" accept="image/*">
                         </div>
+                        
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Video</button>
-                            <button type="button" class="btn btn-outline" id="cancelForm">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-large"><i class="fas fa-save"></i> Save Video</button>
+                            <button type="button" class="btn btn-outline btn-large" id="cancelForm">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -174,7 +253,7 @@ $pageTitle = 'Manage Videos';
                                     <th>Thumbnail</th>
                                     <th>Title</th>
                                     <th>Type</th>
-                                    <th>URL</th>
+                                    <th>Source</th>
                                     <th>Created</th>
                                     <th>Actions</th>
                                 </tr>
@@ -193,10 +272,23 @@ $pageTitle = 'Manage Videos';
                                         </td>
                                         <td><strong><?php echo htmlspecialchars($video['title']); ?></strong></td>
                                         <td><span class="status-badge"><?php echo ucfirst($video['type']); ?></span></td>
-                                        <td><a href="<?php echo htmlspecialchars($video['video_url']); ?>" target="_blank" class="video-link"><i class="fas fa-external-link-alt"></i> View</a></td>
+                                        <td>
+                                            <?php if (!empty($video['video_file'])): ?>
+                                                <span class="source-local"><i class="fas fa-upload"></i> Uploaded</span>
+                                            <?php elseif (!empty($video['video_url'])): ?>
+                                                <a href="<?php echo htmlspecialchars($video['video_url']); ?>" target="_blank" class="source-link"><i class="fas fa-external-link-alt"></i> Link</a>
+                                            <?php else: ?>
+                                                <span class="text-muted">N/A</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?php echo date('M j, Y', strtotime($video['created_at'])); ?></td>
                                         <td class="actions">
-                                            <button class="btn btn-sm btn-secondary edit-btn" data-id="<?php echo $video['id']; ?>" data-title="<?php echo htmlspecialchars($video['title']); ?>" data-description="<?php echo htmlspecialchars($video['description'] ?? ''); ?>" data-url="<?php echo htmlspecialchars($video['video_url']); ?>" data-type="<?php echo $video['type']; ?>">
+                                            <button class="btn btn-sm btn-secondary edit-btn" 
+                                                    data-id="<?php echo $video['id']; ?>" 
+                                                    data-title="<?php echo htmlspecialchars($video['title']); ?>" 
+                                                    data-description="<?php echo htmlspecialchars($video['description'] ?? ''); ?>" 
+                                                    data-url="<?php echo htmlspecialchars($video['video_url']); ?>" 
+                                                    data-type="<?php echo $video['type']; ?>">
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                             <a href="<?php echo SITE_URL; ?>/admin/manage_videos.php?delete=<?php echo $video['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this video?');">
@@ -221,6 +313,132 @@ $pageTitle = 'Manage Videos';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== TAB SWITCHING =====
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab).classList.add('active');
+        });
+    });
+
+    // ===== VIDEO RECORDER LOGIC =====
+    const videoPreview = document.getElementById('videoPreview');
+    const videoPlaceholder = document.getElementById('videoPlaceholder');
+    const startBtn = document.getElementById('startRecordBtn');
+    const stopBtn = document.getElementById('stopRecordBtn');
+    const retakeBtn = document.getElementById('retakeBtn');
+    const confirmBtn = document.getElementById('confirmVideoBtn');
+    const statusSpan = document.getElementById('recordingStatus');
+    const videoFileInput = document.getElementById('video_file');
+    const fileChosenSpan = document.getElementById('fileChosen');
+
+    let mediaRecorder;
+    let recordedChunks = [];
+    let liveStream = null;
+    let recordedBlob = null;
+
+    async function startRecording() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Your browser does not support live video recording.');
+                return;
+            }
+            liveStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            videoPreview.srcObject = liveStream;
+            videoPreview.style.display = 'block';
+            videoPlaceholder.style.display = 'none';
+            
+            mediaRecorder = new MediaRecorder(liveStream);
+            recordedChunks = [];
+            
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = () => {
+                recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(recordedBlob);
+                videoPreview.srcObject = null;
+                videoPreview.src = url;
+                videoPreview.muted = true;
+                videoPreview.style.display = 'block';
+                
+                // Enable confirmation buttons
+                confirmBtn.disabled = false;
+                retakeBtn.disabled = false;
+                statusSpan.textContent = 'Recording stopped.';
+                statusSpan.style.color = '#27ae60';
+            };
+            
+            mediaRecorder.start();
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            retakeBtn.disabled = true;
+            confirmBtn.disabled = true;
+            statusSpan.textContent = '🔴 Recording...';
+            statusSpan.style.color = '#e74c3c';
+        } catch (error) {
+            alert('Camera/Microphone access denied: ' + error.message);
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            liveStream.getTracks().forEach(track => track.stop());
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+    }
+
+    function retakeVideo() {
+        recordedBlob = null;
+        videoPreview.src = '';
+        videoPreview.style.display = 'none';
+        videoPlaceholder.style.display = 'flex';
+        confirmBtn.disabled = true;
+        retakeBtn.disabled = true;
+        videoFileInput.value = '';
+        fileChosenSpan.textContent = 'No file chosen';
+        statusSpan.textContent = 'Ready';
+        statusSpan.style.color = 'var(--text-light)';
+    }
+
+    function useVideo() {
+        if (!recordedBlob) return;
+        const file = new File([recordedBlob], 'recorded_video.webm', { type: 'video/webm' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        videoFileInput.files = dataTransfer.files;
+        fileChosenSpan.textContent = 'Video ready to upload (recorded)';
+        confirmBtn.disabled = true;
+        retakeBtn.disabled = true;
+        statusSpan.textContent = '✅ Video captured!';
+        statusSpan.style.color = '#2ecc71';
+    }
+
+    startBtn.addEventListener('click', startRecording);
+    stopBtn.addEventListener('click', stopRecording);
+    retakeBtn.addEventListener('click', retakeVideo);
+    confirmBtn.addEventListener('click', useVideo);
+
+    // ===== FILE INPUT HANDLING =====
+    videoFileInput.addEventListener('change', function() {
+        if (this.files && this.files.length > 0) {
+            fileChosenSpan.textContent = this.files[0].name;
+        } else {
+            fileChosenSpan.textContent = 'No file chosen';
+        }
+    });
+
+    // ===== FORM TOGGLE LOGIC =====
     const showAddBtn = document.getElementById('showAddForm');
     const formContainer = document.getElementById('videoFormContainer');
     const cancelBtn = document.getElementById('cancelForm');
@@ -228,22 +446,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function toggleForm(show) {
         formContainer.style.display = show ? 'block' : 'none';
-        if (show) formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        else window.location.href = '<?php echo SITE_URL; ?>/admin/manage_videos.php';
+        if (show) {
+            formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            window.location.href = '<?php echo SITE_URL; ?>/admin/manage_videos.php';
+        }
     }
 
     showAddBtn.addEventListener('click', function() {
+        resetForm();
+        toggleForm(true);
+    });
+
+    cancelBtn.addEventListener('click', function() { toggleForm(false); });
+
+    function resetForm() {
         videoIdInput.value = 0;
         document.getElementById('title').value = '';
         document.getElementById('description').value = '';
         document.getElementById('video_url').value = '';
         document.getElementById('type').value = 'short';
         document.querySelector('.card-header h2').textContent = 'Add New Video';
-        toggleForm(true);
-    });
+        retakeVideo();
+    }
 
-    cancelBtn.addEventListener('click', function() { toggleForm(false); });
-
+    // ===== EDIT BUTTON LOGIC =====
     document.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             videoIdInput.value = this.dataset.id;
@@ -252,6 +479,8 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('video_url').value = this.dataset.url;
             document.getElementById('type').value = this.dataset.type;
             document.querySelector('.card-header h2').textContent = 'Edit Video';
+            // Reset recorder for edit
+            retakeVideo();
             toggleForm(true);
         });
     });
@@ -259,34 +488,86 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* ===== ADMIN LAYOUT ===== */
 .admin-page { padding: 32px 0 60px; }
 .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
 .admin-header h1 { font-size: 2rem; margin: 0; }
 .admin-actions { display: flex; gap: 12px; }
 
+/* ===== SEARCH BAR ===== */
 .search-bar { margin-bottom: 24px; }
 .search-form { display: flex; gap: 8px; flex-wrap: wrap; }
-.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
 .search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
 
+/* ===== FORM ===== */
+.admin-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.admin-form .form-group { margin-bottom: 16px; }
+.admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
+.admin-form input[type="text"], .admin-form input[type="email"], .admin-form select, .admin-form textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text);
+}
+.admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.required { color: #dc2626; }
+.admin-form .form-actions { display: flex; gap: 12px; margin-top: 16px; }
+.admin-form .btn-large { padding: 14px 28px; border-radius: 30px; font-size: 1.05rem; }
+
+/* ===== VIDEO UPLOAD / RECORDER SECTION ===== */
+.video-upload-section { border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; background: var(--fantasy); }
+.upload-tabs { margin-top: 8px; }
+.tab-buttons { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.tab-btn { background: transparent; border: none; padding: 8px 16px; font-weight: 500; color: var(--text-light); cursor: pointer; border-radius: 8px 8px 0 0; transition: all 0.2s; }
+.tab-btn.active { color: var(--rose); border-bottom: 2px solid var(--rose); }
+.tab-btn:hover { color: var(--rose); }
+.tab-content { display: none; padding-top: 8px; }
+.tab-content.active { display: block; }
+
+/* ===== RECORDER WIDGET ===== */
+.recorder-wrapper { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.video-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+.video-preview-container video { width: 100%; height: 100%; object-fit: cover; display: none; }
+.video-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-light); text-align: center; padding: 24px; }
+.video-placeholder i { font-size: 2.5rem; margin-bottom: 8px; color: var(--rose); }
+.video-placeholder p { margin: 0; font-size: 0.9rem; }
+.recorder-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; }
+.recorder-controls .btn { padding: 6px 14px; font-size: 0.85rem; }
+.status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
+.file-input-wrapper { display: flex; align-items: center; gap: 8px; }
+.file-input-wrapper .file-status { font-size: 0.85rem; color: var(--text-light); }
+
+/* ===== TABLE ===== */
 .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
 .admin-table thead { background: var(--vanilla); }
 .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
 .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
 .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
-.admin-table tbody tr:last-child td { border-bottom: none; }
 .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 
-.status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.available { background: #2ecc71; color: white; }
-.status-badge.missing { background: #e74c3c; color: white; }
+/* ===== BADGES & STATUS ===== */
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; background: var(--vanilla); color: var(--text); }
+.source-local { color: #27ae60; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px; }
+.source-link { color: var(--rose); font-size: 0.85rem; text-decoration: none; }
+.source-link:hover { text-decoration: underline; }
 
-.actions { display: flex; gap: 6px; }
-.btn-sm { padding: 4px 10px; font-size: 0.8rem; }
-.video-link { color: var(--rose); text-decoration: none; }
-.video-link:hover { text-decoration: underline; }
+/* ===== ACTIONS ===== */
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 20px; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .admin-form .form-row { grid-template-columns: 1fr; }
+    .tab-buttons { flex-direction: column; gap: 4px; border-bottom: none; }
+    .tab-btn { border-radius: 8px; border: 1px solid var(--border); }
+    .recorder-controls { flex-direction: column; align-items: stretch; }
+}
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
