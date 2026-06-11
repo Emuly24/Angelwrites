@@ -70,17 +70,15 @@ if ($isLoggedIn) {
         .skip-link:focus { top: 0; }
 
         .logo-img {
-            height: 200px;
-            width: auto;
+            height: 200px !important;
+            width: auto !important;
             max-width: 100%;
-            display: block;
-            object-fit: contain;
         }
 
         @media (max-width: 480px) {
         .logo-img {
-            height: 120px;
-            max-width: 90%;
+            height: 120px !important;
+            max-width: 90% !important;
             }
         }
 
