@@ -69,15 +69,15 @@ if ($isLoggedIn) {
         }
         .skip-link:focus { top: 0; }
 
-        /* ===== LOGO - ENSURE IT STAYS LARGE ===== */
+        /* ===== LOGO - BALANCED SIZE ===== */
         .logo {
             display: flex;
             align-items: center;
             flex-shrink: 0;
-            min-width: 150px;
+            
         }
         .logo-img {
-            height: 200px !important;
+            height: 180px !important; 
             width: auto !important;
             max-width: 100%;
             display: block;
@@ -85,38 +85,23 @@ if ($isLoggedIn) {
         }
 
         @media (max-width: 480px) {
-            .logo {
-                min-width: 100px;
-            }
             .logo-img {
                 height: 120px !important;
                 max-width: 90% !important;
             }
         }
 
-        /* ===== GLOBAL NOTIFICATION ===== */
-        .global-notification {
-            background: var(--rose);
-            color: white;
-            text-align: center;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            position: sticky;
-            top: 0;
-            z-index: 1001;
+        /* ===== NAVIGATION LINKS - FILL REMAINING SPACE ===== */
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            flex: 1; /* This makes the nav links take up remaining space */
+            justify-content: center;
         }
-        .global-notification a { color: white; text-decoration: underline; }
-
-        /* ===== BREADCRUMBS ===== */
-        .breadcrumbs {
-            background: var(--vanilla);
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.85rem;
-        }
-        .breadcrumbs a { color: var(--text); text-decoration: none; }
-        .breadcrumbs a:hover { color: var(--rose); }
-        .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
 
         /* ===== NAV ACTIONS ===== */
         .nav-actions {
@@ -126,6 +111,7 @@ if ($isLoggedIn) {
             flex-wrap: wrap;
             justify-content: flex-end;
             flex-shrink: 0;
+            margin-left: auto; /* Pushes actions to the right */
         }
         .nav-action-icon {
             position: relative;
@@ -160,6 +146,30 @@ if ($isLoggedIn) {
             text-align: center;
             line-height: 1.4;
         }
+
+        /* ===== GLOBAL NOTIFICATION ===== */
+        .global-notification {
+            background: var(--rose);
+            color: white;
+            text-align: center;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            position: sticky;
+            top: 0;
+            z-index: 1001;
+        }
+        .global-notification a { color: white; text-decoration: underline; }
+
+        /* ===== BREADCRUMBS ===== */
+        .breadcrumbs {
+            background: var(--vanilla);
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .breadcrumbs a { color: var(--text); text-decoration: none; }
+        .breadcrumbs a:hover { color: var(--rose); }
+        .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
 
         /* ===== HAMBURGER MENU (HIDDEN ON DESKTOP) ===== */
         .hamburger {
