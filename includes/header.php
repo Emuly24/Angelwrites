@@ -10,23 +10,28 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 
-
 // Determine current role (guest, reader, admin)
 $isLoggedIn = isLoggedIn();
 $isAdmin = isAdmin();
 $isReader = $isLoggedIn && !$isAdmin;
 $currentPage = basename($_SERVER['PHP_SELF']);
 
-// ===== FETCH UNREAD NOTIFICATIONS COUNT (if user logged in) =====
+// ===== FETCH UNREAD NOTIFICATIONS COUNT & LATEST 3 =====
 $unreadNotifications = 0;
+$latestNotifications = [];
 if ($isLoggedIn) {
     $user_id = $_SESSION['user_id'];
     try {
         $stmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
         $stmt->execute([$user_id]);
         $unreadNotifications = $stmt->fetchColumn();
+        
+        $stmt = $db->prepare("SELECT id, title, message, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
+        $stmt->execute([$user_id]);
+        $latestNotifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
         $unreadNotifications = 0;
+        $latestNotifications = [];
     }
 }
 ?>
@@ -52,6 +57,7 @@ if ($isLoggedIn) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
     <meta name="theme-color" content="#DBA1A2">
+    <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
     
     <style>
         /* ===== SKIP LINK ===== */
@@ -70,7 +76,7 @@ if ($isLoggedIn) {
         }
         .skip-link:focus { top: 0; }
 
-        /* ===== MOVE LOGO TO FAR LEFT ===== */
+        /* ===== LOGO ===== */
         header .container.nav-container {
             max-width: 100% !important;
             padding-left: 0 !important;
@@ -95,7 +101,7 @@ if ($isLoggedIn) {
             }
         }
 
-        /* ===== NAVIGATION LINKS - FILL REMAINING SPACE ===== */
+        /* ===== NAVIGATION ===== */
         .nav-links {
             display: flex;
             align-items: center;
@@ -106,8 +112,6 @@ if ($isLoggedIn) {
             flex: 1;
             justify-content: center;
         }
-
-        /* ===== NAV ACTIONS ===== */
         .nav-actions {
             display: flex;
             align-items: center;
@@ -151,6 +155,139 @@ if ($isLoggedIn) {
             line-height: 1.4;
         }
 
+        /* ===== NOTIFICATION DROPDOWN ===== */
+        .notification-wrapper {
+            position: relative;
+        }
+        .notification-dropdown {
+            position: absolute;
+            top: 130%;
+            right: 0;
+            width: 280px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: var(--shadow-hover);
+            display: none;
+            z-index: 1002;
+        }
+        .notification-dropdown.open {
+            display: block;
+        }
+        .notification-dropdown .notif-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .notification-dropdown .notif-item:last-child {
+            border-bottom: none;
+        }
+        .notification-dropdown .notif-title {
+            font-weight: 600;
+        }
+        .notification-dropdown .notif-date {
+            color: var(--text-light);
+            font-size: 0.75rem;
+        }
+        .notification-dropdown .view-all {
+            display: block;
+            text-align: center;
+            margin-top: 8px;
+            color: var(--rose);
+            font-weight: 500;
+        }
+
+        /* ===== SEARCH DROPDOWN ===== */
+        .search-wrapper {
+            position: relative;
+        }
+        .search-dropdown {
+            position: absolute;
+            top: 130%;
+            right: 0;
+            width: 300px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: var(--shadow-hover);
+            display: none;
+            z-index: 1002;
+        }
+        .search-dropdown.open {
+            display: flex;
+            gap: 8px;
+        }
+        .search-dropdown input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            background: var(--input-bg);
+            color: var(--text);
+        }
+        .search-dropdown input:focus {
+            outline: none;
+            border-color: var(--rose);
+            box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+        }
+        .search-dropdown button {
+            background: var(--rose);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .search-dropdown button:hover {
+            background: var(--rose-dark);
+        }
+
+        /* ===== USER DROPDOWN ===== */
+        .user-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .user-wrapper:hover {
+            background: rgba(219, 161, 162, 0.1);
+        }
+        .user-dropdown {
+            position: absolute;
+            top: 130%;
+            right: 0;
+            width: 160px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px 0;
+            box-shadow: var(--shadow-hover);
+            display: none;
+            z-index: 1002;
+        }
+        .user-dropdown.open {
+            display: block;
+        }
+        .user-dropdown a {
+            display: block;
+            padding: 8px 16px;
+            color: var(--text);
+            text-decoration: none;
+            transition: background 0.2s;
+            font-size: 0.9rem;
+        }
+        .user-dropdown a:hover {
+            background: rgba(219, 161, 162, 0.1);
+        }
+
         /* ===== GLOBAL NOTIFICATION ===== */
         .global-notification {
             background: var(--rose);
@@ -175,29 +312,35 @@ if ($isLoggedIn) {
         .breadcrumbs a:hover { color: var(--rose); }
         .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
 
-        /* ===== MOBILE STYLES (992px and below) ===== */
+        /* ===== STICKY HEADER SHADOW ===== */
+        .site-header.scrolled {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        /* ===== MOBILE ===== */
         @media (max-width: 992px) {
             .hamburger {
                 display: flex !important;
             }
             .nav-links {
-                display: none; /* Default hidden */
+                display: none;
                 flex-direction: column;
                 position: fixed;
                 top: 0;
-                right: -100%; /* Off-screen */
+                right: -100%;
                 width: 280px;
                 height: 100vh;
                 background: var(--card-bg);
                 border-left: 1px solid var(--border);
                 padding: 80px 24px 24px;
-                box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+                box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
                 z-index: 999;
                 overflow-y: auto;
                 transition: right 0.3s ease;
             }
             .nav-links.open {
                 right: 0;
+                display: flex;
             }
             .nav-links li {
                 margin: 4px 0;
@@ -227,11 +370,20 @@ if ($isLoggedIn) {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0,0,0,0.5);
+                background: rgba(0, 0, 0, 0.5);
                 z-index: 998;
             }
             .menu-overlay.open {
                 display: block;
+            }
+            .search-dropdown {
+                width: 260px;
+            }
+            .notification-dropdown {
+                width: 260px;
+            }
+            .user-dropdown {
+                width: 140px;
             }
         }
 
@@ -244,7 +396,7 @@ if ($isLoggedIn) {
 <body>
     <a href="#mainContent" class="skip-link">Skip to main content</a>
 
-    <header class="site-header">
+    <header class="site-header" id="siteHeader">
         <nav class="navbar" role="navigation" aria-label="Main navigation">
             <div class="container nav-container">
                 <a href="<?php echo SITE_URL; ?>/index.php" class="logo" aria-label="AngelWrites – Home">
@@ -286,25 +438,69 @@ if ($isLoggedIn) {
                 </ul>
 
                 <div class="nav-actions">
-                    <a href="<?php echo SITE_URL; ?>/search_results.php" class="nav-action-icon" aria-label="Search content">
-                        <i class="fas fa-search"></i>
-                    </a>
+                    <!-- ===== SEARCH ===== -->
+                    <div class="search-wrapper">
+                        <button class="search-trigger nav-action-icon" aria-label="Search" onclick="toggleSearch()">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <form action="<?php echo SITE_URL; ?>/search_results.php" method="GET" class="search-dropdown" id="searchDropdown">
+                            <input type="text" name="q" placeholder="Search books, poems, blog..." autocomplete="off" id="searchInput">
+                            <button type="submit" aria-label="Submit search"><i class="fas fa-arrow-right"></i></button>
+                        </form>
+                    </div>
+
+                    <!-- ===== BIBLE READER ===== -->
                     <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
                         <i class="fas fa-book-bible"></i>
                     </a>
+
+                    <!-- ===== NOTIFICATIONS ===== -->
                     <?php if ($isLoggedIn): ?>
-                        <a href="<?php echo SITE_URL; ?>/notifications.php" class="nav-action-icon" aria-label="Notifications">
-                            <i class="fas fa-bell"></i>
-                            <?php if ($unreadNotifications > 0): ?>
-                                <span class="notification-badge" aria-label="<?php echo $unreadNotifications; ?> unread notifications"><?php echo $unreadNotifications; ?></span>
-                            <?php endif; ?>
-                        </a>
+                        <div class="notification-wrapper">
+                            <button class="nav-action-icon" aria-label="Notifications" onclick="toggleNotifications()">
+                                <i class="fas fa-bell"></i>
+                                <?php if ($unreadNotifications > 0): ?>
+                                    <span class="notification-badge" aria-label="<?php echo $unreadNotifications; ?> unread notifications"><?php echo $unreadNotifications; ?></span>
+                                <?php endif; ?>
+                            </button>
+                            <div class="notification-dropdown" id="notificationDropdown">
+                                <?php if (count($latestNotifications) > 0): ?>
+                                    <?php foreach ($latestNotifications as $notif): ?>
+                                        <div class="notif-item">
+                                            <div class="notif-title"><?php echo htmlspecialchars($notif['title']); ?></div>
+                                            <div class="notif-message"><?php echo htmlspecialchars(substr($notif['message'], 0, 60)); ?></div>
+                                            <div class="notif-date"><?php echo date('M j, Y', strtotime($notif['created_at'])); ?></div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                    <a href="<?php echo SITE_URL; ?>/notifications.php" class="view-all">View All →</a>
+                                <?php else: ?>
+                                    <div class="notif-item">No notifications yet.</div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     <?php endif; ?>
-                    
+
+                    <!-- ===== THEME TOGGLE ===== -->
                     <button class="nav-action-icon theme-toggle" id="themeToggle" aria-label="Toggle theme">
                         <i class="fas fa-moon"></i>
                     </button>
 
+                    <!-- ===== USER DROPDOWN (Logged in only) ===== -->
+                    <?php if ($isLoggedIn): ?>
+                        <div class="user-wrapper" onclick="toggleUserMenu()">
+                            <i class="fas fa-user-circle" style="font-size: 1.2rem; color: var(--text);"></i>
+                            <span style="font-size: 0.9rem; color: var(--text);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'User'); ?></span>
+                            <div class="user-dropdown" id="userDropdown">
+                                <a href="<?php echo SITE_URL; ?>/dashboard.php">Dashboard</a>
+                                <a href="<?php echo SITE_URL; ?>/library.php">My Library</a>
+                                <a href="<?php echo SITE_URL; ?>/profile.php">Profile</a>
+                                <hr style="margin: 4px 0; border: 0; border-top: 1px solid var(--border);">
+                                <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #e74c3c;">Logout</a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- ===== HAMBURGER (Mobile only) ===== -->
                     <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false" onclick="toggleMobileMenu()">
                         <span></span>
                         <span></span>
@@ -339,8 +535,24 @@ if ($isLoggedIn) {
             </div>
         <?php endif; ?>
 
+        <!-- ===== SCROLL SHADOW SCRIPT ===== -->
         <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const header = document.getElementById('siteHeader');
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 10) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+            });
+        });
+        </script>
+
+        <!-- ===== MAIN JAVASCRIPT ===== -->
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ===== THEME TOGGLE =====
             const themeToggle = document.getElementById('themeToggle');
             const html = document.documentElement;
             const themes = ['light', 'dark', 'system'];
@@ -388,27 +600,61 @@ if ($isLoggedIn) {
             });
         });
 
-        // ===== SEPARATE MOBILE MENU FUNCTIONS (Global Scope) =====
+        // ===== SEARCH DROPDOWN =====
+        function toggleSearch() {
+            const dropdown = document.getElementById('searchDropdown');
+            const input = document.getElementById('searchInput');
+            dropdown.classList.toggle('open');
+            if (dropdown.classList.contains('open')) {
+                input.focus();
+            }
+        }
+        document.addEventListener('click', function(e) {
+            const wrapper = document.querySelector('.search-wrapper');
+            const dropdown = document.getElementById('searchDropdown');
+            if (wrapper && dropdown && !wrapper.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        // ===== NOTIFICATIONS DROPDOWN =====
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationDropdown');
+            dropdown.classList.toggle('open');
+        }
+        document.addEventListener('click', function(e) {
+            const wrapper = document.querySelector('.notification-wrapper');
+            const dropdown = document.getElementById('notificationDropdown');
+            if (wrapper && dropdown && !wrapper.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        // ===== USER DROPDOWN =====
+        function toggleUserMenu() {
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('open');
+        }
+        document.addEventListener('click', function(e) {
+            const wrapper = document.querySelector('.user-wrapper');
+            const dropdown = document.getElementById('userDropdown');
+            if (wrapper && dropdown && !wrapper.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        // ===== MOBILE MENU =====
         function toggleMobileMenu() {
             var navLinks = document.getElementById('navLinks');
             var overlay = document.getElementById('menuOverlay');
             var hamburger = document.getElementById('hamburger');
             var body = document.body;
 
-            // Check if the menu is currently open
             var isOpen = navLinks.classList.contains('open');
 
             if (isOpen) {
-                // Close the menu
-                navLinks.classList.remove('open');
-                overlay.classList.remove('open');
-                hamburger.classList.remove('active');
-                hamburger.setAttribute('aria-expanded', 'false');
-                body.style.overflow = '';
-                navLinks.style.display = 'none';
-                navLinks.style.right = '-100%';
+                closeMobileMenu();
             } else {
-                // Open the menu
                 navLinks.classList.add('open');
                 overlay.classList.add('open');
                 hamburger.classList.add('active');
