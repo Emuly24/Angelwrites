@@ -37,16 +37,14 @@ foreach ($search_terms as $term) {
 // Helper: Build WHERE clause for a table
 function buildSearchWhere($table, $columns, $like_terms) {
     $where_parts = [];
+    $params = [];
     foreach ($columns as $col) {
         $where_parts[] = "$table.$col LIKE ?";
-    }
-    $where = '(' . implode(' OR ', $where_parts) . ')';
-    $params = [];
-    foreach ($like_terms as $term) {
-        foreach ($columns as $col) {
+        foreach ($like_terms as $term) {
             $params[] = $term;
         }
     }
+    $where = '(' . implode(' OR ', $where_parts) . ')';
     return ['where' => $where, 'params' => $params];
 }
 
@@ -55,18 +53,18 @@ if ($type === 'all' || $type === 'books') {
     $columns = ['title', 'author', 'description'];
     $where_data = buildSearchWhere('books', $columns, $like_terms);
     $sql = "SELECT 'book' as type, id, title, author as author, description, cover_path as image, created_at, NULL as slug, NULL as content, NULL as excerpt FROM books WHERE " . $where_data['where'];
-    $params = $where_data['params'];
+    
     // Count
     $count_sql = "SELECT COUNT(*) FROM books WHERE " . $where_data['where'];
     $stmt = $db->prepare($count_sql);
-    $stmt->execute($params);
+    $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
+    
     // Fetch
     if ($count > 0) {
         $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
+        $params = array_merge($where_data['params'], [$limit, $offset]);
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -77,16 +75,16 @@ if ($type === 'all' || $type === 'poems') {
     $columns = ['title', 'intro', 'content'];
     $where_data = buildSearchWhere('poems', $columns, $like_terms);
     $sql = "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt FROM poems WHERE " . $where_data['where'];
-    $params = $where_data['params'];
+    
     $count_sql = "SELECT COUNT(*) FROM poems WHERE " . $where_data['where'];
     $stmt = $db->prepare($count_sql);
-    $stmt->execute($params);
+    $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
+    
     if ($count > 0) {
         $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
+        $params = array_merge($where_data['params'], [$limit, $offset]);
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -97,16 +95,16 @@ if ($type === 'all' || $type === 'blog') {
     $columns = ['title', 'content', 'excerpt', 'category'];
     $where_data = buildSearchWhere('blog_posts', $columns, $like_terms);
     $sql = "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt FROM blog_posts WHERE status = 'published' AND " . $where_data['where'];
-    $params = $where_data['params'];
+    
     $count_sql = "SELECT COUNT(*) FROM blog_posts WHERE status = 'published' AND " . $where_data['where'];
     $stmt = $db->prepare($count_sql);
-    $stmt->execute($params);
+    $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
+    
     if ($count > 0) {
         $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
+        $params = array_merge($where_data['params'], [$limit, $offset]);
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -117,16 +115,16 @@ if ($type === 'all' || $type === 'reflections') {
     $columns = ['title', 'content', 'excerpt'];
     $where_data = buildSearchWhere('reflections', $columns, $like_terms);
     $sql = "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, NULL as slug, content, excerpt FROM reflections WHERE " . $where_data['where'];
-    $params = $where_data['params'];
+    
     $count_sql = "SELECT COUNT(*) FROM reflections WHERE " . $where_data['where'];
     $stmt = $db->prepare($count_sql);
-    $stmt->execute($params);
+    $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
+    
     if ($count > 0) {
         $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
+        $params = array_merge($where_data['params'], [$limit, $offset]);
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -137,16 +135,16 @@ if ($type === 'all' || $type === 'videos') {
     $columns = ['title', 'description'];
     $where_data = buildSearchWhere('videos', $columns, $like_terms);
     $sql = "SELECT 'video' as type, id, title, NULL as author, description, thumbnail as image, created_at, NULL as slug, NULL as content, NULL as excerpt FROM videos WHERE " . $where_data['where'];
-    $params = $where_data['params'];
+    
     $count_sql = "SELECT COUNT(*) FROM videos WHERE " . $where_data['where'];
     $stmt = $db->prepare($count_sql);
-    $stmt->execute($params);
+    $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
+    
     if ($count > 0) {
         $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
+        $params = array_merge($where_data['params'], [$limit, $offset]);
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
