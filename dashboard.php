@@ -288,7 +288,7 @@ $pageTitle = 'My Dashboard';
                     <?php else: ?>
                         <div class="empty-state">
                             <div class="empty-state-icon"><i class="fas fa-feather-alt"></i></div>
-                            <p>You haven't read any poems yet. <a href="<?php echo SITE_URL; ?>/poems.php">Start reading</a></p>
+                            <p>You haven't read any poems yet. <a href="<?php echo SITE_URL; ?>/poem_view.php">Start reading</a></p>
                         </div>
                     <?php endif; ?>
                 </section>

@@ -127,18 +127,18 @@ if ($isLoggedIn) {
                 <!-- Right-side actions -->
                 <div class="nav-actions">
                     <!-- Search -->
-                    <a href="<?php echo SITE_URL; ?>/search_results.php" class="search-toggle" aria-label="Search content">
+                    <a href="<?php echo SITE_URL; ?>/search_results.php" class="nav-action-icon" aria-label="Search content">
                         <i class="fas fa-search"></i>
                     </a>
                     
                     <!-- Bible quick access -->
-                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="bible-toggle" aria-label="Open Bible reader">
+                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
                         <i class="fas fa-book-bible"></i>
                     </a>
                     
                     <!-- Notification bell (logged-in users only) -->
                     <?php if ($isLoggedIn): ?>
-                        <a href="<?php echo SITE_URL; ?>/notifications.php" class="notification-toggle" aria-label="Notifications">
+                        <a href="<?php echo SITE_URL; ?>/notifications.php" class="nav-action-icon" aria-label="Notifications">
                             <i class="fas fa-bell"></i>
                             <?php if ($unreadNotifications > 0): ?>
                                 <span class="notification-badge" aria-label="<?php echo $unreadNotifications; ?> unread notifications"><?php echo $unreadNotifications; ?></span>
@@ -147,11 +147,11 @@ if ($isLoggedIn) {
                     <?php endif; ?>
                     
                     <!-- Theme toggle -->
-                    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                    <button class="nav-action-icon theme-toggle" id="themeToggle" aria-label="Toggle theme">
                         <i class="fas fa-moon"></i>
                     </button>
 
-                    <!-- Hamburger menu (mobile) -->
+                    <!-- Hamburger menu (mobile only) -->
                     <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false">
                         <span></span>
                         <span></span>
@@ -231,31 +231,33 @@ if ($isLoggedIn) {
             .nav-actions {
                 display: flex;
                 align-items: center;
-                gap: 12px;
+                gap: 8px;
                 flex-wrap: wrap;
                 justify-content: flex-end;
+                flex-shrink: 0;
             }
-            .nav-actions .search-toggle,
-            .nav-actions .bible-toggle,
-            .nav-actions .notification-toggle {
+            .nav-action-icon {
                 color: var(--text);
                 transition: color var(--transition);
                 text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                cursor: pointer;
             }
-            .nav-actions .search-toggle:hover,
-            .nav-actions .bible-toggle:hover,
-            .nav-actions .notification-toggle:hover {
+            .nav-action-icon:hover {
                 color: var(--rose);
+                background: rgba(219, 161, 162, 0.1);
             }
             
             /* Notification badge */
-            .notification-toggle {
-                position: relative;
-            }
             .notification-badge {
                 position: absolute;
-                top: -6px;
-                right: -8px;
+                top: -2px;
+                right: -2px;
                 background: var(--rose);
                 color: white;
                 font-size: 0.6rem;
@@ -267,9 +269,91 @@ if ($isLoggedIn) {
                 line-height: 1.4;
             }
             
+            /* Hamburger - hidden on desktop */
+            .hamburger {
+                display: none;
+                flex-direction: column;
+                gap: 4px;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                padding: 8px;
+                border-radius: 8px;
+                transition: background 0.2s;
+            }
+            .hamburger:hover {
+                background: rgba(219, 161, 162, 0.1);
+            }
+            .hamburger span {
+                display: block;
+                width: 24px;
+                height: 2px;
+                background: var(--text);
+                border-radius: 2px;
+                transition: all 0.3s ease;
+            }
+            .hamburger.active span:nth-child(1) {
+                transform: rotate(45deg) translate(4px, 4px);
+            }
+            .hamburger.active span:nth-child(2) {
+                opacity: 0;
+            }
+            .hamburger.active span:nth-child(3) {
+                transform: rotate(-45deg) translate(4px, -4px);
+            }
+            
+            /* Mobile styles */
+            @media (max-width: 992px) {
+                .nav-links {
+                    display: none;
+                    flex-direction: column;
+                    position: fixed;
+                    top: 0;
+                    right: 0;
+                    width: 280px;
+                    height: 100vh;
+                    background: var(--card-bg);
+                    border-left: 1px solid var(--border);
+                    padding: 80px 24px 24px;
+                    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+                    z-index: 999;
+                    overflow-y: auto;
+                }
+                .nav-links.open {
+                    display: flex;
+                }
+                .nav-links li {
+                    margin: 4px 0;
+                }
+                .nav-links .nav-separator {
+                    display: none;
+                }
+                .hamburger {
+                    display: flex;
+                }
+                .menu-overlay {
+                    display: none;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.5);
+                    z-index: 998;
+                }
+                .menu-overlay.open {
+                    display: block;
+                }
+            }
+            
             @media (max-width: 480px) {
                 .nav-actions {
-                    gap: 6px;
+                    gap: 4px;
+                }
+                .nav-action-icon {
+                    width: 32px;
+                    height: 32px;
+                    font-size: 0.9rem;
                 }
             }
         </style>
@@ -358,7 +442,7 @@ if ($isLoggedIn) {
 
             // Close menu on window resize to desktop
             window.addEventListener('resize', function() {
-                if (window.innerWidth > 768 && navLinks.classList.contains('open')) {
+                if (window.innerWidth > 992 && navLinks.classList.contains('open')) {
                     closeMenu();
                 }
             });
