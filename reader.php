@@ -740,7 +740,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
 <style>
 /* ===== RESET & VARIABLES ===== */
 .reader-app {
@@ -755,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
     position: relative;
 }
 
-/* ===== READER HEADER (STICKY) ===== */
+/* ===== READER HEADER  ===== */
 .reader-header {
     flex-shrink: 0;
     display: flex;
@@ -1020,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', function() {
     .reader-content-area { padding: 0 16px 40px 16px; }
     .page-nav-controls { flex-wrap: wrap; }
 }
+
 </style>
 
 <?php require_once 'includes/footer.php'; ?>
