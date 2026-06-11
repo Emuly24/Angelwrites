@@ -29,7 +29,7 @@ if ($isLoggedIn) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en" data-theme="<?php echo $_COOKIE['theme'] ?? 'light'; ?>">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -53,6 +53,7 @@ if ($isLoggedIn) {
     <meta name="theme-color" content="#DBA1A2">
     
     <style>
+        /* ===== SKIP LINK ===== */
         .skip-link {
             position: absolute;
             top: -40px;
@@ -67,6 +68,147 @@ if ($isLoggedIn) {
             font-weight: 600;
         }
         .skip-link:focus { top: 0; }
+
+        /* ===== LOGO RESTORATION ===== */
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+        .logo-img {
+            max-height: 60px;
+            width: auto;
+            display: block;
+        }
+
+        /* ===== GLOBAL NOTIFICATION ===== */
+        .global-notification {
+            background: var(--rose);
+            color: white;
+            text-align: center;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            position: sticky;
+            top: 0;
+            z-index: 1001;
+        }
+        .global-notification a { color: white; text-decoration: underline; }
+
+        /* ===== BREADCRUMBS ===== */
+        .breadcrumbs {
+            background: var(--vanilla);
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .breadcrumbs a { color: var(--text); text-decoration: none; }
+        .breadcrumbs a:hover { color: var(--rose); }
+        .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
+
+        /* ===== NAV ACTIONS ===== */
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            flex-shrink: 0;
+        }
+        .nav-action-icon {
+            color: var(--text);
+            transition: color var(--transition);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .nav-action-icon:hover {
+            color: var(--rose);
+            background: rgba(219, 161, 162, 0.1);
+        }
+
+        /* ===== NOTIFICATION BADGE ===== */
+        .notification-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background: var(--rose);
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 16px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        /* ===== HAMBURGER MENU (HIDDEN ON DESKTOP) ===== */
+        .hamburger {
+            display: none !important; /* Strongly hidden on desktop */
+            flex-direction: column;
+            gap: 4px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .hamburger span {
+            display: block;
+            width: 24px;
+            height: 2px;
+            background: var(--text);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(4px, 4px); }
+        .hamburger.active span:nth-child(2) { opacity: 0; }
+        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(4px, -4px); }
+
+        /* ===== MOBILE STYLES (992px and below) ===== */
+        @media (max-width: 992px) {
+            .hamburger {
+                display: flex !important; /* Forced visible on mobile */
+            }
+            .nav-links {
+                display: none;
+                flex-direction: column;
+                position: fixed;
+                top: 0;
+                right: 0;
+                width: 280px;
+                height: 100vh;
+                background: var(--card-bg);
+                border-left: 1px solid var(--border);
+                padding: 80px 24px 24px;
+                box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+                z-index: 999;
+                overflow-y: auto;
+            }
+            .nav-links.open { display: flex; }
+            .nav-links li { margin: 4px 0; }
+            .nav-links .nav-separator { display: none; }
+            .menu-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 998;
+            }
+            .menu-overlay.open { display: block; }
+        }
+
+        @media (max-width: 480px) {
+            .nav-actions { gap: 4px; }
+            .nav-action-icon { width: 32px; height: 32px; font-size: 0.9rem; }
+        }
     </style>
 </head>
 <body>
@@ -75,12 +217,12 @@ if ($isLoggedIn) {
     <header class="site-header">
         <nav class="navbar" role="navigation" aria-label="Main navigation">
             <div class="container nav-container">
-                <!-- ===== RESTORED LOGO ===== -->
+                <!-- ===== LOGO ===== -->
                 <a href="<?php echo SITE_URL; ?>/index.php" class="logo" aria-label="AngelWrites – Home">
                     <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites – Christian writing and community" class="logo-img">
                 </a>
 
-                <!-- Navigation Links (desktop) -->
+                <!-- ===== NAVIGATION LINKS ===== -->
                 <ul class="nav-links" id="navLinks" role="menubar">
                     <?php if (!$isLoggedIn): ?>
                         <!-- Guest menu -->
@@ -118,7 +260,7 @@ if ($isLoggedIn) {
                     <?php endif; ?>
                 </ul>
 
-                <!-- Right-side actions -->
+                <!-- ===== RIGHT-SIDE ACTIONS ===== -->
                 <div class="nav-actions">
                     <!-- Search -->
                     <a href="<?php echo SITE_URL; ?>/search_results.php" class="nav-action-icon" aria-label="Search content">
@@ -140,12 +282,12 @@ if ($isLoggedIn) {
                         </a>
                     <?php endif; ?>
                     
-                    <!-- Theme toggle -->
+                    <!-- Theme toggle (Light/Dark/System) -->
                     <button class="nav-action-icon theme-toggle" id="themeToggle" aria-label="Toggle theme">
                         <i class="fas fa-moon"></i>
                     </button>
 
-                    <!-- Hamburger menu (mobile ONLY) -->
+                    <!-- Hamburger menu (MOBILE ONLY) -->
                     <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false">
                         <span></span>
                         <span></span>
@@ -161,7 +303,6 @@ if ($isLoggedIn) {
 
     <!-- Start of main content wrapper -->
     <main class="site-main" id="mainContent">
-        
         <!-- Global Notification Area -->
         <?php if (isset($_SESSION['notification'])): ?>
             <div class="global-notification">
@@ -185,213 +326,64 @@ if ($isLoggedIn) {
             </div>
         <?php endif; ?>
 
-        <!-- Inline styles for header components -->
-        <style>
-            /* Global Notification */
-            .global-notification {
-                background: var(--rose);
-                color: white;
-                text-align: center;
-                padding: 8px 16px;
-                font-size: 0.9rem;
-                position: sticky;
-                top: 0;
-                z-index: 1001;
-            }
-            .global-notification a {
-                color: white;
-                text-decoration: underline;
-            }
-            
-            /* Breadcrumbs */
-            .breadcrumbs {
-                background: var(--vanilla);
-                padding: 8px 0;
-                border-bottom: 1px solid var(--border);
-                font-size: 0.85rem;
-            }
-            .breadcrumbs a {
-                color: var(--text);
-                text-decoration: none;
-            }
-            .breadcrumbs a:hover {
-                color: var(--rose);
-            }
-            .breadcrumb-sep {
-                color: var(--text-light);
-                margin: 0 4px;
-            }
-            
-            /* Nav Actions */
-            .nav-actions {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                flex-wrap: wrap;
-                justify-content: flex-end;
-                flex-shrink: 0;
-            }
-            .nav-action-icon {
-                color: var(--text);
-                transition: color var(--transition);
-                text-decoration: none;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 36px;
-                height: 36px;
-                border-radius: 50%;
-                cursor: pointer;
-            }
-            .nav-action-icon:hover {
-                color: var(--rose);
-                background: rgba(219, 161, 162, 0.1);
-            }
-            
-            /* Notification badge */
-            .notification-badge {
-                position: absolute;
-                top: -2px;
-                right: -2px;
-                background: var(--rose);
-                color: white;
-                font-size: 0.6rem;
-                font-weight: 700;
-                padding: 2px 6px;
-                border-radius: 10px;
-                min-width: 16px;
-                text-align: center;
-                line-height: 1.4;
-            }
-            
-            /* ===== FIX: Hamburger hidden on desktop ===== */
-            .hamburger {
-                display: none; /* Hidden by default, shown only on mobile via media query */
-                flex-direction: column;
-                gap: 4px;
-                background: transparent;
-                border: none;
-                cursor: pointer;
-                padding: 8px;
-                border-radius: 8px;
-                transition: background 0.2s;
-            }
-            .hamburger:hover {
-                background: rgba(219, 161, 162, 0.1);
-            }
-            .hamburger span {
-                display: block;
-                width: 24px;
-                height: 2px;
-                background: var(--text);
-                border-radius: 2px;
-                transition: all 0.3s ease;
-            }
-            .hamburger.active span:nth-child(1) {
-                transform: rotate(45deg) translate(4px, 4px);
-            }
-            .hamburger.active span:nth-child(2) {
-                opacity: 0;
-            }
-            .hamburger.active span:nth-child(3) {
-                transform: rotate(-45deg) translate(4px, -4px);
-            }
-            
-            /* ===== FIX: Only show hamburger on mobile ===== */
-            @media (max-width: 992px) {
-                .hamburger {
-                    display: flex;
-                }
-                .nav-links {
-                    display: none;
-                    flex-direction: column;
-                    position: fixed;
-                    top: 0;
-                    right: 0;
-                    width: 280px;
-                    height: 100vh;
-                    background: var(--card-bg);
-                    border-left: 1px solid var(--border);
-                    padding: 80px 24px 24px;
-                    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-                    z-index: 999;
-                    overflow-y: auto;
-                }
-                .nav-links.open {
-                    display: flex;
-                }
-                .nav-links li {
-                    margin: 4px 0;
-                }
-                .nav-links .nav-separator {
-                    display: none;
-                }
-                .menu-overlay {
-                    display: none;
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0,0,0,0.5);
-                    z-index: 998;
-                }
-                .menu-overlay.open {
-                    display: block;
-                }
-            }
-            
-            @media (max-width: 480px) {
-                .nav-actions {
-                    gap: 4px;
-                }
-                .nav-action-icon {
-                    width: 32px;
-                    height: 32px;
-                    font-size: 0.9rem;
-                }
-            }
-        </style>
-
-        <!-- ===== FIXED Theme Toggle and Mobile Menu JavaScript ===== -->
+        <!-- ===== DEFINES THE THEME LOGIC (Light, Dark, System) ===== -->
         <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // ===== THEME TOGGLE =====
+            // ===== THEME TOGGLE MANAGER =====
             const themeToggle = document.getElementById('themeToggle');
             const html = document.documentElement;
+            const themes = ['light', 'dark', 'system'];
+            let currentThemeIndex = 0;
 
-            function getCurrentTheme() {
-                let theme = html.getAttribute('data-theme');
-                if (theme) return theme;
-                const match = document.cookie.match(/theme=([^;]+)/);
-                return match ? match[1] : 'light';
+            // Get stored theme from localStorage
+            const storedTheme = localStorage.getItem('angelwrites_theme');
+            if (storedTheme && themes.includes(storedTheme)) {
+                currentThemeIndex = themes.indexOf(storedTheme);
             }
 
-            function updateThemeIcon(theme) {
+            // Set the theme on the HTML element
+            function applyTheme(theme) {
+                if (theme === 'system') {
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+                } else {
+                    html.setAttribute('data-theme', theme);
+                }
+                // Update cookie for backend
+                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+                // Update icon
+                updateIcon(theme);
+                // Save to localStorage
+                localStorage.setItem('angelwrites_theme', theme);
+            }
+
+            // Update the icon based on the theme
+            function updateIcon(theme) {
                 const icon = themeToggle.querySelector('i');
                 if (theme === 'dark') {
                     icon.className = 'fas fa-sun';
-                } else {
+                } else if (theme === 'light') {
                     icon.className = 'fas fa-moon';
+                } else {
+                    icon.className = 'fas fa-circle-half-stroke';
                 }
             }
 
-            function setTheme(theme) {
-                html.setAttribute('data-theme', theme);
-                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-                updateThemeIcon(theme);
-            }
+            // Initialize theme
+            applyTheme(themes[currentThemeIndex]);
 
-            const currentTheme = getCurrentTheme();
-            setTheme(currentTheme);
+            // Listen for system preference changes if 'system' is active
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (localStorage.getItem('angelwrites_theme') === 'system') {
+                    html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+                }
+            });
 
-            if (themeToggle) {
-                themeToggle.addEventListener('click', function() {
-                    const current = html.getAttribute('data-theme') || 'light';
-                    const newTheme = current === 'dark' ? 'light' : 'dark';
-                    setTheme(newTheme);
-                });
-            }
+            // Click event
+            themeToggle.addEventListener('click', function() {
+                currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+                applyTheme(themes[currentThemeIndex]);
+            });
 
             // ===== MOBILE MENU TOGGLE =====
             const hamburger = document.getElementById('hamburger');
