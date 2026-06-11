@@ -71,11 +71,11 @@ if ($isLoggedIn) {
 
        
     /* ===== MOVE LOGO TO FAR LEFT ===== */
-        .container.nav-container {
-            padding-left: 0 !important;
-            padding-right: 0 !important;
-            gap: 0 !important;
-        }
+        header .container.nav-container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 10px !important;
+}
         .logo {
             margin-left: 0 !important;
             padding-left: 0 !important;
