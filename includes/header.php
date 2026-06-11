@@ -208,13 +208,12 @@ if ($isLoggedIn) {
                 display: flex !important;
             }
             .nav-links {
-                display: flex !important; /* Always flex on mobile */
+                display: none; /* Hidden by default on mobile */
                 flex-direction: column;
                 position: fixed;
                 top: 0;
-                right: -100%; /* Hide completely off-screen */
-                width: 100%;
-                max-width: 320px;
+                right: 0;
+                width: 280px;
                 height: 100vh;
                 background: var(--card-bg);
                 border-left: 1px solid var(--border);
@@ -223,14 +222,13 @@ if ($isLoggedIn) {
                 z-index: 999;
                 overflow-y: auto;
                 transition: right 0.3s ease;
-                align-items: flex-start;
             }
             .nav-links.open {
-                right: 0 !important; /* Slide in */
+                display: flex !important; /* Show when open */
+                right: 0;
             }
             .nav-links li {
                 margin: 4px 0;
-                width: 100%;
                 padding: 8px 0;
                 border-bottom: 1px solid var(--border);
             }
