@@ -24,7 +24,6 @@ if ($isLoggedIn) {
         $stmt->execute([$user_id]);
         $unreadNotifications = $stmt->fetchColumn();
     } catch (Exception $e) {
-        // Table might not exist yet – ignore
         $unreadNotifications = 0;
     }
 }
@@ -40,7 +39,7 @@ if ($isLoggedIn) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     
-    <!-- ===== ADDED: Meta tags for SEO ===== -->
+    <!-- Meta tags -->
     <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : 'AngelWrites — Christian writing and community platform by Angella Bottoman.'; ?>">
     <meta name="keywords" content="AngelWrites, Christian writing, faith, poetry, books, reflections, Angella Bottoman">
     <meta name="robots" content="index, follow">
@@ -49,14 +48,10 @@ if ($isLoggedIn) {
     <meta property="og:url" content="<?php echo SITE_URL . $_SERVER['REQUEST_URI']; ?>">
     <meta name="twitter:card" content="summary_large_image">
     
-    <!-- ===== ADDED: Preconnect for faster loading ===== -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    
-    <!-- ===== ADDED: Service Worker (optional) ===== -->
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
     <meta name="theme-color" content="#DBA1A2">
     
-    <!-- ===== ADDED: Skip to content link (accessibility) ===== -->
     <style>
         .skip-link {
             position: absolute;
@@ -75,13 +70,12 @@ if ($isLoggedIn) {
     </style>
 </head>
 <body>
-    <!-- ===== ADDED: Skip to content link ===== -->
     <a href="#mainContent" class="skip-link">Skip to main content</a>
 
     <header class="site-header">
         <nav class="navbar" role="navigation" aria-label="Main navigation">
             <div class="container nav-container">
-                <!-- Logo -->
+                <!-- ===== RESTORED LOGO ===== -->
                 <a href="<?php echo SITE_URL; ?>/index.php" class="logo" aria-label="AngelWrites – Home">
                     <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites – Christian writing and community" class="logo-img">
                 </a>
@@ -151,7 +145,7 @@ if ($isLoggedIn) {
                         <i class="fas fa-moon"></i>
                     </button>
 
-                    <!-- Hamburger menu (mobile only) -->
+                    <!-- Hamburger menu (mobile ONLY) -->
                     <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false">
                         <span></span>
                         <span></span>
@@ -161,14 +155,14 @@ if ($isLoggedIn) {
             </div>
         </nav>
 
-        <!-- Overlay for hamburger menu (closes when clicked outside) -->
+        <!-- Overlay for hamburger menu -->
         <div class="menu-overlay" id="menuOverlay"></div>
     </header>
 
     <!-- Start of main content wrapper -->
     <main class="site-main" id="mainContent">
         
-        <!-- ===== Global Notification Area ===== -->
+        <!-- Global Notification Area -->
         <?php if (isset($_SESSION['notification'])): ?>
             <div class="global-notification">
                 <?php echo $_SESSION['notification']; ?>
@@ -176,7 +170,7 @@ if ($isLoggedIn) {
             </div>
         <?php endif; ?>
         
-        <!-- ===== Breadcrumbs (optional) ===== -->
+        <!-- Breadcrumbs (optional) -->
         <?php if (isset($breadcrumbs) && is_array($breadcrumbs)): ?>
             <div class="breadcrumbs">
                 <div class="container">
@@ -191,6 +185,7 @@ if ($isLoggedIn) {
             </div>
         <?php endif; ?>
 
+        <!-- Inline styles for header components -->
         <style>
             /* Global Notification */
             .global-notification {
@@ -269,9 +264,9 @@ if ($isLoggedIn) {
                 line-height: 1.4;
             }
             
-            /* Hamburger - hidden on desktop */
+            /* ===== FIX: Hamburger hidden on desktop ===== */
             .hamburger {
-                display: none;
+                display: none; /* Hidden by default, shown only on mobile via media query */
                 flex-direction: column;
                 gap: 4px;
                 background: transparent;
@@ -302,8 +297,11 @@ if ($isLoggedIn) {
                 transform: rotate(-45deg) translate(4px, -4px);
             }
             
-            /* Mobile styles */
+            /* ===== FIX: Only show hamburger on mobile ===== */
             @media (max-width: 992px) {
+                .hamburger {
+                    display: flex;
+                }
                 .nav-links {
                     display: none;
                     flex-direction: column;
@@ -327,9 +325,6 @@ if ($isLoggedIn) {
                 }
                 .nav-links .nav-separator {
                     display: none;
-                }
-                .hamburger {
-                    display: flex;
                 }
                 .menu-overlay {
                     display: none;
@@ -366,11 +361,8 @@ if ($isLoggedIn) {
             const html = document.documentElement;
 
             function getCurrentTheme() {
-                // Check data-theme attribute first
                 let theme = html.getAttribute('data-theme');
                 if (theme) return theme;
-                
-                // Fallback to cookie
                 const match = document.cookie.match(/theme=([^;]+)/);
                 return match ? match[1] : 'light';
             }
@@ -390,11 +382,9 @@ if ($isLoggedIn) {
                 updateThemeIcon(theme);
             }
 
-            // Initialize: set the icon to match the current theme
             const currentTheme = getCurrentTheme();
             setTheme(currentTheme);
 
-            // Toggle on click
             if (themeToggle) {
                 themeToggle.addEventListener('click', function() {
                     const current = html.getAttribute('data-theme') || 'light';
@@ -414,7 +404,6 @@ if ($isLoggedIn) {
                 overlay.classList.toggle('open', isOpen);
                 hamburger.classList.toggle('active', isOpen);
                 hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-                // Prevent body scroll when menu is open
                 body.style.overflow = isOpen ? 'hidden' : '';
             }
 
@@ -433,14 +422,12 @@ if ($isLoggedIn) {
                 overlay.addEventListener('click', closeMenu);
             }
 
-            // Close menu on Escape key
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape' && navLinks.classList.contains('open')) {
                     closeMenu();
                 }
             });
 
-            // Close menu on window resize to desktop
             window.addEventListener('resize', function() {
                 if (window.innerWidth > 992 && navLinks.classList.contains('open')) {
                     closeMenu();
