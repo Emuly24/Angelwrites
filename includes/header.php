@@ -69,13 +69,12 @@ if ($isLoggedIn) {
         }
         .skip-link:focus { top: 0; }
 
-        /* ===== LOGO - BALANCED SIZE ===== */
-        .logo {
-            display: flex;
-            align-items: center;
-            flex-shrink: 0;
-            
-        }
+        
+            /* ===== LOGO ===== */
+            .logo {
+                display: inline-block;
+                padding: 8px 0;
+            }
         .logo-img {
             height: 180px !important; 
             width: auto !important;
