@@ -83,7 +83,7 @@ if ($isLoggedIn) {
         }
             
         .logo-img {
-            height: 160px !important; 
+            height: 155px !important; 
             width: auto !important;
             max-width: 100%;
             display: block;
