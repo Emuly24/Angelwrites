@@ -69,12 +69,22 @@ if ($isLoggedIn) {
         }
         .skip-link:focus { top: 0; }
 
-        
-            /* ===== LOGO ===== */
-            .logo {
-                display: inline-block;
-                padding: 8px 0;
-            }
+        /* ===== LOGO - BALANCED SIZE ===== */
+        .logo {
+            display: flex;
+            flex-shrink: 0;
+    /* ===== MOVE LOGO TO FAR LEFT ===== */
+.container.nav-container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    gap: 0 !important;
+}
+.logo {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+            
+        }
         .logo-img {
             height: 180px !important; 
             width: auto !important;
