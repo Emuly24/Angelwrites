@@ -2,39 +2,30 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php'; // ADDED for Zoho SMTP
+require_once 'includes/mail_helper.php'; 
 
-// ===== SEARCH QUERY =====
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $type = isset($_GET['type']) ? trim($_GET['type']) : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 12;
 $offset = ($page - 1) * $limit;
-$sort = isset($_GET['sort']) ? $_GET['sort'] : 'relevance'; // relevance, newest, oldest
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'relevance';
 
-// If no search query, redirect to home
 if (empty($q)) {
     header('Location: ' . SITE_URL . '/index.php');
     exit;
 }
 
-// ===== SEARCH LOGIC =====
 $results = [];
 $total_results = 0;
-$error = '';
 
 // Build search terms
 $search_terms = explode(' ', $q);
-$search_terms = array_filter($search_terms); // Remove empty
+$search_terms = array_filter($search_terms);
 $search_terms = array_map('trim', $search_terms);
+$like_terms = array_map(function($term) { return '%' . $term . '%'; }, $search_terms);
 
-// Escape for SQL
-$like_terms = [];
-foreach ($search_terms as $term) {
-    $like_terms[] = '%' . $term . '%';
-}
-
-// Helper: Build WHERE clause for a table
+// Helper function
 function buildSearchWhere($table, $columns, $like_terms) {
     $where_parts = [];
     $params = [];
@@ -48,136 +39,75 @@ function buildSearchWhere($table, $columns, $like_terms) {
     return ['where' => $where, 'params' => $params];
 }
 
-// ===== SEARCH BY TYPE =====
+// Define search configurations
+$search_configs = [];
+
 if ($type === 'all' || $type === 'books') {
-    $columns = ['title', 'author', 'description'];
-    $where_data = buildSearchWhere('books', $columns, $like_terms);
-    $sql = "SELECT 'book' as type, id, title, author as author, description, cover_path as image, created_at, NULL as slug, NULL as content, NULL as excerpt FROM books WHERE " . $where_data['where'];
+    $search_configs[] = [
+        'sql' => "SELECT 'book' as type, id, title, author as author, description, cover_path as image, created_at, NULL as slug, NULL as content, NULL as excerpt FROM books",
+        'columns' => ['title', 'author', 'description']
+    ];
+}
+if ($type === 'all' || $type === 'poems') {
+    $search_configs[] = [
+        'sql' => "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt FROM poems",
+        'columns' => ['title', 'intro', 'content']
+    ];
+}
+if ($type === 'all' || $type === 'blog') {
+    $search_configs[] = [
+        'sql' => "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt FROM blog_posts WHERE status = 'published'",
+        'columns' => ['title', 'content', 'excerpt', 'category']
+    ];
+}
+if ($type === 'all' || $type === 'reflections') {
+    $search_configs[] = [
+        'sql' => "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, NULL as slug, content, excerpt FROM reflections",
+        'columns' => ['title', 'content', 'excerpt']
+    ];
+}
+if ($type === 'all' || $type === 'videos') {
+    $search_configs[] = [
+        'sql' => "SELECT 'video' as type, id, title, NULL as author, description, thumbnail as image, created_at, NULL as slug, NULL as content, NULL as excerpt FROM videos",
+        'columns' => ['title', 'description']
+    ];
+}
+
+// Execute each search
+foreach ($search_configs as $config) {
+    $where_data = buildSearchWhere($config['sql'], $config['columns'], $like_terms);
     
     // Count
-    $count_sql = "SELECT COUNT(*) FROM books WHERE " . $where_data['where'];
+    $count_sql = "SELECT COUNT(*) FROM (" . $config['sql'] . " WHERE " . $where_data['where'] . ")";
     $stmt = $db->prepare($count_sql);
     $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
     
-    // Fetch
+    // Fetch (with LIMIT and OFFSET)
     if ($count > 0) {
-        $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params = array_merge($where_data['params'], [$limit, $offset]);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
+        $fetch_sql = $config['sql'] . " WHERE " . $where_data['where'] . " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        $fetch_params = array_merge($where_data['params'], [$limit, $offset]);
+        $stmt = $db->prepare($fetch_sql);
+        $stmt->execute($fetch_params);
         $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 }
 
-if ($type === 'all' || $type === 'poems') {
-    $columns = ['title', 'intro', 'content'];
-    $where_data = buildSearchWhere('poems', $columns, $like_terms);
-    $sql = "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt FROM poems WHERE " . $where_data['where'];
-    
-    $count_sql = "SELECT COUNT(*) FROM poems WHERE " . $where_data['where'];
-    $stmt = $db->prepare($count_sql);
-    $stmt->execute($where_data['params']);
-    $count = $stmt->fetchColumn();
-    $total_results += $count;
-    
-    if ($count > 0) {
-        $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params = array_merge($where_data['params'], [$limit, $offset]);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-}
-
-if ($type === 'all' || $type === 'blog') {
-    $columns = ['title', 'content', 'excerpt', 'category'];
-    $where_data = buildSearchWhere('blog_posts', $columns, $like_terms);
-    $sql = "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt FROM blog_posts WHERE status = 'published' AND " . $where_data['where'];
-    
-    $count_sql = "SELECT COUNT(*) FROM blog_posts WHERE status = 'published' AND " . $where_data['where'];
-    $stmt = $db->prepare($count_sql);
-    $stmt->execute($where_data['params']);
-    $count = $stmt->fetchColumn();
-    $total_results += $count;
-    
-    if ($count > 0) {
-        $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params = array_merge($where_data['params'], [$limit, $offset]);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-}
-
-if ($type === 'all' || $type === 'reflections') {
-    $columns = ['title', 'content', 'excerpt'];
-    $where_data = buildSearchWhere('reflections', $columns, $like_terms);
-    $sql = "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, NULL as slug, content, excerpt FROM reflections WHERE " . $where_data['where'];
-    
-    $count_sql = "SELECT COUNT(*) FROM reflections WHERE " . $where_data['where'];
-    $stmt = $db->prepare($count_sql);
-    $stmt->execute($where_data['params']);
-    $count = $stmt->fetchColumn();
-    $total_results += $count;
-    
-    if ($count > 0) {
-        $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params = array_merge($where_data['params'], [$limit, $offset]);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-}
-
-if ($type === 'all' || $type === 'videos') {
-    $columns = ['title', 'description'];
-    $where_data = buildSearchWhere('videos', $columns, $like_terms);
-    $sql = "SELECT 'video' as type, id, title, NULL as author, description, thumbnail as image, created_at, NULL as slug, NULL as content, NULL as excerpt FROM videos WHERE " . $where_data['where'];
-    
-    $count_sql = "SELECT COUNT(*) FROM videos WHERE " . $where_data['where'];
-    $stmt = $db->prepare($count_sql);
-    $stmt->execute($where_data['params']);
-    $count = $stmt->fetchColumn();
-    $total_results += $count;
-    
-    if ($count > 0) {
-        $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $params = array_merge($where_data['params'], [$limit, $offset]);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-}
-
-// ===== SORT RESULTS =====
+// Sorting
 if ($sort === 'newest') {
-    usort($results, function($a, $b) {
-        return strtotime($b['created_at']) - strtotime($a['created_at']);
-    });
+    usort($results, function($a, $b) { return strtotime($b['created_at']) - strtotime($a['created_at']); });
 } elseif ($sort === 'oldest') {
-    usort($results, function($a, $b) {
-        return strtotime($a['created_at']) - strtotime($b['created_at']);
-    });
+    usort($results, function($a, $b) { return strtotime($a['created_at']) - strtotime($b['created_at']); });
 }
-// 'relevance' is default (keep as is, based on DB order)
 
-// ===== PAGINATION =====
 $total_pages = ceil($total_results / $limit);
 $current_page = $page;
-
-// ===== BUILD URL FOR PAGINATION =====
-$query_params = http_build_query([
-    'q' => $q,
-    'type' => $type,
-    'sort' => $sort
-]);
+$query_params = http_build_query(['q' => $q, 'type' => $type, 'sort' => $sort]);
 
 $pageTitle = 'Search Results: ' . htmlspecialchars($q);
 ?>
 <?php require_once 'includes/header.php'; ?>
-
 <div class="search-results-page">
     <div class="container">
         <!-- Page Header -->
