@@ -1,4 +1,5 @@
 <?php
+header("Cache-Control: no-cache, must-revalidate");
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -8,6 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+
 
 // Determine current role (guest, reader, admin)
 $isLoggedIn = isLoggedIn();
