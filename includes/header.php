@@ -69,16 +69,21 @@ if ($isLoggedIn) {
         }
         .skip-link:focus { top: 0; }
 
-        /* ===== LOGO RESTORATION ===== */
-        .logo {
-            display: flex;
-            align-items: center;
-        }
         .logo-img {
-            max-height: 60px;
+            height: 200px;
             width: auto;
+            max-width: 100%;
             display: block;
+            object-fit: contain;
         }
+
+        @media (max-width: 480px) {
+        .logo-img {
+            height: 120px;
+            max-width: 90%;
+            }
+        }
+
 
         /* ===== GLOBAL NOTIFICATION ===== */
         .global-notification {
