@@ -54,57 +54,38 @@ $existing_content = $stmt->fetch(PDO::FETCH_ASSOC);
 
 /**
  * ====================================================================
- * SMART CLEANUP FUNCTION
- * Converts common Windows-1252/ISO-8859-1 artifacts to proper UTF-8
+ * SMART CLEANUP FUNCTION - CORRECT VERSION
+ * Converts Windows-1252 artifacts to proper UTF-8 punctuation
  * ====================================================================
  */
 function cleanSpecialChars($text) {
-    // First, ensure it's UTF-8
+    // STEP 1: Force a clean UTF-8 conversion from Windows-1252
     $text = mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
     
-    // Replace common Windows-1252 artifacts
-    $replacements = [
-        // Curly quotes and apostrophes
-        'â€œ' => '“',
-        'â€' => '”',
-        'â€™' => '’',
-        'â€˜' => '‘',
-        'â€™' => '\'',
-        'â€¢' => '•',
-        'â€"’' => '—',
-        'â€”' => '—',
-        'â€“' => '–',
-        'â€¦' => '…',
-        // Other common artifacts
-        'â€¹' => '‹',
-        'â€º' => '›',
-        'â‚¬' => '€',
-        'â„¢' => '™',
-        'â€¡' => '‡',
-        'â€°' => '‰',
-        'â€¢' => '•',
-        'â€š' => '‚',
-        'â€ž' => '„',
-        // Single bytes that become garbage
-        'â€' => '”',
-        'â€™' => '\'',
-        'â€˜' => '‘',
-        // Fix line breaks
-        'â€¢' => '•',
-        // Standalone characters
-        'â' => '',
-        '€' => '€',
-        'œ' => 'oe',
-        'Œ' => 'OE',
-        '™' => '™',
-        '©' => '©',
-        '®' => '®',
-        '±' => '±',
-    ];
+    // STEP 2: Fix specific UTF-8 artifacts that still slip through
+    $text = str_replace('â€™', '’', $text);
+    $text = str_replace('â€œ', '“', $text);
+    $text = str_replace('â€', '”', $text);
+    $text = str_replace('â€˜', '‘', $text);
+    $text = str_replace('â€"', '—', $text);
+    $text = str_replace('â€”', '—', $text);
+    $text = str_replace('â€“', '–', $text);
+    $text = str_replace('â€¦', '…', $text);
+    $text = str_replace('â€¢', '•', $text);
+    $text = str_replace('â€¹', '‹', $text);
+    $text = str_replace('â€º', '›', $text);
+    $text = str_replace('â‚¬', '€', $text);
+    $text = str_replace('â„¢', '™', $text);
+    $text = str_replace('â€¡', '‡', $text);
+    $text = str_replace('â€°', '‰', $text);
+    $text = str_replace('â€š', '‚', $text);
+    $text = str_replace('â€ž', '„', $text);
     
-    $text = str_replace(array_keys($replacements), array_values($replacements), $text);
+    // Fix standalone Å symbol (Angstrom) and other common Latin-1 leftovers
+    $text = str_replace('Å', 'Å', $text);
+    $text = str_replace('å', 'å', $text);
     
-    // Final pass: remove any remaining non-printable characters
+    // STEP 3: Final pass to remove any remaining non-printable characters
     $text = preg_replace('/[^\x20-\x7E\xA0-\xFF]/u', '', $text);
     
     return trim($text);
@@ -220,7 +201,6 @@ function extract_epub($file_path) {
         $full_path = $base_dir . $href;
         $content = $zip->getFromName($full_path);
         if ($content) {
-            // Clean up the content
             $content = cleanSpecialChars($content);
             $dom = new DOMDocument();
             @$dom->loadHTML($content);
