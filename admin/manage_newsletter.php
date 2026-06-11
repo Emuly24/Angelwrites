@@ -211,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_newsletter'])) {
                     $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $token;
                     $full_message = $content . "\n\n<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
 
-                    if (sendEmail($email, $subject, $full_message, 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
+                    if (sendMarkdownEmail($email, $subject, $markdown_content, 'angelwrites@zohomail.com', 'AngelWrites Newsletter');) {
                         $sent_count++;
                     } else {
                         $failed_count++;
