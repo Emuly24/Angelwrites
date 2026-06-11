@@ -75,18 +75,20 @@ if ($type === 'all' || $type === 'videos') {
 
 // Execute each search
 foreach ($search_configs as $config) {
+    // Build where clause for this configuration only
     $where_data = buildSearchWhere($config['sql'], $config['columns'], $like_terms);
     
-    // Count
+    // Count total results
     $count_sql = "SELECT COUNT(*) FROM (" . $config['sql'] . " WHERE " . $where_data['where'] . ")";
     $stmt = $db->prepare($count_sql);
     $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
     
-    // Fetch (with LIMIT and OFFSET)
+    // Fetch results with LIMIT and OFFSET
     if ($count > 0) {
         $fetch_sql = $config['sql'] . " WHERE " . $where_data['where'] . " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        // ===== FIX: Create a fresh array for each query =====
         $fetch_params = array_merge($where_data['params'], [$limit, $offset]);
         $stmt = $db->prepare($fetch_sql);
         $stmt->execute($fetch_params);
