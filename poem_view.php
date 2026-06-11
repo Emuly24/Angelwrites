@@ -67,7 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) &&
         exit;
     }
 }
-
 // ===== TRACKING: User read this poem =====
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
