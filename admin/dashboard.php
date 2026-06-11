@@ -286,10 +286,6 @@ $pageTitle = 'Admin Dashboard';
                 <i class="fas fa-newspaper"></i>
                 <span>Manage Newsletter</span>
             </a>
-            <a href="<?php echo SITE_URL; ?>/admin/send_newsletter.php" class="action-card">
-                <i class="fas fa-paper-plane"></i>
-                <span>Send Newsletter</span>
-            </a>
             <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="action-card">
                 <i class="fas fa-cog"></i>
                 <span>Site Settings</span>
