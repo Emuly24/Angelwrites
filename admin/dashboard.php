@@ -148,6 +148,14 @@ $pageTitle = 'Admin Dashboard';
                 <a href="<?php echo SITE_URL; ?>/admin/reflection_editor.php" class="btn btn-secondary">
                     <i class="fas fa-church"></i> New Reflection
                 </a>
+                <!-- ===== NEW BUTTONS ADDED HERE ===== -->
+                <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php" class="btn btn-secondary">
+                    <i class="fas fa-newspaper"></i> New Newsletter
+                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/manage_videos.php" class="btn btn-secondary">
+                    <i class="fas fa-video"></i> New Video
+                </a>
+                <!-- ===================================== -->
             </div>
         </div>
 
