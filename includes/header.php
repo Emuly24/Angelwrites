@@ -173,46 +173,17 @@ if ($isLoggedIn) {
         .breadcrumbs a:hover { color: var(--rose); }
         .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
 
-        /* ===== HAMBURGER MENU (HIDDEN ON DESKTOP) ===== */
-        .hamburger {
-            display: none !important;
-            flex-direction: column;
-            gap: 4px;
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 8px;
-        }
-        .hamburger span {
-            display: block;
-            width: 24px;
-            height: 2px;
-            background: var(--text);
-            border-radius: 2px;
-            transition: all 0.3s ease;
-        }
-        .hamburger.active span:nth-child(1) {
-            transform: rotate(45deg) translate(4px, 4px);
-        }
-        .hamburger.active span:nth-child(2) {
-            opacity: 0;
-        }
-        .hamburger.active span:nth-child(3) {
-            transform: rotate(-45deg) translate(4px, -4px);
-        }
-
         /* ===== MOBILE STYLES (992px and below) ===== */
         @media (max-width: 992px) {
             .hamburger {
                 display: flex !important;
             }
             .nav-links {
-                display: none; /* Hidden by default */
+                display: none; /* Default hidden */
                 flex-direction: column;
                 position: fixed;
                 top: 0;
-                right: 0; /* Positioned at the right edge */
+                right: -100%; /* Off-screen */
                 width: 280px;
                 height: 100vh;
                 background: var(--card-bg);
@@ -224,7 +195,7 @@ if ($isLoggedIn) {
                 transition: right 0.3s ease;
             }
             .nav-links.open {
-                display: flex !important; /* Show when open */
+                /* Only right is changed by JS */
                 right: 0;
             }
             .nav-links li {
@@ -426,6 +397,16 @@ if ($isLoggedIn) {
                 hamburger.classList.toggle('active', isOpen);
                 hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
                 body.style.overflow = isOpen ? 'hidden' : '';
+
+                // ===== DIRECT STYLE MANIPULATION =====
+                // This forces the menu to show/hide regardless of CSS
+                if (isOpen) {
+                    navLinks.style.display = 'flex';
+                    navLinks.style.right = '0';
+                } else {
+                    navLinks.style.display = 'none';
+                    navLinks.style.right = '-100%';
+                }
             }
 
             function closeMenu() {
@@ -434,6 +415,9 @@ if ($isLoggedIn) {
                 hamburger.classList.remove('active');
                 hamburger.setAttribute('aria-expanded', 'false');
                 body.style.overflow = '';
+                // Force hide
+                navLinks.style.display = 'none';
+                navLinks.style.right = '-100%';
             }
 
             if (hamburger) {
