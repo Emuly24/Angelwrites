@@ -6,15 +6,7 @@ require_once 'includes/mail_helper.php';
 $message = '';
 $error = '';
 
-// ===== RATE LIMITING =====
-$ip = $_SERVER['REMOTE_ADDR'];
-$limit_key = 'resend_attempts_' . $ip;
-$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
-if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
-    $error = 'Please wait 5 minutes before requesting another code.';
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -35,19 +27,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $stmt = $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?");
             $stmt->execute([$code, $expiry, $user['id']]);
 
+            // ===== FIX: Extract first word from first_name =====
+            $rawName = trim($user['first_name'] ?? 'there');
+            // Split on space, dash, or underscore, or capitalize transition
+            $nameParts = preg_split('/[\s_\-]+/', $rawName);
+            $greetingName = ucfirst($nameParts[0] ?? 'there');
+            
+            // If the first name is a compound like "Blessingsemulyn", we can also split on capital letters
+            // as a fallback for cases without separators:
+            if (count($nameParts) === 1 && strlen($greetingName) > 12) {
+                // Split on capital letters (e.g., Blessingsemulyn -> Blessings emulyn)
+                $camelParts = preg_split('/(?=[A-Z])/', $greetingName);
+                if (count($camelParts) > 1) {
+                    $greetingName = ucfirst($camelParts[0]);
+                }
+            }
+
             $subject = "Your AngelWrites verification code";
-            $body = "Hello " . $user['first_name'] . ",\n\nYour new verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.";
+            $body = "Hello $greetingName,\n\nYour new verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.\n\n— AngelWrites Team";
 
             if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
                 $message = "A new verification code has been sent to your email address. Please check your inbox and spam folder.";
-                // Set rate limit
-                file_put_contents($attempts_file, time());
-                
-                // ===== SEND ADMIN NOTIFICATION =====
-                $admin_email = 'angelwrites@zohomail.com';
-                $admin_subject = '🔄 Verification Code Resent';
-                $admin_body = "A user requested a new verification code.\n\nEmail: $email\nName: " . $user['first_name'];
-                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
             } else {
                 $error = "Failed to send verification code. Please try again later.";
             }
@@ -58,14 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
 $pageTitle = 'Resend Verification';
 ?>
 <?php require_once 'includes/header.php'; ?>
-
 <div class="auth-page">
     <div class="container">
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
                     <h1>Resend Verification Code</h1>
-                    <p>Enter your email address and we'll send you a new 6-digit verification code.</p>
+                    <p>Enter your email address and we will send you a new 6-digit code.</p>
                 </div>
 
                 <?php if ($error): ?>
@@ -73,9 +72,6 @@ $pageTitle = 'Resend Verification';
                 <?php endif; ?>
                 <?php if ($message): ?>
                     <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
-                    <div class="success-actions" style="text-align: center; margin-top: 16px;">
-                        <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary">Go to Verification</a>
-                    </div>
                 <?php endif; ?>
 
                 <form method="POST" action="" class="auth-form">
@@ -110,7 +106,10 @@ $pageTitle = 'Resend Verification';
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
 .auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
 .auth-footer a { color: var(--rose); font-weight: 600; }
-.success-actions .btn { padding: 10px 24px; border-radius: 30px; }
+.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+.alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+.alert-success { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
+@media (max-width: 480px) { .auth-card { padding: 20px; } }
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

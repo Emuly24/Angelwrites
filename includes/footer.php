@@ -120,6 +120,11 @@ ADDED: TOC Styles and JavaScript (already present - enhanced)
         transform: scale(0.8);
         pointer-events: none;
     }
+    [data-theme="dark"] .footer-links h4,
+    [data-theme="dark"] .footer-social h4 {
+        color: #ffffff !important;
+        font-weight: 700;
+    }
     #tocFloatingBtn.visible {
         opacity: 1;
         transform: scale(1);

@@ -14,6 +14,20 @@ $isLoggedIn = isLoggedIn();
 $isAdmin = isAdmin();
 $isReader = $isLoggedIn && !$isAdmin;
 $currentPage = basename($_SERVER['PHP_SELF']);
+
+// ===== FETCH UNREAD NOTIFICATIONS COUNT (if user logged in) =====
+$unreadNotifications = 0;
+if ($isLoggedIn) {
+    $user_id = $_SESSION['user_id'];
+    try {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
+        $stmt->execute([$user_id]);
+        $unreadNotifications = $stmt->fetchColumn();
+    } catch (Exception $e) {
+        // Table might not exist yet – ignore
+        $unreadNotifications = 0;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="<?php echo $_COOKIE['theme'] ?? 'light'; ?>">
@@ -41,60 +55,96 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <!-- ===== ADDED: Service Worker (optional) ===== -->
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
     <meta name="theme-color" content="#DBA1A2">
+    
+    <!-- ===== ADDED: Skip to content link (accessibility) ===== -->
+    <style>
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--rose);
+            color: white;
+            padding: 8px 16px;
+            z-index: 9999;
+            border-radius: 0 0 8px 0;
+            transition: top 0.2s ease;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .skip-link:focus { top: 0; }
+    </style>
 </head>
 <body>
+    <!-- ===== ADDED: Skip to content link ===== -->
+    <a href="#mainContent" class="skip-link">Skip to main content</a>
+
     <header class="site-header">
         <nav class="navbar" role="navigation" aria-label="Main navigation">
             <div class="container nav-container">
                 <!-- Logo -->
-                <a href="<?php echo SITE_URL; ?>/index.php" class="logo">
-                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="logo-img">
+                <a href="<?php echo SITE_URL; ?>/index.php" class="logo" aria-label="AngelWrites – Home">
+                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites – Christian writing and community" class="logo-img">
                 </a>
 
                 <!-- Navigation Links (desktop) -->
-                <ul class="nav-links" id="navLinks">
+                <ul class="nav-links" id="navLinks" role="menubar">
                     <?php if (!$isLoggedIn): ?>
                         <!-- Guest menu -->
-                        <li><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>">Home</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>">Books</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>">Poems</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/blog.php" class="<?php echo $currentPage === 'blog.php' ? 'active' : ''; ?>">Blog</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/about.php" class="<?php echo $currentPage === 'about.php' ? 'active' : ''; ?>">About</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/contact.php" class="<?php echo $currentPage === 'contact.php' ? 'active' : ''; ?>">Contact</a></li>
-                        <li class="nav-separator">|</li>
-                        <li><a href="<?php echo SITE_URL; ?>/login.php" class="btn-login"><i class="fas fa-sign-in-alt"></i> Login</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/register.php" class="btn-signup">Sign Up</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>" role="menuitem">Books</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>" role="menuitem">Poems</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/blog.php" class="<?php echo $currentPage === 'blog.php' ? 'active' : ''; ?>" role="menuitem">Blog</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/about.php" class="<?php echo $currentPage === 'about.php' ? 'active' : ''; ?>" role="menuitem">About</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/contact.php" class="<?php echo $currentPage === 'contact.php' ? 'active' : ''; ?>" role="menuitem">Contact</a></li>
+                        <li class="nav-separator" role="separator">|</li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/login.php" class="btn-login" role="menuitem"><i class="fas fa-sign-in-alt"></i> Login</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/register.php" class="btn-signup" role="menuitem">Sign Up</a></li>
                     <?php elseif ($isAdmin): ?>
                         <!-- Admin menu -->
-                        <li><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_books.php">📖 Books</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_poems.php">📝 Poems</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php">📅 Sessions</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_users.php">👥 Users</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/admin/settings.php">⚙️ Settings</a></li>
-                        <li class="nav-separator">|</li>
-                        <li><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_books.php" role="menuitem">📖 Books</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" role="menuitem">📝 Poems</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" role="menuitem">📅 Sessions</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_users.php" role="menuitem">👥 Users</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/settings.php" role="menuitem">⚙️ Settings</a></li>
+                        <li class="nav-separator" role="separator">|</li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                     <?php else: ?>
                         <!-- Reader menu -->
-                        <li><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>">Home</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/library.php" class="<?php echo $currentPage === 'library.php' ? 'active' : ''; ?>"><i class="fas fa-book-reader"></i> My Library</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>">Books</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>">Poems</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/community.php" class="<?php echo $currentPage === 'community.php' ? 'active' : ''; ?>">Community</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/book_session.php" class="<?php echo $currentPage === 'book_session.php' ? 'active' : ''; ?>">Book Session</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/profile.php" class="<?php echo $currentPage === 'profile.php' ? 'active' : ''; ?>">Profile</a></li>
-                        <li class="nav-separator">|</li>
-                        <li><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/library.php" class="<?php echo $currentPage === 'library.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-book-reader"></i> My Library</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>" role="menuitem">Books</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>" role="menuitem">Poems</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/community.php" class="<?php echo $currentPage === 'community.php' ? 'active' : ''; ?>" role="menuitem">Community</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/book_session.php" class="<?php echo $currentPage === 'book_session.php' ? 'active' : ''; ?>" role="menuitem">Book Session</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/profile.php" class="<?php echo $currentPage === 'profile.php' ? 'active' : ''; ?>" role="menuitem">Profile</a></li>
+                        <li class="nav-separator" role="separator">|</li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                     <?php endif; ?>
                 </ul>
 
                 <!-- Right-side actions -->
                 <div class="nav-actions">
-                    <!-- Bible quick access - NOW A LINK TO THE FULL READER -->
-                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="bible-toggle" aria-label="Open Bible">
+                    <!-- Search -->
+                    <a href="<?php echo SITE_URL; ?>/search_results.php" class="search-toggle" aria-label="Search content">
+                        <i class="fas fa-search"></i>
+                    </a>
+                    
+                    <!-- Bible quick access -->
+                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="bible-toggle" aria-label="Open Bible reader">
                         <i class="fas fa-book-bible"></i>
                     </a>
+                    
+                    <!-- Notification bell (logged-in users only) -->
+                    <?php if ($isLoggedIn): ?>
+                        <a href="<?php echo SITE_URL; ?>/notifications.php" class="notification-toggle" aria-label="Notifications">
+                            <i class="fas fa-bell"></i>
+                            <?php if ($unreadNotifications > 0): ?>
+                                <span class="notification-badge" aria-label="<?php echo $unreadNotifications; ?> unread notifications"><?php echo $unreadNotifications; ?></span>
+                            <?php endif; ?>
+                        </a>
+                    <?php endif; ?>
                     
                     <!-- Theme toggle -->
                     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
@@ -102,11 +152,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     </button>
 
                     <!-- Hamburger menu (mobile) -->
-                    <div class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0">
+                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false">
                         <span></span>
                         <span></span>
                         <span></span>
-                    </div>
+                    </button>
                 </div>
             </div>
         </nav>
@@ -116,9 +166,9 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     </header>
 
     <!-- Start of main content wrapper -->
-    <main class="site-main">
+    <main class="site-main" id="mainContent">
         
-        <!-- ===== ADDED: Global Notification Area ===== -->
+        <!-- ===== Global Notification Area ===== -->
         <?php if (isset($_SESSION['notification'])): ?>
             <div class="global-notification">
                 <?php echo $_SESSION['notification']; ?>
@@ -126,7 +176,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             </div>
         <?php endif; ?>
         
-        <!-- ===== ADDED: Breadcrumbs (optional) ===== -->
+        <!-- ===== Breadcrumbs (optional) ===== -->
         <?php if (isset($breadcrumbs) && is_array($breadcrumbs)): ?>
             <div class="breadcrumbs">
                 <div class="container">
@@ -141,7 +191,6 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             </div>
         <?php endif; ?>
 
-        <!-- ===== ADDED: CSS for new elements ===== -->
         <style>
             /* Global Notification */
             .global-notification {
@@ -178,7 +227,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 margin: 0 4px;
             }
             
-            /* Nav Actions fix */
+            /* Nav Actions */
             .nav-actions {
                 display: flex;
                 align-items: center;
@@ -186,13 +235,38 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 flex-wrap: wrap;
                 justify-content: flex-end;
             }
-            .nav-actions .bible-toggle {
+            .nav-actions .search-toggle,
+            .nav-actions .bible-toggle,
+            .nav-actions .notification-toggle {
                 color: var(--text);
                 transition: color var(--transition);
+                text-decoration: none;
             }
-            .nav-actions .bible-toggle:hover {
+            .nav-actions .search-toggle:hover,
+            .nav-actions .bible-toggle:hover,
+            .nav-actions .notification-toggle:hover {
                 color: var(--rose);
             }
+            
+            /* Notification badge */
+            .notification-toggle {
+                position: relative;
+            }
+            .notification-badge {
+                position: absolute;
+                top: -6px;
+                right: -8px;
+                background: var(--rose);
+                color: white;
+                font-size: 0.6rem;
+                font-weight: 700;
+                padding: 2px 6px;
+                border-radius: 10px;
+                min-width: 16px;
+                text-align: center;
+                line-height: 1.4;
+            }
+            
             @media (max-width: 480px) {
                 .nav-actions {
                     gap: 6px;
@@ -200,16 +274,24 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             }
         </style>
 
-        <!-- ===== ADDED: JavaScript for Theme Toggle and Mobile Menu ===== -->
+        <!-- ===== FIXED Theme Toggle and Mobile Menu JavaScript ===== -->
         <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Theme toggle
+            // ===== THEME TOGGLE =====
             const themeToggle = document.getElementById('themeToggle');
             const html = document.documentElement;
-            
-            function setTheme(theme) {
-                html.setAttribute('data-theme', theme);
-                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+
+            function getCurrentTheme() {
+                // Check data-theme attribute first
+                let theme = html.getAttribute('data-theme');
+                if (theme) return theme;
+                
+                // Fallback to cookie
+                const match = document.cookie.match(/theme=([^;]+)/);
+                return match ? match[1] : 'light';
+            }
+
+            function updateThemeIcon(theme) {
                 const icon = themeToggle.querySelector('i');
                 if (theme === 'dark') {
                     icon.className = 'fas fa-sun';
@@ -217,30 +299,68 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     icon.className = 'fas fa-moon';
                 }
             }
-            
+
+            function setTheme(theme) {
+                html.setAttribute('data-theme', theme);
+                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+                updateThemeIcon(theme);
+            }
+
+            // Initialize: set the icon to match the current theme
+            const currentTheme = getCurrentTheme();
+            setTheme(currentTheme);
+
+            // Toggle on click
             if (themeToggle) {
                 themeToggle.addEventListener('click', function() {
-                    const current = html.getAttribute('data-theme');
-                    setTheme(current === 'dark' ? 'light' : 'dark');
+                    const current = html.getAttribute('data-theme') || 'light';
+                    const newTheme = current === 'dark' ? 'light' : 'dark';
+                    setTheme(newTheme);
                 });
             }
-            
-            // Mobile menu toggle
+
+            // ===== MOBILE MENU TOGGLE =====
             const hamburger = document.getElementById('hamburger');
             const navLinks = document.getElementById('navLinks');
             const overlay = document.getElementById('menuOverlay');
-            
+            const body = document.body;
+
             function toggleMenu() {
-                navLinks.classList.toggle('open');
-                overlay.classList.toggle('open');
-                hamburger.classList.toggle('active');
+                const isOpen = navLinks.classList.toggle('open');
+                overlay.classList.toggle('open', isOpen);
+                hamburger.classList.toggle('active', isOpen);
+                hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                // Prevent body scroll when menu is open
+                body.style.overflow = isOpen ? 'hidden' : '';
             }
-            
+
+            function closeMenu() {
+                navLinks.classList.remove('open');
+                overlay.classList.remove('open');
+                hamburger.classList.remove('active');
+                hamburger.setAttribute('aria-expanded', 'false');
+                body.style.overflow = '';
+            }
+
             if (hamburger) {
                 hamburger.addEventListener('click', toggleMenu);
             }
             if (overlay) {
-                overlay.addEventListener('click', toggleMenu);
+                overlay.addEventListener('click', closeMenu);
             }
+
+            // Close menu on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && navLinks.classList.contains('open')) {
+                    closeMenu();
+                }
+            });
+
+            // Close menu on window resize to desktop
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768 && navLinks.classList.contains('open')) {
+                    closeMenu();
+                }
+            });
         });
         </script>

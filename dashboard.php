@@ -2,7 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php'; // ADDED for Zoho SMTP
+require_once 'includes/mail_helper.php';
 
 // Redirect non-logged-in users
 redirectIfNotLoggedIn();
@@ -111,19 +111,6 @@ $notifications = safeFetch($db, "
     LIMIT 8
 ", [$user_id], 8);
 
-// ===== HANDLE EMAIL NOTIFICATIONS FOR USER ACTIONS =====
-// (These are triggered elsewhere, but we can add a check here)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test_email'])) {
-    $admin_email = 'angelwrites@zohomail.com';
-    $subject = 'Test Email from User Dashboard';
-    $body = "This is a test email from user dashboard.\n\nUser ID: $user_id\nUser Name: " . $user['name'];
-    if (sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin')) {
-        $success = 'Test email sent to admin.';
-    } else {
-        $error = 'Failed to send test email.';
-    }
-}
-
 // ===== HANDLE MARK ALL NOTIFICATIONS AS READ =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
     $stmt = $db->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
@@ -139,7 +126,7 @@ $pageTitle = 'My Dashboard';
 <div class="dashboard-page">
     <div class="container">
         
-        <!-- ===== HERO / WELCOME SECTION ===== -->
+        <!-- ===== HERO / WELCOME SECTION (Enhanced Layout) ===== -->
         <div class="dashboard-hero">
             <div class="hero-content">
                 <h1>Welcome back, <?php echo htmlspecialchars($user['name']); ?>!</h1>
@@ -163,32 +150,32 @@ $pageTitle = 'My Dashboard';
             </div>
         </div>
 
-        <!-- ===== STATS ROW ===== -->
+        <!-- ===== STATS ROW (Compact & Clean) ===== -->
         <div class="stats-row">
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-book"></i></div>
                 <div class="stat-number"><?php echo $books_finished; ?></div>
-                <div class="stat-label">Books Finished</div>
+                <div class="stat-label">Books</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-feather-alt"></i></div>
                 <div class="stat-number"><?php echo $poems_read; ?></div>
-                <div class="stat-label">Poems Read</div>
+                <div class="stat-label">Poems</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-video"></i></div>
                 <div class="stat-number"><?php echo $videos_watched; ?></div>
-                <div class="stat-label">Videos Watched</div>
+                <div class="stat-label">Videos</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
                 <div class="stat-number"><?php echo $questions_asked; ?></div>
-                <div class="stat-label">Questions Asked</div>
+                <div class="stat-label">Questions</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
                 <div class="stat-number"><?php echo $sessions_booked; ?></div>
-                <div class="stat-label">Sessions Booked</div>
+                <div class="stat-label">Sessions</div>
             </div>
         </div>
 
@@ -251,7 +238,7 @@ $pageTitle = 'My Dashboard';
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <i class="fas fa-book-open" style="font-size: 2rem; color: var(--rose);"></i>
+                            <div class="empty-state-icon"><i class="fas fa-book-open"></i></div>
                             <p>No books in your reading list. <a href="<?php echo SITE_URL; ?>/books.php">Find your next book</a></p>
                         </div>
                     <?php endif; ?>
@@ -300,7 +287,7 @@ $pageTitle = 'My Dashboard';
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <i class="fas fa-feather-alt" style="font-size: 2rem; color: var(--rose);"></i>
+                            <div class="empty-state-icon"><i class="fas fa-feather-alt"></i></div>
                             <p>You haven't read any poems yet. <a href="<?php echo SITE_URL; ?>/poems.php">Start reading</a></p>
                         </div>
                     <?php endif; ?>
@@ -336,7 +323,7 @@ $pageTitle = 'My Dashboard';
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <i class="fas fa-film" style="font-size: 2rem; color: var(--rose);"></i>
+                            <div class="empty-state-icon"><i class="fas fa-film"></i></div>
                             <p>No videos watched yet. <a href="<?php echo SITE_URL; ?>/videos.php">Explore videos</a></p>
                         </div>
                     <?php endif; ?>
@@ -371,7 +358,7 @@ $pageTitle = 'My Dashboard';
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <i class="fas fa-blog" style="font-size: 2rem; color: var(--rose);"></i>
+                            <div class="empty-state-icon"><i class="fas fa-blog"></i></div>
                             <p>No blog posts read yet. <a href="<?php echo SITE_URL; ?>/blog.php">Start reading</a></p>
                         </div>
                     <?php endif; ?>
@@ -406,7 +393,7 @@ $pageTitle = 'My Dashboard';
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <i class="fas fa-pray" style="font-size: 2rem; color: var(--rose);"></i>
+                            <div class="empty-state-icon"><i class="fas fa-pray"></i></div>
                             <p>No reflections read yet. <a href="<?php echo SITE_URL; ?>/reflections.php">Start reading</a></p>
                         </div>
                     <?php endif; ?>
@@ -441,7 +428,7 @@ $pageTitle = 'My Dashboard';
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <i class="fas fa-calendar-plus" style="font-size: 2rem; color: var(--rose);"></i>
+                            <div class="empty-state-icon"><i class="fas fa-calendar-plus"></i></div>
                             <p>No upcoming sessions. <a href="<?php echo SITE_URL; ?>/book_session.php">Book a session</a></p>
                         </div>
                     <?php endif; ?>
@@ -478,7 +465,7 @@ $pageTitle = 'My Dashboard';
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <i class="fas fa-comments" style="font-size: 2rem; color: var(--rose);"></i>
+                            <div class="empty-state-icon"><i class="fas fa-comments"></i></div>
                             <p>No questions asked yet. <a href="<?php echo SITE_URL; ?>/community.php">Ask a question</a></p>
                         </div>
                     <?php endif; ?>
@@ -534,7 +521,7 @@ $pageTitle = 'My Dashboard';
                                 <i class="fas fa-book"></i>
                                 <span>Browse Books</span>
                             </a>
-                            <a href="<?php echo SITE_URL; ?>/poems.php" class="quick-action-btn">
+                            <a href="<?php echo SITE_URL; ?>/poem_view.php" class="quick-action-btn">
                                 <i class="fas fa-pen"></i>
                                 <span>Read Poems</span>
                             </a>
@@ -584,26 +571,87 @@ $pageTitle = 'My Dashboard';
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 20px;
+    gap: 24px;
     border: 1px solid var(--rose-light);
 }
-.hero-content h1 { font-size: 2.2rem; margin: 0 0 8px 0; color: var(--text); }
-.hero-content .hero-sub { color: var(--text-light); font-size: 1.1rem; margin: 0; }
-.hero-profile { display: flex; align-items: center; gap: 16px; }
-.profile-pic-large { width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: var(--vanilla); display: flex; align-items: center; justify-content: center; border: 3px solid var(--rose-light); }
-.profile-pic-large img { width: 100%; height: 100%; object-fit: cover; }
-.profile-pic-large i { font-size: 3.5rem; color: var(--rose); }
-.profile-details h3 { font-size: 1.2rem; margin: 0; }
-.profile-details .user-email { color: var(--text-light); font-size: 0.9rem; margin: 2px 0 4px; }
-.profile-details .user-bio { color: var(--text); font-size: 0.9rem; line-height: 1.4; margin: 0; }
+
+.hero-content {
+    flex: 1;
+    min-width: 250px;
+}
+
+.hero-content h1 {
+    font-size: 2.2rem;
+    margin: 0 0 8px 0;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+.hero-content .hero-sub {
+    color: var(--text-light);
+    font-size: 1.1rem;
+    margin: 0;
+    max-width: 500px;
+}
+
+.hero-profile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.profile-pic-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--vanilla);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--rose-light);
+    flex-shrink: 0;
+}
+
+.profile-pic-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-pic-large i {
+    font-size: 3.5rem;
+    color: var(--rose);
+}
+
+.profile-details h3 {
+    font-size: 1.2rem;
+    margin: 0 0 2px 0;
+    font-weight: 700;
+}
+
+.profile-details .user-email {
+    color: var(--text-light);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.profile-details .user-bio {
+    color: var(--text);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin: 4px 0 0 0;
+}
 
 /* ===== STATS ROW ===== */
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: 16px;
     margin-bottom: 32px;
 }
+
 .stat-card {
     background: var(--card-bg);
     border-radius: 12px;
@@ -612,26 +660,85 @@ $pageTitle = 'My Dashboard';
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
     transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
 }
-.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
-.stat-icon { font-size: 2rem; color: var(--rose); margin-bottom: 4px; }
-.stat-number { font-size: 1.8rem; font-weight: 700; color: var(--text); }
-.stat-label { font-size: 0.8rem; color: var(--text-light); }
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+}
+
+.stat-icon {
+    font-size: 2rem;
+    color: var(--rose);
+    margin-bottom: 4px;
+}
+
+.stat-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
 
 /* ===== GRID LAYOUT ===== */
-.dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; }
-.main-content { display: flex; flex-direction: column; gap: 32px; }
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 32px;
+}
+
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
 
 /* ===== SECTIONS ===== */
-.dashboard-section { background: var(--card-bg); border-radius: 16px; padding: 24px; border: 1px solid var(--border); }
-.section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-.section-header h2 { font-size: 1.3rem; margin: 0; display: flex; align-items: center; gap: 8px; }
-.section-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.dashboard-section {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.section-header h2 {
+    font-size: 1.3rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
 
 /* ===== CARDS GRIDS ===== */
 .book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
 }
 
@@ -643,119 +750,610 @@ $pageTitle = 'My Dashboard';
     border: 1px solid var(--border);
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.book-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+
+.book-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+}
+
 .book-cover-wrapper {
     position: relative;
-    height: 180px;
+    height: 160px;
     background: var(--vanilla);
     overflow: hidden;
 }
-.book-cover-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+
+.book-cover-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .book-cover-wrapper .placeholder-cover {
-    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--rose);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: var(--rose);
 }
+
 .book-cover-wrapper .status-badge {
-    position: absolute; top: 8px; right: 8px; padding: 2px 10px; border-radius: 12px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; color: white;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: white;
 }
+
 .status-badge.currently\ reading { background: var(--rose); }
 .status-badge.finished { background: #27ae60; }
-.book-info { padding: 12px; }
-.book-info h3 { font-size: 0.95rem; margin: 0 0 4px; }
-.book-desc { font-size: 0.8rem; color: var(--text-light); margin-bottom: 8px; }
-.book-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.book-actions .btn { padding: 4px 8px; font-size: 0.75rem; flex: 1; min-width: 60px; }
+.status-badge.want\ to\ read { background: #3498db; }
+
+.book-info {
+    padding: 12px;
+}
+
+.book-info h3 {
+    font-size: 0.95rem;
+    margin: 0 0 4px;
+}
+
+.book-desc {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-bottom: 8px;
+}
+
+.book-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.book-actions .btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    flex: 1;
+    min-width: 50px;
+}
 
 /* ===== POEM CARD ===== */
-.poem-card { background: var(--bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
-.poem-thumbnail { height: 140px; background: var(--vanilla); overflow: hidden; }
-.poem-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
-.poem-thumbnail-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--rose); }
-.poem-body { padding: 12px; }
-.poem-body h3 { font-size: 0.95rem; margin: 0 0 6px; }
-.poem-verse-box { background: var(--vanilla); padding: 6px 10px; border-radius: 6px; border-left: 3px solid var(--rose); margin-bottom: 8px; }
-.verse-label { display: block; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--rose); }
-.poem-verse-box p { font-size: 0.8rem; color: var(--text-light); margin: 2px 0 0; }
-.poem-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.poem-actions .btn { padding: 4px 12px; font-size: 0.75rem; flex: 1; }
+.poem-card {
+    background: var(--bg);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.poem-thumbnail {
+    height: 120px;
+    background: var(--vanilla);
+    overflow: hidden;
+}
+
+.poem-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.poem-thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: var(--rose);
+}
+
+.poem-body {
+    padding: 12px;
+}
+
+.poem-body h3 {
+    font-size: 0.95rem;
+    margin: 0 0 6px;
+}
+
+.poem-verse-box {
+    background: var(--vanilla);
+    padding: 6px 10px;
+    border-radius: 6px;
+    border-left: 3px solid var(--rose);
+    margin-bottom: 8px;
+}
+
+.verse-label {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--rose);
+}
+
+.poem-verse-box p {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin: 2px 0 0;
+}
+
+.poem-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.poem-actions .btn {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    flex: 1;
+}
 
 /* ===== VIDEO CARD ===== */
-.video-card { background: var(--bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
-.video-thumb { position: relative; height: 140px; background: var(--vanilla); overflow: hidden; }
-.video-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); color: white; font-size: 2.5rem; opacity: 0.7; transition: opacity 0.2s; }
-.video-thumb:hover .play-overlay { opacity: 1; }
-.video-thumb .placeholder-cover { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--rose); }
-.video-info { padding: 12px; }
-.video-info h3 { font-size: 0.95rem; margin: 0 0 8px; }
-.video-info .btn { width: 100%; padding: 4px; font-size: 0.75rem; }
+.video-card {
+    background: var(--bg);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.video-thumb {
+    position: relative;
+    height: 120px;
+    background: var(--vanilla);
+    overflow: hidden;
+}
+
+.video-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.play-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.3);
+    color: white;
+    font-size: 2.5rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.video-thumb:hover .play-overlay {
+    opacity: 1;
+}
+
+.video-thumb .placeholder-cover {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: var(--rose);
+}
+
+.video-info {
+    padding: 12px;
+}
+
+.video-info h3 {
+    font-size: 0.95rem;
+    margin: 0 0 8px;
+}
+
+.video-info .btn {
+    width: 100%;
+    padding: 4px;
+    font-size: 0.75rem;
+}
 
 /* ===== BLOG & REFLECTION CARDS ===== */
-.blog-card, .reflection-card { background: var(--bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
-.blog-thumbnail, .reflection-thumb { height: 140px; background: var(--vanilla); overflow: hidden; }
-.blog-thumbnail img, .reflection-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.blog-thumbnail-placeholder, .reflection-thumb .placeholder-cover { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--rose); }
-.blog-body, .reflection-body { padding: 12px; }
-.blog-body h3, .reflection-body h3 { font-size: 0.95rem; margin: 0 0 6px; }
-.blog-excerpt { font-size: 0.8rem; color: var(--text-light); margin-bottom: 8px; }
-.blog-body .btn, .reflection-body .btn { width: 100%; padding: 4px; font-size: 0.75rem; }
+.blog-card, .reflection-card {
+    background: var(--bg);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.blog-thumbnail, .reflection-thumb {
+    height: 120px;
+    background: var(--vanilla);
+    overflow: hidden;
+}
+
+.blog-thumbnail img, .reflection-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.blog-thumbnail-placeholder, .reflection-thumb .placeholder-cover {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: var(--rose);
+}
+
+.blog-body, .reflection-body {
+    padding: 12px;
+}
+
+.blog-body h3, .reflection-body h3 {
+    font-size: 0.95rem;
+    margin: 0 0 6px;
+}
+
+.blog-excerpt {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-bottom: 8px;
+}
+
+.blog-body .btn, .reflection-body .btn {
+    width: 100%;
+    padding: 4px;
+    font-size: 0.75rem;
+}
 
 /* ===== SESSION & QA LISTS ===== */
-.session-list, .qa-list { display: flex; flex-direction: column; gap: 8px; }
-.session-item, .qa-item { background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-.session-info { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.session-date, .session-time { font-weight: 500; font-size: 0.9rem; }
-.session-message { font-size: 0.8rem; color: var(--text-light); margin: 4px 0 0; width: 100%; }
-.session-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.session-actions .btn { padding: 4px 12px; font-size: 0.75rem; }
-.qa-title { font-weight: 500; }
-.qa-title a { color: var(--text); text-decoration: none; }
-.qa-title a:hover { color: var(--rose); }
-.qa-meta { font-size: 0.8rem; color: var(--text-light); display: flex; gap: 8px; }
-.qa-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.qa-actions .btn { padding: 4px 12px; font-size: 0.75rem; }
+.session-list, .qa-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.session-item, .qa-item {
+    background: var(--bg);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.session-date, .session-time {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.session-message {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin: 4px 0 0;
+    width: 100%;
+}
+
+.session-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.session-actions .btn {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+}
+
+.qa-title {
+    font-weight: 500;
+}
+
+.qa-title a {
+    color: var(--text);
+    text-decoration: none;
+}
+
+.qa-title a:hover {
+    color: var(--rose);
+}
+
+.qa-meta {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    display: flex;
+    gap: 8px;
+}
+
+.qa-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.qa-actions .btn {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+}
 
 /* ===== EMPTY STATE ===== */
-.empty-state { text-align: center; padding: 20px; color: var(--text-light); }
-.empty-state i { display: block; margin-bottom: 8px; }
-.empty-state p { margin: 0; }
-.empty-state a { color: var(--rose); font-weight: 600; text-decoration: none; }
-.empty-state a:hover { text-decoration: underline; }
+.empty-state {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-light);
+}
+
+.empty-state-icon {
+    display: block;
+    font-size: 2.5rem;
+    color: var(--rose);
+    margin-bottom: 12px;
+}
+
+.empty-state p {
+    margin: 0;
+}
+
+.empty-state a {
+    color: var(--rose);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.empty-state a:hover {
+    text-decoration: underline;
+}
 
 /* ===== SIDEBAR ===== */
-.dashboard-sidebar { display: flex; flex-direction: column; gap: 32px; }
-.sidebar-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); }
-.sidebar-card .card-header { margin-bottom: 12px; }
-.sidebar-card .card-header h4 { font-size: 1rem; margin: 0; display: flex; align-items: center; gap: 8px; }
-.sidebar-card .card-header-actions { display: flex; gap: 8px; align-items: center; }
-.sidebar-card .card-header-actions .btn { padding: 4px 12px; font-size: 0.75rem; }
-.sidebar-card .card-header-actions .view-all-link { font-size: 0.8rem; font-weight: 600; color: var(--rose-dark); text-decoration: none; transition: color var(--transition); }
-.sidebar-card .card-header-actions .view-all-link:hover { color: var(--rose); text-decoration: underline; }
-.notification-list { display: flex; flex-direction: column; gap: 8px; }
-.notification-item { background: var(--bg); padding: 10px; border-radius: 8px; border-left: 3px solid transparent; }
-.notification-item.unread { border-left-color: var(--rose); }
-.notif-title { font-weight: 600; font-size: 0.9rem; }
-.notif-message { font-size: 0.8rem; color: var(--text-light); }
-.notif-date { font-size: 0.7rem; color: var(--text-light); margin-top: 2px; }
-.no-items { text-align: center; color: var(--text-light); font-size: 0.9rem; }
+.dashboard-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.sidebar-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.sidebar-card .card-header {
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.sidebar-card .card-header h4 {
+    font-size: 1rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-card .card-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.sidebar-card .card-header-actions .btn {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+}
+
+.sidebar-card .card-header-actions .view-all-link {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--rose-dark);
+    text-decoration: none;
+    transition: color var(--transition);
+}
+
+.sidebar-card .card-header-actions .view-all-link:hover {
+    color: var(--rose);
+    text-decoration: underline;
+}
+
+.notification-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.notification-item {
+    background: var(--bg);
+    padding: 10px;
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+}
+
+.notification-item.unread {
+    border-left-color: var(--rose);
+}
+
+.notif-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.notif-message {
+    font-size: 0.8rem;
+    color: var(--text-light);
+}
+
+.notif-date {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+.no-items {
+    text-align: center;
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
 
 /* ===== QUICK ACTIONS ===== */
-.quick-actions-card .card-body { padding: 0; }
-.quick-actions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; padding: 12px; }
-.quick-action-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); text-decoration: none; color: var(--text); transition: all 0.2s; }
-.quick-action-btn:hover { background: var(--vanilla); border-color: var(--rose); transform: translateY(-2px); }
-.quick-action-btn i { font-size: 1.5rem; color: var(--rose); margin-bottom: 4px; }
-.quick-action-btn span { font-size: 0.8rem; text-align: center; line-height: 1.2; }
+.quick-actions-card .card-body {
+    padding: 0;
+}
+
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    padding: 12px;
+}
+
+.quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+}
+
+.quick-action-btn:hover {
+    background: var(--vanilla);
+    border-color: var(--rose);
+    transform: translateY(-2px);
+}
+
+.quick-action-btn i {
+    font-size: 1.3rem;
+    color: var(--rose);
+    margin-bottom: 4px;
+}
+
+.quick-action-btn span {
+    font-size: 0.75rem;
+    text-align: center;
+    line-height: 1.2;
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
-    .dashboard-grid { grid-template-columns: 1fr; }
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
 }
+
 @media (max-width: 768px) {
-    .dashboard-hero { flex-direction: column; text-align: center; }
-    .hero-profile { flex-direction: column; text-align: center; }
-    .book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-    .stats-row { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-    .quick-actions-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+    .dashboard-hero {
+        flex-direction: column;
+        text-align: center;
+        align-items: center;
+    }
+
+    .hero-profile {
+        flex-direction: column;
+        text-align: center;
+        align-items: center;
+    }
+
+    .hero-content h1 {
+        font-size: 1.8rem;
+    }
+
+    .hero-content .hero-sub {
+        font-size: 1rem;
+    }
+
+    .stats-row {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
+
+    .stat-number {
+        font-size: 1.4rem;
+    }
+
+    .book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    .quick-actions-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    }
+
+    .book-cover-wrapper {
+        height: 140px;
+    }
+
+    .poem-thumbnail, .video-thumb, .blog-thumbnail, .reflection-thumb {
+        height: 100px;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-section {
+        padding: 16px;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .section-actions {
+        width: 100%;
+    }
+
+    .section-actions .btn {
+        flex: 1;
+        text-align: center;
+    }
+
+    .stats-row {
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+        gap: 8px;
+    }
+
+    .stat-card {
+        padding: 10px;
+    }
+
+    .stat-icon {
+        font-size: 1.2rem;
+    }
+
+    .stat-number {
+        font-size: 1.2rem;
+    }
+
+    .stat-label {
+        font-size: 0.6rem;
+    }
+
+    .book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
 }
 </style>
 

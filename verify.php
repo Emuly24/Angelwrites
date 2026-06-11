@@ -13,20 +13,11 @@ $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'verify_attempts_' . $ip;
 $attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
 $attempts = 0;
-$last_attempt = 0;
-
 if (file_exists($attempts_file)) {
-    $data = file_get_contents($attempts_file);
-    if ($data) {
-        list($attempts, $last_attempt) = explode('|', $data);
-        $attempts = (int)$attempts;
-        $last_attempt = (int)$last_attempt;
-    }
+    $attempts = (int)file_get_contents($attempts_file);
 }
-
-// If more than 5 attempts in 15 minutes, block
-if ($attempts >= 5 && (time() - $last_attempt < 900)) {
-    $error = 'Too many failed verification attempts. Please wait 15 minutes and try again.';
+if ($attempts >= 5) {
+    $error = 'Too many verification attempts. Please wait 15 minutes and try again.';
 }
 
 // Handle form submission
@@ -37,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     if (empty($email) || empty($code)) {
         $error = 'Please fill in all fields.';
     } else {
-        $stmt = $db->prepare("SELECT id, verification_code, verification_code_expiry, is_verified, name FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, verification_code, verification_code_expiry, is_verified FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -46,11 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         } elseif ($user['is_verified'] == 1) {
             $success = 'Your account is already verified. You can <a href="login.php">log in</a>.';
         } elseif ($user['verification_code'] !== $code) {
-            $error = 'Invalid verification code. Please try again.';
-            // Increment failed attempts
+            // Increment attempts
             $attempts++;
-            $last_attempt = time();
-            file_put_contents($attempts_file, $attempts . '|' . $last_attempt);
+            file_put_contents($attempts_file, $attempts);
+            $error = 'Invalid verification code. Please try again.';
         } elseif (strtotime($user['verification_code_expiry']) < time()) {
             $error = 'Verification code has expired. Please request a new code.';
         } else {
@@ -59,16 +49,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $stmt->execute([$user['id']]);
             $success = 'Account verified successfully! You can now <a href="login.php">log in</a>.';
             
+            // ===== SEND ADMIN NOTIFICATION =====
+            $admin_email = 'angelwrites@zohomail.com';
+            $admin_subject = '✅ User Verified';
+            $admin_body = "A user has verified their account.\n\nEmail: $email\nUser ID: {$user['id']}\n\nTime: " . date('Y-m-d H:i:s');
+            sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites Admin');
+            
             // Reset attempts on success
             if (file_exists($attempts_file)) {
                 unlink($attempts_file);
             }
-            
-            // ===== SEND ADMIN NOTIFICATION =====
-            $admin_email = 'angelwrites@zohomail.com';
-            $admin_subject = '✅ Account Verified';
-            $admin_body = "A user has verified their account.\n\nEmail: $email\nName: " . $user['name'];
-            sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
         }
     }
 }
@@ -90,24 +80,34 @@ $pageTitle = 'Verify Account';
                     <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
                 <?php endif; ?>
                 <?php if ($success): ?>
-                    <div class="alert alert-success"><?php echo $success; ?></div>
+                    <div class="alert alert-success">
+                        <?php echo $success; ?>
+                    </div>
                 <?php endif; ?>
 
-                <form method="POST" action="" class="auth-form">
-                    <div class="form-group">
-                        <label for="email">Email Address</label>
-                        <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="code">Verification Code</label>
-                        <input type="text" id="code" name="code" placeholder="Enter 6-digit code" pattern="[0-9]{6}" maxlength="6" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block">Verify Account</button>
-                </form>
+                <?php if (!$success): ?>
+                    <form method="POST" action="" class="auth-form">
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="you@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="code">Verification Code</label>
+                            <input type="text" id="code" name="code" placeholder="Enter 6-digit code" pattern="[0-9]{6}" maxlength="6" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Verify Account</button>
+                    </form>
 
-                <div class="auth-footer">
-                    <p>Didn't receive a code? <a href="resend_verification.php">Resend code</a></p>
-                </div>
+                    <div class="auth-footer">
+                        <p>Didn't receive a code? <a href="resend_verification.php">Resend code</a></p>
+                    </div>
+                <?php else: ?>
+                    <div class="success-actions" style="text-align: center; margin-top: 16px;">
+                        <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-primary btn-block">
+                            <i class="fas fa-sign-in-alt"></i> Log In Now
+                        </a>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -127,6 +127,12 @@ $pageTitle = 'Verify Account';
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
 .auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
 .auth-footer a { color: var(--rose); font-weight: 600; }
+.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+.alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+.alert-success { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
+.alert-success a { color: #065f46; font-weight: 600; text-decoration: underline; }
+.success-actions .btn-block { padding: 14px; font-size: 1.05rem; }
+@media (max-width: 480px) { .auth-card { padding: 20px; } }
 </style>
 
 <?php require_once 'includes/footer.php'; ?>
