@@ -52,16 +52,77 @@ $stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
 $stmt->execute([$book_id]);
 $existing_content = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// ===== REAL EXTRACTION ENGINE =====
+/**
+ * ====================================================================
+ * SMART CLEANUP FUNCTION
+ * Converts common Windows-1252/ISO-8859-1 artifacts to proper UTF-8
+ * ====================================================================
+ */
+function cleanSpecialChars($text) {
+    // First, ensure it's UTF-8
+    $text = mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
+    
+    // Replace common Windows-1252 artifacts
+    $replacements = [
+        // Curly quotes and apostrophes
+        'â€œ' => '“',
+        'â€' => '”',
+        'â€™' => '’',
+        'â€˜' => '‘',
+        'â€™' => '\'',
+        'â€¢' => '•',
+        'â€"’' => '—',
+        'â€”' => '—',
+        'â€“' => '–',
+        'â€¦' => '…',
+        // Other common artifacts
+        'â€¹' => '‹',
+        'â€º' => '›',
+        'â‚¬' => '€',
+        'â„¢' => '™',
+        'â€¡' => '‡',
+        'â€°' => '‰',
+        'â€¢' => '•',
+        'â€š' => '‚',
+        'â€ž' => '„',
+        // Single bytes that become garbage
+        'â€' => '”',
+        'â€™' => '\'',
+        'â€˜' => '‘',
+        // Fix line breaks
+        'â€¢' => '•',
+        // Standalone characters
+        'â' => '',
+        '€' => '€',
+        'œ' => 'oe',
+        'Œ' => 'OE',
+        '™' => '™',
+        '©' => '©',
+        '®' => '®',
+        '±' => '±',
+    ];
+    
+    $text = str_replace(array_keys($replacements), array_values($replacements), $text);
+    
+    // Final pass: remove any remaining non-printable characters
+    $text = preg_replace('/[^\x20-\x7E\xA0-\xFF]/u', '', $text);
+    
+    return trim($text);
+}
 
+/**
+ * ====================================================================
+ * EXTRACT PDF
+ * ====================================================================
+ */
 function extract_pdf($file_path) {
     if (!file_exists($file_path)) return false;
     $parser = new \Smalot\PdfParser\Parser();
     try {
         $pdf = $parser->parseFile($file_path);
         $text = $pdf->getText();
-        // Force UTF-8 encoding
-        $text = mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
+        $text = cleanSpecialChars($text);
+        
         // Convert plain text to simple HTML
         $lines = explode("\n", $text);
         $html = '';
@@ -81,6 +142,11 @@ function extract_pdf($file_path) {
     }
 }
 
+/**
+ * ====================================================================
+ * EXTRACT DOCX
+ * ====================================================================
+ */
 function extract_docx($file_path) {
     if (!file_exists($file_path)) return false;
     
@@ -102,8 +168,7 @@ function extract_docx($file_path) {
     }
     zip_close($zip);
     
-    // 🔥 CRITICAL FIX: Convert from Windows-1252 to UTF-8 (NOT ISO-8859-1)
-    $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
+    $content = cleanSpecialChars($content);
     
     // Format into paragraphs
     $lines = explode("\n", $content);
@@ -111,13 +176,17 @@ function extract_docx($file_path) {
     foreach ($lines as $line) {
         $trimmed = trim($line);
         if (!empty($trimmed)) {
-            // Escape HTML to prevent XSS
             $html .= "<p>" . htmlspecialchars($trimmed, ENT_QUOTES, 'UTF-8') . "</p>";
         }
     }
     return $html;
 }
 
+/**
+ * ====================================================================
+ * EXTRACT EPUB
+ * ====================================================================
+ */
 function extract_epub($file_path) {
     if (!file_exists($file_path)) return false;
     $zip = new ZipArchive();
@@ -151,7 +220,8 @@ function extract_epub($file_path) {
         $full_path = $base_dir . $href;
         $content = $zip->getFromName($full_path);
         if ($content) {
-            $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
+            // Clean up the content
+            $content = cleanSpecialChars($content);
             $dom = new DOMDocument();
             @$dom->loadHTML($content);
             $xpath = new DOMXPath($dom);
@@ -211,7 +281,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['extract_content'])) {
             $updated_html = $dom->saveHTML();
             $toc_json = json_encode($toc);
 
-            // Delete old content before inserting new one to avoid corruption
+            // Delete old content before inserting new one
             $stmt = $db->prepare("DELETE FROM book_content WHERE book_id = ?");
             $stmt->execute([$book_id]);
 
@@ -298,7 +368,6 @@ $pageTitle = 'Process Book: ' . htmlspecialchars($book['title']);
                 <form method="POST" id="processForm">
                     <input type="hidden" name="save_processed" value="1">
                     
-                    <!-- Hidden TOC JSON field -->
                     <input type="hidden" name="toc_json" id="toc_json" value="<?php echo htmlspecialchars($existing_content['toc_json'] ?? '[]'); ?>">
 
                     <div class="form-group">
