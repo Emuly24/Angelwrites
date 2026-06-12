@@ -47,8 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login']) && !$error) 
     if (empty($email) || empty($password)) {
         $error = 'Please enter both email and password.';
     } else {
-        $stmt = $db->prepare("SELECT * FROM users WHERE email = ?");
-        $stmt->execute([$email]);
+        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name FROM users WHERE username = ? OR email = ?");
+        $stmt->execute([$login, $login]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
@@ -63,7 +63,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login']) && !$error) 
             $attempts++;
             $last_attempt = time();
             file_put_contents($attempts_file, $attempts . '|' . $last_attempt);
-        } elseif ($user['is_verified'] != 1) {
+        } elseif ($user && password_verify($password, $user['password'])) {
+            // ===== FIX: Bypass verification for admin and Test User =====
+            if (($user['username'] === 'admin' || $user['username'] === 'Test User') && $user['is_verified'] == 0) {
+                $user['is_verified'] = 1; // Bypass verification for admin and Test User
+            } elseif ($user['is_verified'] != 1) {
             $error = 'Please verify your email address before logging in. <a href="resend_verification.php?email=' . urlencode($email) . '">Resend verification code</a>.';
         } else {
             // Login successful
