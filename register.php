@@ -208,30 +208,36 @@ $pageTitle = 'Sign Up';
                         <div class="form-group">
                             <label for="username">Username</label>
                             <input type="text" id="username" name="username" placeholder="Choose a username (3-20 chars)" required>
+                            <div id="usernameStatus" class="field-status"></div>
                         </div>
 
                         <div class="form-group">
                             <label for="email">Email Address</label>
                             <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                            <div id="emailStatus" class="field-status"></div>
                         </div>
 
                         <div class="form-group">
                             <label for="password">Password</label>
-                            <div class="password-wrapper" style="position: relative;">
+                            <div class="password-wrapper">
                                 <input type="password" id="password" name="password" placeholder="Must be at least 8 characters" required>
-                                <button type="button" id="generatePassword" class="btn btn-sm btn-secondary" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 2; padding: 4px 8px; font-size: 0.7rem;">
-                                    <i class="fas fa-sync-alt"></i> Suggest
-                                </button>
-                                <span class="password-toggle" id="togglePassword" style="position: absolute; right: 110px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; z-index: 1; background: var(--input-bg); padding: 4px; border-radius: 4px;">
+                                <span class="password-toggle" id="togglePassword">
                                     <i class="fas fa-eye"></i>
                                 </span>
                             </div>
-                            <small class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</small>
+                            <div class="password-strength-meter">
+                                <div class="strength-bar" id="strengthBar"></div>
+                                <span id="strengthText">Strength: None</span>
+                            </div>
+                            <button type="button" id="generatePassword" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-sync-alt"></i> Suggest Strong Password
+                            </button>
                         </div>
 
                         <div class="form-group">
                             <label for="confirm_password">Confirm Password</label>
                             <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter your password" required>
+                            <div id="passwordMatchStatus" class="field-status"></div>
                         </div>
 
                         <div class="form-group">
@@ -264,15 +270,15 @@ $pageTitle = 'Sign Up';
 
                         <div class="form-group">
                             <label for="contact">Contact Number</label>
-                            <div style="display: flex; gap: 4px;">
-                                <span id="countryCodeDisplay" style="padding: 10px 14px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; color: var(--text); min-width: 60px; display: flex; align-items: center;">+265</span>
-                                <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456" required style="flex: 1;">
+                            <div class="contact-wrapper">
+                                <span id="countryCodeDisplay" class="country-code-display">+265</span>
+                                <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456" required>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label for="referral_source">How did you hear about AngelWrites?</label>
-                            <select id="referral_source" name="referral_source" required onchange="toggleOtherField()">
+                            <select id="referral_source" name="referral_source" required>
                                 <option value="">Select a source</option>
                                 <?php foreach ($referral_sources as $source): ?>
                                     <option value="<?php echo htmlspecialchars($source); ?>"><?php echo htmlspecialchars($source); ?></option>
@@ -280,22 +286,24 @@ $pageTitle = 'Sign Up';
                             </select>
                             <div id="otherReferralWrapper" style="display: none; margin-top: 8px;">
                                 <label for="other_referral">Please specify:</label>
-                                <input type="text" id="other_referral" name="other_referral" placeholder="Where did you hear about us?" class="form-control">
+                                <input type="text" id="other_referral" name="other_referral" placeholder="Where did you hear about us?">
                             </div>
                         </div>
+
                         <div class="checkbox-group">
                             <input type="checkbox" name="terms" id="terms" required>
                             <label for="terms">
                                 I agree to the <a href="/terms.php">Terms of Service</a> and <a href="/privacy.php">Privacy Policy</a>
                             </label>
                         </div>
+
                         <button type="submit" class="btn btn-primary btn-block">
                             <i class="fas fa-user-plus"></i>
                             Create Account
                         </button>
                     </form>
 
-                    <!-- ===== SOCIAL LOGIN BUTTONS (Google only) ===== -->
+                    <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
                     <div class="social-login-section">
                         <p>Or continue with:</p>
                         <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
@@ -319,11 +327,11 @@ $pageTitle = 'Sign Up';
                             Please check your inbox, enter the code on the verification page to activate your account.
                         </p>
                         <div class="success-actions">
-                            <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary btn-large btn-block">
+                            <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary btn-block">
                                 <i class="fas fa-sign-in-alt"></i>
                                 Go to Verification
                             </a>
-                            <p class="small-note" style="margin-top: 12px; color: var(--text-muted);">
+                            <p class="small-note">
                                 📧 Didn't receive the email? Check your spam folder or 
                                 <a href="<?php echo SITE_URL; ?>/resend_verification.php">Request a new code</a>.
                             </p>
@@ -335,9 +343,10 @@ $pageTitle = 'Sign Up';
     </div>
 </div>
 
+<!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ---- Auto-generate strong password ----
+    // ===== GENERATE STRONG PASSWORD =====
     const genBtn = document.getElementById('generatePassword');
     const passwordInput = document.getElementById('password');
     const confirmInput = document.getElementById('confirm_password');
@@ -356,11 +365,65 @@ document.addEventListener('DOMContentLoaded', function() {
         const newPassword = generateStrongPassword();
         passwordInput.value = newPassword;
         confirmInput.value = newPassword;
-        passwordInput.style.borderColor = '#27ae60';
-        setTimeout(() => { passwordInput.style.borderColor = ''; }, 1500);
+        checkPasswordStrength(newPassword);
+        checkPasswordMatch();
     });
 
-    // ---- Country Code Detection ----
+    // ===== PASSWORD STRENGTH METER =====
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
+
+    function checkPasswordStrength(password) {
+        let strength = 0;
+        if (password.length >= 8) strength++;
+        if (password.match(/[a-z]/)) strength++;
+        if (password.match(/[A-Z]/)) strength++;
+        if (password.match(/[0-9]/)) strength++;
+        if (password.match(/[^a-zA-Z0-9]/)) strength++;
+
+        const levels = ['None', 'Weak', 'Fair', 'Good', 'Strong'];
+        const colors = ['#ddd', '#e74c3c', '#f39c12', '#3498db', '#2ecc71'];
+        const widths = ['0%', '20%', '40%', '60%', '100%'];
+
+        strengthBar.style.width = widths[strength];
+        strengthBar.style.background = colors[strength];
+        strengthText.textContent = 'Strength: ' + levels[strength];
+    }
+
+    passwordInput.addEventListener('input', function() {
+        checkPasswordStrength(this.value);
+        checkPasswordMatch();
+    });
+
+    // ===== PASSWORD MATCH CHECK =====
+    function checkPasswordMatch() {
+        const status = document.getElementById('passwordMatchStatus');
+        const pass = passwordInput.value;
+        const confirm = confirmInput.value;
+        if (confirm.length === 0) {
+            status.textContent = '';
+            status.className = '';
+        } else if (pass === confirm) {
+            status.textContent = '✅ Passwords match';
+            status.className = 'field-status success';
+        } else {
+            status.textContent = '❌ Passwords do not match';
+            status.className = 'field-status error';
+        }
+    }
+
+    confirmInput.addEventListener('input', checkPasswordMatch);
+
+    // ===== TOGGLE PASSWORD VISIBILITY =====
+    const togglePassword = document.getElementById('togglePassword');
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+
+    // ===== COUNTRY CODE DETECTION =====
     const countrySelect = document.getElementById('country');
     const codeDisplay = document.getElementById('countryCodeDisplay');
 
@@ -372,42 +435,81 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Trigger change event on page load to set default code
     if (countrySelect.value) {
         countrySelect.dispatchEvent(new Event('change'));
     }
 
-    // ---- Show/Hide Password Toggle ----
-    const togglePassword = document.getElementById('togglePassword');
-    if (togglePassword && passwordInput) {
-        togglePassword.addEventListener('click', function () {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            this.querySelector('i').classList.toggle('fa-eye');
-            this.querySelector('i').classList.toggle('fa-eye-slash');
-        });
-    }
+    // ===== REFERRAL 'OTHER' FIELD =====
+    const referralSelect = document.getElementById('referral_source');
+    const otherWrapper = document.getElementById('otherReferralWrapper');
 
-    // ---- Toggle 'Other' Referral Field ----
-    window.toggleOtherField = function() {
-        const dropdown = document.getElementById('referral_source');
-        const otherWrapper = document.getElementById('otherReferralWrapper');
-        const otherInput = document.getElementById('other_referral');
-        
-        if (dropdown.value === 'Other') {
+    referralSelect.addEventListener('change', function() {
+        if (this.value === 'Other') {
             otherWrapper.style.display = 'block';
-            otherInput.setAttribute('required', 'required');
         } else {
             otherWrapper.style.display = 'none';
-            otherInput.removeAttribute('required');
-            otherInput.value = '';
         }
-    };
+    });
+
+    // ===== AJAX USERNAME AVAILABILITY =====
+    const usernameInput = document.getElementById('username');
+    const usernameStatus = document.getElementById('usernameStatus');
+
+    let usernameTimer;
+    usernameInput.addEventListener('input', function() {
+        clearTimeout(usernameTimer);
+        const username = this.value.trim();
+        if (username.length < 3) {
+            usernameStatus.textContent = 'Minimum 3 characters';
+            usernameStatus.className = 'field-status info';
+            return;
+        }
+        usernameTimer = setTimeout(() => {
+            fetch('<?php echo SITE_URL; ?>/check_username.php?username=' + encodeURIComponent(username))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.available) {
+                        usernameStatus.textContent = '✅ Username available';
+                        usernameStatus.className = 'field-status success';
+                    } else {
+                        usernameStatus.textContent = '❌ Username not available';
+                        usernameStatus.className = 'field-status error';
+                    }
+                });
+        }, 500);
+    });
+
+    // ===== AJAX EMAIL AVAILABILITY =====
+    const emailInput = document.getElementById('email');
+    const emailStatus = document.getElementById('emailStatus');
+
+    let emailTimer;
+    emailInput.addEventListener('input', function() {
+        clearTimeout(emailTimer);
+        const email = this.value.trim();
+        if (!email.includes('@')) {
+            emailStatus.textContent = '';
+            emailStatus.className = '';
+            return;
+        }
+        emailTimer = setTimeout(() => {
+            fetch('<?php echo SITE_URL; ?>/check_email.php?email=' + encodeURIComponent(email))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.available) {
+                        emailStatus.textContent = '✅ Email available';
+                        emailStatus.className = 'field-status success';
+                    } else {
+                        emailStatus.textContent = '❌ Email already registered';
+                        emailStatus.className = 'field-status error';
+                    }
+                });
+        }, 500);
+    });
 });
 </script>
 
 <style>
-/* Auth Styles */
 .auth-page { padding: 40px 0; }
 .auth-wrapper { display: flex; justify-content: center; }
 .auth-card { max-width: 480px; width: 100%; background: var(--card-bg); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-hover); border: 1px solid var(--border); }
@@ -419,43 +521,54 @@ document.addEventListener('DOMContentLoaded', function() {
 .form-group label { display: block; font-weight: 600; margin-bottom: 4px; }
 .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.field-hint { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--text-light); }
 
-.password-wrapper input {
-    padding-right: 160px; /* Make room for button + icon */
-}
-.password-toggle {
-    color: #888 !important; /* Always visible grey */
-}
-.password-toggle:hover {
-    color: #333 !important;
-}
-.password-toggle i {
-    font-size: 1.1rem;
-    transition: color 0.2s;
-}
+.field-status { font-size: 0.8rem; margin-top: 4px; }
+.field-status.success { color: #27ae60; }
+.field-status.error { color: #e74c3c; }
+.field-status.info { color: #3498db; }
+
+.password-wrapper { position: relative; }
+.password-wrapper input { padding-right: 40px; }
+.password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; }
+.password-toggle:hover { color: #333; }
+
+.password-strength-meter { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.strength-bar { height: 4px; width: 0%; background: #ddd; border-radius: 2px; transition: width 0.3s; }
+#strengthText { font-size: 0.8rem; color: var(--text-light); }
+
+#generatePassword { margin-top: 4px; padding: 4px 12px; font-size: 0.8rem; }
+
+.contact-wrapper { display: flex; gap: 4px; }
+.country-code-display { padding: 10px 14px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; color: var(--text); min-width: 60px; display: flex; align-items: center; justify-content: center; }
+.contact-wrapper input { flex: 1; }
+
+.checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.checkbox-group input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--rose); }
+.checkbox-group a { color: var(--rose); text-decoration: none; }
+.checkbox-group a:hover { text-decoration: underline; }
 
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
-
-.social-login-section { text-align: center; margin: 20px 0; }
-.social-login-section .btn { display: inline-block; margin: 4px; padding: 10px 20px; border-radius: 6px; color: white; text-decoration: none; font-size: 0.95rem; }
-.btn-google { background: #DB4437; }
+.btn-google { background: #DB4437; color: white; display: block; text-align: center; padding: 10px; border-radius: 8px; text-decoration: none; margin: 8px 0; }
 .btn-google:hover { background: #c23321; }
 
 .auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
 .auth-footer a { color: var(--rose); font-weight: 600; }
+
+.social-login-section { text-align: center; margin: 20px 0; }
 
 .success-popup { text-align: center; padding: 30px 20px; animation: fadeInUp 0.6s ease-out; }
 .success-icon { font-size: 4rem; color: #28a745; margin-bottom: 15px; animation: popIn 0.5s ease-out; }
 .success-popup h2 { margin-bottom: 10px; color: var(--text); }
 .success-popup .success-message { font-size: 1.1rem; color: var(--text-light); margin-bottom: 25px; line-height: 1.6; }
 .success-popup .small-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; }
+.success-actions .btn-block { padding: 14px; font-size: 1.05rem; }
 
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes popIn { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
 @media (max-width: 480px) {
     .auth-card { padding: 20px; }
+    .success-popup { padding: 20px; }
 }
 </style>
 

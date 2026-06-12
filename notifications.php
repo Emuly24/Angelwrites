@@ -73,14 +73,22 @@ $pageTitle = 'Notifications';
 
 <div class="notifications-page">
     <div class="container">
+        <!-- ===== DARK MODE TOGGLE ===== -->
+        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
+            <i class="fas fa-moon"></i>
+        </button>
+
+        <!-- ===== READING PROGRESS BAR ===== -->
+        <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
+
         <!-- Page Header -->
         <div class="notifications-header">
             <h1>Notifications</h1>
             <p>Stay up to date with everything happening on AngelWrites.</p>
             <div class="notifications-meta">
-                <span><?php echo number_format($total_notifications); ?> total</span>
+                <span id="totalNotifCount"><?php echo number_format($total_notifications); ?></span> total
                 <span>•</span>
-                <span><?php echo number_format($unread_count); ?> unread</span>
+                <span id="unreadNotifCount"><?php echo number_format($unread_count); ?></span> unread
             </div>
         </div>
 
@@ -94,6 +102,9 @@ $pageTitle = 'Notifications';
                         </button>
                     </form>
                 <?php endif; ?>
+                <button id="refreshNotifications" class="btn btn-sm btn-outline">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
             </div>
             <div class="actions-right">
                 <?php if ($total_notifications > 0): ?>
@@ -108,9 +119,9 @@ $pageTitle = 'Notifications';
 
         <!-- Notifications List -->
         <?php if (count($notifications) > 0): ?>
-            <div class="notifications-list">
+            <div class="notifications-list" id="notificationsList">
                 <?php foreach ($notifications as $notif): ?>
-                    <div class="notification-item <?php echo $notif['is_read'] ? 'read' : 'unread'; ?>">
+                    <div class="notification-item <?php echo $notif['is_read'] ? 'read' : 'unread'; ?>" data-id="<?php echo $notif['id']; ?>">
                         <div class="notification-content">
                             <div class="notification-icon">
                                 <i class="fas <?php echo $notif['icon'] ?? 'fa-bell'; ?>"></i>
@@ -126,19 +137,13 @@ $pageTitle = 'Notifications';
                         </div>
                         <div class="notification-actions">
                             <?php if (!$notif['is_read']): ?>
-                                <form method="POST" style="display:inline;">
-                                    <input type="hidden" name="notif_id" value="<?php echo $notif['id']; ?>">
-                                    <button type="submit" name="mark_read" class="btn btn-sm btn-outline" title="Mark as read">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                </form>
-                            <?php endif; ?>
-                            <form method="POST" style="display:inline;" onsubmit="return confirm('Delete this notification?');">
-                                <input type="hidden" name="notif_id" value="<?php echo $notif['id']; ?>">
-                                <button type="submit" name="delete_notif" class="btn btn-sm btn-outline" title="Delete">
-                                    <i class="fas fa-times"></i>
+                                <button class="btn btn-sm btn-outline mark-read-btn" data-id="<?php echo $notif['id']; ?>" title="Mark as read">
+                                    <i class="fas fa-check"></i>
                                 </button>
-                            </form>
+                            <?php endif; ?>
+                            <button class="btn btn-sm btn-outline delete-notif-btn" data-id="<?php echo $notif['id']; ?>" title="Delete">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -181,34 +186,117 @@ $pageTitle = 'Notifications';
     </div>
 </div>
 
+<!-- ===== JAVASCRIPT FOR AJAX ===== -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ===== THEME TOGGLE =====
+    const themeToggle = document.getElementById('themeToggle');
+    const currentTheme = localStorage.getItem('notificationsTheme') || 'light';
+    if (currentTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+    }
+
+    window.toggleTheme = function() {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        localStorage.setItem('notificationsTheme', isDark ? 'dark' : 'light');
+        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    };
+
+    // ===== READING PROGRESS BAR =====
+    window.addEventListener('scroll', function() {
+        const scrollTop = window.scrollY;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPercent = (scrollTop / docHeight) * 100;
+        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
+    });
+
+    // ===== AJAX: Mark as Read =====
+    document.querySelectorAll('.mark-read-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const formData = new FormData();
+            formData.append('action', 'mark_read');
+            formData.append('notif_id', id);
+            fetch('<?php echo SITE_URL; ?>/notifications_ajax.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+                    if (item) {
+                        item.classList.remove('unread');
+                        item.classList.add('read');
+                        this.remove();
+                        updateCounts();
+                    }
+                }
+            });
+        });
+    });
+
+    // ===== AJAX: Delete Notification =====
+    document.querySelectorAll('.delete-notif-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!confirm('Delete this notification?')) return;
+            const id = this.dataset.id;
+            const formData = new FormData();
+            formData.append('action', 'delete_notif');
+            formData.append('notif_id', id);
+            fetch('<?php echo SITE_URL; ?>/notifications_ajax.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+                    if (item) {
+                        item.remove();
+                        updateCounts();
+                    }
+                }
+            });
+        });
+    });
+
+    // ===== AJAX: Refresh Notifications =====
+    document.getElementById('refreshNotifications').addEventListener('click', function() {
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        fetch('<?php echo SITE_URL; ?>/notifications_ajax.php?action=get_list')
+            .then(r => r.text())
+            .then(html => {
+                document.getElementById('notificationsList').innerHTML = html;
+                updateCounts();
+                // Re-bind event listeners
+                document.getElementById('refreshNotifications').innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+            })
+            .catch(() => {
+                document.getElementById('refreshNotifications').innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+            });
+    });
+
+    // ===== Update Counts =====
+    function updateCounts() {
+        const totalItems = document.querySelectorAll('.notification-item').length;
+        const unreadItems = document.querySelectorAll('.notification-item.unread').length;
+        document.getElementById('totalNotifCount').textContent = totalItems;
+        document.getElementById('unreadNotifCount').textContent = unreadItems;
+    }
+});
+</script>
+
 <style>
 /* ===== NOTIFICATIONS PAGE ===== */
-.notifications-page {
-    padding: 32px 0 60px;
-}
+.notifications-page { padding: 32px 0 60px; }
+.notifications-header { text-align: center; margin-bottom: 24px; }
+.notifications-header h1 { font-size: 2.4rem; margin-bottom: 4px; }
+.notifications-header p { color: var(--text-light); font-size: 1.05rem; }
+.notifications-meta { color: var(--text-light); font-size: 0.9rem; margin-top: 4px; }
 
-.notifications-header {
-    text-align: center;
-    margin-bottom: 24px;
-}
-
-.notifications-header h1 {
-    font-size: 2.4rem;
-    margin-bottom: 4px;
-}
-
-.notifications-header p {
-    color: var(--text-light);
-    font-size: 1.05rem;
-}
-
-.notifications-meta {
-    color: var(--text-light);
-    font-size: 0.9rem;
-    margin-top: 4px;
-}
-
-/* ===== ACTIONS BAR ===== */
 .notifications-actions {
     display: flex;
     justify-content: space-between;
@@ -222,36 +310,16 @@ $pageTitle = 'Notifications';
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
 }
-
-.notifications-actions .actions-left,
-.notifications-actions .actions-right {
+.notifications-actions .actions-left, .notifications-actions .actions-right {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
 }
+.notifications-actions .btn-sm { padding: 6px 16px; border-radius: 30px; }
+.btn-danger { background: #e74c3c; color: white; transition: background 0.3s; }
+.btn-danger:hover { background: #c0392b; }
 
-.notifications-actions .btn-sm {
-    padding: 6px 16px;
-    border-radius: 30px;
-}
-
-.btn-danger {
-    background: #e74c3c;
-    color: white;
-    transition: background 0.3s;
-}
-
-.btn-danger:hover {
-    background: #c0392b;
-}
-
-/* ===== NOTIFICATIONS LIST ===== */
-.notifications-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
+.notifications-list { display: flex; flex-direction: column; gap: 12px; }
 .notification-item {
     display: flex;
     justify-content: space-between;
@@ -265,173 +333,41 @@ $pageTitle = 'Notifications';
     box-shadow: var(--shadow);
     transition: transform 0.2s, box-shadow 0.2s;
 }
+.notification-item:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.notification-item.unread { border-left: 4px solid var(--rose); background: var(--fantasy); }
+.notification-item.read { border-left: 4px solid var(--border); }
 
-.notification-item:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
-}
+.notification-content { display: flex; align-items: flex-start; gap: 16px; flex: 1; min-width: 200px; }
+.notification-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--vanilla); display: flex; align-items: center; justify-content: center; color: var(--rose); font-size: 1.1rem; }
+.notification-details { flex: 1; }
+.notification-title { font-weight: 600; font-size: 1rem; color: var(--text); }
+.notification-message { color: var(--text-light); font-size: 0.9rem; line-height: 1.5; margin: 2px 0 4px; }
+.notification-date { font-size: 0.8rem; color: var(--text-light); }
+.notification-date i { margin-right: 4px; }
 
-.notification-item.unread {
-    border-left: 4px solid var(--rose);
-    background: var(--fantasy);
-}
+.notification-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.notification-actions .btn-sm { padding: 4px 10px; font-size: 0.75rem; border-radius: 20px; }
 
-.notification-item.read {
-    border-left: 4px solid var(--border);
-}
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-light); }
+.empty-state-icon { font-size: 4rem; color: var(--rose); margin-bottom: 16px; }
+.empty-state h3 { font-size: 1.4rem; margin-bottom: 4px; color: var(--text); }
+.empty-state p { margin-bottom: 20px; }
 
-.notification-content {
-    display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    flex: 1;
-    min-width: 200px;
-}
+.pagination { display: flex; justify-content: center; gap: 6px; margin-top: 32px; flex-wrap: wrap; }
+.page-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); font-size: 0.9rem; transition: all 0.2s; min-width: 36px; text-decoration: none; }
+.page-link:hover { border-color: var(--rose); }
+.page-link.active { background: var(--rose); color: white; border-color: var(--rose); }
 
-.notification-icon {
-    flex-shrink: 0;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--vanilla);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--rose);
-    font-size: 1.1rem;
-}
-
-.notification-details {
-    flex: 1;
-}
-
-.notification-title {
-    font-weight: 600;
-    font-size: 1rem;
-    color: var(--text);
-}
-
-.notification-message {
-    color: var(--text-light);
-    font-size: 0.9rem;
-    line-height: 1.5;
-    margin: 2px 0 4px;
-}
-
-.notification-date {
-    font-size: 0.8rem;
-    color: var(--text-light);
-}
-
-.notification-date i {
-    margin-right: 4px;
-}
-
-.notification-actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.notification-actions .btn-sm {
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    border-radius: 20px;
-}
-
-/* ===== EMPTY STATE ===== */
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-light);
-}
-
-.empty-state-icon {
-    font-size: 4rem;
-    color: var(--rose);
-    margin-bottom: 16px;
-}
-
-.empty-state h3 {
-    font-size: 1.4rem;
-    margin-bottom: 4px;
-    color: var(--text);
-}
-
-.empty-state p {
-    margin-bottom: 20px;
-}
-
-/* ===== PAGINATION ===== */
-.pagination {
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-    margin-top: 32px;
-    flex-wrap: wrap;
-}
-
-.page-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 14px;
-    border-radius: 8px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    min-width: 36px;
-    text-decoration: none;
-}
-
-.page-link:hover {
-    border-color: var(--rose);
-}
-
-.page-link.active {
-    background: var(--rose);
-    color: white;
-    border-color: var(--rose);
-}
-
-/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
-    .notification-item {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .notification-content {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .notification-actions {
-        justify-content: flex-end;
-        margin-top: 4px;
-    }
-
-    .notifications-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .notifications-actions .actions-left,
-    .notifications-actions .actions-right {
-        justify-content: center;
-    }
+    .notification-item { flex-direction: column; align-items: stretch; }
+    .notification-content { flex-direction: column; align-items: stretch; }
+    .notification-actions { justify-content: flex-end; margin-top: 4px; }
+    .notifications-actions { flex-direction: column; align-items: stretch; }
+    .notifications-actions .actions-left, .notifications-actions .actions-right { justify-content: center; }
 }
-
 @media (max-width: 480px) {
-    .notifications-header h1 {
-        font-size: 1.8rem;
-    }
-
-    .notification-item {
-        padding: 12px 16px;
-    }
+    .notifications-header h1 { font-size: 1.8rem; }
+    .notification-item { padding: 12px 16px; }
 }
 </style>
 

@@ -7,7 +7,7 @@ require_once 'includes/mail_helper.php';
 $error = '';
 $success = '';
 
-// ===== RATE LIMITING (simple) =====
+// ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'contact_submit_' . $ip;
 $limit_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $subject = trim($_POST['subject']);
     $message = trim($_POST['message']);
 
-    // ===== SIMPLE MATH CAPTCHA (optional) =====
+    // ===== SIMPLE MATH CAPTCHA =====
     $captcha_result = isset($_POST['captcha_result']) ? (int)$_POST['captcha_result'] : 0;
     $captcha_expected = isset($_POST['captcha_expected']) ? (int)$_POST['captcha_expected'] : 0;
     if ($captcha_result !== $captcha_expected) {
@@ -37,34 +37,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     } else {
         $stmt = $db->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
         if ($stmt->execute([$name, $email, $subject, $message])) {
-            // ===== SEND ADMIN NOTIFICATION VIA ZOHO SMTP =====
+            // ===== ADMIN NOTIFICATION =====
             $admin_email = 'angelwrites@zohomail.com';
             $admin_subject = '📩 New Contact Message: ' . ($subject ?: 'No Subject');
-            $admin_body = "You have received a new message from your website.\n\n";
+            $admin_body = "You have received a new message.\n\n";
             $admin_body .= "Name: $name\n";
             $admin_body .= "Email: $email\n";
             $admin_body .= "Subject: " . ($subject ?: 'No Subject') . "\n\n";
             $admin_body .= "Message:\n$message\n\n";
             $admin_body .= "---\n";
             $admin_body .= "To manage this message, login to your admin panel.\n";
-
-            $emailSent = sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites', false);
+            sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites', false);
             
-            // ===== SEND CONFIRMATION EMAIL TO USER (optional) =====
+            // ===== USER CONFIRMATION EMAIL =====
             $user_subject = "Thank you for contacting AngelWrites";
-            $user_body = "Hello $name,\n\nThank you for reaching out to AngelWrites. We have received your message and will respond as soon as possible.\n\nHere's a copy of your message for your records:\n\n";
-            $user_body .= "Subject: " . ($subject ?: 'No Subject') . "\n";
-            $user_body .= "Message:\n$message\n\n";
-            $user_body .= "Blessings,\nAngella Bottoman\nAngelWrites";
-            $userEmailSent = sendEmail($email, $user_subject, $user_body, 'angelwrites@zohomail.com', 'AngelWrites', false);
+            $user_body = "Hello $name,\n\nThank you for reaching out. We have received your message and will respond as soon as possible.\n\nBlessings,\nAngella Bottoman\nAngelWrites";
+            sendEmail($email, $user_subject, $user_body, 'angelwrites@zohomail.com', 'AngelWrites', false);
             
-            if ($emailSent) {
-                $success = 'Your message has been sent! Thank you for reaching out.';
-            } else {
-                $success = 'Your message was saved but email notification could not be sent. We\'ll review it soon.';
-            }
-            
-            // ===== SET RATE LIMIT =====
+            $success = 'Your message has been sent! Thank you for reaching out.';
             file_put_contents($limit_file, time());
         } else {
             $error = 'Something went wrong. Please try again.';
@@ -83,6 +73,11 @@ $pageTitle = 'Contact';
 
 <div class="contact-page">
     <div class="container">
+        <!-- ===== DARK MODE TOGGLE ===== -->
+        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
+            <i class="fas fa-moon"></i>
+        </button>
+
         <div class="contact-wrapper">
             <div class="contact-header">
                 <h1>Get in Touch</h1>
@@ -116,7 +111,7 @@ $pageTitle = 'Contact';
                             <textarea id="message" name="message" rows="5" placeholder="Write your message here..." required></textarea>
                         </div>
                         
-                        <!-- ===== ADDED: Simple Math CAPTCHA ===== -->
+                        <!-- ===== MATH CAPTCHA ===== -->
                         <div class="form-group captcha-group">
                             <label for="captcha_result">Verify you are human</label>
                             <div style="display: flex; align-items: center; gap: 8px;">
@@ -150,8 +145,50 @@ $pageTitle = 'Contact';
     </div>
 </div>
 
+<script>
+// ===== THEME TOGGLE =====
+const themeToggle = document.getElementById('themeToggle');
+const currentTheme = localStorage.getItem('contactTheme') || 'light';
+if (currentTheme === 'dark') {
+    document.body.classList.add('dark-mode');
+    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+}
+
+function toggleTheme() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('contactTheme', isDark ? 'dark' : 'light');
+    themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+}
+</script>
+
 <style>
-/* ===== ORIGINAL STYLES (PRESERVED) ===== */
+/* ===== DARK MODE SUPPORT ===== */
+:root {
+    --rose: #c0392b;
+    --rose-dark: #a93226;
+    --vanilla: #fdf5e6;
+    --dark: #1a1a1a;
+    --text-light: #666;
+    --input-bg: #f9f9f9;
+    --card-bg: #ffffff;
+    --border: #e0e0e0;
+    --shadow: 0 4px 20px rgba(0,0,0,0.06);
+    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
+    --bg: #fdfdfd;
+}
+body.dark-mode {
+    --bg: #1a1a1a;
+    --card-bg: #2a2a2a;
+    --border: #444;
+    --text-light: #aaa;
+    --input-bg: #333;
+    --vanilla: #2a2a2a;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
+}
+body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+
 .contact-page { padding: 32px 0 60px; }
 .contact-wrapper { max-width: 900px; margin: 0 auto; }
 .contact-header { text-align: center; margin-bottom: 32px; }
@@ -161,8 +198,8 @@ $pageTitle = 'Contact';
 .contact-form-container { background: var(--card-bg); border-radius: 16px; padding: 32px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .contact-form .form-group { margin-bottom: 20px; }
 .contact-form label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--text); }
-.contact-form input, .contact-form textarea { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--input-bg); color: var(--text); transition: border-color var(--transition), box-shadow var(--transition); font-family: inherit; }
-.contact-form input:focus, .contact-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.contact-form input, .contact-form textarea { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--input-bg); color: var(--text); transition: border-color 0.3s, box-shadow 0.3s; }
+.contact-form input:focus, .contact-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .contact-form textarea { resize: vertical; min-height: 120px; }
 .required { color: #e74c3c; }
 .contact-form .btn-block { width: 100%; padding: 14px; font-size: 1.05rem; justify-content: center; }
@@ -172,8 +209,13 @@ $pageTitle = 'Contact';
 .info-card h3 { font-size: 1.05rem; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
 .info-card h3 i { font-size: 1.2rem; }
 .info-card p { color: var(--text); line-height: 1.6; font-size: 0.95rem; }
-.info-card a { color: var(--rose); transition: color var(--transition); }
+.info-card a { color: var(--rose); transition: color 0.2s; }
 .info-card a:hover { color: var(--rose-dark); }
+
+/* ===== CAPTCHA ===== */
+.captcha-group { margin-top: 4px; }
+.captcha-group input[type="number"] { width: 80px; text-align: center; }
+.captcha-group input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
 @media (max-width: 768px) {
     .contact-layout { grid-template-columns: 1fr; gap: 24px; }
@@ -181,11 +223,6 @@ $pageTitle = 'Contact';
     .contact-form-container { padding: 20px; }
     .info-card { padding: 16px 20px; }
 }
-
-/* ===== ADDED: CAPTCHA STYLES ===== */
-.captcha-group { margin-top: 4px; }
-.captcha-group input[type="number"] { width: 80px; text-align: center; }
-.captcha-group input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

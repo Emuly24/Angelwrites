@@ -8,7 +8,7 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
 ?>
 <?php require_once 'includes/header.php'; ?>
 
-<!-- ===== SKIP TO CONTENT LINK (Accessibility Feature) ===== -->
+<!-- ===== SKIP TO CONTENT LINK ===== -->
 <a href="#mainContent" class="skip-link" style="position:absolute;top:-40px;left:0;background:var(--rose);color:white;padding:8px 16px;z-index:9999;border-radius:0 0 8px 0;transition:top 0.2s;text-decoration:none;font-weight:600;">Skip to main content</a>
 
 <style>
@@ -44,7 +44,12 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
             <p>AngelWrites is committed to making our website accessible to all users, including those with disabilities.</p>
         </div>
 
-        <!-- High Contrast Toggle (User Control) -->
+        <!-- ===== THEME TOGGLE ===== -->
+        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
+            <i class="fas fa-moon"></i>
+        </button>
+
+        <!-- Accessibility Controls -->
         <div class="accessibility-controls">
             <button id="highContrastToggle" class="btn btn-outline">
                 <i class="fas fa-adjust"></i> Toggle High Contrast Mode
@@ -135,33 +140,44 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
     </div>
 </div>
 
-<!-- ===== JAVASCRIPT FOR ACCESSIBILITY TOGGLES ===== -->
+<!-- ===== JAVASCRIPT FOR ACCESSIBILITY ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== THEME TOGGLE =====
+    const themeToggle = document.getElementById('themeToggle');
+    const currentTheme = localStorage.getItem('accessibilityTheme') || 'light';
+    if (currentTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        localStorage.setItem('accessibilityTheme', isDark ? 'dark' : 'light');
+        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    }
+
+    // ===== HIGH CONTRAST TOGGLE =====
     const highContrastBtn = document.getElementById('highContrastToggle');
     const resetBtn = document.getElementById('resetAccessibility');
     const html = document.documentElement;
 
-    // High contrast toggle
     highContrastBtn.addEventListener('click', function() {
         html.classList.toggle('high-contrast');
-        // Store preference in localStorage
         const isHighContrast = html.classList.contains('high-contrast');
         localStorage.setItem('highContrastMode', isHighContrast ? 'true' : 'false');
-        // Update button text
         this.innerHTML = isHighContrast 
             ? '<i class="fas fa-adjust"></i> Disable High Contrast' 
             : '<i class="fas fa-adjust"></i> Toggle High Contrast Mode';
     });
 
-    // Reset accessibility settings
     resetBtn.addEventListener('click', function() {
         html.classList.remove('high-contrast');
         localStorage.setItem('highContrastMode', 'false');
         highContrastBtn.innerHTML = '<i class="fas fa-adjust"></i> Toggle High Contrast Mode';
     });
 
-    // Load saved preference on page load
     const savedMode = localStorage.getItem('highContrastMode');
     if (savedMode === 'true') {
         html.classList.add('high-contrast');
@@ -172,155 +188,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <style>
 /* ===== ACCESSIBILITY PAGE STYLES ===== */
-.accessibility-page {
-    padding: 32px 0 60px;
-}
-
-.accessibility-header {
-    text-align: center;
-    margin-bottom: 24px;
-}
-
-.accessibility-header h1 {
-    font-size: 2.4rem;
-    margin-bottom: 4px;
-}
-
-.accessibility-header p {
-    color: var(--text-light);
-    font-size: 1.05rem;
-}
-
-/* ===== CONTROLS ===== */
-.accessibility-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    justify-content: center;
-    margin-bottom: 32px;
-}
-
-.accessibility-controls .btn {
-    padding: 10px 20px;
-    border-radius: 30px;
-    font-weight: 500;
-}
-
-/* ===== SECTIONS ===== */
-.a11y-section {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 24px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    margin-bottom: 24px;
-}
-
-.a11y-section h2 {
-    font-size: 1.6rem;
-    margin-bottom: 12px;
-    color: var(--text);
-}
-
-.a11y-section p {
-    line-height: 1.7;
-    color: var(--text);
-    margin-bottom: 12px;
-}
-
-.a11y-section ul {
-    padding-left: 24px;
-    margin-bottom: 12px;
-}
-
-.a11y-section ul li {
-    line-height: 1.7;
-    color: var(--text);
-    margin-bottom: 4px;
-}
-
-/* ===== FEATURES GRID ===== */
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 16px;
-    margin-top: 12px;
-}
-
-.feature-card {
-    background: var(--vanilla);
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    border: 1px solid var(--border);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.feature-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-hover);
-}
-
-.feature-icon {
-    font-size: 2.2rem;
-    color: var(--rose);
-    margin-bottom: 8px;
-}
-
-.feature-card h3 {
-    font-size: 1.05rem;
-    margin-bottom: 4px;
-}
-
-.feature-card p {
-    font-size: 0.9rem;
-    color: var(--text-light);
-    line-height: 1.5;
-    margin: 0;
-}
-
-/* ===== CONTACT ACTIONS ===== */
-.contact-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin: 12px 0;
-}
-
-.contact-actions .btn {
-    padding: 10px 24px;
-    border-radius: 30px;
-}
-
-.contact-details {
-    margin-top: 8px;
-}
-
-.contact-details a {
-    color: var(--rose);
-    text-decoration: none;
-}
-
-.contact-details a:hover {
-    text-decoration: underline;
-}
-
-/* ===== RESPONSIVE ===== */
+.accessibility-page { padding: 32px 0 60px; }
+.accessibility-header { text-align: center; margin-bottom: 24px; }
+.accessibility-header h1 { font-size: 2.4rem; margin-bottom: 4px; }
+.accessibility-header p { color: var(--text-light); font-size: 1.05rem; }
+.accessibility-controls { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 32px; }
+.accessibility-controls .btn { padding: 10px 20px; border-radius: 30px; font-weight: 500; }
+.a11y-section { background: var(--card-bg); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 24px; }
+.a11y-section h2 { font-size: 1.6rem; margin-bottom: 12px; color: var(--text); }
+.a11y-section p { line-height: 1.7; color: var(--text); margin-bottom: 12px; }
+.a11y-section ul { padding-left: 24px; margin-bottom: 12px; }
+.a11y-section ul li { line-height: 1.7; color: var(--text); margin-bottom: 4px; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 12px; }
+.feature-card { background: var(--vanilla); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid var(--border); transition: transform 0.2s, box-shadow 0.2s; }
+.feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+.feature-icon { font-size: 2.2rem; color: var(--rose); margin-bottom: 8px; }
+.feature-card h3 { font-size: 1.05rem; margin-bottom: 4px; }
+.feature-card p { font-size: 0.9rem; color: var(--text-light); line-height: 1.5; margin: 0; }
+.contact-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.contact-actions .btn { padding: 10px 24px; border-radius: 30px; }
+.contact-details { margin-top: 8px; }
+.contact-details a { color: var(--rose); text-decoration: none; }
+.contact-details a:hover { text-decoration: underline; }
 @media (max-width: 480px) {
-    .accessibility-header h1 {
-        font-size: 1.8rem;
-    }
-    .features-grid {
-        grid-template-columns: 1fr;
-    }
-    .accessibility-controls {
-        flex-direction: column;
-        align-items: center;
-    }
-    .accessibility-controls .btn {
-        width: 100%;
-        max-width: 280px;
-    }
+    .accessibility-header h1 { font-size: 1.8rem; }
+    .features-grid { grid-template-columns: 1fr; }
+    .accessibility-controls { flex-direction: column; align-items: center; }
+    .accessibility-controls .btn { width: 100%; max-width: 280px; }
 }
 </style>
 
