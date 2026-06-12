@@ -2,28 +2,27 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
-require_once '../includes/mail_helper.php'; // Added for email
+require_once '../includes/mail_helper.php';
 
-// Only admin can access
 redirectIfNotAdmin();
 
-if (isset($_GET['type']) && $_GET['type'] === 'poem') {
-    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-    header('Location: ' . SITE_URL . '/admin/poem_editor.php' . ($id ? '?id=' . $id : ''));
-    exit;
-}
-
+$type = isset($_GET['type']) ? $_GET['type'] : 'blog';
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
 $error = '';
 $success = '';
 
 $title = '';
 $intro = '';
 $content = '';
-$category = '';
+$category = 'Christian Reflections';
 $tags = '';
 $status = 'draft';
 $featured_image = '';
+
+if ($type === 'reflection') {
+    $category = 'Christian Reflections';
+}
 
 if ($id > 0) {
     $stmt = $db->prepare("SELECT * FROM blog_posts WHERE id = ?");
@@ -53,7 +52,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $uploaded_featured_image = $featured_image;
 
-    if (!empty($_FILES['featured_image']['name'])) {
+    // ===== LIVE PHOTO CAPTURE =====
+    if (!empty($_FILES['live_photo']['name'])) {
+        $upload_dir = '../assets/uploads/blog/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+        $photo_filename = 'live_' . time() . '.jpg';
+        if (move_uploaded_file($_FILES['live_photo']['tmp_name'], $upload_dir . $photo_filename)) {
+            $uploaded_featured_image = 'assets/uploads/blog/' . $photo_filename;
+        } else {
+            $error = 'Failed to upload captured photo.';
+        }
+    }
+
+    // ===== STANDARD IMAGE UPLOAD =====
+    if (empty($error) && !empty($_FILES['featured_image']['name'])) {
         $upload_dir = '../assets/uploads/blog/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $feat_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['featured_image']['name']);
@@ -64,23 +76,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ===== AUDIO RECORDING =====
     if (isset($_FILES['audio_recording']) && $_FILES['audio_recording']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/audio/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $rec_filename = 'rec_' . time() . '.webm';
         if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
-            $uploaded_audio_path = 'assets/uploads/audio/' . $rec_filename;
+            // Attach audio to post (you might store it in a separate table or as metadata)
         } else {
             $error = 'Failed to upload recorded audio.';
         }
     }
 
+    // ===== VIDEO RECORDING =====
     if (isset($_FILES['video_recording']) && $_FILES['video_recording']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/videos/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $video_filename = 'vid_' . time() . '.webm';
         if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
-            $uploaded_video_path = 'assets/uploads/videos/' . $video_filename;
+            // Attach video to post
         } else {
             $error = 'Failed to upload recorded video.';
         }
@@ -100,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $db->lastInsertId();
             $success = 'Blog post created successfully!';
 
-            // ===== ADMIN NOTIFICATION (Zoho SMTP) =====
+            // Admin notification via Zoho SMTP
             $admin_email = 'angelwrites@zohomail.com';
             $subject = 'New Blog Post: ' . $title;
             $body = "A new blog post has been added.\n\nTitle: $title\nCategory: $category\n\nView post: " . SITE_URL . "/blog.php?slug=" . $slug;
@@ -110,7 +124,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ===== NEWSLETTER BROADCAST (using Zoho SMTP) =====
         if (isset($_POST['send_newsletter'])) {
             $subject = $title;
-            // Build HTML email content
             $full_message = "<html><body>";
             $full_message .= "<h2>$title</h2>";
             if (!empty($intro)) $full_message .= "<p><em>$intro</em></p>";
@@ -118,25 +131,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $full_message .= "<hr><p>Unsubscribe: " . SITE_URL . "/newsletter.php?unsubscribe=1&token=[TOKEN]</p>";
             $full_message .= "</body></html>";
 
-            // Fetch all active subscribers
             $stmt = $db->prepare("SELECT email, unsubscribe_token FROM newsletter WHERE is_active = 1");
             $stmt->execute();
             $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             $sent_count = 0;
             foreach ($subscribers as $sub) {
-                // Replace token placeholder
                 $personalized_message = str_replace('[TOKEN]', $sub['unsubscribe_token'], $full_message);
                 if (sendEmail($sub['email'], $subject, $personalized_message, 'no-reply@angelwrites.gt.tc', SITE_NAME . ' Blog')) {
                     $sent_count++;
                 }
-                usleep(500000); // Rate limit
+                usleep(500000);
             }
             $success .= " Broadcast sent to $sent_count subscribers.";
         }
 
         if ($action === 'save_and_continue') {
-            header('Location: ' . SITE_URL . '/admin/editor.php?id=' . $id);
+            header('Location: ' . SITE_URL . '/admin/editor.php?type=' . $type . '&id=' . $id);
             exit;
         } else {
             header('Location: ' . SITE_URL . '/admin/manage_blog.php');
@@ -188,11 +199,11 @@ $pageTitle = $id > 0 ? 'Edit Blog Post' : 'Add New Blog';
                     <div class="form-row">
                         <div class="form-group">
                             <label for="category">Category</label>
-                            <input type="text" id="category" name="category" value="<?php echo htmlspecialchars($category ?? 'Christian Reflections'); ?>" placeholder="e.g. Christian Reflections">
+                            <input type="text" id="category" name="category" value="<?php echo htmlspecialchars($category); ?>" placeholder="e.g. Christian Reflections">
                         </div>
                         <div class="form-group">
                             <label for="tags">Tags (comma separated)</label>
-                            <input type="text" id="tags" name="tags" value="<?php echo htmlspecialchars($tags ?? ''); ?>" placeholder="e.g. faith, hope, healing">
+                            <input type="text" id="tags" name="tags" value="<?php echo htmlspecialchars($tags); ?>" placeholder="e.g. faith, hope, healing">
                         </div>
                         <div class="form-group">
                             <label for="status">Status</label>
@@ -204,9 +215,42 @@ $pageTitle = $id > 0 ? 'Edit Blog Post' : 'Add New Blog';
                         </div>
                     </div>
 
-                    <!-- Featured Image -->
+                    <!-- ===== LIVE PHOTO CAPTURE ===== -->
                     <div class="form-group">
-                        <label>Featured Image (for blog listing)</label>
+                        <label>Live Photo (capture with camera)</label>
+                        <div class="camera-section">
+                            <div class="camera-preview-container">
+                                <video id="cameraPreview" autoplay muted playsinline></video>
+                                <div class="camera-placeholder" id="cameraPlaceholder">
+                                    <i class="fas fa-camera"></i>
+                                    <p>Camera preview will appear here.</p>
+                                </div>
+                            </div>
+                            <div class="camera-controls">
+                                <button type="button" id="startCameraBtn" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-camera"></i> Start Camera
+                                </button>
+                                <button type="button" id="capturePhotoBtn" class="btn btn-primary btn-sm" disabled>
+                                    <i class="fas fa-camera-retro"></i> Capture
+                                </button>
+                                <button type="button" id="retakePhotoBtn" class="btn btn-warning btn-sm" disabled>
+                                    <i class="fas fa-redo"></i> Retake
+                                </button>
+                                <button type="button" id="confirmPhotoBtn" class="btn btn-success btn-sm" disabled>
+                                    <i class="fas fa-check"></i> Use This Photo
+                                </button>
+                                <span id="cameraStatus" class="status-indicator">Camera ready</span>
+                            </div>
+                            <div class="captured-photo-container" id="capturedPhotoContainer" style="display:none;">
+                                <img id="capturedPhotoPreview" style="max-width:200px; max-height:200px; border-radius:8px;">
+                            </div>
+                            <input type="file" id="livePhotoInput" name="live_photo" accept="image/*" style="display:none;">
+                        </div>
+                    </div>
+
+                    <!-- Standard Image Upload (Fallback) -->
+                    <div class="form-group">
+                        <label for="featured_image">Or Upload Featured Image</label>
                         <div id="featDropZone" class="upload-zone">
                             <i class="fas fa-image"></i>
                             <p>Click to upload a featured image</p>
@@ -300,7 +344,7 @@ $pageTitle = $id > 0 ? 'Edit Blog Post' : 'Add New Blog';
     });
 </script>
 
-<!-- ===== FULL RECORDER JAVASCRIPT (Audio + Video with Confirm/Retake) ===== -->
+<!-- ===== RECORDER JAVASCRIPT (Camera, Audio, Video) ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ============================================================
@@ -354,19 +398,107 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ============================================================
-    // 2. SHARED RECORDER STATE
+    // 2. LIVE PHOTO CAPTURE
     // ============================================================
-    let audioRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
-    let videoRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
+    const cameraPreview = document.getElementById('cameraPreview');
+    const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+    const startCameraBtn = document.getElementById('startCameraBtn');
+    const capturePhotoBtn = document.getElementById('capturePhotoBtn');
+    const retakePhotoBtn = document.getElementById('retakePhotoBtn');
+    const confirmPhotoBtn = document.getElementById('confirmPhotoBtn');
+    const cameraStatus = document.getElementById('cameraStatus');
+    const capturedPhotoContainer = document.getElementById('capturedPhotoContainer');
+    const capturedPhotoPreview = document.getElementById('capturedPhotoPreview');
+    const livePhotoInput = document.getElementById('livePhotoInput');
+
+    let cameraStream = null;
+    let capturedBlob = null;
+
+    async function startCamera() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Your browser does not support camera access.');
+                return;
+            }
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            cameraPreview.srcObject = cameraStream;
+            cameraPreview.style.display = 'block';
+            cameraPlaceholder.style.display = 'none';
+            startCameraBtn.disabled = true;
+            capturePhotoBtn.disabled = false;
+            cameraStatus.textContent = 'Camera active';
+            cameraStatus.style.color = '#27ae60';
+        } catch (error) {
+            alert('Camera access denied: ' + error.message);
+        }
+    }
+
+    function capturePhoto() {
+        if (!cameraStream) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = cameraPreview.videoWidth;
+        canvas.height = cameraPreview.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+            capturedBlob = blob;
+            const url = URL.createObjectURL(blob);
+            capturedPhotoPreview.src = url;
+            capturedPhotoContainer.style.display = 'block';
+            capturePhotoBtn.disabled = true;
+            retakePhotoBtn.disabled = false;
+            confirmPhotoBtn.disabled = false;
+            cameraStatus.textContent = 'Photo captured';
+            cameraStatus.style.color = '#3498db';
+            // Stop camera stream
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraPreview.srcObject = null;
+            cameraPreview.style.display = 'none';
+            cameraPlaceholder.style.display = 'flex';
+            startCameraBtn.disabled = false;
+        }, 'image/jpeg');
+    }
+
+    function retakePhoto() {
+        capturedBlob = null;
+        capturedPhotoContainer.style.display = 'none';
+        capturedPhotoPreview.src = '';
+        capturePhotoBtn.disabled = true;
+        retakePhotoBtn.disabled = true;
+        confirmPhotoBtn.disabled = true;
+        cameraStatus.textContent = 'Camera ready';
+        cameraStatus.style.color = 'var(--text-light)';
+        // Restart camera if needed
+        startCameraBtn.disabled = false;
+    }
+
+    function confirmPhoto() {
+        if (!capturedBlob) return;
+        const file = new File([capturedBlob], 'live_photo.jpg', { type: 'image/jpeg' });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        livePhotoInput.files = dt.files;
+        confirmPhotoBtn.disabled = true;
+        retakePhotoBtn.disabled = true;
+        cameraStatus.textContent = '✅ Photo confirmed!';
+        cameraStatus.style.color = '#2ecc71';
+    }
+
+    startCameraBtn.addEventListener('click', startCamera);
+    capturePhotoBtn.addEventListener('click', capturePhoto);
+    retakePhotoBtn.addEventListener('click', retakePhoto);
+    confirmPhotoBtn.addEventListener('click', confirmPhoto);
 
     // ============================================================
-    // 3. AUDIO RECORDER (with preview + retake)
+    // 3. AUDIO RECORDER
     // ============================================================
     const recordBtn = document.getElementById('recordBtn');
     const recordingStatus = document.getElementById('recordingStatus');
     const recordingInput = document.getElementById('recordingInput');
     const audioPreviewRecorderContainer = document.getElementById('audioPreviewRecorderContainer');
     const audioPreviewRecorder = document.getElementById('audioPreviewRecorder');
+
+    let audioRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
 
     if (recordBtn) {
         recordBtn.addEventListener('click', async function() {
@@ -451,7 +583,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ============================================================
-    // 4. VIDEO RECORDER (with preview + retake)
+    // 4. VIDEO RECORDER
     // ============================================================
     const videoRecordBtn = document.getElementById('videoRecordBtn');
     const videoRecordingStatus = document.getElementById('videoRecordingStatus');
@@ -459,6 +591,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const videoPreviewContainer = document.getElementById('videoPreviewContainer');
     const videoPreview = videoPreviewContainer ? videoPreviewContainer.querySelector('video') : null;
     const videoRecordingForm = document.getElementById('videoRecordingForm');
+
+    let videoRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
 
     if (videoRecordBtn) {
         videoRecordBtn.addEventListener('click', async function() {
@@ -558,74 +692,72 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-    .admin-editor { padding: 32px 0 60px; }
-    .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-    .admin-header h1 { font-size: 2rem; margin: 0; }
-    .admin-actions { display: flex; gap: 12px; }
+.admin-editor { padding: 32px 0 60px; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.admin-header h1 { font-size: 2rem; margin: 0; }
+.admin-actions { display: flex; gap: 12px; }
 
-    /* ===== FORM STYLES ===== */
-    .admin-form .form-group { margin-bottom: 16px; }
-    .admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
-    .admin-form input[type="text"], .admin-form textarea, .admin-form select {
-        width: 100%;
-        padding: 12px 16px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font-size: 1rem;
-        background: var(--input-bg);
-        color: var(--text);
-        transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    }
-    .admin-form input[type="text"]:focus, .admin-form textarea:focus, .admin-form select:focus {
-        outline: none;
-        border-color: var(--rose);
-        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-    }
-    .admin-form textarea { resize: vertical; min-height: 60px; }
-    .required { color: #dc2626; }
+.admin-form .form-group { margin-bottom: 16px; }
+.admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
+.admin-form input[type="text"], .admin-form textarea, .admin-form select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.admin-form textarea { resize: vertical; min-height: 60px; }
+.required { color: #dc2626; }
 
-    /* ===== FORM ROW ===== */
-    .form-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 12px; }
-    .form-row .form-group { flex: 1; min-width: 150px; }
+.form-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 12px; }
+.form-row .form-group { flex: 1; min-width: 150px; }
 
-    /* ===== FEATURED IMAGE UPLOAD ===== */
-    .upload-zone {
-        border: 2px dashed var(--border);
-        border-radius: 12px;
-        padding: 30px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s;
-        background: var(--fantasy);
-    }
-    .upload-zone i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block; }
-    .upload-zone p { margin: 0; color: var(--text-light); }
-    .upload-zone:hover { border-color: var(--rose); background: rgba(219, 161, 162, 0.05); }
+/* ===== CAMERA SECTION ===== */
+.camera-section { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--fantasy); margin-top: 8px; }
+.camera-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
+.camera-preview-container video { width: 100%; height: 100%; object-fit: cover; display: none; }
+.camera-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-light); text-align: center; padding: 24px; }
+.camera-placeholder i { font-size: 2.5rem; margin-bottom: 8px; color: var(--rose); }
+.camera-placeholder p { margin: 0; font-size: 0.9rem; }
+.camera-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; margin-top: 12px; }
+.camera-controls .btn { padding: 6px 14px; font-size: 0.85rem; }
+.captured-photo-container { text-align: center; margin-top: 12px; }
+.captured-photo-container img { border: 2px solid var(--rose); border-radius: 8px; }
+.status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
 
-    /* ===== RECORDER SECTION ===== */
-    .recorder-section { background: var(--fantasy); border-radius: 12px; padding: 20px; margin-top: 16px; border: 1px solid var(--border); }
-    .recorder-section h3 { margin-bottom: 12px; }
-    .recorder-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
-    .recorder-controls .btn { padding: 8px 16px; }
-    #recordingStatus, #videoRecordingStatus { font-weight: 600; color: #e74c3c; }
-    .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
+/* ===== UPLOAD ZONE ===== */
+.upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--fantasy); }
+.upload-zone i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block; }
+.upload-zone p { margin: 0; color: var(--text-light); }
+.upload-zone:hover { border-color: var(--rose); background: rgba(219, 161, 162, 0.05); }
 
-    /* ===== FORM ACTIONS ===== */
-    .form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
-    .form-actions .btn { min-width: 120px; justify-content: center; padding: 10px 24px; font-weight: 600; border-radius: 30px; }
-    .btn-primary { background: var(--rose); color: white; }
-    .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
-    .btn-secondary { background: var(--dark); color: white; }
-    .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
-    .btn-info { background: #3498db; color: white; }
-    .btn-info:hover { background: #2980b9; transform: translateY(-2px); }
-    .btn-block { width: 100%; }
+/* ===== RECORDER SECTION ===== */
+.recorder-section { background: var(--fantasy); border-radius: 12px; padding: 20px; margin-top: 16px; border: 1px solid var(--border); }
+.recorder-section h3 { margin-bottom: 12px; }
+.recorder-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
+.recorder-controls .btn { padding: 8px 16px; }
+#recordingStatus, #videoRecordingStatus { font-weight: 600; color: #e74c3c; }
+.recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
 
-    @media (max-width: 768px) {
-        .form-row { flex-direction: column; }
-        .form-actions { flex-direction: column; }
-        .form-actions .btn { width: 100%; }
-    }
+.form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.form-actions .btn { min-width: 120px; justify-content: center; padding: 10px 24px; font-weight: 600; border-radius: 30px; }
+.btn-primary { background: var(--rose); color: white; }
+.btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
+.btn-secondary { background: var(--dark); color: white; }
+.btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
+.btn-info { background: #3498db; color: white; }
+.btn-info:hover { background: #2980b9; transform: translateY(-2px); }
+.btn-block { width: 100%; }
+
+@media (max-width: 768px) {
+    .form-row { flex-direction: column; }
+    .form-actions { flex-direction: column; }
+    .form-actions .btn { width: 100%; }
+}
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

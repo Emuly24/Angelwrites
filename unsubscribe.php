@@ -10,7 +10,6 @@ $email = isset($_GET['email']) ? trim($_GET['email']) : '';
 if (isset($_GET['token'])) {
     $token = trim($_GET['token']);
 
-    // Look up subscriber by token
     $stmt = $db->prepare("SELECT id, email, is_active FROM newsletter WHERE unsubscribe_token = ?");
     $stmt->execute([$token]);
     $subscriber = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -20,23 +19,69 @@ if (isset($_GET['token'])) {
     } elseif ($subscriber['is_active'] == 0) {
         $success = 'This email is already unsubscribed.';
     } else {
-        // Update status to inactive
         $stmt = $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP WHERE id = ?");
         if ($stmt->execute([$subscriber['id']])) {
             $success = 'You have been successfully unsubscribed from the newsletter. We\'re sorry to see you go, but we respect your decision.';
-            $email = $subscriber['email']; // For display
-            
+            $email = $subscriber['email'];
+
             // ===== SEND ADMIN NOTIFICATION =====
             $admin_email = 'angelwrites@zohomail.com';
             $admin_subject = 'User Unsubscribed from Newsletter';
             $admin_body = "A user has unsubscribed from the newsletter.\n\nEmail: $email";
-            sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
+            
+            if (function_exists('sendEmail')) {
+                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
+            } else {
+                require_once 'includes/mail_helper.php';
+                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
+            }
+
+            // ===== LOG TO AUDIT =====
+            $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
+            $stmt->execute([null, 'unsubscribe', "Email: $email via token"]);
         } else {
             $error = 'Something went wrong. Please try again.';
         }
     }
-} else {
-    $error = 'No unsubscribe token provided. Please use the link from your email.';
+} elseif (isset($_GET['email'])) {
+    // ===== SEND UNSUBSCRIBE LINK VIA EMAIL =====
+    $email = trim($_GET['email']);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Please enter a valid email address.';
+    } else {
+        $stmt = $db->prepare("SELECT id, is_active, unsubscribe_token FROM newsletter WHERE email = ?");
+        $stmt->execute([$email]);
+        $subscriber = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$subscriber) {
+            $error = 'This email is not subscribed to our newsletter.';
+        } elseif ($subscriber['is_active'] == 0) {
+            $success = 'This email is already unsubscribed.';
+        } else {
+            $token = $subscriber['unsubscribe_token'];
+            $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $token;
+            
+            $subject = 'Unsubscribe from AngelWrites Newsletter';
+            $body = "<p>You requested to unsubscribe from the AngelWrites newsletter.</p>";
+            $body .= "<p>To confirm your unsubscription, please click the link below:</p>";
+            $body .= "<p><a href=\"$unsubscribe_link\">$unsubscribe_link</a></p>";
+            $body .= "<p>If you did not request this, you can safely ignore this email.</p>";
+            $body .= "<p>— AngelWrites Team</p>";
+
+            if (function_exists('sendEmail')) {
+                $result = sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+            } else {
+                require_once 'includes/mail_helper.php';
+                $result = sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+            }
+
+            if ($result) {
+                $success = 'An unsubscribe link has been sent to your email address. Please check your inbox.';
+            } else {
+                $error = 'Failed to send unsubscribe link. Please try again later.';
+            }
+        }
+    }
 }
 
 $pageTitle = 'Unsubscribe';
@@ -74,7 +119,7 @@ $pageTitle = 'Unsubscribe';
                 </div>
             <?php endif; ?>
 
-            <!-- Only show form if no token was provided -->
+            <!-- Only show form if no token was provided and no success/error -->
             <?php if (!$success && !$error): ?>
                 <div class="unsubscribe-form-container">
                     <div class="info-box">
@@ -111,7 +156,6 @@ $pageTitle = 'Unsubscribe';
 </div>
 
 <style>
-/* (same as before – keep your existing CSS) */
 .unsubscribe-page { padding: 32px 0 60px; }
 .unsubscribe-wrapper { max-width: 480px; margin: 0 auto; }
 .unsubscribe-header { text-align: center; margin-bottom: 32px; }

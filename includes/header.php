@@ -1,22 +1,19 @@
 <?php
 header("Cache-Control: no-cache, must-revalidate");
-// Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Load configuration and database
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 
-// Determine current role (guest, reader, admin)
 $isLoggedIn = isLoggedIn();
 $isAdmin = isAdmin();
 $isReader = $isLoggedIn && !$isAdmin;
 $currentPage = basename($_SERVER['PHP_SELF']);
 
-// ===== FETCH UNREAD NOTIFICATIONS COUNT & LATEST 3 =====
+// ===== FETCH UNREAD NOTIFICATIONS =====
 $unreadNotifications = 0;
 $latestNotifications = [];
 if ($isLoggedIn) {
@@ -103,15 +100,54 @@ if ($isLoggedIn) {
 
         /* ===== NAVIGATION ===== */
         .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            flex: 1;
-            justify-content: center;
+            display: none;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 320px;
+            height: 100vh;
+            background: var(--card-bg);
+            border-left: 1px solid var(--border);
+            padding: 80px 24px 24px;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            overflow-y: auto;
+            transition: right 0.3s ease;
         }
+        .nav-links.open {
+            right: 0;
+            display: flex;
+        }
+        .nav-links li {
+            margin: 4px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-links li:last-child {
+            border-bottom: none;
+        }
+        .nav-links a {
+            padding: 4px 0;
+            display: block;
+            width: 100%;
+            font-size: 1rem;
+            color: var(--text);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover {
+            color: var(--rose);
+        }
+        .nav-links a.active {
+            color: var(--rose);
+            font-weight: 600;
+        }
+        .nav-links .nav-separator {
+            display: none;
+        }
+
+        /* ===== NAV ACTIONS ===== */
         .nav-actions {
             display: flex;
             align-items: center;
@@ -133,10 +169,57 @@ if ($isLoggedIn) {
             height: 36px;
             border-radius: 50%;
             cursor: pointer;
+            background: none;
+            border: none;
         }
         .nav-action-icon:hover {
             color: var(--rose);
             background: rgba(219, 161, 162, 0.1);
+        }
+
+        /* ===== HAMBURGER ===== */
+        .hamburger {
+            display: flex !important;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 28px;
+            height: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            z-index: 1001;
+        }
+        .hamburger span {
+            display: block;
+            width: 100%;
+            height: 2px;
+            background: var(--text);
+            transition: all 0.3s ease;
+        }
+        .hamburger.active span:nth-child(1) {
+            transform: rotate(45deg) translate(6px, 6px);
+        }
+        .hamburger.active span:nth-child(2) {
+            opacity: 0;
+        }
+        .hamburger.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* ===== MENU OVERLAY ===== */
+        .menu-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .menu-overlay.open {
+            display: block;
         }
 
         /* ===== NOTIFICATION BADGE ===== */
@@ -287,6 +370,11 @@ if ($isLoggedIn) {
         .user-dropdown a:hover {
             background: rgba(219, 161, 162, 0.1);
         }
+        .user-dropdown hr {
+            margin: 4px 0;
+            border: 0;
+            border-top: 1px solid var(--border);
+        }
 
         /* ===== GLOBAL NOTIFICATION ===== */
         .global-notification {
@@ -317,64 +405,11 @@ if ($isLoggedIn) {
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
 
-        /* ===== MOBILE ===== */
-        @media (max-width: 992px) {
-            .hamburger {
-                display: flex !important;
-            }
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
             .nav-links {
-                display: none;
-                flex-direction: column;
-                position: fixed;
-                top: 0;
-                right: -100%;
                 width: 280px;
-                height: 100vh;
-                background: var(--card-bg);
-                border-left: 1px solid var(--border);
-                padding: 80px 24px 24px;
-                box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
-                z-index: 999;
-                overflow-y: auto;
-                transition: right 0.3s ease;
-            }
-            .nav-links.open {
-                right: 0;
-                display: flex;
-            }
-            .nav-links li {
-                margin: 4px 0;
-                padding: 8px 0;
-                border-bottom: 1px solid var(--border);
-            }
-            .nav-links li:last-child {
-                border-bottom: none;
-            }
-            .nav-links a {
-                padding: 4px 0;
-                display: block;
-                width: 100%;
-                font-size: 1rem;
-                color: var(--text);
-            }
-            .nav-links a:hover {
-                color: var(--rose);
-            }
-            .nav-links .nav-separator {
-                display: none;
-            }
-            .menu-overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.5);
-                z-index: 998;
-            }
-            .menu-overlay.open {
-                display: block;
+                padding: 70px 20px 20px;
             }
             .search-dropdown {
                 width: 260px;
@@ -385,11 +420,25 @@ if ($isLoggedIn) {
             .user-dropdown {
                 width: 140px;
             }
+            .nav-actions {
+                gap: 4px;
+            }
+            .nav-action-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 0.9rem;
+            }
         }
 
         @media (max-width: 480px) {
-            .nav-actions { gap: 4px; }
-            .nav-action-icon { width: 32px; height: 32px; font-size: 0.9rem; }
+            .search-dropdown {
+                width: 220px;
+                right: -40px;
+            }
+            .notification-dropdown {
+                width: 220px;
+                right: -40px;
+            }
         }
     </style>
 </head>
@@ -403,6 +452,7 @@ if ($isLoggedIn) {
                     <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites – Christian writing and community" class="logo-img">
                 </a>
 
+                <!-- ===== NAVIGATION LINKS (Slide-in drawer) ===== -->
                 <ul class="nav-links" id="navLinks" role="menubar">
                     <?php if (!$isLoggedIn): ?>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
@@ -494,13 +544,13 @@ if ($isLoggedIn) {
                                 <a href="<?php echo SITE_URL; ?>/dashboard.php">Dashboard</a>
                                 <a href="<?php echo SITE_URL; ?>/library.php">My Library</a>
                                 <a href="<?php echo SITE_URL; ?>/profile.php">Profile</a>
-                                <hr style="margin: 4px 0; border: 0; border-top: 1px solid var(--border);">
+                                <hr>
                                 <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #e74c3c;">Logout</a>
                             </div>
                         </div>
                     <?php endif; ?>
 
-                    <!-- ===== HAMBURGER (Mobile only) ===== -->
+                    <!-- ===== HAMBURGER (Visible on ALL screens) ===== -->
                     <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false" onclick="toggleMobileMenu()">
                         <span></span>
                         <span></span>
@@ -534,81 +584,78 @@ if ($isLoggedIn) {
                 </div>
             </div>
         <?php endif; ?>
+    </main>
 
-        <!-- ===== SCROLL SHADOW SCRIPT ===== -->
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const header = document.getElementById('siteHeader');
-            window.addEventListener('scroll', function() {
-                if (window.scrollY > 10) {
-                    header.classList.add('scrolled');
-                } else {
-                    header.classList.remove('scrolled');
-                }
-            });
+    <!-- ===== JAVASCRIPT ===== -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // ===== SCROLL SHADOW =====
+        const header = document.getElementById('siteHeader');
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > 10) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
         });
-        </script>
 
-        <!-- ===== MAIN JAVASCRIPT ===== -->
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // ===== THEME TOGGLE =====
-            const themeToggle = document.getElementById('themeToggle');
-            const html = document.documentElement;
-            const themes = ['light', 'dark', 'system'];
-            let currentThemeIndex = 0;
+        // ===== THEME TOGGLE =====
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        const themes = ['light', 'dark', 'system'];
+        let currentThemeIndex = 0;
 
-            const storedTheme = localStorage.getItem('angelwrites_theme');
-            if (storedTheme && themes.includes(storedTheme)) {
-                currentThemeIndex = themes.indexOf(storedTheme);
+        const storedTheme = localStorage.getItem('angelwrites_theme');
+        if (storedTheme && themes.includes(storedTheme)) {
+            currentThemeIndex = themes.indexOf(storedTheme);
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+            } else {
+                html.setAttribute('data-theme', theme);
             }
+            document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+            updateIcon(theme);
+            localStorage.setItem('angelwrites_theme', theme);
+        }
 
-            function applyTheme(theme) {
-                if (theme === 'system') {
-                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-                } else {
-                    html.setAttribute('data-theme', theme);
-                }
-                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-                updateIcon(theme);
-                localStorage.setItem('angelwrites_theme', theme);
+        function updateIcon(theme) {
+            const icon = themeToggle.querySelector('i');
+            if (theme === 'dark') {
+                icon.className = 'fas fa-sun';
+            } else if (theme === 'light') {
+                icon.className = 'fas fa-moon';
+            } else {
+                icon.className = 'fas fa-circle-half-stroke';
             }
+        }
 
-            function updateIcon(theme) {
-                const icon = themeToggle.querySelector('i');
-                if (theme === 'dark') {
-                    icon.className = 'fas fa-sun';
-                } else if (theme === 'light') {
-                    icon.className = 'fas fa-moon';
-                } else {
-                    icon.className = 'fas fa-circle-half-stroke';
-                }
+        applyTheme(themes[currentThemeIndex]);
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            if (localStorage.getItem('angelwrites_theme') === 'system') {
+                html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
             }
+        });
 
+        themeToggle.addEventListener('click', function() {
+            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
             applyTheme(themes[currentThemeIndex]);
-
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                if (localStorage.getItem('angelwrites_theme') === 'system') {
-                    html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-                }
-            });
-
-            themeToggle.addEventListener('click', function() {
-                currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-                applyTheme(themes[currentThemeIndex]);
-            });
         });
 
         // ===== SEARCH DROPDOWN =====
-        function toggleSearch() {
+        document.querySelector('.search-trigger').addEventListener('click', function() {
             const dropdown = document.getElementById('searchDropdown');
             const input = document.getElementById('searchInput');
             dropdown.classList.toggle('open');
             if (dropdown.classList.contains('open')) {
                 input.focus();
             }
-        }
+        });
+
         document.addEventListener('click', function(e) {
             const wrapper = document.querySelector('.search-wrapper');
             const dropdown = document.getElementById('searchDropdown');
@@ -618,10 +665,11 @@ if ($isLoggedIn) {
         });
 
         // ===== NOTIFICATIONS DROPDOWN =====
-        function toggleNotifications() {
+        document.querySelector('.notification-wrapper .nav-action-icon').addEventListener('click', function() {
             const dropdown = document.getElementById('notificationDropdown');
             dropdown.classList.toggle('open');
-        }
+        });
+
         document.addEventListener('click', function(e) {
             const wrapper = document.querySelector('.notification-wrapper');
             const dropdown = document.getElementById('notificationDropdown');
@@ -631,10 +679,11 @@ if ($isLoggedIn) {
         });
 
         // ===== USER DROPDOWN =====
-        function toggleUserMenu() {
+        document.querySelector('.user-wrapper').addEventListener('click', function() {
             const dropdown = document.getElementById('userDropdown');
             dropdown.classList.toggle('open');
-        }
+        });
+
         document.addEventListener('click', function(e) {
             const wrapper = document.querySelector('.user-wrapper');
             const dropdown = document.getElementById('userDropdown');
@@ -643,14 +692,14 @@ if ($isLoggedIn) {
             }
         });
 
-        // ===== MOBILE MENU =====
-        function toggleMobileMenu() {
-            var navLinks = document.getElementById('navLinks');
-            var overlay = document.getElementById('menuOverlay');
-            var hamburger = document.getElementById('hamburger');
-            var body = document.body;
+        // ===== MOBILE MENU (Works on all screens) =====
+        const navLinks = document.getElementById('navLinks');
+        const overlay = document.getElementById('menuOverlay');
+        const hamburger = document.getElementById('hamburger');
+        const body = document.body;
 
-            var isOpen = navLinks.classList.contains('open');
+        window.toggleMobileMenu = function() {
+            const isOpen = navLinks.classList.contains('open');
 
             if (isOpen) {
                 closeMobileMenu();
@@ -660,23 +709,24 @@ if ($isLoggedIn) {
                 hamburger.classList.add('active');
                 hamburger.setAttribute('aria-expanded', 'true');
                 body.style.overflow = 'hidden';
-                navLinks.style.display = 'flex';
-                navLinks.style.right = '0';
             }
-        }
+        };
 
-        function closeMobileMenu() {
-            var navLinks = document.getElementById('navLinks');
-            var overlay = document.getElementById('menuOverlay');
-            var hamburger = document.getElementById('hamburger');
-            var body = document.body;
-
+        window.closeMobileMenu = function() {
             navLinks.classList.remove('open');
             overlay.classList.remove('open');
             hamburger.classList.remove('active');
             hamburger.setAttribute('aria-expanded', 'false');
             body.style.overflow = '';
-            navLinks.style.display = 'none';
-            navLinks.style.right = '-100%';
-        }
-        </script>
+        };
+
+        // Close menu on link click (for single-page navigation)
+        navLinks.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', function() {
+                closeMobileMenu();
+            });
+        });
+    });
+    </script>
+</body>
+</html>

@@ -2,11 +2,9 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// Fetch poem from database
 $stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
 $stmt->execute([$id]);
 $poem = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -16,7 +14,14 @@ if (!$poem) {
     exit;
 }
 
-// ===== HANDLE TEXT REVIEW SUBMISSION =====
+// ===== TRACKING =====
+if (isLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $stmt = $db->prepare("INSERT OR IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
+    $stmt->execute([$user_id, $id]);
+}
+
+// ===== HANDLE TEXT REVIEW =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
     $target_type = $_POST['target_type'];
     $target_id = (int)$_POST['target_id'];
@@ -26,13 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     if ($rating >= 1 && $rating <= 5 && !empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$target_type, $target_id, $_SESSION['user_id'], $rating, $comment]);
-        $success = 'Your review has been posted!';
         header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
         exit;
     }
 }
 
-// ===== HANDLE VOICE COMMENT SUBMISSION =====
+// ===== HANDLE VOICE COMMENT =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment']) && isLoggedIn()) {
     $target_id = (int)$_POST['target_id'];
     $rating = isset($_POST['rating']) ? (int)$_POST['rating'] : 0;
@@ -41,13 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment'
         $upload_dir = '../assets/uploads/voice_comments/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $filename = 'voice_' . time() . '.webm';
-        $target = $upload_dir . $filename;
-        if (move_uploaded_file($_FILES['voice_file']['tmp_name'], $target)) {
+        if (move_uploaded_file($_FILES['voice_file']['tmp_name'], $upload_dir . $filename)) {
             $voice_path = 'assets/uploads/voice_comments/' . $filename;
-            // Insert as a review with a special marker
             $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, voice_path) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute(['poem', $target_id, $_SESSION['user_id'], $rating, '🎙️ Voice comment', $voice_path]);
-            $success = 'Your voice comment has been posted!';
             header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
             exit;
         }
@@ -62,39 +63,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) &&
     if (!empty($reply)) {
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, comment, is_admin_reply) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute(['poem', $target_id, $_SESSION['user_id'], $reply, 1]);
-        $success = 'Your reply has been posted!';
         header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
         exit;
     }
 }
-/// ===== TRACKING: User read this poem =====
-if (isLoggedIn()) {
-    $user_id = $_SESSION['user_id'];
 
-    // ===== SAFETY CHECK: Verify the user still exists =====
-    $stmtCheck = $db->prepare("SELECT id FROM users WHERE id = ?");
-    $stmtCheck->execute([$user_id]);
-    $userExists = $stmtCheck->fetch();
-
-    if (!$userExists) {
-        // The session is stale. Force a logout and redirect.
-        session_destroy();
-        header('Location: ' . SITE_URL . '/login.php');
-        exit;
-    }
-    // =============================================
-
-    $stmt = $db->prepare("INSERT OR IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
-    $stmt->execute([$user_id, $id]);
+// ===== READING TIME =====
+function readingTime($content) {
+    $word_count = str_word_count(strip_tags($content));
+    $minutes = ceil($word_count / 200);
+    return $minutes < 1 ? '1 min read' : $minutes . ' min read';
 }
+
+// ===== FETCH REVIEWS =====
+$stmt = $db->prepare("
+    SELECT r.*, u.name AS author_name 
+    FROM reviews r
+    JOIN users u ON r.user_id = u.id
+    WHERE r.target_type = 'poem' AND r.target_id = ?
+    ORDER BY r.created_at DESC
+");
+$stmt->execute([$id]);
+$reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== AVERAGE RATING =====
+$stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'poem' AND target_id = ?");
+$stmt->execute([$id]);
+$rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
+$avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
+$total_reviews = $rating_data['total'] ?? 0;
 
 $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 ?>
 <?php require_once 'includes/header.php'; ?>
 
+<!-- ===== READING PROGRESS BAR ===== -->
+<div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
+
 <div class="poem-view-page">
     <div class="container">
-        <!-- Navigation back -->
+        <!-- Navigation -->
         <div class="poem-nav">
             <a href="<?php echo SITE_URL; ?>/poetry.php" class="back-link">
                 <i class="fas fa-arrow-left"></i> Back to Poetry
@@ -106,19 +114,15 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
             <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
             <div class="poem-meta">
                 <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
-                <span class="poem-views">
-                    <i class="fas fa-eye"></i>
-                    <?php echo number_format($poem['view_count'] ?? 1); ?> views
-                </span>
+                <span class="poem-views"><i class="fas fa-eye"></i> <?php echo number_format($poem['view_count'] ?? 1); ?> views</span>
+                <span class="poem-reading-time"><i class="fas fa-clock"></i> <?php echo readingTime($poem['content']); ?></span>
             </div>
         </header>
 
         <!-- Poem Image -->
         <?php if ($poem['image_path']): ?>
             <div class="poem-image-container">
-                <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" 
-                     alt="<?php echo htmlspecialchars($poem['title']); ?>" 
-                     class="poem-feature-image">
+                <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
             </div>
         <?php endif; ?>
 
@@ -152,18 +156,10 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
             </div>
         </div>
 
-        <!-- ===== REVIEWS & COMMENTS SECTION ===== -->
+        <!-- ===== REVIEWS & COMMENTS ===== -->
         <div class="reviews-section">
             <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
             
-            <?php
-            // Fetch average rating
-            $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'poem' AND target_id = ?");
-            $stmt->execute([$id]);
-            $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
-            $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
-            $total_reviews = $rating_data['total'] ?? 0;
-            ?>
             <div class="rating-summary">
                 <div class="rating-stars">
                     <?php for ($i = 1; $i <= 5; $i++): ?>
@@ -174,7 +170,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
             </div>
 
-            <!-- Review Form (Text) – Logged in users only -->
+            <!-- Text Review Form -->
             <?php if (isLoggedIn()): ?>
                 <div class="review-form-container">
                     <h4>Write a Text Review</h4>
@@ -223,7 +219,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 </div>
             <?php endif; ?>
 
-            <!-- Admin Reply Form (Only for Admin) -->
+            <!-- Admin Reply Form -->
             <?php if (isAdmin()): ?>
                 <div class="admin-reply-container">
                     <h4>🛡️ Angella's Reply</h4>
@@ -238,19 +234,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 </div>
             <?php endif; ?>
 
-            <!-- Existing Reviews & Comments -->
-            <?php
-            $stmt = $db->prepare("
-                SELECT r.*, u.name AS author_name 
-                FROM reviews r
-                JOIN users u ON r.user_id = u.id
-                WHERE r.target_type = 'poem' AND r.target_id = ?
-                ORDER BY r.created_at DESC
-            ");
-            $stmt->execute([$id]);
-            $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            ?>
-            
+            <!-- Reviews List -->
             <?php if (count($reviews) > 0): ?>
                 <div class="reviews-list">
                     <?php foreach ($reviews as $review): ?>
@@ -312,108 +296,33 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     </div>
 </div>
 
-<!-- ===== STYLES ===== -->
-<style>
-/* ===== POEM VIEW PAGE ===== */
-.poem-view-page { padding: 32px 0 60px; }
-.poem-nav { margin-bottom: 24px; }
-.poem-nav .back-link { color: var(--text-light); font-size: 0.95rem; transition: color var(--transition); }
-.poem-nav .back-link:hover { color: var(--rose); }
-.poem-nav .back-link i { margin-right: 6px; }
+<!-- ===== BACK TO TOP BUTTON ===== -->
+<button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <i class="fas fa-arrow-up"></i>
+</button>
 
-.poem-header { text-align: center; margin-bottom: 32px; }
-.poem-header h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 4vw, 3.2rem); color: var(--dark); margin-bottom: 8px; line-height: 1.2; }
-.poem-meta { display: flex; justify-content: center; gap: 24px; color: var(--text-light); font-size: 0.9rem; }
-.poem-meta i { margin-right: 4px; }
-
-.poem-image-container { margin: 0 auto 32px; max-width: 700px; text-align: center; }
-.poem-feature-image { width: 100%; height: auto; border: 6px solid var(--rose); border-radius: 16px; box-shadow: var(--shadow-hover); display: block; }
-
-.poem-audio-player { max-width: 700px; margin: 0 auto 24px; background: var(--vanilla); border-radius: 12px; padding: 20px 24px; border: 1px solid var(--border); }
-.audio-label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-.audio-label i { color: var(--rose); font-size: 1.2rem; }
-.poem-audio-player audio { width: 100%; border-radius: 8px; }
-
-.poem-intro-section { max-width: 700px; margin: 0 auto 32px; background: var(--fantasy); border-left: 4px solid var(--rose); border-radius: 0 12px 12px 0; padding: 20px 24px; }
-.intro-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--rose); margin-bottom: 6px; }
-.intro-body { font-style: italic; font-size: 1.05rem; color: var(--text); line-height: 1.8; text-align: justify; }
-
-.poem-content-section { max-width: 700px; margin: 0 auto 32px; border: 4px solid var(--rose); border-radius: 16px; padding: 32px; background: var(--card-bg); box-shadow: var(--shadow-hover); }
-.poem-body { font-family: 'Georgia', serif; font-size: 1.15rem; line-height: 2.4; color: var(--text); text-align: center; padding: 0; }
-.poem-body p { margin-bottom: 24px; }
-.poem-body p:last-child { margin-bottom: 0; }
-.poem-body br { display: block; content: ""; margin: 12px 0; }
-.poem-body img { max-width: 100%; height: auto; margin: 16px auto; display: block; border-radius: 8px; }
-
-/* ===== REVIEWS & COMMENTS ===== */
-.reviews-section { max-width: 700px; margin: 48px auto 0; }
-.reviews-section h3 { font-size: 1.4rem; margin-bottom: 16px; }
-
-.rating-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.rating-stars { display: flex; gap: 2px; }
-.rating-stars .filled { color: #f1c40f; }
-.rating-stars .empty { color: #ddd; }
-.rating-score { font-weight: 700; font-size: 1.1rem; }
-.rating-count { color: var(--text-light); font-size: 0.9rem; }
-
-.review-form-container { background: var(--vanilla); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
-.review-form-container h4 { margin-bottom: 12px; }
-.review-form .star-rating { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.review-form .stars { display: flex; flex-direction: row-reverse; gap: 2px; }
-.review-form .stars input { display: none; }
-.review-form .stars label { font-size: 1.4rem; color: #ddd; cursor: pointer; transition: color 0.2s; }
-.review-form .stars label:hover, .review-form .stars label:hover ~ label { color: #f1c40f; }
-.review-form .stars input:checked ~ label { color: #f1c40f; }
-.review-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
-.review-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-.review-form .btn { margin-top: 8px; }
-
-.voice-comment-section { margin-top: 20px; padding: 16px; background: var(--fantasy); border-radius: 12px; }
-.voice-comment-section h4 { margin-bottom: 12px; }
-.recorder-wrapper { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-#recordingStatus { font-weight: 600; }
-.recorder-wrapper .btn { padding: 8px 16px; }
-
-.admin-reply-container { background: var(--vanilla); border-radius: 12px; padding: 20px; border-left: 5px solid var(--rose); margin-top: 16px; }
-.admin-reply-container h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--dark); }
-.admin-reply-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
-.admin-reply-form .btn { margin-top: 8px; }
-
-.reviews-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
-.review-item { background: var(--card-bg); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); }
-.review-item.admin-reply { background: var(--vanilla); border-left: 5px solid var(--rose); }
-.review-author { font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.review-author i { color: var(--rose); }
-.admin-badge { background: var(--rose); color: white; font-size: 0.7rem; padding: 2px 10px; border-radius: 12px; font-weight: 600; }
-.review-date { font-size: 0.85rem; color: var(--text-light); margin: 2px 0 6px; }
-.review-rating { margin-bottom: 6px; }
-.review-rating .filled { color: #f1c40f; }
-.review-rating .empty { color: #ddd; }
-.review-comment { line-height: 1.6; color: var(--text); }
-.voice-comment-player { margin: 6px 0; }
-.voice-comment-player audio { width: 100%; border-radius: 8px; }
-
-.poem-footer-actions { max-width: 700px; margin: 32px auto 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding-top: 24px; border-top: 1px solid var(--border); }
-.share-section { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--text-light); }
-.share-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: white; font-size: 0.9rem; transition: transform var(--transition), opacity var(--transition); }
-.share-btn:hover { transform: scale(1.05); opacity: 0.85; }
-.share-btn.facebook { background: #1877f2; }
-.share-btn.twitter { background: #1da1f2; }
-.share-btn.whatsapp { background: #25d366; }
-
-.reading-actions .btn { font-size: 0.85rem; }
-
-@media (max-width: 480px) {
-    .poem-header h1 { font-size: 1.8rem; }
-    .poem-meta { flex-direction: column; gap: 4px; align-items: center; }
-    .poem-footer-actions { flex-direction: column; align-items: center; }
-    .poem-body { font-size: 1rem; line-height: 2; }
-}
-</style>
-
-<!-- ===== VOICE RECORDING JAVASCRIPT ===== -->
+<!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== READING PROGRESS BAR =====
+    window.addEventListener('scroll', function() {
+        const scrollTop = window.scrollY;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPercent = (scrollTop / docHeight) * 100;
+        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
+    });
+
+    // ===== BACK TO TOP BUTTON =====
+    const backToTopBtn = document.getElementById('backToTop');
+    window.addEventListener('scroll', function() {
+        if (window.scrollY > 400) {
+            backToTopBtn.style.display = 'flex';
+        } else {
+            backToTopBtn.style.display = 'none';
+        }
+    });
+
+    // ===== VOICE RECORDER =====
     const recordBtn = document.getElementById('recordBtn');
     const recordingStatus = document.getElementById('recordingStatus');
     const voiceForm = document.getElementById('voiceForm');
@@ -469,7 +378,152 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // ===== THEME TOGGLE (optional for poem page) =====
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        const currentTheme = localStorage.getItem('poemTheme') || 'light';
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        }
+
+        window.toggleTheme = function() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('poemTheme', isDark ? 'dark' : 'light');
+            themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        };
+    }
 });
 </script>
+
+<style>
+/* ===== DARK MODE SUPPORT ===== */
+:root {
+    --rose: #c0392b;
+    --rose-dark: #a93226;
+    --vanilla: #fdf5e6;
+    --dark: #1a1a1a;
+    --text-light: #666;
+    --card-bg: #ffffff;
+    --border: #e0e0e0;
+    --shadow: 0 4px 20px rgba(0,0,0,0.06);
+    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
+    --bg: #fdfdfd;
+}
+body.dark-mode {
+    --bg: #1a1a1a;
+    --card-bg: #2a2a2a;
+    --border: #444;
+    --text-light: #aaa;
+    --vanilla: #2a2a2a;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
+}
+body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+
+/* ===== EXISTING STYLES (PRESERVED) ===== */
+.poem-view-page { padding: 32px 0 60px; }
+.poem-nav { margin-bottom: 24px; }
+.poem-nav .back-link { color: var(--text-light); font-size: 0.95rem; transition: color 0.2s; }
+.poem-nav .back-link:hover { color: var(--rose); }
+.poem-nav .back-link i { margin-right: 6px; }
+
+.poem-header { text-align: center; margin-bottom: 32px; }
+.poem-header h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 4vw, 3.2rem); color: var(--dark); margin-bottom: 8px; line-height: 1.2; }
+.poem-meta { display: flex; justify-content: center; gap: 24px; color: var(--text-light); font-size: 0.9rem; flex-wrap: wrap; }
+.poem-meta i { margin-right: 4px; }
+
+.poem-image-container { margin: 0 auto 32px; max-width: 700px; text-align: center; }
+.poem-feature-image { width: 100%; height: auto; border: 6px solid var(--rose); border-radius: 16px; box-shadow: var(--shadow-hover); display: block; }
+
+.poem-audio-player { max-width: 700px; margin: 0 auto 24px; background: var(--vanilla); border-radius: 12px; padding: 20px 24px; border: 1px solid var(--border); }
+.audio-label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.audio-label i { color: var(--rose); font-size: 1.2rem; }
+.poem-audio-player audio { width: 100%; border-radius: 8px; }
+
+.poem-intro-section { max-width: 700px; margin: 0 auto 32px; background: var(--fantasy); border-left: 4px solid var(--rose); border-radius: 0 12px 12px 0; padding: 20px 24px; }
+.intro-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--rose); margin-bottom: 6px; }
+.intro-body { font-style: italic; font-size: 1.05rem; color: var(--text); line-height: 1.8; text-align: justify; }
+
+.poem-content-section { max-width: 700px; margin: 0 auto 32px; border: 4px solid var(--rose); border-radius: 16px; padding: 32px; background: var(--card-bg); box-shadow: var(--shadow-hover); }
+.poem-body { font-family: 'Georgia', serif; font-size: 1.15rem; line-height: 2.4; color: var(--text); text-align: center; padding: 0; }
+.poem-body p { margin-bottom: 24px; }
+.poem-body p:last-child { margin-bottom: 0; }
+.poem-body br { display: block; content: ""; margin: 12px 0; }
+.poem-body img { max-width: 100%; height: auto; margin: 16px auto; display: block; border-radius: 8px; }
+
+/* ===== REVIEWS ===== */
+.reviews-section { max-width: 700px; margin: 48px auto 0; }
+.reviews-section h3 { font-size: 1.4rem; margin-bottom: 16px; }
+
+.rating-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.rating-stars { display: flex; gap: 2px; }
+.rating-stars .filled { color: #f1c40f; }
+.rating-stars .empty { color: #ddd; }
+.rating-score { font-weight: 700; font-size: 1.1rem; }
+.rating-count { color: var(--text-light); font-size: 0.9rem; }
+
+.review-form-container { background: var(--vanilla); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+.review-form-container h4 { margin-bottom: 12px; }
+.review-form .star-rating { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.review-form .stars { display: flex; flex-direction: row-reverse; gap: 2px; }
+.review-form .stars input { display: none; }
+.review-form .stars label { font-size: 1.4rem; color: #ddd; cursor: pointer; transition: color 0.2s; }
+.review-form .stars label:hover, .review-form .stars label:hover ~ label { color: #f1c40f; }
+.review-form .stars input:checked ~ label { color: #f1c40f; }
+.review-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
+.review-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+.review-form .btn { margin-top: 8px; }
+
+.voice-comment-section { margin-top: 20px; padding: 16px; background: var(--fantasy); border-radius: 12px; }
+.voice-comment-section h4 { margin-bottom: 12px; }
+.recorder-wrapper { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+#recordingStatus { font-weight: 600; }
+.recorder-wrapper .btn { padding: 8px 16px; }
+
+.admin-reply-container { background: var(--vanilla); border-radius: 12px; padding: 20px; border-left: 5px solid var(--rose); margin-top: 16px; }
+.admin-reply-container h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--dark); }
+.admin-reply-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
+.admin-reply-form .btn { margin-top: 8px; }
+
+.reviews-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.review-item { background: var(--card-bg); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); }
+.review-item.admin-reply { background: var(--vanilla); border-left: 5px solid var(--rose); }
+.review-author { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.review-author i { color: var(--rose); }
+.admin-badge { background: var(--rose); color: white; font-size: 0.7rem; padding: 2px 10px; border-radius: 12px; font-weight: 600; }
+.review-date { font-size: 0.85rem; color: var(--text-light); margin: 2px 0 6px; }
+.review-rating { margin-bottom: 6px; }
+.review-rating .filled { color: #f1c40f; }
+.review-rating .empty { color: #ddd; }
+.review-comment { line-height: 1.6; color: var(--text); }
+.voice-comment-player { margin: 6px 0; }
+.voice-comment-player audio { width: 100%; border-radius: 8px; }
+
+/* ===== POEM FOOTER ===== */
+.poem-footer-actions { max-width: 700px; margin: 32px auto 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding-top: 24px; border-top: 1px solid var(--border); }
+.share-section { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--text-light); }
+.share-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: white; font-size: 0.9rem; transition: transform 0.2s; }
+.share-btn:hover { transform: scale(1.05); opacity: 0.85; }
+.share-btn.facebook { background: #1877f2; }
+.share-btn.twitter { background: #1da1f2; }
+.share-btn.whatsapp { background: #25d366; }
+
+.reading-actions .btn { font-size: 0.85rem; }
+
+/* ===== BACK TO TOP ===== */
+.back-to-top { position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px; border-radius: 50%; background: var(--rose); color: white; border: none; font-size: 1.2rem; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; transition: transform 0.2s; z-index: 1000; }
+.back-to-top:hover { transform: scale(1.05); }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 480px) {
+    .poem-header h1 { font-size: 1.8rem; }
+    .poem-meta { flex-direction: column; gap: 4px; align-items: center; }
+    .poem-footer-actions { flex-direction: column; align-items: center; }
+    .poem-body { font-size: 1rem; line-height: 2; }
+}
+</style>
 
 <?php require_once 'includes/footer.php'; ?>

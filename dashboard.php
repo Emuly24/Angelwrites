@@ -4,7 +4,6 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
 
-// Redirect non-logged-in users
 redirectIfNotLoggedIn();
 
 if (isAdmin()) {
@@ -14,102 +13,161 @@ if (isAdmin()) {
 
 $user_id = $_SESSION['user_id'];
 
-// Fetch user data
+// ===== FETCH USER DATA =====
 $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// === Helper: Safe fetch ===
-function safeFetch($db, $sql, $params = [], $limit = 6) {
-    try {
-        $stmt = $db->prepare($sql . " LIMIT " . $limit);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        return [];
-    }
-}
+// ===== ADVANCED STATS =====
+// Books finished
+$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'finished'");
+$stmt->execute([$user_id]);
+$books_finished = $stmt->fetchColumn();
 
-// === Helper: Get image ===
-function getImageSrc($row, $column) {
-    if (isset($row[$column]) && !empty($row[$column])) {
-        return SITE_URL . '/' . $row[$column];
-    }
-    return null;
-}
+// Books currently reading
+$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'currently reading'");
+$stmt->execute([$user_id]);
+$books_reading = $stmt->fetchColumn();
 
-// === STATS QUERIES ===
-$books_finished = safeFetch($db, "SELECT COUNT(*) as count FROM reading_status WHERE user_id = ? AND status = 'finished'", [$user_id])[0]['count'] ?? 0;
-$poems_read = safeFetch($db, "SELECT COUNT(*) as count FROM poem_reads WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
-$videos_watched = safeFetch($db, "SELECT COUNT(*) as count FROM video_watches WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
-$questions_asked = safeFetch($db, "SELECT COUNT(*) as count FROM questions WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
-$sessions_booked = safeFetch($db, "SELECT COUNT(*) as count FROM sessions WHERE user_id = ?", [$user_id])[0]['count'] ?? 0;
+// Poems read
+$stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$poems_read = $stmt->fetchColumn();
 
-// === 1. Books you have reading status ===
-$my_books = safeFetch($db, "
-    SELECT b.*, rs.status, rs.progress 
+// Videos watched
+$stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$videos_watched = $stmt->fetchColumn();
+
+// Questions asked
+$stmt = $db->prepare("SELECT COUNT(*) FROM questions WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$questions_asked = $stmt->fetchColumn();
+
+// Sessions booked
+$stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$sessions_booked = $stmt->fetchColumn();
+
+// ===== READING STREAK =====
+$stmt = $db->prepare("SELECT current_streak, longest_streak FROM reading_streaks WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$streak = $stmt->fetch(PDO::FETCH_ASSOC);
+$current_streak = $streak['current_streak'] ?? 0;
+$longest_streak = $streak['longest_streak'] ?? 0;
+
+// ===== TOTAL READING TIME =====
+$stmt = $db->prepare("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions WHERE user_id = ? AND end_time IS NOT NULL");
+$stmt->execute([$user_id]);
+$total_seconds = $stmt->fetchColumn() ?? 0;
+$total_hours = floor($total_seconds / 3600);
+$total_minutes = floor(($total_seconds % 3600) / 60);
+
+// ===== ACHIEVEMENTS =====
+$stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC");
+$stmt->execute([$user_id]);
+$achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== USER REPUTATION =====
+$stmt = $db->prepare("SELECT points, level, badges FROM user_reputations WHERE user_id = ?");
+$stmt->execute([$user_id]);
+$reputation = $stmt->fetch(PDO::FETCH_ASSOC);
+$rep_points = $reputation['points'] ?? 0;
+$rep_level = $reputation['level'] ?? 1;
+$badges = json_decode($reputation['badges'] ?? '[]', true);
+
+// ===== CURRENTLY READING BOOKS =====
+$stmt = $db->prepare("
+    SELECT b.*, rs.progress 
     FROM books b
     JOIN reading_status rs ON b.id = rs.book_id
-    WHERE rs.user_id = ? AND rs.status IN ('currently reading', 'finished')
+    WHERE rs.user_id = ? AND rs.status = 'currently reading'
     ORDER BY rs.updated_at DESC
-", [$user_id], 6);
+");
+$stmt->execute([$user_id]);
+$reading_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// === 2. Poems you have read ===
-$read_poems = safeFetch($db, "
+// ===== RECENTLY FINISHED BOOKS =====
+$stmt = $db->prepare("
+    SELECT b.* FROM books b
+    JOIN reading_status rs ON b.id = rs.book_id
+    WHERE rs.user_id = ? AND rs.status = 'finished'
+    ORDER BY rs.updated_at DESC
+    LIMIT 5
+");
+$stmt->execute([$user_id]);
+$finished_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ===== RECENT POEMS =====
+$stmt = $db->prepare("
     SELECT p.* FROM poems p
     JOIN poem_reads pr ON p.id = pr.poem_id
     WHERE pr.user_id = ?
     ORDER BY pr.read_at DESC
-", [$user_id], 6);
+    LIMIT 5
+");
+$stmt->execute([$user_id]);
+$recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// === 3. Videos you have watched ===
-$watched_videos = safeFetch($db, "
+// ===== RECENT VIDEOS =====
+$stmt = $db->prepare("
     SELECT v.* FROM videos v
     JOIN video_watches vw ON v.id = vw.video_id
     WHERE vw.user_id = ?
     ORDER BY vw.watched_at DESC
-", [$user_id], 6);
+    LIMIT 5
+");
+$stmt->execute([$user_id]);
+$recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// === 4. Blog posts you have read ===
-$read_blog_posts = safeFetch($db, "
+// ===== RECENT BLOG POSTS =====
+$stmt = $db->prepare("
     SELECT bp.* FROM blog_posts bp
     JOIN blog_reads br ON bp.id = br.blog_post_id
     WHERE br.user_id = ?
     ORDER BY br.read_at DESC
-", [$user_id], 6);
+    LIMIT 5
+");
+$stmt->execute([$user_id]);
+$recent_blog = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// === 5. Christian Reflections you have read ===
-$read_reflections = safeFetch($db, "
+// ===== RECENT REFLECTIONS =====
+$stmt = $db->prepare("
     SELECT r.* FROM reflections r
     JOIN reflection_reads rr ON r.id = rr.reflection_id
     WHERE rr.user_id = ?
     ORDER BY rr.read_at DESC
-", [$user_id], 6);
+    LIMIT 5
+");
+$stmt->execute([$user_id]);
+$recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// === 6. Your upcoming sessions ===
-$my_sessions = safeFetch($db, "
+// ===== UPCOMING SESSIONS =====
+$stmt = $db->prepare("
     SELECT * FROM sessions 
     WHERE user_id = ? AND date >= date('now')
     ORDER BY date ASC, time ASC
-", [$user_id], 6);
+");
+$stmt->execute([$user_id]);
+$upcoming_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// === 7. Your community questions ===
-$my_questions = safeFetch($db, "
-    SELECT q.*, COUNT(a.id) AS answer_count 
+// ===== RECENT QUESTIONS =====
+$stmt = $db->prepare("
+    SELECT q.*, COUNT(a.id) as answer_count 
     FROM questions q
     LEFT JOIN answers a ON q.id = a.question_id
     WHERE q.user_id = ?
     GROUP BY q.id
     ORDER BY q.created_at DESC
-", [$user_id], 6);
+    LIMIT 5
+");
+$stmt->execute([$user_id]);
+$recent_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// === 8. Recent notifications ===
-$notifications = safeFetch($db, "
-    SELECT * FROM notifications 
-    WHERE user_id = ? 
-    ORDER BY created_at DESC 
-    LIMIT 8
-", [$user_id], 8);
+// ===== NOTIFICATIONS =====
+$stmt = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 8");
+$stmt->execute([$user_id]);
+$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== HANDLE MARK ALL NOTIFICATIONS AS READ =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
@@ -125,12 +183,16 @@ $pageTitle = 'My Dashboard';
 
 <div class="dashboard-page">
     <div class="container">
-        
-        <!-- ===== HERO / WELCOME SECTION (Enhanced Layout) ===== -->
+        <!-- ===== HERO / WELCOME SECTION ===== -->
         <div class="dashboard-hero">
             <div class="hero-content">
                 <h1>Welcome back, <?php echo htmlspecialchars($user['name']); ?>!</h1>
-                <p class="hero-sub">Your personal reading and listening journey — curated just for you.</p>
+                <p class="hero-sub">Your personal reading journey — curated just for you.</p>
+                <div class="hero-stats">
+                    <span class="hero-stat"><i class="fas fa-fire"></i> <?php echo $current_streak; ?> day streak</span>
+                    <span class="hero-stat"><i class="fas fa-clock"></i> <?php echo $total_hours; ?>h <?php echo $total_minutes; ?>m read</span>
+                    <span class="hero-stat"><i class="fas fa-trophy"></i> Level <?php echo $rep_level; ?></span>
+                </div>
             </div>
             <div class="hero-profile">
                 <div class="profile-pic-large">
@@ -146,16 +208,28 @@ $pageTitle = 'My Dashboard';
                     <?php if ($user['bio']): ?>
                         <p class="user-bio"><?php echo htmlspecialchars($user['bio']); ?></p>
                     <?php endif; ?>
+                    <?php if ($badges): ?>
+                        <div class="badge-container">
+                            <?php foreach ($badges as $badge): ?>
+                                <span class="badge"><?php echo $badge; ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- ===== STATS ROW (Compact & Clean) ===== -->
+        <!-- ===== STATS ROW ===== -->
         <div class="stats-row">
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-book"></i></div>
+                <div class="stat-number"><?php echo $books_reading; ?></div>
+                <div class="stat-label">Reading</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
                 <div class="stat-number"><?php echo $books_finished; ?></div>
-                <div class="stat-label">Books</div>
+                <div class="stat-label">Finished</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-feather-alt"></i></div>
@@ -179,57 +253,39 @@ $pageTitle = 'My Dashboard';
             </div>
         </div>
 
-        <!-- ===== DASHBOARD GRID ===== -->
+        <!-- ===== MAIN GRID ===== -->
         <div class="dashboard-grid">
-            
-            <!-- ===== MAIN CONTENT AREA ===== -->
             <div class="main-content">
-                
-                <!-- Books You're Reading -->
-                <section class="dashboard-section" id="my-books">
+                <!-- ===== CURRENTLY READING ===== -->
+                <section class="dashboard-section" id="currently-reading">
                     <div class="section-header">
-                        <h2><i class="fas fa-book" style="color: var(--rose);"></i> Books You're Reading</h2>
+                        <h2><i class="fas fa-book-open" style="color: var(--rose);"></i> Currently Reading</h2>
                         <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">Browse All →</a>
-                            <a href="<?php echo SITE_URL; ?>/library.php" class="btn btn-sm btn-secondary">View Library</a>
+                            <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">Browse Books</a>
                         </div>
                     </div>
-                    <?php if (count($my_books) > 0): ?>
+                    <?php if (count($reading_books) > 0): ?>
                         <div class="book-grid">
-                            <?php foreach ($my_books as $book): ?>
+                            <?php foreach ($reading_books as $book): ?>
                                 <div class="book-card">
                                     <div class="book-cover-wrapper">
-                                        <?php $img = getImageSrc($book, 'cover_path'); ?>
-                                        <?php if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
+                                        <?php if ($book['cover_path']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                                         <?php endif; ?>
-                                        <span class="status-badge <?php echo $book['status'] ?? 'want to read'; ?>">
-                                            <?php echo ucfirst($book['status'] ?? 'Want to Read'); ?>
-                                        </span>
+                                        <span class="progress-badge"><?php echo $book['progress'] ?? 0; ?>%</span>
                                     </div>
                                     <div class="book-info">
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                        <p class="book-desc"><?php echo htmlspecialchars(substr($book['description'] ?? '', 0, 60)); ?>...</p>
+                                        <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                         <div class="book-actions">
                                             <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Continue</a>
-                                            <?php if ($book['status'] === 'currently reading'): ?>
-                                                <form method="POST" action="<?php echo SITE_URL; ?>/library.php" style="display:inline;">
-                                                    <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                                    <input type="hidden" name="status" value="finished">
-                                                    <input type="hidden" name="update_status" value="1">
-                                                    <button type="submit" class="btn btn-sm btn-secondary" title="Mark as finished">
-                                                        <i class="fas fa-check"></i> Finished
-                                                    </button>
-                                                </form>
-                                            <?php endif; ?>
-                                            <form method="POST" action="<?php echo SITE_URL; ?>/library.php" style="display:inline;" onsubmit="return confirm('Remove this book from your library?');">
+                                            <form method="POST" action="<?php echo SITE_URL; ?>/library.php" style="display:inline;">
                                                 <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                                <input type="hidden" name="remove_status" value="1">
-                                                <button type="submit" class="btn btn-sm btn-outline" title="Remove from library">
-                                                    <i class="fas fa-times"></i> Remove
-                                                </button>
+                                                <input type="hidden" name="status" value="finished">
+                                                <input type="hidden" name="update_status" value="1">
+                                                <button type="submit" class="btn btn-sm btn-success">✓ Finished</button>
                                             </form>
                                         </div>
                                     </div>
@@ -239,119 +295,150 @@ $pageTitle = 'My Dashboard';
                     <?php else: ?>
                         <div class="empty-state">
                             <div class="empty-state-icon"><i class="fas fa-book-open"></i></div>
-                            <p>No books in your reading list. <a href="<?php echo SITE_URL; ?>/books.php">Find your next book</a></p>
+                            <p>No books in progress. <a href="<?php echo SITE_URL; ?>/books.php">Start reading</a></p>
                         </div>
                     <?php endif; ?>
                 </section>
 
-                <!-- Poems You've Read -->
-                <section class="dashboard-section" id="my-poems">
+                <!-- ===== RECENTLY FINISHED ===== -->
+                <section class="dashboard-section" id="recently-finished">
                     <div class="section-header">
-                        <h2><i class="fas fa-pen" style="color: var(--rose);"></i> Poems You've Read</h2>
+                        <h2><i class="fas fa-check-circle" style="color: var(--rose);"></i> Recently Finished</h2>
                         <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/poems.php" class="btn btn-sm btn-outline">Browse All →</a>
+                            <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">More Books</a>
                         </div>
                     </div>
-                    <?php if (count($read_poems) > 0): ?>
-                        <div class="poem-grid">
-                            <?php foreach ($read_poems as $poem): 
-                                $intro_parts = explode("\n\n", $poem['intro'] ?? '');
-                                $verse = $intro_parts[0] ?? '';
-                                $purpose = $intro_parts[1] ?? '';
-                            ?>
-                            <div class="poem-card">
-                                <div class="poem-thumbnail">
-                                    <?php if ($poem['image_path']): ?>
-                                        <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
-                                    <?php else: ?>
-                                        <div class="poem-thumbnail-placeholder"><i class="fas fa-pen"></i></div>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="poem-body">
-                                    <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                                    <?php if ($verse): ?>
-                                    <div class="poem-verse-box">
-                                        <span class="verse-label">✧ Verse</span>
-                                        <p><?php echo htmlspecialchars(substr($verse, 0, 120)); ?>...</p>
+                    <?php if (count($finished_books) > 0): ?>
+                        <div class="book-grid">
+                            <?php foreach ($finished_books as $book): ?>
+                                <div class="book-card finished">
+                                    <div class="book-cover-wrapper">
+                                        <?php if ($book['cover_path']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
+                                        <?php else: ?>
+                                            <div class="placeholder-cover"><i class="fas fa-book"></i></div>
+                                        <?php endif; ?>
+                                        <span class="finished-badge">✅</span>
                                     </div>
-                                    <?php endif; ?>
-                                    <div class="poem-actions">
-                                        <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">Read Again</a>
-                                        <?php if ($poem['audio_path']): ?>
-                                            <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>&autoplay=1" class="btn btn-sm btn-outline">Listen</a>
+                                    <div class="book-info">
+                                        <h3><?php echo htmlspecialchars($book['title']); ?></h3>
+                                        <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
+                                        <div class="book-actions">
+                                            <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">Re-read</a>
+                                            <a href="<?php echo SITE_URL; ?>/book_review.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary">Review</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
+                            <p>No finished books yet. <a href="<?php echo SITE_URL; ?>/books.php">Start your first book</a></p>
+                        </div>
+                    <?php endif; ?>
+                </section>
+
+                <!-- ===== RECENT POEMS ===== -->
+                <section class="dashboard-section" id="recent-poems">
+                    <div class="section-header">
+                        <h2><i class="fas fa-feather-alt" style="color: var(--rose);"></i> Recent Poems</h2>
+                        <div class="section-actions">
+                            <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-sm btn-outline">More Poetry</a>
+                        </div>
+                    </div>
+                    <?php if (count($recent_poems) > 0): ?>
+                        <div class="poem-grid">
+                            <?php foreach ($recent_poems as $poem): ?>
+                                <div class="poem-card">
+                                    <div class="poem-thumbnail">
+                                        <?php if ($poem['image_path']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>">
+                                        <?php else: ?>
+                                            <div class="poem-thumbnail-placeholder"><i class="fas fa-feather-alt"></i></div>
                                         <?php endif; ?>
                                     </div>
+                                    <div class="poem-body">
+                                        <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
+                                        <?php if ($poem['intro']): ?>
+                                            <p class="poem-intro"><?php echo htmlspecialchars(substr($poem['intro'], 0, 60)); ?>...</p>
+                                        <?php endif; ?>
+                                        <div class="poem-actions">
+                                            <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">Read</a>
+                                            <?php if ($poem['audio_path']): ?>
+                                                <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>&autoplay=1" class="btn btn-sm btn-outline">Listen</a>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
                             <div class="empty-state-icon"><i class="fas fa-feather-alt"></i></div>
-                            <p>You haven't read any poems yet. <a href="<?php echo SITE_URL; ?>/poem_view.php">Start reading</a></p>
+                            <p>No poems read yet. <a href="<?php echo SITE_URL; ?>/poetry.php">Start reading</a></p>
                         </div>
                     <?php endif; ?>
                 </section>
 
-                <!-- Videos You've Watched -->
-                <section class="dashboard-section" id="my-videos">
+                <!-- ===== RECENT VIDEOS ===== -->
+                <section class="dashboard-section" id="recent-videos">
                     <div class="section-header">
-                        <h2><i class="fas fa-video" style="color: var(--rose);"></i> Videos You've Watched</h2>
+                        <h2><i class="fas fa-video" style="color: var(--rose);"></i> Recent Videos</h2>
                         <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/videos.php" class="btn btn-sm btn-outline">Browse All →</a>
+                            <a href="<?php echo SITE_URL; ?>/videos.php" class="btn btn-sm btn-outline">More Videos</a>
                         </div>
                     </div>
-                    <?php if (count($watched_videos) > 0): ?>
+                    <?php if (count($recent_videos) > 0): ?>
                         <div class="video-grid">
-                            <?php foreach ($watched_videos as $video): ?>
+                            <?php foreach ($recent_videos as $video): ?>
                                 <div class="video-card">
                                     <div class="video-thumb">
-                                        <?php $img = getImageSrc($video, 'thumbnail'); ?>
-                                        <?php if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
-                                            <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
+                                        <?php if ($video['thumbnail']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-video"></i></div>
                                         <?php endif; ?>
+                                        <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
                                     </div>
                                     <div class="video-info">
                                         <h3><?php echo htmlspecialchars($video['title']); ?></h3>
-                                        <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch Again</a>
+                                        <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch</a>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-film"></i></div>
-                            <p>No videos watched yet. <a href="<?php echo SITE_URL; ?>/videos.php">Explore videos</a></p>
+                            <div class="empty-state-icon"><i class="fas fa-video"></i></div>
+                            <p>No videos watched yet. <a href="<?php echo SITE_URL; ?>/videos.php">Start watching</a></p>
                         </div>
                     <?php endif; ?>
                 </section>
 
-                <!-- Blog Posts You've Read -->
-                <section class="dashboard-section" id="my-blog-posts">
+                <!-- ===== RECENT BLOG POSTS ===== -->
+                <section class="dashboard-section" id="recent-blog">
                     <div class="section-header">
-                        <h2><i class="fas fa-pen-fancy" style="color: var(--rose);"></i> Blog Posts You've Read</h2>
+                        <h2><i class="fas fa-blog" style="color: var(--rose);"></i> Recent Blog Posts</h2>
                         <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/blog.php" class="btn btn-sm btn-outline">Browse All →</a>
+                            <a href="<?php echo SITE_URL; ?>/blog.php" class="btn btn-sm btn-outline">More Blog</a>
                         </div>
                     </div>
-                    <?php if (count($read_blog_posts) > 0): ?>
+                    <?php if (count($recent_blog) > 0): ?>
                         <div class="blog-grid">
-                            <?php foreach ($read_blog_posts as $post): ?>
+                            <?php foreach ($recent_blog as $post): ?>
                                 <div class="blog-card">
                                     <div class="blog-thumbnail">
                                         <?php if ($post['featured_image']): ?>
                                             <img src="<?php echo SITE_URL . '/' . $post['featured_image']; ?>" alt="<?php echo htmlspecialchars($post['title']); ?>">
                                         <?php else: ?>
-                                            <div class="blog-thumbnail-placeholder"><i class="fas fa-pen-fancy"></i></div>
+                                            <div class="blog-thumbnail-placeholder"><i class="fas fa-blog"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="blog-body">
                                         <h3><?php echo htmlspecialchars($post['title']); ?></h3>
                                         <p class="blog-excerpt"><?php echo htmlspecialchars(substr($post['excerpt'] ?? '', 0, 80)); ?>...</p>
-                                        <a href="<?php echo SITE_URL; ?>/blog_post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-outline">Read Again</a>
+                                        <a href="<?php echo SITE_URL; ?>/blog_post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Read</a>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -364,29 +451,28 @@ $pageTitle = 'My Dashboard';
                     <?php endif; ?>
                 </section>
 
-                <!-- Christian Reflections You've Read -->
-                <section class="dashboard-section" id="my-reflections">
+                <!-- ===== RECENT REFLECTIONS ===== -->
+                <section class="dashboard-section" id="recent-reflections">
                     <div class="section-header">
-                        <h2><i class="fas fa-pray" style="color: var(--rose);"></i> Reflections You've Read</h2>
+                        <h2><i class="fas fa-pray" style="color: var(--rose);"></i> Recent Reflections</h2>
                         <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/reflections.php" class="btn btn-sm btn-outline">Browse All →</a>
+                            <a href="<?php echo SITE_URL; ?>/reflections.php" class="btn btn-sm btn-outline">More Reflections</a>
                         </div>
                     </div>
-                    <?php if (count($read_reflections) > 0): ?>
+                    <?php if (count($recent_reflections) > 0): ?>
                         <div class="reflection-grid">
-                            <?php foreach ($read_reflections as $reflection): ?>
+                            <?php foreach ($recent_reflections as $reflection): ?>
                                 <div class="reflection-card">
                                     <div class="reflection-thumb">
-                                        <?php $img = getImageSrc($reflection, 'image_path'); ?>
-                                        <?php if ($img): ?>
-                                            <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>">
+                                        <?php if ($reflection['image_path']): ?>
+                                            <img src="<?php echo SITE_URL . '/' . $reflection['image_path']; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>">
                                         <?php else: ?>
                                             <div class="placeholder-cover"><i class="fas fa-pray"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="reflection-body">
                                         <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
-                                        <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="btn btn-sm btn-primary">Read Again</a>
+                                        <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="btn btn-sm btn-primary">Read</a>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -399,23 +485,23 @@ $pageTitle = 'My Dashboard';
                     <?php endif; ?>
                 </section>
 
-                <!-- Your Upcoming Sessions -->
-                <section class="dashboard-section" id="my-sessions">
+                <!-- ===== UPCOMING SESSIONS ===== -->
+                <section class="dashboard-section" id="upcoming-sessions">
                     <div class="section-header">
-                        <h2><i class="fas fa-calendar-check" style="color: var(--rose);"></i> Your Upcoming Sessions</h2>
+                        <h2><i class="fas fa-calendar-check" style="color: var(--rose);"></i> Upcoming Sessions</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/book_session.php" class="btn btn-sm btn-primary">Book Session</a>
                         </div>
                     </div>
-                    <?php if (count($my_sessions) > 0): ?>
+                    <?php if (count($upcoming_sessions) > 0): ?>
                         <div class="session-list">
-                            <?php foreach ($my_sessions as $session): ?>
+                            <?php foreach ($upcoming_sessions as $session): ?>
                                 <div class="session-item">
                                     <div class="session-info">
-                                        <div class="session-date"><?php echo htmlspecialchars($session['date']); ?></div>
-                                        <div class="session-time"><?php echo htmlspecialchars($session['time']); ?></div>
-                                        <span class="status-badge <?php echo $session['status'] ?? 'pending'; ?>"><?php echo ucfirst($session['status'] ?? 'Pending'); ?></span>
-                                        <?php if (isset($session['message'])): ?>
+                                        <div class="session-date"><?php echo date('M j, Y', strtotime($session['date'])); ?></div>
+                                        <div class="session-time"><?php echo date('g:i a', strtotime($session['time'])); ?></div>
+                                        <span class="status-badge <?php echo $session['status']; ?>"><?php echo ucfirst($session['status']); ?></span>
+                                        <?php if ($session['message']): ?>
                                             <p class="session-message"><?php echo htmlspecialchars($session['message']); ?></p>
                                         <?php endif; ?>
                                     </div>
@@ -434,22 +520,20 @@ $pageTitle = 'My Dashboard';
                     <?php endif; ?>
                 </section>
 
-                <!-- Your Community Questions -->
-                <section class="dashboard-section" id="my-questions">
+                <!-- ===== RECENT QUESTIONS ===== -->
+                <section class="dashboard-section" id="recent-questions">
                     <div class="section-header">
-                        <h2><i class="fas fa-question-circle" style="color: var(--rose);"></i> Your Questions</h2>
+                        <h2><i class="fas fa-question-circle" style="color: var(--rose);"></i> Recent Questions</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-sm btn-primary">Ask a Question</a>
                         </div>
                     </div>
-                    <?php if (count($my_questions) > 0): ?>
+                    <?php if (count($recent_questions) > 0): ?>
                         <div class="qa-list">
-                            <?php foreach ($my_questions as $q): ?>
+                            <?php foreach ($recent_questions as $q): ?>
                                 <div class="qa-item">
                                     <div class="qa-title">
-                                        <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>">
-                                            <?php echo htmlspecialchars($q['title']); ?>
-                                        </a>
+                                        <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>"><?php echo htmlspecialchars($q['title']); ?></a>
                                     </div>
                                     <div class="qa-meta">
                                         <span><?php echo date('M j, Y', strtotime($q['created_at'])); ?></span>
@@ -458,7 +542,6 @@ $pageTitle = 'My Dashboard';
                                     <div class="qa-actions">
                                         <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>" class="btn btn-sm btn-outline">View</a>
                                         <a href="<?php echo SITE_URL; ?>/community_edit.php?id=<?php echo $q['id']; ?>" class="btn btn-sm btn-outline">Edit</a>
-                                        <a href="<?php echo SITE_URL; ?>/community_delete.php?id=<?php echo $q['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this question?');">Delete</a>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -474,8 +557,7 @@ $pageTitle = 'My Dashboard';
 
             <!-- ===== SIDEBAR ===== -->
             <div class="dashboard-sidebar">
-                
-                <!-- Notifications -->
+                <!-- ===== NOTIFICATIONS ===== -->
                 <div class="sidebar-card notifications-card">
                     <div class="card-header">
                         <h4><i class="fas fa-bell" style="color: var(--rose);"></i> Notifications</h4>
@@ -492,13 +574,13 @@ $pageTitle = 'My Dashboard';
                         <?php if (count($notifications) > 0): ?>
                             <div class="notification-list">
                                 <?php foreach ($notifications as $notif): ?>
-                                    <div class="notification-item <?php echo isset($notif['is_read']) && $notif['is_read'] ? 'read' : 'unread'; ?>">
+                                    <div class="notification-item <?php echo $notif['is_read'] ? 'read' : 'unread'; ?>">
                                         <div class="notif-content">
                                             <div class="notif-title"><?php echo htmlspecialchars($notif['title']); ?></div>
                                             <div class="notif-message"><?php echo htmlspecialchars($notif['message']); ?></div>
                                             <div class="notif-date"><?php echo date('M j, Y', strtotime($notif['created_at'])); ?></div>
                                         </div>
-                                        <?php if (isset($notif['is_read']) && !$notif['is_read']): ?>
+                                        <?php if (!$notif['is_read']): ?>
                                             <a href="<?php echo SITE_URL; ?>/notification_read.php?id=<?php echo $notif['id']; ?>" class="btn btn-sm btn-outline">Mark read</a>
                                         <?php endif; ?>
                                     </div>
@@ -509,8 +591,31 @@ $pageTitle = 'My Dashboard';
                         <?php endif; ?>
                     </div>
                 </div>
-                
-                <!-- Quick Actions -->
+
+                <!-- ===== ACHIEVEMENTS ===== -->
+                <div class="sidebar-card achievements-card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-trophy" style="color: var(--rose);"></i> Achievements</h4>
+                        <a href="<?php echo SITE_URL; ?>/achievements.php" class="view-all-link">View all →</a>
+                    </div>
+                    <div class="card-body">
+                        <?php if (count($achievements) > 0): ?>
+                            <div class="achievement-list">
+                                <?php foreach ($achievements as $achievement): ?>
+                                    <div class="achievement-item">
+                                        <span class="achievement-icon">🏆</span>
+                                        <span class="achievement-name"><?php echo ucfirst(str_replace('_', ' ', $achievement['achievement_type'])); ?></span>
+                                        <span class="achievement-date"><?php echo date('M j, Y', strtotime($achievement['unlocked_at'])); ?></span>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <p class="no-items">No achievements yet. Keep reading to unlock them!</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- ===== QUICK ACTIONS ===== -->
                 <div class="sidebar-card quick-actions-card">
                     <div class="card-header">
                         <h4><i class="fas fa-bolt" style="color: var(--rose);"></i> Quick Actions</h4>
@@ -521,8 +626,8 @@ $pageTitle = 'My Dashboard';
                                 <i class="fas fa-book"></i>
                                 <span>Browse Books</span>
                             </a>
-                            <a href="<?php echo SITE_URL; ?>/poem_view.php" class="quick-action-btn">
-                                <i class="fas fa-pen"></i>
+                            <a href="<?php echo SITE_URL; ?>/poetry.php" class="quick-action-btn">
+                                <i class="fas fa-feather-alt"></i>
                                 <span>Read Poems</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/videos.php" class="quick-action-btn">
@@ -534,7 +639,7 @@ $pageTitle = 'My Dashboard';
                                 <span>Read Blog</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/reflections.php" class="quick-action-btn">
-                                <i class="fas fa-church"></i>
+                                <i class="fas fa-pray"></i>
                                 <span>Reflections</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/community.php" class="quick-action-btn">
@@ -559,14 +664,14 @@ $pageTitle = 'My Dashboard';
 
 <style>
 /* ===== DASHBOARD PAGE ===== */
-.dashboard-page { padding: 40px 0 60px; }
+.dashboard-page { padding: 32px 0 60px; }
 
 /* ===== HERO SECTION ===== */
 .dashboard-hero {
     background: linear-gradient(135deg, var(--vanilla), var(--fantasy));
     border-radius: 20px;
     padding: 40px;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -590,8 +695,30 @@ $pageTitle = 'My Dashboard';
 .hero-content .hero-sub {
     color: var(--text-light);
     font-size: 1.1rem;
-    margin: 0;
+    margin: 0 0 16px 0;
     max-width: 500px;
+}
+
+.hero-stats {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.hero-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: var(--text-light);
+    background: var(--card-bg);
+    padding: 4px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+}
+
+.hero-stat i {
+    color: var(--rose);
 }
 
 .hero-profile {
@@ -644,6 +771,22 @@ $pageTitle = 'My Dashboard';
     margin: 4px 0 0 0;
 }
 
+.badge-container {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.badge-container .badge {
+    background: var(--rose);
+    color: white;
+    padding: 0 10px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
 /* ===== STATS ROW ===== */
 .stats-row {
     display: grid;
@@ -660,7 +803,6 @@ $pageTitle = 'My Dashboard';
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
     transition: transform 0.2s, box-shadow 0.2s;
-    overflow: hidden;
 }
 
 .stat-card:hover {
@@ -686,8 +828,6 @@ $pageTitle = 'My Dashboard';
     color: var(--text-light);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
 }
 
 /* ===== GRID LAYOUT ===== */
@@ -735,14 +875,13 @@ $pageTitle = 'My Dashboard';
     flex-wrap: wrap;
 }
 
-/* ===== CARDS GRIDS ===== */
-.book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid {
+/* ===== BOOK CARDS ===== */
+.book-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 16px;
 }
 
-/* ===== BOOK CARD ===== */
 .book-card {
     background: var(--bg);
     border-radius: 12px;
@@ -756,9 +895,13 @@ $pageTitle = 'My Dashboard';
     box-shadow: var(--shadow-hover);
 }
 
+.book-card.finished {
+    opacity: 0.8;
+}
+
 .book-cover-wrapper {
     position: relative;
-    height: 160px;
+    height: 180px;
     background: var(--vanilla);
     overflow: hidden;
 }
@@ -779,21 +922,24 @@ $pageTitle = 'My Dashboard';
     color: var(--rose);
 }
 
-.book-cover-wrapper .status-badge {
+.progress-badge {
     position: absolute;
     top: 8px;
     right: 8px;
     padding: 2px 10px;
     border-radius: 12px;
-    font-size: 0.6rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    text-transform: uppercase;
+    background: var(--rose);
     color: white;
 }
 
-.status-badge.currently\ reading { background: var(--rose); }
-.status-badge.finished { background: #27ae60; }
-.status-badge.want\ to\ read { background: #3498db; }
+.finished-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 1.5rem;
+}
 
 .book-info {
     padding: 12px;
@@ -804,26 +950,31 @@ $pageTitle = 'My Dashboard';
     margin: 0 0 4px;
 }
 
-.book-desc {
+.book-author {
     font-size: 0.8rem;
     color: var(--text-light);
-    margin-bottom: 8px;
+    margin: 0 0 8px;
 }
 
 .book-actions {
     display: flex;
-    flex-wrap: wrap;
     gap: 4px;
+    flex-wrap: wrap;
 }
 
 .book-actions .btn {
-    padding: 4px 8px;
+    padding: 4px 12px;
     font-size: 0.75rem;
     flex: 1;
-    min-width: 50px;
 }
 
-/* ===== POEM CARD ===== */
+/* ===== POEM CARDS ===== */
+.poem-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+}
+
 .poem-card {
     background: var(--bg);
     border-radius: 12px;
@@ -859,45 +1010,33 @@ $pageTitle = 'My Dashboard';
 
 .poem-body h3 {
     font-size: 0.95rem;
-    margin: 0 0 6px;
+    margin: 0 0 4px;
 }
 
-.poem-verse-box {
-    background: var(--vanilla);
-    padding: 6px 10px;
-    border-radius: 6px;
-    border-left: 3px solid var(--rose);
-    margin-bottom: 8px;
-}
-
-.verse-label {
-    display: block;
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--rose);
-}
-
-.poem-verse-box p {
+.poem-intro {
     font-size: 0.8rem;
     color: var(--text-light);
-    margin: 2px 0 0;
+    margin: 0 0 8px;
 }
 
 .poem-actions {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: wrap;
 }
 
 .poem-actions .btn {
     padding: 4px 12px;
     font-size: 0.75rem;
-    flex: 1;
 }
 
-/* ===== VIDEO CARD ===== */
+/* ===== VIDEO CARDS ===== */
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+}
+
 .video-card {
     background: var(--bg);
     border-radius: 12px;
@@ -916,6 +1055,16 @@ $pageTitle = 'My Dashboard';
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.video-thumb .placeholder-cover {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: var(--rose);
 }
 
 .play-overlay {
@@ -938,16 +1087,6 @@ $pageTitle = 'My Dashboard';
     opacity: 1;
 }
 
-.video-thumb .placeholder-cover {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.5rem;
-    color: var(--rose);
-}
-
 .video-info {
     padding: 12px;
 }
@@ -964,6 +1103,12 @@ $pageTitle = 'My Dashboard';
 }
 
 /* ===== BLOG & REFLECTION CARDS ===== */
+.blog-grid, .reflection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+}
+
 .blog-card, .reflection-card {
     background: var(--bg);
     border-radius: 12px;
@@ -999,13 +1144,13 @@ $pageTitle = 'My Dashboard';
 
 .blog-body h3, .reflection-body h3 {
     font-size: 0.95rem;
-    margin: 0 0 6px;
+    margin: 0 0 4px;
 }
 
 .blog-excerpt {
     font-size: 0.8rem;
     color: var(--text-light);
-    margin-bottom: 8px;
+    margin: 0 0 8px;
 }
 
 .blog-body .btn, .reflection-body .btn {
@@ -1206,6 +1351,37 @@ $pageTitle = 'My Dashboard';
     margin-top: 2px;
 }
 
+.achievement-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.achievement-icon {
+    font-size: 1.2rem;
+}
+
+.achievement-name {
+    font-weight: 500;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+.achievement-date {
+    font-size: 0.7rem;
+    color: var(--text-light);
+}
+
 .no-items {
     text-align: center;
     color: var(--text-light);
@@ -1282,6 +1458,10 @@ $pageTitle = 'My Dashboard';
 
     .hero-content .hero-sub {
         font-size: 1rem;
+    }
+
+    .hero-stats {
+        justify-content: center;
     }
 
     .stats-row {

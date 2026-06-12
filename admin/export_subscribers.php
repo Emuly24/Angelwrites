@@ -9,15 +9,16 @@ header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename=subscribers_' . date('Y-m-d') . '.csv');
 
 $output = fopen('php://output', 'w');
-fputcsv($output, ['Email', 'Name', 'Status', 'Subscribed At']);
+fputcsv($output, ['Email', 'Name', 'Status', 'Subscribed At', 'Source']);
 
-$stmt = $db->query("SELECT email, name, is_active, subscribed_at FROM newsletter ORDER BY subscribed_at DESC");
+$stmt = $db->query("SELECT email, name, is_active, subscribed_at, source FROM newsletter ORDER BY subscribed_at DESC");
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     fputcsv($output, [
         $row['email'],
         $row['name'] ?? '',
         $row['is_active'] ? 'Active' : 'Inactive',
-        $row['subscribed_at']
+        $row['subscribed_at'],
+        $row['source'] ?? 'manual'
     ]);
 }
 fclose($output);

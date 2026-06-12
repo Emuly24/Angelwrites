@@ -4,232 +4,359 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 
-// Only admin can access
-if (!isAdmin()) {
-    header('Location: ' . SITE_URL . '/login.php');
-    exit;
-}
+redirectIfNotAdmin();
 
 $error = '';
 $success = '';
-$message = '';
 
-// ===== HANDLE UNSUBSCRIBE (via admin action) =====
-if (isset($_GET['unsubscribe'])) {
-    $id = (int)$_GET['unsubscribe'];
-    $stmt = $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $success = 'Subscriber has been unsubscribed.';
-    } else {
-        $error = 'Failed to unsubscribe.';
-    }
-}
+// ====== TAB NAVIGATION ======
+$active_tab = $_GET['tab'] ?? 'send';
 
-// ===== HANDLE DELETE (remove completely) =====
-if (isset($_GET['delete'])) {
-    $id = (int)$_GET['delete'];
-    $stmt = $db->prepare("DELETE FROM newsletter WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $success = 'Subscriber has been removed completely.';
-    } else {
-        $error = 'Failed to remove subscriber.';
-    }
-}
-
-// ===== FETCH SUBSCRIBERS =====
+// ====== FETCH ALL DATA ======
 $stmt = $db->query("SELECT * FROM newsletter ORDER BY subscribed_at DESC");
 $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get active subscriber count
 $stmt = $db->query("SELECT COUNT(*) FROM newsletter WHERE is_active = 1");
 $active_count = $stmt->fetchColumn();
-$active_subscribers = array_filter($subscribers, function($sub) { return $sub['is_active'] == 1; });
 
-// ===== HANDLE QUEUE CANCEL =====
-if (isset($_GET['cancel_queue'])) {
-    $id = (int)$_GET['cancel_queue'];
-    $stmt = $db->prepare("UPDATE email_queue SET status = 'cancelled' WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $success = 'Scheduled email has been cancelled.';
-    } else {
-        $error = 'Failed to cancel scheduled email.';
-    }
-}
-
-// ===== HANDLE QUEUE DELETE =====
-if (isset($_GET['delete_queue'])) {
-    $id = (int)$_GET['delete_queue'];
-    $stmt = $db->prepare("DELETE FROM email_queue WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $success = 'Scheduled email has been deleted.';
-    } else {
-        $error = 'Failed to delete scheduled email.';
-    }
-}
-
-// ===== FETCH QUEUE =====
-$stmt = $db->query("SELECT * FROM email_queue ORDER BY scheduled_at ASC");
+$stmt = $db->query("SELECT * FROM email_queue ORDER BY scheduled_at DESC");
 $queue = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== HANDLE TEMPLATE SAVE =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_template'])) {
-    $template_name = trim($_POST['template_name']);
-    $subject = trim($_POST['subject']);
-    $content = trim($_POST['content']);
-    if (!empty($template_name) && !empty($subject) && !empty($content)) {
-        $stmt = $db->prepare("INSERT INTO newsletter_templates (name, subject, content) VALUES (?, ?, ?)");
-        $stmt->execute([$template_name, $subject, $content]);
-        $success = 'Template saved successfully.';
-    } else {
-        $error = 'Template name, subject, and content are required.';
-    }
-}
+$stmt = $db->query("SELECT * FROM subscriber_segments ORDER BY name ASC");
+$segments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== HANDLE TEMPLATE LOAD =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['load_template'])) {
-    $template_id = (int)$_POST['template_id'];
-    $stmt = $db->prepare("SELECT * FROM newsletter_templates WHERE id = ?");
-    $stmt->execute([$template_id]);
-    $template = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($template) {
-        $_SESSION['newsletter_template'] = $template;
-        header('Location: ' . SITE_URL . '/admin/manage_newsletter.php');
-        exit;
-    } else {
-        $error = 'Template not found.';
-    }
-}
+$stmt = $db->query("SELECT * FROM newsletter_archive ORDER BY sent_at DESC");
+$archive = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== HANDLE TEMPLATE DELETE =====
-if (isset($_GET['delete_template'])) {
-    $id = (int)$_GET['delete_template'];
-    $stmt = $db->prepare("DELETE FROM newsletter_templates WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $success = 'Template deleted.';
-    } else {
-        $error = 'Failed to delete template.';
-    }
-    header('Location: ' . SITE_URL . '/admin/manage_newsletter.php');
-    exit;
-}
+$stmt = $db->query("SELECT * FROM newsletter_audit_log ORDER BY created_at DESC LIMIT 50");
+$audit_log = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== FETCH TEMPLATES =====
-$templates = $db->query("SELECT * FROM newsletter_templates ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+// ====== HANDLE POST ACTIONS ======
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
 
-// ===== HANDLE NEWSLETTER SEND OR SCHEDULE =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_newsletter'])) {
-    $subject = trim($_POST['subject']);
-    $content = trim($_POST['content']);
-    $send_to = $_POST['send_to'] ?? 'all';
-    $action_type = $_POST['action_type'] ?? 'send_now'; // send_now or schedule
-    $scheduled_at = null;
+    // ====== SEND NEWSLETTER ======
+    if ($action === 'send_newsletter') {
+        $subject = trim($_POST['subject']);
+        $content = trim($_POST['content']);
+        $send_to = $_POST['send_to'] ?? 'all';
+        $segment_id = isset($_POST['segment_id']) ? (int)$_POST['segment_id'] : null;
+        $schedule = isset($_POST['schedule']) ? trim($_POST['schedule']) : '';
+        $attachments = [];
 
-    if ($action_type === 'schedule') {
-        $scheduled_datetime = trim($_POST['scheduled_datetime'] ?? '');
-        if (!empty($scheduled_datetime)) {
-            $scheduled_at = date('Y-m-d H:i:s', strtotime($scheduled_datetime));
-            if ($scheduled_at === false) {
-                $error = 'Invalid schedule date/time.';
-            }
+        // Validate
+        if (empty($subject) || empty($content)) {
+            $error = 'Subject and content are required.';
         } else {
-            $error = 'Please select a schedule date and time.';
-        }
-    }
-
-    if (empty($subject) || empty($content)) {
-        $error = 'Please fill in both subject and content.';
-    } else {
-        $target_emails = [];
-
-        if ($send_to === 'all') {
-            foreach ($active_subscribers as $sub) {
-                $target_emails[] = $sub['email'];
-            }
-        } elseif ($send_to === 'selected' && !empty($_POST['selected_emails'])) {
-            $emails_string = trim($_POST['selected_emails']);
-            $target_emails = array_map('trim', explode(',', $emails_string));
-            $target_emails = array_filter($target_emails);
-        } elseif ($send_to === 'single') {
-            $email = trim($_POST['single_email']);
-            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $target_emails[] = $email;
-            } else {
-                $error = 'Invalid email address for single send.';
-            }
-        } else {
-            $error = 'No valid recipients selected.';
-        }
-
-        // Attachments handling
-        $attachment_paths = [];
-        if (empty($error) && !empty($_FILES['attachments']['name'][0])) {
-            $upload_dir = '../assets/uploads/attachments/';
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0755, true);
-            }
-            foreach ($_FILES['attachments']['name'] as $key => $name) {
-                if ($_FILES['attachments']['error'][$key] === UPLOAD_ERR_OK) {
-                    $ext = pathinfo($name, PATHINFO_EXTENSION);
-                    $filename = 'attachment_' . time() . '_' . $key . '.' . $ext;
-                    $target = $upload_dir . $filename;
-                    if (move_uploaded_file($_FILES['attachments']['tmp_name'][$key], $target)) {
-                        $attachment_paths[] = 'assets/uploads/attachments/' . $filename;
+            // Handle attachments
+            if (!empty($_FILES['attachments']['name'][0])) {
+                $upload_dir = '../assets/uploads/attachments/';
+                if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+                foreach ($_FILES['attachments']['name'] as $key => $name) {
+                    if ($_FILES['attachments']['error'][$key] === UPLOAD_ERR_OK) {
+                        $ext = pathinfo($name, PATHINFO_EXTENSION);
+                        $filename = 'newsletter_' . time() . '_' . $key . '.' . $ext;
+                        $target = $upload_dir . $filename;
+                        if (move_uploaded_file($_FILES['attachments']['tmp_name'][$key], $target)) {
+                            $attachments[] = 'assets/uploads/attachments/' . $filename;
+                        }
                     }
                 }
             }
-        }
 
-        if (empty($error) && count($target_emails) > 0) {
-            $recipient_emails = implode(',', $target_emails);
-
-            // Insert into email queue
-            $stmt = $db->prepare("
-                INSERT INTO email_queue (subject, content, recipient_emails, send_to_type, scheduled_at, status)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ");
-            $queue_status = ($action_type === 'schedule') ? 'pending' : 'processing';
-            $stmt->execute([$subject, $content, $recipient_emails, $send_to, $scheduled_at ?? date('Y-m-d H:i:s'), $queue_status]);
-            $queue_id = $db->lastInsertId();
-
-            // Attach files to this queue entry
-            foreach ($attachment_paths as $path) {
-                $stmt = $db->prepare("INSERT INTO email_attachments (email_queue_id, file_path, file_name, file_size) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$queue_id, $path, basename($path), filesize('../' . $path)]);
+            // Determine recipients
+            $recipients = [];
+            if ($send_to === 'all') {
+                $stmt = $db->prepare("SELECT email FROM newsletter WHERE is_active = 1");
+                $stmt->execute();
+                $recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            } elseif ($send_to === 'segment' && $segment_id) {
+                $stmt = $db->prepare("
+                    SELECT n.email FROM newsletter n
+                    JOIN subscriber_segment_assignments a ON n.id = a.subscriber_id
+                    WHERE a.segment_id = ? AND n.is_active = 1
+                ");
+                $stmt->execute([$segment_id]);
+                $recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            } elseif ($send_to === 'single') {
+                $email = trim($_POST['single_email']);
+                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $recipients[] = $email;
+                } else {
+                    $error = 'Invalid email address.';
+                }
+            } elseif ($send_to === 'selected' && !empty($_POST['selected_emails'])) {
+                $emails = explode(',', trim($_POST['selected_emails']));
+                foreach ($emails as $e) {
+                    if (filter_var(trim($e), FILTER_VALIDATE_EMAIL)) {
+                        $recipients[] = trim($e);
+                    }
+                }
             }
 
-            if ($action_type === 'schedule') {
-                $message = "Newsletter scheduled successfully for " . date('F j, Y, g:i a', strtotime($scheduled_at));
-            } else {
-                // Immediately send
-                $sent_count = 0;
-                $failed_count = 0;
-                foreach ($target_emails as $email) {
-                    $stmt = $db->prepare("SELECT unsubscribe_token FROM newsletter WHERE email = ?");
-                    $stmt->execute([$email]);
-                    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-                    $token = $existing ? $existing['unsubscribe_token'] : bin2hex(random_bytes(32));
-                    $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $token;
-                    $full_message = $content . "\n\n<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
+            if (empty($recipients)) {
+                $error = 'No valid recipients selected.';
+            }
 
-                    if (sendMarkdownEmail($email, $subject, $markdown_content, 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
-                        $sent_count++;
+            if (empty($error)) {
+                $recipient_emails = implode(',', $recipients);
+                $scheduled_at = null;
+                $status = 'pending';
+
+                if (!empty($schedule)) {
+                    $scheduled_at = date('Y-m-d H:i:s', strtotime($schedule));
+                    if ($scheduled_at === false) {
+                        $error = 'Invalid schedule date/time.';
+                    }
+                } else {
+                    $status = 'processing'; // send immediately
+                }
+
+                if (empty($error)) {
+                    // Insert into queue
+                    $stmt = $db->prepare("
+                        INSERT INTO email_queue (subject, content, recipient_emails, send_to_type, segment_id, scheduled_at, status, attempt_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                    ");
+                    $stmt->execute([$subject, $content, $recipient_emails, $send_to, $segment_id, $scheduled_at ?? date('Y-m-d H:i:s'), $status]);
+                    $queue_id = $db->lastInsertId();
+
+                    // Attachments
+                    foreach ($attachments as $path) {
+                        $stmt = $db->prepare("INSERT INTO email_attachments (email_queue_id, file_path, file_name, file_size) VALUES (?, ?, ?, ?)");
+                        $stmt->execute([$queue_id, $path, basename($path), filesize('../' . $path)]);
+                    }
+
+                    // If sending immediately, process now
+                    if ($status === 'processing') {
+                        // Send immediately (limited to 10 recipients per cycle)
+                        $sent = 0;
+                        $failed = 0;
+                        $limit = 10;
+                        foreach ($recipients as $idx => $email) {
+                            if ($idx >= $limit) break;
+                            $stmt = $db->prepare("SELECT unsubscribe_token FROM newsletter WHERE email = ?");
+                            $stmt->execute([$email]);
+                            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                            $token = $existing ? $existing['unsubscribe_token'] : bin2hex(random_bytes(32));
+                            $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $token;
+                            $full_message = $content . "\n\n<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
+
+                            if (sendEmail($email, $subject, $full_message, 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
+                                $sent++;
+                                // Log stats
+                                $stmt = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, 'sent')");
+                                $stmt->execute([$queue_id, $email]);
+                            } else {
+                                $failed++;
+                            }
+                            usleep(500000);
+                        }
+                        // Update queue
+                        $stmt = $db->prepare("UPDATE email_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?");
+                        $stmt->execute([$failed > 0 ? "Failed: $failed, Sent: $sent" : null, $queue_id]);
+
+                        // Archive
+                        $stmt = $db->prepare("INSERT INTO newsletter_archive (subject, content, recipient_count, sent_at, email_queue_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)");
+                        $stmt->execute([$subject, $content, count($recipients), $queue_id]);
+
+                        $success = "Newsletter sent! Sent: $sent, Failed: $failed.";
                     } else {
-                        $failed_count++;
+                        $success = "Newsletter scheduled for " . date('F j, Y, g:i a', strtotime($scheduled_at));
                     }
-                    usleep(500000);
+
+                    // Audit log
+                    $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
+                    $stmt->execute([$_SESSION['user_id'], 'send_newsletter', "Subject: $subject, Recipients: " . count($recipients)]);
                 }
-                $message = "Newsletter sent successfully! Sent: $sent_count, Failed: $failed_count.";
-                // Mark queue as sent
-                $stmt = $db->prepare("UPDATE email_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE id = ?");
-                $stmt->execute([$queue_id]);
             }
-        } elseif (empty($error) && count($target_emails) === 0) {
-            $error = 'No valid recipients selected.';
+        }
+    }
+
+    // ====== SAVE TEMPLATE ======
+    if ($action === 'save_template') {
+        $name = trim($_POST['template_name']);
+        $subject = trim($_POST['subject']);
+        $content = trim($_POST['content']);
+        if (empty($name) || empty($subject) || empty($content)) {
+            $error = 'Name, subject, and content are required.';
+        } else {
+            $stmt = $db->prepare("INSERT INTO newsletter_templates (name, subject, content) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $subject, $content]);
+            $success = 'Template saved.';
+            $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
+            $stmt->execute([$_SESSION['user_id'], 'save_template', "Name: $name"]);
+        }
+    }
+
+    // ====== DELETE TEMPLATE ======
+    if ($action === 'delete_template') {
+        $template_id = (int)$_POST['template_id'];
+        $stmt = $db->prepare("DELETE FROM newsletter_templates WHERE id = ?");
+        $stmt->execute([$template_id]);
+        $success = 'Template deleted.';
+        $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
+        $stmt->execute([$_SESSION['user_id'], 'delete_template', "ID: $template_id"]);
+    }
+
+    // ====== LOAD TEMPLATE ======
+    if ($action === 'load_template') {
+        $template_id = (int)$_POST['template_id'];
+        $stmt = $db->prepare("SELECT * FROM newsletter_templates WHERE id = ?");
+        $stmt->execute([$template_id]);
+        $template = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($template) {
+            $_SESSION['newsletter_template'] = $template;
+            $success = 'Template loaded.';
+        } else {
+            $error = 'Template not found.';
+        }
+    }
+
+    // ====== BULK ACTIONS ======
+    if ($action === 'bulk_subscribers') {
+        $ids = isset($_POST['selected_ids']) ? explode(',', $_POST['selected_ids']) : [];
+        $bulk_action = $_POST['bulk_action'] ?? '';
+        if (empty($ids) || empty($bulk_action)) {
+            $error = 'Please select at least one subscriber and an action.';
+        } else {
+            if ($bulk_action === 'unsubscribe') {
+                $stmt = $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP WHERE id = ?");
+                foreach ($ids as $id) {
+                    $stmt->execute([$id]);
+                }
+                $success = count($ids) . ' subscribers unsubscribed.';
+            } elseif ($bulk_action === 'delete') {
+                $stmt = $db->prepare("DELETE FROM newsletter WHERE id = ?");
+                foreach ($ids as $id) {
+                    $stmt->execute([$id]);
+                }
+                $success = count($ids) . ' subscribers deleted.';
+            } elseif ($bulk_action === 'add_segment') {
+                $segment_id = (int)$_POST['segment_id'];
+                if (!$segment_id) {
+                    $error = 'Please select a segment.';
+                } else {
+                    $stmt = $db->prepare("INSERT OR IGNORE INTO subscriber_segment_assignments (subscriber_id, segment_id) VALUES (?, ?)");
+                    foreach ($ids as $id) {
+                        $stmt->execute([$id, $segment_id]);
+                    }
+                    $success = count($ids) . ' subscribers added to segment.';
+                }
+            } elseif ($bulk_action === 'remove_segment') {
+                $segment_id = (int)$_POST['segment_id'];
+                if (!$segment_id) {
+                    $error = 'Please select a segment.';
+                } else {
+                    $stmt = $db->prepare("DELETE FROM subscriber_segment_assignments WHERE subscriber_id = ? AND segment_id = ?");
+                    foreach ($ids as $id) {
+                        $stmt->execute([$id, $segment_id]);
+                    }
+                    $success = count($ids) . ' subscribers removed from segment.';
+                }
+            }
+            if ($success) {
+                $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
+                $stmt->execute([$_SESSION['user_id'], 'bulk_' . $bulk_action, "Count: " . count($ids)]);
+            }
+        }
+    }
+
+    // ====== IMPORT CSV ======
+    if ($action === 'import_csv') {
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            $error = 'Please upload a valid CSV file.';
+        } else {
+            $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+            if ($handle === false) {
+                $error = 'Failed to read CSV file.';
+            } else {
+                $headers = fgetcsv($handle);
+                $email_index = array_search('email', array_map('strtolower', $headers));
+                $name_index = array_search('name', array_map('strtolower', $headers));
+                if ($email_index === false) {
+                    $error = 'CSV must contain an "email" column.';
+                } else {
+                    $imported = 0;
+                    $skipped = 0;
+                    while (($row = fgetcsv($handle)) !== false) {
+                        if (!isset($row[$email_index])) continue;
+                        $email = trim($row[$email_index]);
+                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) continue;
+                        $name = ($name_index !== false && isset($row[$name_index])) ? trim($row[$name_index]) : '';
+                        $token = bin2hex(random_bytes(32));
+                        $stmt = $db->prepare("INSERT OR IGNORE INTO newsletter (email, name, unsubscribe_token, source) VALUES (?, ?, ?, 'import')");
+                        $stmt->execute([$email, $name, $token]);
+                        if ($stmt->rowCount() > 0) $imported++;
+                        else $skipped++;
+                    }
+                    fclose($handle);
+                    $success = "Import complete: $imported added, $skipped skipped.";
+                    $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
+                    $stmt->execute([$_SESSION['user_id'], 'import_csv', "Imported: $imported, Skipped: $skipped"]);
+                }
+            }
+        }
+    }
+
+    // ====== CREATE SEGMENT ======
+    if ($action === 'create_segment') {
+        $name = trim($_POST['segment_name']);
+        $description = trim($_POST['segment_description']);
+        if (empty($name)) {
+            $error = 'Segment name is required.';
+        } else {
+            $stmt = $db->prepare("INSERT OR IGNORE INTO subscriber_segments (name, description) VALUES (?, ?)");
+            $stmt->execute([$name, $description]);
+            if ($stmt->rowCount() > 0) {
+                $success = "Segment '$name' created.";
+            } else {
+                $error = 'Segment already exists.';
+            }
+        }
+    }
+
+    // ====== DELETE SEGMENT ======
+    if ($action === 'delete_segment') {
+        $segment_id = (int)$_POST['segment_id'];
+        $stmt = $db->prepare("DELETE FROM subscriber_segments WHERE id = ?");
+        $stmt->execute([$segment_id]);
+        $stmt = $db->prepare("DELETE FROM subscriber_segment_assignments WHERE segment_id = ?");
+        $stmt->execute([$segment_id]);
+        $success = 'Segment deleted.';
+    }
+
+    // ====== RESEND FAILED ======
+    if ($action === 'resend_failed') {
+        $queue_id = (int)$_POST['queue_id'];
+        $stmt = $db->prepare("SELECT * FROM email_queue WHERE id = ? AND status = 'failed'");
+        $stmt->execute([$queue_id]);
+        $q = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$q) {
+            $error = 'Failed email not found.';
+        } else {
+            $recipients = explode(',', $q['recipient_emails']);
+            $sent = 0;
+            $failed = 0;
+            foreach ($recipients as $email) {
+                $email = trim($email);
+                if (sendEmail($email, $q['subject'], $q['content'], 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
+                    $sent++;
+                    $stmt = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, 'sent')");
+                    $stmt->execute([$queue_id, $email]);
+                } else {
+                    $failed++;
+                }
+                usleep(500000);
+            }
+            $stmt = $db->prepare("UPDATE email_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?");
+            $stmt->execute([$failed > 0 ? "Resent: $sent, Failed: $failed" : null, $queue_id]);
+            $success = "Resent: $sent, Failed: $failed.";
         }
     }
 }
 
-// ===== LOAD TEMPLATE FROM SESSION (if set) =====
+// ====== LOAD TEMPLATE FROM SESSION ======
 $template_name = '';
 $subject = '';
 $content = '';
@@ -240,20 +367,20 @@ if (isset($_SESSION['newsletter_template'])) {
     $content = $template['content'];
 }
 
-$pageTitle = 'Manage Newsletter';
+$pageTitle = 'Newsletter Management';
+require_once '../includes/header.php';
 ?>
-<?php require_once '../includes/header.php'; ?>
 
-<div class="admin-page">
+<div class="admin-newsletter">
     <div class="container">
         <div class="admin-header">
             <h1>📨 Newsletter Management</h1>
             <div class="admin-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php" class="btn btn-outline btn-sm">
-                    <i class="fas fa-file-csv"></i> Export CSV
+                    <i class="fas fa-file-csv"></i> Export
                 </a>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    <i class="fas fa-arrow-left"></i> Dashboard
                 </a>
             </div>
         </div>
@@ -261,571 +388,149 @@ $pageTitle = 'Manage Newsletter';
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
-        <?php if ($message): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
-        <?php endif; ?>
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- Send Newsletter Form -->
-        <div class="card">
-            <div class="card-header">
-                <h2>📤 Send or Schedule Newsletter</h2>
-                <div class="card-header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button type="button" id="previewBtn" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> Preview</button>
-                    <button type="button" id="testSendBtn" class="btn btn-sm btn-secondary"><i class="fas fa-vial"></i> Send Test</button>
-                    <button type="button" id="saveTemplateBtn" class="btn btn-sm btn-primary"><i class="fas fa-save"></i> Save Template</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <form method="POST" class="admin-form" id="newsletterForm" enctype="multipart/form-data">
-                    <div class="form-group">
-                        <label for="subject">Subject <span class="required">*</span></label>
-                        <input type="text" id="subject" name="subject" placeholder="e.g. New Book Release Announcement" value="<?php echo htmlspecialchars($subject); ?>" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="content">Message Content (HTML allowed) <span class="required">*</span></label>
-                        <textarea id="editor" name="content" rows="10" placeholder="Write your newsletter content here..."><?php echo htmlspecialchars($content); ?></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Send to</label>
-                        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                            <label style="display: flex; align-items: center; gap: 4px;">
-                                <input type="radio" name="send_to" value="all" checked> All Active Subscribers (<?php echo $active_count; ?>)
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 4px;">
-                                <input type="radio" name="send_to" value="selected"> Select Subscribers
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 4px;">
-                                <input type="radio" name="send_to" value="single"> Single Email
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Single Email Input -->
-                    <div class="form-group" id="singleEmailGroup" style="display: none;">
-                        <label for="single_email">Enter Subscriber Email</label>
-                        <input type="email" id="single_email" name="single_email" placeholder="subscriber@example.com">
-                    </div>
-
-                    <!-- Select Subscribers List -->
-                    <div id="selectedSubscriberGroup" style="display: none; margin-top: 16px;">
-                        <div class="form-group">
-                            <label>Select Subscribers</label>
-                            <div class="subscriber-list-wrapper" style="border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: var(--fantasy);">
-                                <div class="select-all-wrapper" style="margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600;">
-                                        <input type="checkbox" id="selectAllSubscribers"> Select All / Deselect All
-                                    </label>
-                                </div>
-                                <div class="subscriber-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
-                                    <?php foreach ($active_subscribers as $sub): ?>
-                                        <div class="checkbox-item" style="display: flex; align-items: center; gap: 6px; padding: 4px 6px; background: var(--card-bg); border-radius: 4px; border: 1px solid var(--border);">
-                                            <input type="checkbox" class="subscriber-checkbox" value="<?php echo htmlspecialchars($sub['email']); ?>" id="sub_<?php echo $sub['id']; ?>" style="margin: 0;">
-                                            <label for="sub_<?php echo $sub['id']; ?>" style="font-size: 0.85rem; cursor: pointer; margin: 0; flex: 1;">
-                                                <?php echo htmlspecialchars($sub['email']); ?>
-                                                <?php if (!empty($sub['name'])): ?>
-                                                    <span style="color: var(--text-light); font-weight: 300;">(<?php echo htmlspecialchars($sub['name']); ?>)</span>
-                                                <?php endif; ?>
-                                            </label>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                                <input type="hidden" name="selected_emails" id="selectedEmailsInput" value="">
-                            </div>
-                            <div id="selectedEmailsDisplay" style="margin-top: 8px; border: 1px dashed var(--border); padding: 8px; min-height: 40px; border-radius: 8px; background: var(--card-bg); display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
-                                <span style="color: var(--text-light); font-size: 0.85rem;">No subscribers selected.</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Schedule Options -->
-                    <div class="form-group" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-                        <label>Send Options</label>
-                        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                            <label style="display: flex; align-items: center; gap: 4px;">
-                                <input type="radio" name="action_type" value="send_now" checked> Send Now
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 4px;">
-                                <input type="radio" name="action_type" value="schedule"> Schedule for Later
-                            </label>
-                        </div>
-                        <div id="scheduleDateTimeGroup" style="display: none; margin-top: 8px;">
-                            <label for="scheduled_datetime">Schedule Date & Time</label>
-                            <input type="datetime-local" id="scheduled_datetime" name="scheduled_datetime">
-                        </div>
-                    </div>
-
-                    <!-- Attachments -->
-                    <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px;">
-                        <label for="attachments">Attachments</label>
-                        <input type="file" id="attachments" name="attachments[]" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.zip">
-                        <small class="field-hint">Max file size: 10MB per file. Supported: PDF, DOC, DOCX, JPG, PNG, GIF, ZIP.</small>
-                        <div id="attachmentPreview" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
-                    </div>
-
-                    <!-- Template Load & Save -->
-                    <div class="form-row" style="display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; align-items: flex-end;">
-                        <div class="form-group" style="flex: 1; min-width: 150px;">
-                            <label for="templateSelect">Load Template</label>
-                            <select id="templateSelect" name="template_id">
-                                <option value="">— Select a template —</option>
-                                <?php foreach ($templates as $tpl): ?>
-                                    <option value="<?php echo $tpl['id']; ?>" <?php echo ($template_id ?? 0) == $tpl['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($tpl['name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <button type="button" id="loadTemplateBtn" class="btn btn-sm btn-outline" style="margin-top: 4px;">Load</button>
-                            <?php if (count($templates) > 0): ?>
-                                <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php?delete_template=<?php echo $templates[0]['id']; ?>" class="btn btn-sm btn-danger" style="margin-top: 4px;" onclick="return confirm('Delete this template?');">Delete</a>
-                            <?php endif; ?>
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 200px;">
-                            <label for="template_name">Save as Template</label>
-                            <input type="text" id="template_name" name="template_name" placeholder="Template name...">
-                            <button type="button" id="saveTemplateBtnAction" class="btn btn-sm btn-primary" style="margin-top: 4px;">Save</button>
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" name="send_newsletter" class="btn btn-primary btn-block">
-                            <i class="fas fa-paper-plane"></i> Send / Schedule Newsletter
-                        </button>
-                    </div>
-                </form>
-            </div>
+        <div class="tabs">
+            <a href="?tab=send" class="tab <?php echo $active_tab === 'send' ? 'active' : ''; ?>">
+                <i class="fas fa-paper-plane"></i> Send
+            </a>
+            <a href="?tab=subscribers" class="tab <?php echo $active_tab === 'subscribers' ? 'active' : ''; ?>">
+                <i class="fas fa-users"></i> Subscribers (<?php echo count($subscribers); ?>)
+            </a>
+            <a href="?tab=segments" class="tab <?php echo $active_tab === 'segments' ? 'active' : ''; ?>">
+                <i class="fas fa-tags"></i> Segments
+            </a>
+            <a href="?tab=queue" class="tab <?php echo $active_tab === 'queue' ? 'active' : ''; ?>">
+                <i class="fas fa-clock"></i> Queue (<?php echo count($queue); ?>)
+            </a>
+            <a href="?tab=archive" class="tab <?php echo $active_tab === 'archive' ? 'active' : ''; ?>">
+                <i class="fas fa-archive"></i> Archive
+            </a>
+            <a href="?tab=audit" class="tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">
+                <i class="fas fa-history"></i> Audit Log
+            </a>
+            <a href="?tab=import" class="tab <?php echo $active_tab === 'import' ? 'active' : ''; ?>">
+                <i class="fas fa-upload"></i> Import
+            </a>
         </div>
 
-        <!-- Queue Management -->
-        <div class="card">
-            <div class="card-header">
-                <h2>📋 Email Queue (<?php echo count($queue); ?>)</h2>
-            </div>
-            <div class="card-body">
-                <?php if (count($queue) > 0): ?>
-                    <div class="table-responsive">
-                        <table class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>Subject</th>
-                                    <th>Recipients</th>
-                                    <th>Scheduled</th>
-                                    <th>Status</th>
-                                    <th>Attempts</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($queue as $q): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($q['subject']); ?></td>
-                                        <td><?php echo substr($q['recipient_emails'], 0, 30); ?>...</td>
-                                        <td><?php echo date('M j, Y, g:i a', strtotime($q['scheduled_at'])); ?></td>
-                                        <td>
-                                            <span class="status-badge <?php echo $q['status']; ?>">
-                                                <?php echo ucfirst($q['status']); ?>
-                                            </span>
-                                        </td>
-                                        <td><?php echo $q['attempt_count'] ?? 0; ?></td>
-                                        <td class="actions">
-                                            <?php if ($q['status'] === 'pending' || $q['status'] === 'processing'): ?>
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php?cancel_queue=<?php echo $q['id']; ?>" class="btn btn-sm btn-secondary" onclick="return confirm('Cancel this scheduled email?');">
-                                                    <i class="fas fa-times"></i>
-                                                </a>
-                                            <?php endif; ?>
-                                            <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php?delete_queue=<?php echo $q['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this queue entry?');">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <p class="no-items">No emails in the queue.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Subscriber List -->
-        <div class="card">
-            <div class="card-header">
-                <h2>📋 Subscribers (<?php echo count($subscribers); ?>)</h2>
-                <div class="card-header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <select id="bulkActionSelect" style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); font-size: 0.85rem;">
-                        <option value="">Bulk Actions</option>
-                        <option value="unsubscribe">Unsubscribe Selected</option>
-                        <option value="delete">Delete Selected</option>
-                    </select>
-                    <button id="executeBulkAction" class="btn btn-sm btn-primary" disabled>Apply</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <?php if (count($subscribers) > 0): ?>
-                    <div class="table-responsive">
-                        <form method="POST" id="bulkForm">
-                            <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
-                            <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
-                            <table class="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th><input type="checkbox" id="selectAllRows"></th>
-                                        <th>Email</th>
-                                        <th>Name</th>
-                                        <th>Status</th>
-                                        <th>Subscribed</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($subscribers as $sub): ?>
-                                        <tr>
-                                            <td><input type="checkbox" class="row-select" value="<?php echo $sub['id']; ?>"></td>
-                                            <td><?php echo htmlspecialchars($sub['email']); ?></td>
-                                            <td><?php echo htmlspecialchars($sub['name'] ?? '—'); ?></td>
-                                            <td>
-                                                <span class="status-badge <?php echo $sub['is_active'] ? 'active' : 'inactive'; ?>">
-                                                    <?php echo $sub['is_active'] ? 'Active' : 'Inactive'; ?>
-                                                </span>
-                                            </td>
-                                            <td><?php echo date('M j, Y', strtotime($sub['subscribed_at'])); ?></td>
-                                            <td class="actions">
-                                                <?php if ($sub['is_active']): ?>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php?unsubscribe=<?php echo $sub['id']; ?>" class="btn btn-sm btn-secondary" onclick="return confirm('Unsubscribe this user?');">
-                                                        <i class="fas fa-times"></i> Unsubscribe
-                                                    </a>
-                                                <?php endif; ?>
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php?delete=<?php echo $sub['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Remove this subscriber permanently?');">
-                                                    <i class="fas fa-trash"></i> Delete
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </form>
-                    </div>
-                <?php else: ?>
-                    <p class="no-items">No subscribers yet.</p>
-                <?php endif; ?>
-            </div>
-        </div>
+        <?php
+        // Include tab content based on active tab
+        switch ($active_tab) {
+            case 'send':
+                require_once 'newsletter_tabs/send.php';
+                break;
+            case 'subscribers':
+                require_once 'newsletter_tabs/subscribers.php';
+                break;
+            case 'segments':
+                require_once 'newsletter_tabs/segments.php';
+                break;
+            case 'queue':
+                require_once 'newsletter_tabs/queue.php';
+                break;
+            case 'archive':
+                require_once 'newsletter_tabs/archive.php';
+                break;
+            case 'audit':
+                require_once 'newsletter_tabs/audit.php';
+                break;
+            case 'import':
+                require_once 'newsletter_tabs/import.php';
+                break;
+            default:
+                require_once 'newsletter_tabs/send.php';
+        }
+        ?>
     </div>
 </div>
 
-<!-- ===== TINYMCE EDITOR ===== -->
+<style>
+.admin-newsletter { padding: 32px 0 60px; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.admin-header h1 { margin: 0; }
+.admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.tabs { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
+.tab { padding: 10px 20px; border: none; background: none; cursor: pointer; font-size: 0.95rem; color: var(--text-light); border-bottom: 3px solid transparent; transition: all 0.2s; text-decoration: none; }
+.tab:hover { color: var(--text); background: var(--vanilla); }
+.tab.active { color: var(--rose); border-bottom-color: var(--rose); font-weight: 600; }
+
+.card { margin-bottom: 24px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.card-header { background: var(--vanilla); padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.card-header h2 { font-size: 1.15rem; margin: 0; display: flex; align-items: center; gap: 8px; }
+.card-body { padding: 20px; }
+
+.admin-form .form-group { margin-bottom: 16px; }
+.admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
+.admin-form input[type="text"], .admin-form input[type="email"], .admin-form textarea, .admin-form select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text);
+}
+.admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+.admin-form textarea { resize: vertical; min-height: 120px; }
+.required { color: #dc2626; }
+
+.table-responsive { overflow-x: auto; border-radius: 12px; }
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th { background: var(--vanilla); padding: 10px 16px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); }
+.admin-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+
+.status-badge { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.status-badge.active { background: #27ae60; color: #fff; }
+.status-badge.inactive { background: #95a5a6; color: #fff; }
+.status-badge.pending { background: #f1c40f; color: #fff; }
+.status-badge.processing { background: #3498db; color: #fff; }
+.status-badge.sent { background: #2ecc71; color: #fff; }
+.status-badge.failed { background: #e74c3c; color: #fff; }
+.status-badge.cancelled { background: #95a5a6; color: #fff; }
+
+.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+
+@media (max-width: 768px) {
+    .admin-header { flex-direction: column; align-items: flex-start; }
+    .tabs { gap: 4px; }
+    .tab { padding: 8px 12px; font-size: 0.85rem; }
+}
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
 <script>
-    tinymce.init({
-        selector: '#editor',
-        height: 500,
-        menubar: true,
-        plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
-        toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
-        content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
-        forced_root_block: 'p',
-        setup: function(editor) {
-            editor.on('change', function () {
-                tinymce.triggerSave();
-            });
-        }
-    });
-</script>
-
-<!-- ===== MAIN JAVASCRIPT ===== -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // ===== SCHEDULE TOGGLE =====
-    const sendNowRadio = document.querySelector('input[name="action_type"][value="send_now"]');
-    const scheduleRadio = document.querySelector('input[name="action_type"][value="schedule"]');
-    const scheduleGroup = document.getElementById('scheduleDateTimeGroup');
-
-    sendNowRadio.addEventListener('change', function() {
-        scheduleGroup.style.display = 'none';
-    });
-    scheduleRadio.addEventListener('change', function() {
-        scheduleGroup.style.display = 'block';
-    });
-
-    // ===== RADIO TOGGLES =====
-    const radioAll = document.querySelector('input[name="send_to"][value="all"]');
-    const radioSelected = document.querySelector('input[name="send_to"][value="selected"]');
-    const radioSingle = document.querySelector('input[name="send_to"][value="single"]');
-    const singleGroup = document.getElementById('singleEmailGroup');
-    const selectedGroup = document.getElementById('selectedSubscriberGroup');
-    const selectAllCheckbox = document.getElementById('selectAllSubscribers');
-    const subscriberCheckboxes = document.querySelectorAll('.subscriber-checkbox');
-    const selectedEmailsInput = document.getElementById('selectedEmailsInput');
-    const selectedEmailsDisplay = document.getElementById('selectedEmailsDisplay');
-
-    function updateSelectedEmails() {
-        let selected = [];
-        let htmlContent = '';
-        subscriberCheckboxes.forEach(cb => {
-            if (cb.checked) {
-                selected.push(cb.value);
-            }
-        });
-        selectedEmailsInput.value = selected.join(',');
-
-        if (selected.length === 0) {
-            htmlContent = '<span style="color: var(--text-light); font-size: 0.85rem;">No subscribers selected.</span>';
-        } else {
-            selected.forEach(email => {
-                htmlContent += `<span style="background: var(--rose-light); color: var(--dark); padding: 4px 10px; border-radius: 16px; font-size: 0.8rem; display: inline-block; border: 1px solid var(--rose);">${email}</span>`;
-            });
-        }
-        selectedEmailsDisplay.innerHTML = htmlContent;
-
-        const total = subscriberCheckboxes.length;
-        const checked = document.querySelectorAll('.subscriber-checkbox:checked').length;
-        selectAllCheckbox.checked = (total > 0 && checked === total);
-        selectAllCheckbox.indeterminate = (checked > 0 && checked < total);
+tinymce.init({
+    selector: '#editor',
+    height: 500,
+    menubar: true,
+    plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+    toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
+    content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
+    forced_root_block: 'p',
+    setup: function(editor) {
+        editor.on('change', function () { tinymce.triggerSave(); });
     }
+});
 
-    function updateVisibility() {
-        if (radioAll.checked) {
-            singleGroup.style.display = 'none';
-            selectedGroup.style.display = 'none';
-        } else if (radioSelected.checked) {
-            singleGroup.style.display = 'none';
-            selectedGroup.style.display = 'block';
-        } else if (radioSingle.checked) {
-            singleGroup.style.display = 'block';
-            selectedGroup.style.display = 'none';
-        }
-    }
-
-    radioAll.addEventListener('change', updateVisibility);
-    radioSelected.addEventListener('change', updateVisibility);
-    radioSingle.addEventListener('change', updateVisibility);
-
-    selectAllCheckbox.addEventListener('change', function() {
-        subscriberCheckboxes.forEach(cb => {
-            cb.checked = this.checked;
-        });
-        updateSelectedEmails();
-    });
-
-    subscriberCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateSelectedEmails);
-    });
-
-    updateVisibility();
-    updateSelectedEmails();
-
-    // ===== VALIDATION FOR EMPTY SELECTION =====
-    document.getElementById('newsletterForm').addEventListener('submit', function(e) {
-        const sendTo = document.querySelector('input[name="send_to"]:checked').value;
-        if (sendTo === 'selected') {
-            const selected = document.querySelectorAll('.subscriber-checkbox:checked');
-            if (selected.length === 0) {
-                e.preventDefault();
-                alert('Please select at least one subscriber.');
-            }
-        }
-        const actionType = document.querySelector('input[name="action_type"]:checked').value;
-        if (actionType === 'schedule') {
-            const datetime = document.getElementById('scheduled_datetime').value;
-            if (!datetime) {
-                e.preventDefault();
-                alert('Please select a schedule date and time.');
-            }
-        }
-    });
-
-    // ===== PREVIEW =====
-    document.getElementById('previewBtn').addEventListener('click', function() {
-        const content = tinymce.get('editor').getContent();
-        const subject = document.getElementById('subject').value;
-        const previewWindow = window.open('', 'Preview', 'width=600,height=800');
-        previewWindow.document.write(`
-            <html><head><title>Newsletter Preview</title></head>
-            <body style="font-family: Inter, sans-serif; padding:20px; max-width:600px; margin:0 auto;">
-                <h2 style="color: var(--rose);">${subject}</h2>
-                <hr>
-                ${content}
-            </body></html>
-        `);
-    });
-
-    // ===== SEND TEST =====
-    document.getElementById('testSendBtn').addEventListener('click', function() {
-        const content = tinymce.get('editor').getContent();
-        const subject = document.getElementById('subject').value;
-        if (!subject || !content) {
-            alert('Please fill in both subject and content before sending a test.');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('subject', subject);
-        formData.append('content', content);
-        formData.append('send_to', 'single');
-        formData.append('single_email', 'angelwrites@zohomail.com');
-        formData.append('send_newsletter', '1');
-
-        fetch('<?php echo SITE_URL; ?>/admin/manage_newsletter.php', {
-            method: 'POST',
-            body: formData
-        }).then(response => response.text()).then(() => {
-            alert('Test email sent to angelwrites@zohomail.com.');
-        }).catch(() => {
-            alert('Failed to send test email.');
-        });
-    });
-
-    // ===== SAVE TEMPLATE =====
-    document.getElementById('saveTemplateBtnAction').addEventListener('click', function() {
-        const name = document.getElementById('template_name').value;
-        const subject = document.getElementById('subject').value;
-        const content = tinymce.get('editor').getContent();
-        if (!name || !subject || !content) {
-            alert('Please fill in template name, subject, and content.');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('template_name', name);
-        formData.append('subject', subject);
-        formData.append('content', content);
-        formData.append('save_template', '1');
-
-        fetch('<?php echo SITE_URL; ?>/admin/manage_newsletter.php', {
-            method: 'POST',
-            body: formData
-        }).then(() => {
-            location.reload();
-        });
-    });
-
-    // ===== LOAD TEMPLATE =====
-    document.getElementById('loadTemplateBtn').addEventListener('click', function() {
-        const templateId = document.getElementById('templateSelect').value;
-        if (!templateId) {
-            alert('Please select a template.');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('load_template', '1');
-        formData.append('template_id', templateId);
-        fetch('<?php echo SITE_URL; ?>/admin/manage_newsletter.php', {
-            method: 'POST',
-            body: formData
-        }).then(() => {
-            location.reload();
-        });
-    });
-
-    // ===== ATTACHMENT PREVIEW =====
-    const fileInput = document.getElementById('attachments');
-    const attachmentPreview = document.getElementById('attachmentPreview');
-
-    fileInput.addEventListener('change', function() {
-        attachmentPreview.innerHTML = '';
-        if (this.files) {
-            Array.from(this.files).forEach(file => {
-                const span = document.createElement('span');
-                span.style.cssText = 'background: var(--vanilla); padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; display: inline-block; border: 1px solid var(--border);';
-                span.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
-                attachmentPreview.appendChild(span);
-            });
-        }
-    });
-
-    // ===== BULK ACTIONS (SUBSCRIBER TABLE) =====
-    const selectAllRows = document.getElementById('selectAllRows');
-    const rowCheckboxes = document.querySelectorAll('.row-select');
-    const executeBulkBtn = document.getElementById('executeBulkAction');
-    const bulkActionSelect = document.getElementById('bulkActionSelect');
-
-    selectAllRows.addEventListener('change', function() {
-        rowCheckboxes.forEach(cb => cb.checked = this.checked);
-        updateBulkButton();
-    });
-
-    rowCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateBulkButton);
-    });
-
-    function updateBulkButton() {
-        const checked = document.querySelectorAll('.row-select:checked').length;
-        executeBulkBtn.disabled = (checked === 0);
-    }
-
-    executeBulkBtn.addEventListener('click', function() {
-        const action = bulkActionSelect.value;
-        const selectedIds = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
-        if (!action || selectedIds.length === 0) {
-            alert('Please select an action and at least one subscriber.');
-            return;
-        }
-        if (!confirm(`Are you sure you want to ${action} ${selectedIds.length} subscriber(s)?`)) return;
-        document.getElementById('bulkActionInput').value = action;
-        document.getElementById('selectedIdsInput').value = selectedIds.join(',');
-        document.getElementById('bulkForm').submit();
-    });
+// Preview
+document.getElementById('previewBtn')?.addEventListener('click', function() {
+    const content = tinymce.get('editor').getContent();
+    const subject = document.getElementById('subject').value;
+    const w = window.open('', 'Preview', 'width=600,height=800');
+    w.document.write(`
+        <html><head><title>Newsletter Preview</title></head>
+        <body style="font-family: Inter, sans-serif; padding:20px; max-width:600px; margin:0 auto;">
+            <h2 style="color: var(--rose);">${subject}</h2>
+            <hr>
+            ${content}
+        </body></html>
+    `);
 });
 </script>
-
-<style>
-    .admin-page { padding: 32px 0 60px; }
-    .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-    .admin-header h1 { font-size: 2rem; margin: 0; }
-    .admin-actions { display: flex; gap: 12px; }
-    .card { margin-bottom: 24px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); }
-    .card-header { background: var(--vanilla); padding: 14px 20px; border-bottom: 1px solid var(--border); }
-    .card-header h2 { font-size: 1.15rem; margin: 0; display: flex; align-items: center; gap: 8px; }
-    .card-body { padding: 20px; }
-
-    .admin-form .form-group { margin-bottom: 16px; }
-    .admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
-    .admin-form input[type="text"], .admin-form input[type="email"], .admin-form textarea, .admin-form select {
-        width: 100%;
-        padding: 12px 16px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font-size: 1rem;
-        background: var(--input-bg);
-        color: var(--text);
-        transition: border-color 0.3s, box-shadow 0.3s;
-    }
-    .admin-form input:focus, .admin-form textarea:focus {
-        outline: none;
-        border-color: var(--rose);
-        box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
-    }
-    .admin-form textarea { resize: vertical; min-height: 120px; }
-    .required { color: #dc2626; }
-    .admin-form .btn-block { width: 100%; justify-content: center; padding: 14px; font-size: 1.05rem; border-radius: 30px; }
-    .admin-form .form-actions { margin-top: 16px; }
-
-    .table-responsive { overflow-x: auto; border-radius: 12px; }
-    .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-    .admin-table thead { background: var(--vanilla); }
-    .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
-    .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
-    .admin-table tbody tr:last-child td { border-bottom: none; }
-    .admin-table td.actions { display: flex; gap: 4px; flex-wrap: wrap; }
-    .admin-table td.actions .btn { padding: 4px 12px; font-size: 0.75rem; border-radius: 20px; }
-
-    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-    .status-badge.active { background: #27ae60; color: #fff; }
-    .status-badge.inactive { background: #95a5a6; color: #fff; }
-    .status-badge.pending { background: #f1c40f; color: #fff; }
-    .status-badge.processing { background: #3498db; color: #fff; }
-    .status-badge.sent { background: #2ecc71; color: #fff; }
-    .status-badge.failed { background: #e74c3c; color: #fff; }
-    .status-badge.cancelled { background: #95a5a6; color: #fff; }
-    .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
-
-    @media (max-width: 768px) {
-        .admin-header { flex-direction: column; align-items: flex-start; }
-        .admin-actions { width: 100%; }
-    }
-</style>
 
 <?php require_once '../includes/footer.php'; ?>
