@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/db.php';
+require_once 'includes/auth.php'; // For isLoggedIn check
 
 // ===== SEARCH & FILTER =====
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -60,7 +61,7 @@ $pageTitle = 'Books';
             <div class="books-grid">
                 <?php foreach ($books as $book): ?>
                     <div class="book-card">
-                        <!-- Book Cover (Centered) -->
+                        <!-- Book Cover -->
                         <div class="book-cover-wrapper">
                             <?php if ($book['cover_path']): ?>
                                 <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
@@ -81,7 +82,7 @@ $pageTitle = 'Books';
                             <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                             <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
 
-                            <!-- Full Description (Justified) with Read More toggle -->
+                            <!-- Description with Read More toggle -->
                             <div class="book-description-wrapper">
                                 <div class="book-description" id="desc-<?php echo $book['id']; ?>">
                                     <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
@@ -91,25 +92,34 @@ $pageTitle = 'Books';
                                 <?php endif; ?>
                             </div>
 
-                            <!-- Bottom: Price & Action -->
-                            <div class="book-bottom">
-                                <div class="book-price">
-                                    <?php if ($book['is_free']): ?>
-                                        <span class="free-text">Free</span>
-                                    <?php elseif ($book['is_sale']): ?>
-                                        <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
-                                    <?php else: ?>
-                                        <span>MWK <?php echo number_format($book['price'], 2); ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
+                            <!-- Bottom: Price & Actions -->
+                            <!-- Bottom: Price & Actions -->
+                        <div class="book-bottom">
+                            <div class="book-price">
+                                <?php if ($book['is_free']): ?>
+                                    <span class="free-text">Free</span>
+                                <?php elseif ($book['is_sale']): ?>
+                                    <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                <?php else: ?>
+                                    <span>MWK <?php echo number_format($book['price'], 2); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="book-actions">
+                                <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
                                     <i class="fas fa-book-open"></i> Read
                                 </a>
+                                
+                                <?php if (isLoggedIn()): ?>
+                                    <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo $book['is_free'] ? '1' : '0'; ?>" data-price="<?php echo $book['price']; ?>">
+                                        <i class="fas fa-download"></i> Download
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+                        </div> <!-- .book-card -->
+                    <?php endforeach; ?>
+            </div> <!-- .books-grid -->
+
         <?php else: ?>
             <div class="empty-state">
                 <i class="fas fa-book" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
@@ -120,8 +130,52 @@ $pageTitle = 'Books';
     </div>
 </div>
 
+<!-- ===== PAYMENT MODAL ===== -->
+<div id="paymentModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closePaymentModal()">&times;</span>
+        <h3><i class="fas fa-lock" style="color: var(--rose);"></i> Complete Your Purchase</h3>
+        <p class="modal-sub">You are about to download <strong id="modalBookTitle"></strong>. Choose your payment method below.</p>
+        
+        <div class="payment-options">
+            <button class="payment-option" data-method="airtel" onclick="selectPayment('airtel')">
+                <i class="fas fa-mobile-alt"></i>
+                <span>Airtel Money</span>
+            </button>
+            <button class="payment-option" data-method="mpamba" onclick="selectPayment('mpamba')">
+                <i class="fas fa-mobile-alt"></i>
+                <span>Mpamba</span>
+            </button>
+            <button class="payment-option" data-method="nbm" onclick="selectPayment('nbm')">
+                <i class="fas fa-university"></i>
+                <span>NBM Mo626</span>
+            </button>
+        </div>
+
+        <div id="paymentForm" style="display:none;">
+            <div class="form-group">
+                <label for="paymentPhone">Phone Number</label>
+                <input type="tel" id="paymentPhone" placeholder="e.g. 0999123456" required>
+            </div>
+            <div class="form-group">
+                <label for="paymentAmount">Amount (MWK)</label>
+                <input type="text" id="paymentAmount" readonly>
+            </div>
+            <div id="paymentStatus" class="payment-status"></div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="payNowBtn" onclick="processPayment()">
+                    <i class="fas fa-credit-card"></i> Pay Now
+                </button>
+                <button class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== READ MORE TOGGLE =====
     const toggleBtns = document.querySelectorAll('.toggle-desc-btn');
     toggleBtns.forEach(btn => {
         btn.addEventListener('click', function() {
@@ -136,61 +190,286 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // ===== DOWNLOAD BUTTON =====
+    const downloadBtns = document.querySelectorAll('.download-btn');
+    downloadBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const bookId = this.dataset.id;
+            const isFree = this.dataset.free === '1';
+            const bookTitle = this.closest('.book-card').querySelector('h3').textContent;
+
+            if (isFree) {
+                // Free book – download directly
+                window.location.href = '<?php echo SITE_URL; ?>/download.php?book_id=' + bookId;
+            } else {
+                // Paid book – open payment modal
+                const price = parseFloat(this.dataset.price);
+                openPaymentModal(bookId, bookTitle, price);
+            }
+        });
+    });
 });
+
+// ===== PAYMENT MODAL FUNCTIONS =====
+let currentBookId = null;
+let selectedMethod = null;
+
+function openPaymentModal(bookId, title, price) {
+    currentBookId = bookId;
+    document.getElementById('modalBookTitle').textContent = title;
+    document.getElementById('paymentAmount').value = 'MWK ' + price.toFixed(2);
+    document.getElementById('paymentForm').style.display = 'none';
+    document.getElementById('paymentStatus').innerHTML = '';
+    document.getElementById('paymentStatus').className = 'payment-status';
+    document.querySelectorAll('.payment-option').forEach(btn => btn.classList.remove('selected'));
+    document.getElementById('paymentModal').style.display = 'flex';
+}
+
+function closePaymentModal() {
+    document.getElementById('paymentModal').style.display = 'none';
+    currentBookId = null;
+    selectedMethod = null;
+}
+
+function selectPayment(method) {
+    selectedMethod = method;
+    document.querySelectorAll('.payment-option').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.method === method);
+    });
+    document.getElementById('paymentForm').style.display = 'block';
+    document.getElementById('paymentStatus').innerHTML = '';
+    document.getElementById('paymentStatus').className = 'payment-status';
+}
+
+function processPayment() {
+    const phone = document.getElementById('paymentPhone').value.trim();
+    if (!phone || phone.length < 10) {
+        document.getElementById('paymentStatus').innerHTML = '<span class="error">Please enter a valid phone number.</span>';
+        return;
+    }
+
+    const statusDiv = document.getElementById('paymentStatus');
+    statusDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Processing payment...</div>';
+    statusDiv.className = 'payment-status';
+
+    // ===== SEND PAYMENT DATA TO SERVER =====
+    const formData = new FormData();
+    formData.append('book_id', currentBookId);
+    formData.append('payment_method', selectedMethod);
+    formData.append('phone_number', phone);
+    formData.append('amount', document.getElementById('paymentAmount').value.replace('MWK ', ''));
+
+    fetch('<?php echo SITE_URL; ?>/process_payment.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<span class="success"><i class="fas fa-check-circle"></i> Payment successful! Preparing your download...</span>';
+            statusDiv.className = 'payment-status success';
+
+            setTimeout(() => {
+                window.location.href = '<?php echo SITE_URL; ?>/download.php?book_id=' + currentBookId;
+                closePaymentModal();
+            }, 1000);
+        } else {
+            statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> ' + data.error + '</span>';
+            statusDiv.className = 'payment-status error';
+        }
+    })
+    .catch(error => {
+        statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> Payment failed. Please try again.</span>';
+        statusDiv.className = 'payment-status error';
+    });
+}
 </script>
 
 <style>
-.books-page { padding: 32px 0 60px; }
-.books-header { text-align: center; margin-bottom: 32px; }
-.books-header h1 { font-size: 2.4rem; margin-bottom: 4px; }
-.books-header p { color: var(--text-light); font-size: 1.1rem; }
-
-.books-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 24px; }
-.search-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1; }
-.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.search-form select { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
-.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
-.book-count { font-size: 0.9rem; color: var(--text-light); }
-
-.books-grid { display: grid; grid-template-columns: 1fr; gap: 40px; max-width: 600px; margin: 0 auto; justify-content: center; }
-@media (min-width: 768px) {
-    .books-grid { grid-template-columns: repeat(auto-fill, minmax(500px, 1fr)); max-width: 1000px; }
+/* ===== DOWNLOAD BUTTON ===== */
+.book-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.book-actions .btn {
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 0.95rem;
+}
+.book-actions .btn-secondary {
+    background: var(--card-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+.book-actions .btn-secondary:hover {
+    border-color: var(--rose);
+    color: var(--rose);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
 }
 
-.book-card { background: var(--card-bg); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid var(--border); transition: transform 0.3s ease, box-shadow 0.3s ease; display: flex; flex-direction: column; }
-.book-card:hover { transform: translateY(-6px); box-shadow: 0 12px 40px rgba(0,0,0,0.10); }
+/* ===== MODAL ===== */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: var(--shadow-hover);
+    position: relative;
+    animation: modalSlideIn 0.3s ease;
+}
+@keyframes modalSlideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: color 0.2s;
+}
+.modal-close:hover {
+    color: var(--rose);
+}
+.modal-content h3 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+.modal-sub {
+    color: var(--text-light);
+    margin-bottom: 20px;
+}
 
-.book-cover-wrapper { position: relative; width: 100%; height: 380px; overflow: hidden; background: var(--vanilla); display: flex; align-items: center; justify-content: center; }
-.book-cover-wrapper img { width: auto; height: 100%; object-fit: cover; display: block; max-width: 100%; }
-.placeholder-cover { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 4rem; color: var(--rose); background: var(--vanilla); }
+/* ===== PAYMENT OPTIONS ===== */
+.payment-options {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.payment-option {
+    flex: 1;
+    min-width: 100px;
+    padding: 14px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+}
+.payment-option i {
+    font-size: 1.4rem;
+    color: var(--text-light);
+}
+.payment-option:hover {
+    border-color: var(--rose);
+    transform: translateY(-2px);
+}
+.payment-option.selected {
+    border-color: var(--rose);
+    background: rgba(219, 161, 162, 0.1);
+}
+.payment-option.selected i {
+    color: var(--rose);
+}
 
-.badge { position: absolute; top: 16px; right: 16px; padding: 4px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; }
-.badge.free { background: #27ae60; }
-.badge.sale { background: #e74c3c; }
+/* ===== PAYMENT FORM ===== */
+#paymentForm .form-group {
+    margin-bottom: 12px;
+}
+#paymentForm label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+#paymentForm input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--input-bg);
+    color: var(--text);
+}
+#paymentForm input:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+#paymentForm input[readonly] {
+    background: var(--vanilla);
+    cursor: not-allowed;
+}
 
-.book-details { padding: 28px; flex: 1; display: flex; flex-direction: column; }
-.book-details h3 { font-size: 1.6rem; margin: 0 0 4px 0; text-align: center; font-family: 'Playfair Display', serif; color: var(--text); }
-.book-author { text-align: center; color: var(--text-light); font-size: 1rem; margin-bottom: 16px; }
+.payment-status {
+    margin: 12px 0;
+    text-align: center;
+    font-weight: 500;
+}
+.payment-status .loading {
+    color: var(--text-light);
+}
+.payment-status .success {
+    color: #2ecc71;
+}
+.payment-status .error {
+    color: #e74c3c;
+}
+.payment-status i {
+    margin-right: 6px;
+}
 
-.book-description-wrapper { flex: 1; }
-.book-description { font-size: 1rem; line-height: 1.8; color: var(--text); text-align: justify; margin-bottom: 12px; max-height: 200px; overflow: hidden; transition: max-height 0.5s ease; }
-.book-description.expanded { max-height: none; }
-.toggle-desc-btn { background: none; border: none; color: var(--rose); font-size: 0.9rem; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 12px; }
-.toggle-desc-btn:hover { text-decoration: underline; }
+.modal-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.modal-actions .btn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 30px;
+    font-weight: 600;
+}
 
-.book-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
-.book-price { font-weight: 700; font-size: 1.1rem; color: var(--text); }
-.free-text { color: #27ae60; }
-.sale-text { color: #e74c3c; }
-.book-bottom .btn { padding: 10px 28px; border-radius: 30px; font-size: 0.95rem; }
-
-.empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-light); }
-.empty-state i { display: block; margin-bottom: 16px; }
-.empty-state h3 { font-size: 1.4rem; margin-bottom: 4px; }
-
+/* ===== RESPONSIVE ===== */
 @media (max-width: 480px) {
-    .books-grid { max-width: 100%; }
+    .payment-options {
+        flex-direction: column;
+    }
+    .payment-option {
+        flex-direction: row;
+        justify-content: center;
+        padding: 10px;
+    }
 }
 </style>
 

@@ -177,7 +177,7 @@ if ($isLoggedIn) {
             background: rgba(219, 161, 162, 0.1);
         }
 
-        /* ===== HAMBURGER ===== */
+        /* ===== HAMBURGER – ALWAYS VISIBLE & ROSE ===== */
         .hamburger {
             display: flex !important;
             flex-direction: column;
@@ -194,8 +194,14 @@ if ($isLoggedIn) {
             display: block;
             width: 100%;
             height: 2px;
-            background: var(--text);
+            background: var(--rose); /* Brand colour – always visible */
+            border-radius: 2px;
             transition: all 0.3s ease;
+        }
+        /* In dark mode, add a subtle glow to ensure it pops */
+        body.dark-mode .hamburger span,
+        [data-theme="dark"] .hamburger span {
+            box-shadow: 0 0 8px rgba(192, 57, 43, 0.4);
         }
         .hamburger.active span:nth-child(1) {
             transform: rotate(45deg) translate(6px, 6px);
@@ -499,8 +505,8 @@ if ($isLoggedIn) {
                         </form>
                     </div>
 
-                    <!-- ===== BIBLE READER ===== -->
-                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
+                    <!-- ===== BIBLE READER – TOGGLE ON SAME PAGE ===== -->
+                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader" onclick="handleBibleReaderToggle(event)">
                         <i class="fas fa-book-bible"></i>
                     </a>
 
@@ -550,8 +556,8 @@ if ($isLoggedIn) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- ===== HAMBURGER (Visible on ALL screens) ===== -->
-                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false" onclick="toggleMobileMenu()">
+                    <!-- ===== HAMBURGER (Always visible – works on every page) ===== -->
+                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false">
                         <span></span>
                         <span></span>
                         <span></span>
@@ -586,147 +592,216 @@ if ($isLoggedIn) {
         <?php endif; ?>
     </main>
 
-    <!-- ===== JAVASCRIPT ===== -->
+    <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // ===== SCROLL SHADOW =====
-        const header = document.getElementById('siteHeader');
-        window.addEventListener('scroll', function() {
-            if (window.scrollY > 10) {
-                header.classList.add('scrolled');
-            } else {
-                header.classList.remove('scrolled');
+    (function() {
+        'use strict';
+
+        // ===== DOM READY =====
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // ===== SCROLL SHADOW =====
+            const header = document.getElementById('siteHeader');
+            if (header) {
+                window.addEventListener('scroll', function() {
+                    if (window.scrollY > 10) {
+                        header.classList.add('scrolled');
+                    } else {
+                        header.classList.remove('scrolled');
+                    }
+                });
             }
-        });
 
-        // ===== THEME TOGGLE =====
-        const themeToggle = document.getElementById('themeToggle');
-        const html = document.documentElement;
-        const themes = ['light', 'dark', 'system'];
-        let currentThemeIndex = 0;
+            // ===== THEME TOGGLE =====
+            const themeToggle = document.getElementById('themeToggle');
+            const html = document.documentElement;
+            const themes = ['light', 'dark', 'system'];
+            let currentThemeIndex = 0;
 
-        const storedTheme = localStorage.getItem('angelwrites_theme');
-        if (storedTheme && themes.includes(storedTheme)) {
-            currentThemeIndex = themes.indexOf(storedTheme);
-        }
-
-        function applyTheme(theme) {
-            if (theme === 'system') {
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-            } else {
-                html.setAttribute('data-theme', theme);
+            const storedTheme = localStorage.getItem('angelwrites_theme');
+            if (storedTheme && themes.includes(storedTheme)) {
+                currentThemeIndex = themes.indexOf(storedTheme);
             }
-            document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-            updateIcon(theme);
-            localStorage.setItem('angelwrites_theme', theme);
-        }
 
-        function updateIcon(theme) {
-            const icon = themeToggle.querySelector('i');
-            if (theme === 'dark') {
-                icon.className = 'fas fa-sun';
-            } else if (theme === 'light') {
-                icon.className = 'fas fa-moon';
-            } else {
-                icon.className = 'fas fa-circle-half-stroke';
+            function applyTheme(theme) {
+                if (theme === 'system') {
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+                } else {
+                    html.setAttribute('data-theme', theme);
+                }
+                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+                updateIcon(theme);
+                localStorage.setItem('angelwrites_theme', theme);
             }
-        }
 
-        applyTheme(themes[currentThemeIndex]);
-
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-            if (localStorage.getItem('angelwrites_theme') === 'system') {
-                html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+            function updateIcon(theme) {
+                if (themeToggle) {
+                    const icon = themeToggle.querySelector('i');
+                    if (theme === 'dark') {
+                        icon.className = 'fas fa-sun';
+                    } else if (theme === 'light') {
+                        icon.className = 'fas fa-moon';
+                    } else {
+                        icon.className = 'fas fa-circle-half-stroke';
+                    }
+                }
             }
-        });
 
-        themeToggle.addEventListener('click', function() {
-            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
             applyTheme(themes[currentThemeIndex]);
-        });
 
-        // ===== SEARCH DROPDOWN =====
-        document.querySelector('.search-trigger').addEventListener('click', function() {
-            const dropdown = document.getElementById('searchDropdown');
-            const input = document.getElementById('searchInput');
-            dropdown.classList.toggle('open');
-            if (dropdown.classList.contains('open')) {
-                input.focus();
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+                    applyTheme(themes[currentThemeIndex]);
+                });
             }
-        });
 
-        document.addEventListener('click', function(e) {
-            const wrapper = document.querySelector('.search-wrapper');
-            const dropdown = document.getElementById('searchDropdown');
-            if (wrapper && dropdown && !wrapper.contains(e.target)) {
-                dropdown.classList.remove('open');
-            }
-        });
-
-        // ===== NOTIFICATIONS DROPDOWN =====
-        document.querySelector('.notification-wrapper .nav-action-icon').addEventListener('click', function() {
-            const dropdown = document.getElementById('notificationDropdown');
-            dropdown.classList.toggle('open');
-        });
-
-        document.addEventListener('click', function(e) {
-            const wrapper = document.querySelector('.notification-wrapper');
-            const dropdown = document.getElementById('notificationDropdown');
-            if (wrapper && dropdown && !wrapper.contains(e.target)) {
-                dropdown.classList.remove('open');
-            }
-        });
-
-        // ===== USER DROPDOWN =====
-        document.querySelector('.user-wrapper').addEventListener('click', function() {
-            const dropdown = document.getElementById('userDropdown');
-            dropdown.classList.toggle('open');
-        });
-
-        document.addEventListener('click', function(e) {
-            const wrapper = document.querySelector('.user-wrapper');
-            const dropdown = document.getElementById('userDropdown');
-            if (wrapper && dropdown && !wrapper.contains(e.target)) {
-                dropdown.classList.remove('open');
-            }
-        });
-
-        // ===== MOBILE MENU (Works on all screens) =====
-        const navLinks = document.getElementById('navLinks');
-        const overlay = document.getElementById('menuOverlay');
-        const hamburger = document.getElementById('hamburger');
-        const body = document.body;
-
-        window.toggleMobileMenu = function() {
-            const isOpen = navLinks.classList.contains('open');
-
-            if (isOpen) {
-                closeMobileMenu();
-            } else {
-                navLinks.classList.add('open');
-                overlay.classList.add('open');
-                hamburger.classList.add('active');
-                hamburger.setAttribute('aria-expanded', 'true');
-                body.style.overflow = 'hidden';
-            }
-        };
-
-        window.closeMobileMenu = function() {
-            navLinks.classList.remove('open');
-            overlay.classList.remove('open');
-            hamburger.classList.remove('active');
-            hamburger.setAttribute('aria-expanded', 'false');
-            body.style.overflow = '';
-        };
-
-        // Close menu on link click (for single-page navigation)
-        navLinks.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', function() {
-                closeMobileMenu();
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (localStorage.getItem('angelwrites_theme') === 'system') {
+                    html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+                }
             });
-        });
-    });
+
+            // ===== SEARCH DROPDOWN =====
+            const searchTrigger = document.querySelector('.search-trigger');
+            const searchDropdown = document.getElementById('searchDropdown');
+            const searchInput = document.getElementById('searchInput');
+
+            if (searchTrigger && searchDropdown) {
+                searchTrigger.addEventListener('click', function() {
+                    searchDropdown.classList.toggle('open');
+                    if (searchDropdown.classList.contains('open') && searchInput) {
+                        searchInput.focus();
+                    }
+                });
+
+                document.addEventListener('click', function(e) {
+                    const wrapper = document.querySelector('.search-wrapper');
+                    if (wrapper && !wrapper.contains(e.target)) {
+                        searchDropdown.classList.remove('open');
+                    }
+                });
+            }
+
+            // ===== NOTIFICATIONS DROPDOWN =====
+            const notifTrigger = document.querySelector('.notification-wrapper .nav-action-icon');
+            const notifDropdown = document.getElementById('notificationDropdown');
+
+            if (notifTrigger && notifDropdown) {
+                notifTrigger.addEventListener('click', function() {
+                    notifDropdown.classList.toggle('open');
+                });
+
+                document.addEventListener('click', function(e) {
+                    const wrapper = document.querySelector('.notification-wrapper');
+                    if (wrapper && !wrapper.contains(e.target)) {
+                        notifDropdown.classList.remove('open');
+                    }
+                });
+            }
+
+            // ===== USER DROPDOWN =====
+            const userWrapper = document.querySelector('.user-wrapper');
+            const userDropdown = document.getElementById('userDropdown');
+
+            if (userWrapper && userDropdown) {
+                userWrapper.addEventListener('click', function() {
+                    userDropdown.classList.toggle('open');
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (userWrapper && !userWrapper.contains(e.target)) {
+                        userDropdown.classList.remove('open');
+                    }
+                });
+            }
+
+            // ===== HAMBURGER MENU – Works on every page =====
+            const hamburger = document.getElementById('hamburger');
+            const navLinks = document.getElementById('navLinks');
+            const overlay = document.getElementById('menuOverlay');
+            const body = document.body;
+
+            // Expose functions globally so inline onclick works
+            window.toggleMobileMenu = function() {
+                if (!navLinks || !hamburger) return;
+                const isOpen = navLinks.classList.contains('open');
+
+                if (isOpen) {
+                    closeMobileMenu();
+                } else {
+                    navLinks.classList.add('open');
+                    overlay.classList.add('open');
+                    hamburger.classList.add('active');
+                    hamburger.setAttribute('aria-expanded', 'true');
+                    body.style.overflow = 'hidden';
+                }
+            };
+
+            window.closeMobileMenu = function() {
+                if (!navLinks || !hamburger) return;
+                navLinks.classList.remove('open');
+                overlay.classList.remove('open');
+                hamburger.classList.remove('active');
+                hamburger.setAttribute('aria-expanded', 'false');
+                body.style.overflow = '';
+            };
+
+            // Attach click event to hamburger (if not using onclick attribute)
+            if (hamburger) {
+                hamburger.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    window.toggleMobileMenu();
+                });
+            }
+
+            // Close menu on overlay click
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    window.closeMobileMenu();
+                });
+            }
+
+            // Close menu on any nav link click
+            if (navLinks) {
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        window.closeMobileMenu();
+                    });
+                });
+            }
+
+            // Close menu on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    window.closeMobileMenu();
+                }
+            });
+
+            // ===== BIBLE READER TOGGLE (when on bible_reader.php) =====
+            window.handleBibleReaderToggle = function(event) {
+                const readerPage = '/bible_reader.php';
+                const currentPath = window.location.pathname;
+
+                if (currentPath.endsWith(readerPage) || currentPath.includes(readerPage)) {
+                    event.preventDefault();
+                    const readerContent = document.getElementById('bibleReaderContent');
+                    if (readerContent) {
+                        const isHidden = readerContent.style.display === 'none' || readerContent.style.display === '';
+                        readerContent.style.display = isHidden ? 'block' : 'none';
+                        readerContent.classList.toggle('visible');
+                    }
+                }
+                // Otherwise let the link navigate normally
+            };
+
+            // ===== DYNAMIC BACK BUTTON (already in PHP) =====
+            // No extra JS needed – it's handled by the PHP conditional in the header.
+
+        }); // end DOMContentLoaded
+    })();
     </script>
 </body>
 </html>

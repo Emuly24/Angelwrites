@@ -125,12 +125,7 @@ $pageTitle = htmlspecialchars($book['title']);
 
 <div class="book-page">
     <div class="container">
-        <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
-
-        <!-- ===== READING PROGRESS BAR ===== -->
+                <!-- ===== READING PROGRESS BAR ===== -->
         <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
 
         <!-- Back Link -->
@@ -185,7 +180,7 @@ $pageTitle = htmlspecialchars($book['title']);
 
                     <div class="action-buttons">
                         <?php if ($has_processed): ?>
-                            <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
+                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
                         <?php else: ?>
@@ -372,22 +367,7 @@ $pageTitle = htmlspecialchars($book['title']);
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== THEME TOGGLE =====
-    const themeToggle = document.getElementById('themeToggle');
-    const currentTheme = localStorage.getItem('bookTheme') || 'light';
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-    }
-
-    window.toggleTheme = function() {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('bookTheme', isDark ? 'dark' : 'light');
-        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-    };
-
-    // ===== READING PROGRESS BAR =====
+       // ===== READING PROGRESS BAR =====
     window.addEventListener('scroll', function() {
         const scrollTop = window.scrollY;
         const docHeight = document.documentElement.scrollHeight - window.innerHeight;

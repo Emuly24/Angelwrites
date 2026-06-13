@@ -186,12 +186,22 @@ $pageTitle = 'My Dashboard';
         <!-- ===== HERO / WELCOME SECTION ===== -->
         <div class="dashboard-hero">
             <div class="hero-content">
-                <h1>Welcome back, <?php echo htmlspecialchars($user['name']); ?>!</h1>
+                <h1>Welcome back, <span class="rose-text"><?php echo htmlspecialchars($user['name']); ?></span>!</h1>
                 <p class="hero-sub">Your personal reading journey — curated just for you.</p>
                 <div class="hero-stats">
-                    <span class="hero-stat"><i class="fas fa-fire"></i> <?php echo $current_streak; ?> day streak</span>
-                    <span class="hero-stat"><i class="fas fa-clock"></i> <?php echo $total_hours; ?>h <?php echo $total_minutes; ?>m read</span>
-                    <span class="hero-stat"><i class="fas fa-trophy"></i> Level <?php echo $rep_level; ?></span>
+                    <div class="hero-stat">
+                        <i class="fas fa-fire"></i>
+                        <strong><?php echo $current_streak; ?> day streak</strong>
+                    </div>
+                    <div class="hero-stat">
+                        <i class="fas fa-clock"></i>
+                        <strong><?php echo $total_hours; ?>h <?php echo $total_minutes; ?>m</strong> read
+                    </div>
+                    <div class="hero-stat">
+                        <i class="fas fa-trophy"></i>
+                        <strong>Level <?php echo $rep_level; ?></strong>
+                        <span class="hero-stat-points">(<?php echo $rep_points; ?> pts)</span>
+                    </div>
                 </div>
             </div>
             <div class="hero-profile">
@@ -221,32 +231,32 @@ $pageTitle = 'My Dashboard';
 
         <!-- ===== STATS ROW ===== -->
         <div class="stats-row">
-            <div class="stat-card">
+            <div class="stat-card stat-reading">
                 <div class="stat-icon"><i class="fas fa-book"></i></div>
                 <div class="stat-number"><?php echo $books_reading; ?></div>
                 <div class="stat-label">Reading</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card stat-finished">
                 <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
                 <div class="stat-number"><?php echo $books_finished; ?></div>
                 <div class="stat-label">Finished</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card stat-poems">
                 <div class="stat-icon"><i class="fas fa-feather-alt"></i></div>
                 <div class="stat-number"><?php echo $poems_read; ?></div>
-                <div class="stat-label">Poems</div>
+                <div class="stat-label">Poems Read</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card stat-videos">
                 <div class="stat-icon"><i class="fas fa-video"></i></div>
                 <div class="stat-number"><?php echo $videos_watched; ?></div>
-                <div class="stat-label">Videos</div>
+                <div class="stat-label">Videos Watched</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card stat-questions">
                 <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
                 <div class="stat-number"><?php echo $questions_asked; ?></div>
                 <div class="stat-label">Questions</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card stat-sessions">
                 <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
                 <div class="stat-number"><?php echo $sessions_booked; ?></div>
                 <div class="stat-label">Sessions</div>
@@ -259,7 +269,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== CURRENTLY READING ===== -->
                 <section class="dashboard-section" id="currently-reading">
                     <div class="section-header">
-                        <h2><i class="fas fa-book-open" style="color: var(--rose);"></i> Currently Reading</h2>
+                        <h2><i class="fas fa-book-open section-icon"></i> Currently Reading</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">Browse Books</a>
                         </div>
@@ -280,7 +290,7 @@ $pageTitle = 'My Dashboard';
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                                         <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                         <div class="book-actions">
-                                            <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Continue</a>
+                                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Continue</a>
                                             <form method="POST" action="<?php echo SITE_URL; ?>/library.php" style="display:inline;">
                                                 <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
                                                 <input type="hidden" name="status" value="finished">
@@ -303,7 +313,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== RECENTLY FINISHED ===== -->
                 <section class="dashboard-section" id="recently-finished">
                     <div class="section-header">
-                        <h2><i class="fas fa-check-circle" style="color: var(--rose);"></i> Recently Finished</h2>
+                        <h2><i class="fas fa-check-circle section-icon"></i> Recently Finished</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">More Books</a>
                         </div>
@@ -324,7 +334,7 @@ $pageTitle = 'My Dashboard';
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                                         <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                         <div class="book-actions">
-                                            <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">Re-read</a>
+                                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">Re-read</a>
                                             <a href="<?php echo SITE_URL; ?>/book_review.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary">Review</a>
                                         </div>
                                     </div>
@@ -342,7 +352,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== RECENT POEMS ===== -->
                 <section class="dashboard-section" id="recent-poems">
                     <div class="section-header">
-                        <h2><i class="fas fa-feather-alt" style="color: var(--rose);"></i> Recent Poems</h2>
+                        <h2><i class="fas fa-feather-alt section-icon"></i> Recent Poems</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-sm btn-outline">More Poetry</a>
                         </div>
@@ -384,7 +394,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== RECENT VIDEOS ===== -->
                 <section class="dashboard-section" id="recent-videos">
                     <div class="section-header">
-                        <h2><i class="fas fa-video" style="color: var(--rose);"></i> Recent Videos</h2>
+                        <h2><i class="fas fa-video section-icon"></i> Recent Videos</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/videos.php" class="btn btn-sm btn-outline">More Videos</a>
                         </div>
@@ -397,7 +407,7 @@ $pageTitle = 'My Dashboard';
                                         <?php if ($video['thumbnail']): ?>
                                             <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
                                         <?php else: ?>
-                                            <div class="placeholder-cover"><i class="fas fa-video"></i></div>
+                                            <div class="video-thumb-placeholder"><i class="fas fa-video"></i></div>
                                         <?php endif; ?>
                                         <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
                                     </div>
@@ -419,7 +429,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== RECENT BLOG POSTS ===== -->
                 <section class="dashboard-section" id="recent-blog">
                     <div class="section-header">
-                        <h2><i class="fas fa-blog" style="color: var(--rose);"></i> Recent Blog Posts</h2>
+                        <h2><i class="fas fa-blog section-icon"></i> Recent Blog Posts</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/blog.php" class="btn btn-sm btn-outline">More Blog</a>
                         </div>
@@ -454,7 +464,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== RECENT REFLECTIONS ===== -->
                 <section class="dashboard-section" id="recent-reflections">
                     <div class="section-header">
-                        <h2><i class="fas fa-pray" style="color: var(--rose);"></i> Recent Reflections</h2>
+                        <h2><i class="fas fa-pray section-icon"></i> Recent Reflections</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/reflections.php" class="btn btn-sm btn-outline">More Reflections</a>
                         </div>
@@ -467,7 +477,7 @@ $pageTitle = 'My Dashboard';
                                         <?php if ($reflection['image_path']): ?>
                                             <img src="<?php echo SITE_URL . '/' . $reflection['image_path']; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>">
                                         <?php else: ?>
-                                            <div class="placeholder-cover"><i class="fas fa-pray"></i></div>
+                                            <div class="reflection-thumb-placeholder"><i class="fas fa-pray"></i></div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="reflection-body">
@@ -488,7 +498,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== UPCOMING SESSIONS ===== -->
                 <section class="dashboard-section" id="upcoming-sessions">
                     <div class="section-header">
-                        <h2><i class="fas fa-calendar-check" style="color: var(--rose);"></i> Upcoming Sessions</h2>
+                        <h2><i class="fas fa-calendar-check section-icon"></i> Upcoming Sessions</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/book_session.php" class="btn btn-sm btn-primary">Book Session</a>
                         </div>
@@ -523,7 +533,7 @@ $pageTitle = 'My Dashboard';
                 <!-- ===== RECENT QUESTIONS ===== -->
                 <section class="dashboard-section" id="recent-questions">
                     <div class="section-header">
-                        <h2><i class="fas fa-question-circle" style="color: var(--rose);"></i> Recent Questions</h2>
+                        <h2><i class="fas fa-question-circle section-icon"></i> Recent Questions</h2>
                         <div class="section-actions">
                             <a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-sm btn-primary">Ask a Question</a>
                         </div>
@@ -664,11 +674,14 @@ $pageTitle = 'My Dashboard';
 
 <style>
 /* ===== DASHBOARD PAGE ===== */
-.dashboard-page { padding: 32px 0 60px; }
+.dashboard-page {
+    padding: 32px 0 60px;
+    font-family: 'Inter', sans-serif;
+}
 
 /* ===== HERO SECTION ===== */
 .dashboard-hero {
-    background: linear-gradient(135deg, var(--vanilla), var(--fantasy));
+    background: linear-gradient(135deg, var(--vanilla), #fdf5e6, var(--fantasy));
     border-radius: 20px;
     padding: 40px;
     margin-bottom: 32px;
@@ -678,18 +691,40 @@ $pageTitle = 'My Dashboard';
     flex-wrap: wrap;
     gap: 24px;
     border: 1px solid var(--rose-light);
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    background: rgba(192, 57, 43, 0.05);
+    border-radius: 50%;
+    pointer-events: none;
 }
 
 .hero-content {
     flex: 1;
     min-width: 250px;
+    position: relative;
+    z-index: 1;
 }
 
 .hero-content h1 {
-    font-size: 2.2rem;
+    font-size: 2.4rem;
     margin: 0 0 8px 0;
     color: var(--text);
     line-height: 1.2;
+    font-weight: 700;
+}
+
+.hero-content h1 .rose-text {
+    color: var(--rose);
 }
 
 .hero-content .hero-sub {
@@ -701,7 +736,7 @@ $pageTitle = 'My Dashboard';
 
 .hero-stats {
     display: flex;
-    gap: 20px;
+    gap: 16px;
     flex-wrap: wrap;
 }
 
@@ -712,13 +747,30 @@ $pageTitle = 'My Dashboard';
     font-size: 0.9rem;
     color: var(--text-light);
     background: var(--card-bg);
-    padding: 4px 14px;
+    padding: 6px 16px;
     border-radius: 20px;
     border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+}
+
+.hero-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
 }
 
 .hero-stat i {
     color: var(--rose);
+}
+
+.hero-stat strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.hero-stat-points {
+    font-size: 0.85rem;
+    color: var(--text-light);
 }
 
 .hero-profile {
@@ -726,6 +778,8 @@ $pageTitle = 'My Dashboard';
     align-items: center;
     gap: 16px;
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
 
 .profile-pic-large {
@@ -739,6 +793,7 @@ $pageTitle = 'My Dashboard';
     justify-content: center;
     border: 3px solid var(--rose-light);
     flex-shrink: 0;
+    box-shadow: var(--shadow);
 }
 
 .profile-pic-large img {
@@ -756,6 +811,7 @@ $pageTitle = 'My Dashboard';
     font-size: 1.2rem;
     margin: 0 0 2px 0;
     font-weight: 700;
+    color: var(--text);
 }
 
 .profile-details .user-email {
@@ -797,12 +853,24 @@ $pageTitle = 'My Dashboard';
 
 .stat-card {
     background: var(--card-bg);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 16px;
     text-align: center;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: 16px 16px 0 0;
 }
 
 .stat-card:hover {
@@ -812,8 +880,8 @@ $pageTitle = 'My Dashboard';
 
 .stat-icon {
     font-size: 2rem;
-    color: var(--rose);
     margin-bottom: 4px;
+    display: block;
 }
 
 .stat-number {
@@ -828,7 +896,27 @@ $pageTitle = 'My Dashboard';
     color: var(--text-light);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-weight: 600;
 }
+
+/* ===== STAT CARD VARIANTS ===== */
+.stat-reading::before { background: #3498db; }
+.stat-reading .stat-icon { color: #3498db; }
+
+.stat-finished::before { background: #2ecc71; }
+.stat-finished .stat-icon { color: #2ecc71; }
+
+.stat-poems::before { background: #9b59b6; }
+.stat-poems .stat-icon { color: #9b59b6; }
+
+.stat-videos::before { background: #ff9f40; }
+.stat-videos .stat-icon { color: #ff9f40; }
+
+.stat-questions::before { background: #e74c3c; }
+.stat-questions .stat-icon { color: #e74c3c; }
+
+.stat-sessions::before { background: #f39c12; }
+.stat-sessions .stat-icon { color: #f39c12; }
 
 /* ===== GRID LAYOUT ===== */
 .dashboard-grid {
@@ -850,6 +938,11 @@ $pageTitle = 'My Dashboard';
     padding: 24px;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+}
+
+.dashboard-section:hover {
+    box-shadow: var(--shadow-hover);
 }
 
 .section-header {
@@ -862,17 +955,30 @@ $pageTitle = 'My Dashboard';
 }
 
 .section-header h2 {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     margin: 0;
     display: flex;
     align-items: center;
     gap: 8px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.section-header h2 .section-icon {
+    color: var(--rose);
 }
 
 .section-actions {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+.section-actions .btn {
+    padding: 6px 16px;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    font-weight: 600;
 }
 
 /* ===== BOOK CARDS ===== */
@@ -887,7 +993,7 @@ $pageTitle = 'My Dashboard';
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .book-card:hover {
@@ -896,12 +1002,12 @@ $pageTitle = 'My Dashboard';
 }
 
 .book-card.finished {
-    opacity: 0.8;
+    opacity: 0.85;
 }
 
 .book-cover-wrapper {
     position: relative;
-    height: 180px;
+    height: 200px;
     background: var(--vanilla);
     overflow: hidden;
 }
@@ -924,41 +1030,44 @@ $pageTitle = 'My Dashboard';
 
 .progress-badge {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    padding: 2px 10px;
+    top: 10px;
+    right: 10px;
+    padding: 2px 12px;
     border-radius: 12px;
     font-size: 0.7rem;
     font-weight: 700;
     background: var(--rose);
     color: white;
+    box-shadow: 0 2px 8px rgba(192, 57, 43, 0.3);
 }
 
 .finished-badge {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 10px;
+    right: 10px;
     font-size: 1.5rem;
 }
 
 .book-info {
-    padding: 12px;
+    padding: 14px;
 }
 
 .book-info h3 {
     font-size: 0.95rem;
     margin: 0 0 4px;
+    color: var(--text);
+    font-weight: 600;
 }
 
 .book-author {
     font-size: 0.8rem;
     color: var(--text-light);
-    margin: 0 0 8px;
+    margin: 0 0 10px;
 }
 
 .book-actions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
@@ -966,6 +1075,7 @@ $pageTitle = 'My Dashboard';
     padding: 4px 12px;
     font-size: 0.75rem;
     flex: 1;
+    border-radius: 8px;
 }
 
 /* ===== POEM CARDS ===== */
@@ -980,6 +1090,12 @@ $pageTitle = 'My Dashboard';
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.poem-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
 }
 
 .poem-thumbnail {
@@ -1011,6 +1127,8 @@ $pageTitle = 'My Dashboard';
 .poem-body h3 {
     font-size: 0.95rem;
     margin: 0 0 4px;
+    color: var(--text);
+    font-weight: 600;
 }
 
 .poem-intro {
@@ -1028,6 +1146,8 @@ $pageTitle = 'My Dashboard';
 .poem-actions .btn {
     padding: 4px 12px;
     font-size: 0.75rem;
+    flex: 1;
+    border-radius: 8px;
 }
 
 /* ===== VIDEO CARDS ===== */
@@ -1042,6 +1162,12 @@ $pageTitle = 'My Dashboard';
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.video-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
 }
 
 .video-thumb {
@@ -1057,7 +1183,7 @@ $pageTitle = 'My Dashboard';
     object-fit: cover;
 }
 
-.video-thumb .placeholder-cover {
+.video-thumb-placeholder {
     width: 100%;
     height: 100%;
     display: flex;
@@ -1076,11 +1202,11 @@ $pageTitle = 'My Dashboard';
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.25);
     color: white;
     font-size: 2.5rem;
     opacity: 0.7;
-    transition: opacity 0.2s;
+    transition: opacity 0.3s ease;
 }
 
 .video-thumb:hover .play-overlay {
@@ -1094,41 +1220,56 @@ $pageTitle = 'My Dashboard';
 .video-info h3 {
     font-size: 0.95rem;
     margin: 0 0 8px;
+    color: var(--text);
+    font-weight: 600;
 }
 
 .video-info .btn {
     width: 100%;
     padding: 4px;
     font-size: 0.75rem;
+    border-radius: 8px;
 }
 
 /* ===== BLOG & REFLECTION CARDS ===== */
-.blog-grid, .reflection-grid {
+.blog-grid,
+.reflection-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
 }
 
-.blog-card, .reflection-card {
+.blog-card,
+.reflection-card {
     background: var(--bg);
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
+    transition: all 0.2s ease;
 }
 
-.blog-thumbnail, .reflection-thumb {
+.blog-card:hover,
+.reflection-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.blog-thumbnail,
+.reflection-thumb {
     height: 120px;
     background: var(--vanilla);
     overflow: hidden;
 }
 
-.blog-thumbnail img, .reflection-thumb img {
+.blog-thumbnail img,
+.reflection-thumb img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.blog-thumbnail-placeholder, .reflection-thumb .placeholder-cover {
+.blog-thumbnail-placeholder,
+.reflection-thumb-placeholder {
     width: 100%;
     height: 100%;
     display: flex;
@@ -1138,13 +1279,17 @@ $pageTitle = 'My Dashboard';
     color: var(--rose);
 }
 
-.blog-body, .reflection-body {
+.blog-body,
+.reflection-body {
     padding: 12px;
 }
 
-.blog-body h3, .reflection-body h3 {
+.blog-body h3,
+.reflection-body h3 {
     font-size: 0.95rem;
     margin: 0 0 4px;
+    color: var(--text);
+    font-weight: 600;
 }
 
 .blog-excerpt {
@@ -1153,24 +1298,35 @@ $pageTitle = 'My Dashboard';
     margin: 0 0 8px;
 }
 
-.blog-body .btn, .reflection-body .btn {
+.blog-body .btn,
+.reflection-body .btn {
     width: 100%;
     padding: 4px;
     font-size: 0.75rem;
+    border-radius: 8px;
 }
 
 /* ===== SESSION & QA LISTS ===== */
-.session-list, .qa-list {
+.session-list,
+.qa-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.session-item, .qa-item {
+.session-item,
+.qa-item {
     background: var(--bg);
-    padding: 12px;
-    border-radius: 8px;
+    padding: 14px;
+    border-radius: 10px;
     border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.session-item:hover,
+.qa-item:hover {
+    box-shadow: var(--shadow);
+    border-color: var(--rose-light);
 }
 
 .session-info {
@@ -1180,13 +1336,15 @@ $pageTitle = 'My Dashboard';
     flex-wrap: wrap;
 }
 
-.session-date, .session-time {
+.session-date,
+.session-time {
     font-weight: 500;
     font-size: 0.9rem;
+    color: var(--text);
 }
 
 .session-message {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--text-light);
     margin: 4px 0 0;
     width: 100%;
@@ -1194,22 +1352,26 @@ $pageTitle = 'My Dashboard';
 
 .session-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
+    margin-top: 8px;
 }
 
 .session-actions .btn {
     padding: 4px 12px;
     font-size: 0.75rem;
+    border-radius: 8px;
 }
 
 .qa-title {
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 0.95rem;
 }
 
 .qa-title a {
     color: var(--text);
     text-decoration: none;
+    transition: color 0.2s;
 }
 
 .qa-title a:hover {
@@ -1220,24 +1382,27 @@ $pageTitle = 'My Dashboard';
     font-size: 0.8rem;
     color: var(--text-light);
     display: flex;
-    gap: 8px;
+    gap: 12px;
+    margin-top: 2px;
 }
 
 .qa-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
+    margin-top: 8px;
 }
 
 .qa-actions .btn {
     padding: 4px 12px;
     font-size: 0.75rem;
+    border-radius: 8px;
 }
 
 /* ===== EMPTY STATE ===== */
 .empty-state {
     text-align: center;
-    padding: 20px;
+    padding: 24px;
     color: var(--text-light);
 }
 
@@ -1246,10 +1411,12 @@ $pageTitle = 'My Dashboard';
     font-size: 2.5rem;
     color: var(--rose);
     margin-bottom: 12px;
+    opacity: 0.6;
 }
 
 .empty-state p {
     margin: 0;
+    font-size: 0.95rem;
 }
 
 .empty-state a {
@@ -1275,6 +1442,11 @@ $pageTitle = 'My Dashboard';
     padding: 20px;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+}
+
+.sidebar-card:hover {
+    box-shadow: var(--shadow-hover);
 }
 
 .sidebar-card .card-header {
@@ -1292,6 +1464,12 @@ $pageTitle = 'My Dashboard';
     display: flex;
     align-items: center;
     gap: 8px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.sidebar-card .card-header h4 i {
+    color: var(--rose);
 }
 
 .sidebar-card .card-header-actions {
@@ -1303,21 +1481,27 @@ $pageTitle = 'My Dashboard';
 .sidebar-card .card-header-actions .btn {
     padding: 4px 12px;
     font-size: 0.75rem;
+    border-radius: 8px;
 }
 
-.sidebar-card .card-header-actions .view-all-link {
+.view-all-link {
     font-size: 0.8rem;
     font-weight: 600;
-    color: var(--rose-dark);
+    color: var(--rose);
     text-decoration: none;
-    transition: color var(--transition);
+    transition: color 0.2s;
 }
 
-.sidebar-card .card-header-actions .view-all-link:hover {
-    color: var(--rose);
+.view-all-link:hover {
+    color: var(--rose-dark);
     text-decoration: underline;
 }
 
+.card-body {
+    padding: 0;
+}
+
+/* ===== NOTIFICATIONS ===== */
 .notification-list {
     display: flex;
     flex-direction: column;
@@ -1326,31 +1510,42 @@ $pageTitle = 'My Dashboard';
 
 .notification-item {
     background: var(--bg);
-    padding: 10px;
-    border-radius: 8px;
+    padding: 12px;
+    border-radius: 10px;
     border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.notification-item:hover {
+    box-shadow: var(--shadow);
 }
 
 .notification-item.unread {
     border-left-color: var(--rose);
 }
 
+.notif-content {
+    flex: 1;
+}
+
 .notif-title {
     font-weight: 600;
     font-size: 0.9rem;
+    color: var(--text);
 }
 
 .notif-message {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--text-light);
+    margin: 2px 0;
 }
 
 .notif-date {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-light);
-    margin-top: 2px;
 }
 
+/* ===== ACHIEVEMENTS ===== */
 .achievement-list {
     display: flex;
     flex-direction: column;
@@ -1360,11 +1555,16 @@ $pageTitle = 'My Dashboard';
 .achievement-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
+    gap: 10px;
+    padding: 8px 12px;
     background: var(--bg);
-    border-radius: 6px;
+    border-radius: 8px;
     border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.achievement-item:hover {
+    box-shadow: var(--shadow);
 }
 
 .achievement-icon {
@@ -1375,6 +1575,7 @@ $pageTitle = 'My Dashboard';
     font-weight: 500;
     font-size: 0.85rem;
     flex: 1;
+    color: var(--text);
 }
 
 .achievement-date {
@@ -1386,18 +1587,18 @@ $pageTitle = 'My Dashboard';
     text-align: center;
     color: var(--text-light);
     font-size: 0.9rem;
+    padding: 8px 0;
 }
 
 /* ===== QUICK ACTIONS ===== */
 .quick-actions-card .card-body {
-    padding: 0;
+    padding: 12px;
 }
 
 .quick-actions-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     gap: 8px;
-    padding: 12px;
 }
 
 .quick-action-btn {
@@ -1405,32 +1606,50 @@ $pageTitle = 'My Dashboard';
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 12px;
+    padding: 12px 8px;
     background: var(--bg);
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid var(--border);
     text-decoration: none;
     color: var(--text);
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 6px;
 }
 
 .quick-action-btn:hover {
     background: var(--vanilla);
     border-color: var(--rose);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
 }
 
 .quick-action-btn i {
-    font-size: 1.3rem;
+    font-size: 1.4rem;
     color: var(--rose);
-    margin-bottom: 4px;
 }
 
 .quick-action-btn span {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     text-align: center;
     line-height: 1.2;
+    font-weight: 500;
 }
+
+/* ===== STATUS BADGES ===== */
+.status-badge {
+    padding: 2px 12px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.status-badge.pending { background: #f1c40f; color: white; }
+.status-badge.confirmed { background: #2ecc71; color: white; }
+.status-badge.cancelled { background: #e74c3c; color: white; }
+.status-badge.completed { background: #3498db; color: white; }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
@@ -1444,6 +1663,7 @@ $pageTitle = 'My Dashboard';
         flex-direction: column;
         text-align: center;
         align-items: center;
+        padding: 28px;
     }
 
     .hero-profile {
@@ -1466,13 +1686,18 @@ $pageTitle = 'My Dashboard';
 
     .stats-row {
         grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 12px;
     }
 
     .stat-number {
         font-size: 1.4rem;
     }
 
-    .book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid {
+    .book-grid,
+    .poem-grid,
+    .video-grid,
+    .blog-grid,
+    .reflection-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
 
@@ -1481,19 +1706,22 @@ $pageTitle = 'My Dashboard';
     }
 
     .book-cover-wrapper {
-        height: 140px;
+        height: 160px;
     }
 
-    .poem-thumbnail, .video-thumb, .blog-thumbnail, .reflection-thumb {
+    .poem-thumbnail,
+    .video-thumb,
+    .blog-thumbnail,
+    .reflection-thumb {
         height: 100px;
+    }
+
+    .dashboard-section {
+        padding: 16px;
     }
 }
 
 @media (max-width: 480px) {
-    .dashboard-section {
-        padding: 16px;
-    }
-
     .section-header {
         flex-direction: column;
         align-items: flex-start;
@@ -1530,9 +1758,21 @@ $pageTitle = 'My Dashboard';
         font-size: 0.6rem;
     }
 
-    .book-grid, .poem-grid, .video-grid, .blog-grid, .reflection-grid {
+    .book-grid,
+    .poem-grid,
+    .video-grid,
+    .blog-grid,
+    .reflection-grid {
         grid-template-columns: 1fr 1fr;
         gap: 8px;
+    }
+
+    .book-cover-wrapper {
+        height: 120px;
+    }
+
+    .quick-actions-grid {
+        grid-template-columns: 1fr 1fr;
     }
 }
 </style>
