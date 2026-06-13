@@ -24,12 +24,12 @@ $search_terms = array_filter($search_terms);
 $search_terms = array_map('trim', $search_terms);
 $like_terms = array_map(function($term) { return '%' . $term . '%'; }, $search_terms);
 
-// Helper function
-function buildSearchWhere($table, $columns, $like_terms) {
+// Helper function to build WHERE clause
+function buildSearchWhere($columns, $like_terms) {
     $where_parts = [];
     $params = [];
     foreach ($columns as $col) {
-        $where_parts[] = "$table.$col LIKE ?";
+        $where_parts[] = "$col LIKE ?";
         foreach ($like_terms as $term) {
             $params[] = $term;
         }
@@ -43,46 +43,66 @@ $search_configs = [];
 
 if ($type === 'all' || $type === 'books') {
     $search_configs[] = [
-        'sql' => "SELECT 'book' as type, id, title, author as author, description, cover_path as image, created_at, NULL as slug, NULL as content, NULL as excerpt, NULL as comment_count, 0 as likes, 0 as loves, 0 as prays FROM books",
-        'columns' => ['title', 'author', 'description']
+        'type' => 'book',
+        'table' => 'books',
+        'columns' => ['title', 'author', 'description'],
+        'select' => "SELECT 'book' as type, id, title, author as author, description, cover_path as image, created_at, NULL as slug, NULL as content, NULL as excerpt, 0 as comment_count, 0 as likes, 0 as loves, 0 as prays FROM books"
     ];
 }
 if ($type === 'all' || $type === 'poems') {
     $search_configs[] = [
-        'sql' => "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt, NULL as comment_count, 0 as likes, 0 as loves, 0 as prays FROM poems",
-        'columns' => ['title', 'intro', 'content']
+        'type' => 'poem',
+        'table' => 'poems',
+        'columns' => ['title', 'intro', 'content'],
+        'select' => "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt, 0 as comment_count, 0 as likes, 0 as loves, 0 as prays FROM poems"
     ];
 }
 if ($type === 'all' || $type === 'blog') {
     $search_configs[] = [
-        'sql' => "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published'",
-        'columns' => ['title', 'content', 'excerpt', 'category']
+        'type' => 'blog',
+        'table' => 'blog_posts',
+        'columns' => ['title', 'content', 'excerpt', 'category'],
+        'select' => "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published'"
     ];
 }
 if ($type === 'all' || $type === 'reflections') {
     $search_configs[] = [
-        'sql' => "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM reflections",
-        'columns' => ['title', 'content', 'excerpt']
+        'type' => 'reflection',
+        'table' => 'reflections',
+        'columns' => ['title', 'content', 'excerpt'],
+        'select' => "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM reflections"
     ];
 }
 if ($type === 'all' || $type === 'videos') {
     $search_configs[] = [
-        'sql' => "SELECT 'video' as type, id, title, NULL as author, description, thumbnail as image, created_at, NULL as slug, NULL as content, NULL as excerpt, NULL as comment_count, 0 as likes, 0 as loves, 0 as prays FROM videos",
-        'columns' => ['title', 'description']
+        'type' => 'video',
+        'table' => 'videos',
+        'columns' => ['title', 'description'],
+        'select' => "SELECT 'video' as type, id, title, NULL as author, description, thumbnail as image, created_at, NULL as slug, NULL as content, NULL as excerpt, 0 as comment_count, 0 as likes, 0 as loves, 0 as prays FROM videos"
     ];
 }
 
 // Execute each search
 foreach ($search_configs as $config) {
-    $where_data = buildSearchWhere($config['sql'], $config['columns'], $like_terms);
-    $count_sql = "SELECT COUNT(*) FROM (" . $config['sql'] . " WHERE " . $where_data['where'] . ")";
+    $where_data = buildSearchWhere($config['columns'], $like_terms);
+    
+    // Count total for this config
+    $count_sql = "SELECT COUNT(*) FROM " . $config['table'] . " WHERE " . $where_data['where'];
+    if ($config['type'] === 'blog') {
+        $count_sql = "SELECT COUNT(*) FROM " . $config['table'] . " WHERE status = 'published' AND " . $where_data['where'];
+    }
     $stmt = $db->prepare($count_sql);
     $stmt->execute($where_data['params']);
     $count = $stmt->fetchColumn();
     $total_results += $count;
 
     if ($count > 0) {
-        $fetch_sql = $config['sql'] . " WHERE " . $where_data['where'] . " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        // Fetch results for this config
+        $fetch_sql = $config['select'] . " WHERE " . $where_data['where'];
+        if ($config['type'] === 'blog') {
+            $fetch_sql = str_replace("WHERE status = 'published'", "", $config['select']) . " WHERE status = 'published' AND " . $where_data['where'];
+        }
+        $fetch_sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
         $fetch_params = array_merge($where_data['params'], [$limit, $offset]);
         $stmt = $db->prepare($fetch_sql);
         $stmt->execute($fetch_params);
