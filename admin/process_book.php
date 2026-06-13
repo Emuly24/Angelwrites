@@ -9,7 +9,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 // ===== DEFINE LIB_PATH =====
-define('LIB_PATH', __DIR__ . '/../lib/');
+define('LIB_PATH', __DIR__ . '/../libs/pdfparser-master/src/');
 
 redirectIfNotAdmin();
 
@@ -81,8 +81,28 @@ function extractRawText($file_path) {
 }
 
 function extractPDF($file_path) {
-    require_once LIB_PATH . 'pdfparser-master/src/Smalot/PdfParser/Element.php';
-    // ... include all PDF parser classes as before ...
+    require_once LIB_PATH . 'Smalot/PdfParser/Element.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementArray.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementBoolean.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementDate.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementHexa.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementMissing.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementNull.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementNumber.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementString.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementStruct.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementXRef.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Parser.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Config.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Encoding.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Font.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Header.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Page.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Pages.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/PDFObject.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/XObject.php';
+    require_once LIB_PATH . 'Smalot/PdfParser/Exception/Exception.php';
+
     $parser = new \Smalot\PdfParser\Parser();
     try {
         $pdf = $parser->parseFile($file_path);
