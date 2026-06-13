@@ -1139,6 +1139,64 @@ $pageTitle = 'Admin Dashboard';
     color: var(--text-light);
     margin: 0 0 4px;
 }
+/* ===== FIX: HERO CARD DARK MODE + HEIGHT REDUCTION ===== */
+
+/* 1. REDUCE HERO HEIGHT */
+.dashboard-hero {
+    padding: 24px 32px !important; /* Reduced from 40px */
+    margin-bottom: 24px;
+    gap: 16px; /* Tighter gap */
+}
+
+/* 2. DARK MODE HERO CARD FIX */
+body.dark-mode .dashboard-hero,
+[data-theme="dark"] .dashboard-hero {
+    /* Force a dark, readable background */
+    background: var(--card-bg) !important;
+    border-color: var(--border) !important;
+}
+
+/* Dark mode text colors */
+body.dark-mode .dashboard-hero h1,
+[data-theme="dark"] .dashboard-hero h1 {
+    color: var(--text) !important;
+}
+body.dark-mode .dashboard-hero h1 .rose-text,
+[data-theme="dark"] .dashboard-hero h1 .rose-text {
+    color: var(--rose) !important;
+}
+
+/* Fix the subtitle text */
+body.dark-mode .dashboard-hero .hero-sub,
+[data-theme="dark"] .dashboard-hero .hero-sub {
+    color: var(--text-light) !important; 
+}
+
+/* Fix the hero stats pills */
+body.dark-mode .hero-stat,
+[data-theme="dark"] .hero-stat {
+    background: var(--card-bg) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+body.dark-mode .hero-stat i,
+[data-theme="dark"] .hero-stat i {
+    color: var(--rose) !important;
+}
+body.dark-mode .hero-stat strong,
+[data-theme="dark"] .hero-stat strong {
+    color: var(--text) !important;
+}
+
+/* Fix the hero profile text */
+body.dark-mode .profile-details h3,
+[data-theme="dark"] .profile-details h3 {
+    color: var(--text) !important;
+}
+body.dark-mode .profile-details .user-email,
+[data-theme="dark"] .profile-details .user-email {
+    color: var(--text-light) !important;
+}
 
 /* ===== VIDEO CARDS ===== */
 .video-card {
@@ -1516,6 +1574,54 @@ $pageTitle = 'Admin Dashboard';
     .mini-grid {
         grid-template-columns: 1fr 1fr;
         gap: 8px;
+    }
+}
+@media (max-width: 992px) {
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+    .stat-number {
+        font-size: 1.4rem;
+    }
+    .stat-label {
+        font-size: 0.6rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-hero h1 {
+        font-size: 1.8rem;
+    }
+    .hero-content {
+        text-align: center;
+    }
+    .hero-stat {
+        white-space: normal;
+        padding: 4px 10px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr 1fr; /* Force 2 columns on very small screens */
+        gap: 8px;
+    }
+    .stat-card {
+        padding: 10px 8px;
+        gap: 8px;
+    }
+    .stat-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+    }
+    .stat-number {
+        font-size: 1.2rem;
+    }
+    .stat-label {
+        font-size: 0.55rem;
     }
 }
 </style>

@@ -1544,6 +1544,64 @@ $pageTitle = 'My Dashboard';
     font-size: 0.75rem;
     color: var(--text-light);
 }
+/* ===== FIX: HERO CARD DARK MODE + HEIGHT REDUCTION ===== */
+
+/* 1. REDUCE HERO HEIGHT */
+.dashboard-hero {
+    padding: 24px 32px !important; /* Reduced from 40px */
+    margin-bottom: 24px;
+    gap: 16px; /* Tighter gap */
+}
+
+/* 2. DARK MODE HERO CARD FIX */
+body.dark-mode .dashboard-hero,
+[data-theme="dark"] .dashboard-hero {
+    /* Force a dark, readable background */
+    background: var(--card-bg) !important;
+    border-color: var(--border) !important;
+}
+
+/* Dark mode text colors */
+body.dark-mode .dashboard-hero h1,
+[data-theme="dark"] .dashboard-hero h1 {
+    color: var(--text) !important;
+}
+body.dark-mode .dashboard-hero h1 .rose-text,
+[data-theme="dark"] .dashboard-hero h1 .rose-text {
+    color: var(--rose) !important;
+}
+
+/* Fix the subtitle text */
+body.dark-mode .dashboard-hero .hero-sub,
+[data-theme="dark"] .dashboard-hero .hero-sub {
+    color: var(--text-light) !important; 
+}
+
+/* Fix the hero stats pills */
+body.dark-mode .hero-stat,
+[data-theme="dark"] .hero-stat {
+    background: var(--card-bg) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+body.dark-mode .hero-stat i,
+[data-theme="dark"] .hero-stat i {
+    color: var(--rose) !important;
+}
+body.dark-mode .hero-stat strong,
+[data-theme="dark"] .hero-stat strong {
+    color: var(--text) !important;
+}
+
+/* Fix the hero profile text */
+body.dark-mode .profile-details h3,
+[data-theme="dark"] .profile-details h3 {
+    color: var(--text) !important;
+}
+body.dark-mode .profile-details .user-email,
+[data-theme="dark"] .profile-details .user-email {
+    color: var(--text-light) !important;
+}
 
 /* ===== ACHIEVEMENTS ===== */
 .achievement-list {
@@ -1650,6 +1708,87 @@ $pageTitle = 'My Dashboard';
 .status-badge.confirmed { background: #2ecc71; color: white; }
 .status-badge.cancelled { background: #e74c3c; color: white; }
 .status-badge.completed { background: #3498db; color: white; }
+/* ===== FIX: PREVENT TEXT OVERFLOW ===== */
+
+/* 1. FIX HERO HEADLINE TRUNCATION */
+.dashboard-hero h1 {
+    font-size: 2.4rem;
+    line-height: 1.1;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+.dashboard-hero h1 .rose-text {
+    display: inline-block;
+}
+
+/* 2. FIX SMALL STAT CARDS BREAKING */
+.stats-grid {
+    /* Give the cards more room to breathe */
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.stat-card {
+    /* Ensure content stays inside */
+    padding: 16px 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stat-icon {
+    /* Ensure icon doesn't push text out */
+    width: 44px;
+    height: 44px;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.stat-content {
+    /* Allow text to shrink and wrap */
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.stat-number {
+    /* Keep number on one line */
+    font-size: 1.6rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stat-label {
+    /* Allow label to wrap gracefully */
+    font-size: 0.7rem;
+    line-height: 1.2;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    max-width: 100%;
+}
+
+/* 3. FIX HERO STAT PILLS */
+.hero-stat {
+    font-size: 0.85rem;
+    padding: 6px 14px;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 4. FIX SIDEBAR QUICK ACTION LABELS */
+.quick-action-btn span {
+    font-size: 0.7rem;
+    line-height: 1.2;
+    word-break: break-word;
+    white-space: normal;
+    max-width: 100%;
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
@@ -1773,6 +1912,54 @@ $pageTitle = 'My Dashboard';
 
     .quick-actions-grid {
         grid-template-columns: 1fr 1fr;
+    }
+}
+@media (max-width: 992px) {
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+    .stat-number {
+        font-size: 1.4rem;
+    }
+    .stat-label {
+        font-size: 0.6rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-hero h1 {
+        font-size: 1.8rem;
+    }
+    .hero-content {
+        text-align: center;
+    }
+    .hero-stat {
+        white-space: normal;
+        padding: 4px 10px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr 1fr; /* Force 2 columns on very small screens */
+        gap: 8px;
+    }
+    .stat-card {
+        padding: 10px 8px;
+        gap: 8px;
+    }
+    .stat-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+    }
+    .stat-number {
+        font-size: 1.2rem;
+    }
+    .stat-label {
+        font-size: 0.55rem;
     }
 }
 </style>
