@@ -87,30 +87,30 @@ function extractPDF($file_path) {
     
     // --- LOAD DEPENDENCIES IN THE CORRECT ORDER ---
     
-    // 1. Base core classes
+    // 1. Core base classes
     require_once $base_path . 'Config.php';
-    require_once $base_path . 'Encoding.php';
-    require_once $base_path . 'Font.php';
-    require_once $base_path . 'Header.php';
-    require_once $base_path . 'PDFObject.php';
-    require_once $base_path . 'XObject.php';
+    require_once $base_path . 'Encoding.php';      // Extends PDFObject
+    require_once $base_path . 'Font.php';          // Extends PDFObject
+    require_once $base_path . 'Header.php';        // Extends PDFObject
+    require_once $base_path . 'PDFObject.php';     // Base class for many
+    require_once $base_path . 'XObject.php';       // Extends PDFObject
     
-    // 2. Element classes (hierarchy: Element -> ElementString -> ElementDate)
+    // 2. Element classes
     require_once $base_path . 'Element/Element.php';
-    require_once $base_path . 'Element/ElementString.php';
-    require_once $base_path . 'Element/ElementDate.php';
     require_once $base_path . 'Element/ElementArray.php';
     require_once $base_path . 'Element/ElementBoolean.php';
+    require_once $base_path . 'Element/ElementDate.php';
     require_once $base_path . 'Element/ElementHexa.php';
     require_once $base_path . 'Element/ElementMissing.php';
     require_once $base_path . 'Element/ElementNull.php';
     require_once $base_path . 'Element/ElementNumber.php';
+    require_once $base_path . 'Element/ElementString.php';
     require_once $base_path . 'Element/ElementStruct.php';
     require_once $base_path . 'Element/ElementXRef.php';
     
     // 3. Core parser classes
-    require_once $base_path . 'Page.php';
-    require_once $base_path . 'Pages.php';
+    require_once $base_path . 'Page.php';          // Extends PDFObject
+    require_once $base_path . 'Pages.php';         // Extends PDFObject
     require_once $base_path . 'Parser.php';
     require_once $base_path . 'Exception/Exception.php';
 
@@ -119,13 +119,29 @@ function extractPDF($file_path) {
         $pdf = $parser->parseFile($file_path);
         $text = $pdf->getText();
         if (empty(trim($text))) {
-            return '⚠️ This PDF appears to be a scan (no extractable text). For InfinityFree, we cannot run OCR. If you upgrade to a VPS, we can use Tesseract.';
+            return '⚠️ This PDF appears to be a scan (no extractable text).';
         }
         return fixEncoding($text);
     } catch (Exception $e) {
         return false;
     }
 }
+function extractPDF($file_path) {
+    // Try using pdftotext (command line)
+    if (function_exists('exec')) {
+        $txt_path = dirname($file_path) . '/' . pathinfo($file_path, PATHINFO_FILENAME) . '.txt';
+        exec("pdftotext -layout -enc UTF-8 '$file_path' '$txt_path' 2>&1", $output, $return_var);
+        if ($return_var === 0 && file_exists($txt_path)) {
+            $text = file_get_contents($txt_path);
+            @unlink($txt_path);
+            return fixEncoding($text);
+        }
+    }
+    
+    // If no pdftotext, return a helpful message
+    return '⚠️ PDF processing requires pdftotext. Please convert your PDF to EPUB or DOCX format.';
+}
+
 function extractDOCX($file_path) {
     $zip = zip_open($file_path);
     if (!$zip || is_numeric($zip)) return false;
