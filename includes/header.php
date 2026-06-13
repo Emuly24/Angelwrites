@@ -451,37 +451,51 @@ if ($isLoggedIn) {
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
 
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 768px) {
-            .search-dropdown {
-                width: 260px;
-            }
-            .notification-dropdown {
-                width: 260px;
-            }
-            .user-dropdown {
-                width: 140px;
-            }
-            .nav-actions {
-                gap: 4px;
-            }
-            .nav-action-icon {
-                width: 32px;
-                height: 32px;
-                font-size: 0.9rem;
-            }
-        }
+        /* ===== MOBILE MENU – FIXED, NO PUSH, LINKS VISIBLE ===== */
+@media (max-width: 992px) {
+    .hamburger { display: flex !important; flex-direction: column; justify-content: space-between; width: 28px; height: 20px; background: none; border: none; cursor: pointer; padding: 0; z-index: 1001; }
+    .hamburger span { display: block; width: 100%; height: 2px; background: var(--text); border-radius: 2px; transition: all 0.3s ease; }
+    .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(6px, 6px); }
+    .hamburger.active span:nth-child(2) { opacity: 0; }
+    .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(6px, -6px); }
 
-        @media (max-width: 480px) {
-            .search-dropdown {
-                width: 220px;
-                right: -40px;
-            }
-            .notification-dropdown {
-                width: 220px;
-                right: -40px;
-            }
-        }
+    .nav-links {
+        position: fixed !important; /* CRITICAL: Removes from flow, no push */
+        top: 0 !important;
+        right: -100% !important;
+        width: 320px !important;
+        height: 100vh !important;
+        background: var(--card-bg) !important;
+        border-left: 1px solid var(--border) !important;
+        padding: 80px 24px 24px !important;
+        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
+        z-index: 1000 !important;
+        overflow-y: auto !important;
+        transition: right 0.3s ease !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        margin: 0 !important;
+    }
+    .nav-links.open { right: 0 !important; }
+    .nav-links li { width: 100%; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .nav-links li:last-child { border-bottom: none; }
+    .nav-links a { display: block; width: 100%; padding: 4px 0; font-size: 1rem; color: var(--text); text-decoration: none; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--rose); }
+    .nav-links .nav-separator { display: none; }
+
+    .menu-overlay {
+        display: none !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        z-index: 999 !important;
+    }
+    .menu-overlay.open { display: block !important; }
+}
     </style>
 </head>
 <body>
@@ -640,38 +654,51 @@ if ($isLoggedIn) {
 
     <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
-    // ===== GLOBAL FUNCTIONS – ALWAYS AVAILABLE =====
-    function toggleMobileMenu() {
-        const navLinks = document.getElementById('navLinks');
-        const overlay = document.getElementById('menuOverlay');
-        const hamburger = document.getElementById('hamburger');
-        const body = document.body;
+// ===== SIMPLE TOGGLE – Works every time =====
+function toggleMobileMenu() {
+    const navLinks = document.getElementById('navLinks');
+    const overlay = document.getElementById('menuOverlay');
+    const hamburger = document.getElementById('hamburger');
+    const body = document.body;
 
-        if (!navLinks) return;
-        const isOpen = navLinks.classList.contains('open');
+    if (!navLinks) return;
+    const isOpen = navLinks.classList.contains('open');
 
-        if (isOpen) {
-            closeMobileMenu();
-        } else {
-            navLinks.classList.add('open');
-            if (overlay) overlay.classList.add('open');
-            if (hamburger) hamburger.classList.add('active');
-            body.style.overflow = 'hidden'; /* Prevents background scrolling */
-        }
+    if (isOpen) {
+        closeMobileMenu();
+    } else {
+        navLinks.classList.add('open');
+        if (overlay) overlay.classList.add('open');
+        if (hamburger) hamburger.classList.add('active');
+        body.style.overflow = 'hidden';
     }
+}
 
-    function closeMobileMenu() {
-        const navLinks = document.getElementById('navLinks');
-        const overlay = document.getElementById('menuOverlay');
-        const hamburger = document.getElementById('hamburger');
-        const body = document.body;
+function closeMobileMenu() {
+    const navLinks = document.getElementById('navLinks');
+    const overlay = document.getElementById('menuOverlay');
+    const hamburger = document.getElementById('hamburger');
+    const body = document.body;
 
-        if (!navLinks) return;
-        navLinks.classList.remove('open');
-        if (overlay) overlay.classList.remove('open');
-        if (hamburger) hamburger.classList.remove('active');
-        body.style.overflow = '';
-    }
+    if (!navLinks) return;
+    navLinks.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+    if (hamburger) hamburger.classList.remove('active');
+    body.style.overflow = '';
+}
+
+// Attach click listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Close menu when a link is clicked
+    document.querySelectorAll('#navLinks a').forEach(link => {
+        link.addEventListener('click', closeMobileMenu);
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeMobileMenu();
+    });
+});
 
     // ===== DOM READY =====
     document.addEventListener('DOMContentLoaded', function() {
