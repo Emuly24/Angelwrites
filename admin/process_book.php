@@ -8,6 +8,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 // ===== DEFINE LIB_PATH =====
 define('LIB_PATH', __DIR__ . '/../libs/pdfparser-master/src/');
 
@@ -81,27 +82,37 @@ function extractRawText($file_path) {
 }
 
 function extractPDF($file_path) {
-    require_once LIB_PATH . 'Smalot/PdfParser/Element.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementArray.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementBoolean.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementDate.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementHexa.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementMissing.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementNull.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementNumber.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementString.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementStruct.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Element/ElementXRef.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Parser.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Config.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Encoding.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Font.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Header.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Page.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Pages.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/PDFObject.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/XObject.php';
-    require_once LIB_PATH . 'Smalot/PdfParser/Exception/Exception.php';
+    // Base path
+    $base_path = LIB_PATH . 'Smalot/PdfParser/';
+    
+    // --- LOAD DEPENDENCIES IN THE CORRECT ORDER ---
+    
+    // 1. Base core classes
+    require_once $base_path . 'Config.php';
+    require_once $base_path . 'Encoding.php';
+    require_once $base_path . 'Font.php';
+    require_once $base_path . 'Header.php';
+    require_once $base_path . 'PDFObject.php';
+    require_once $base_path . 'XObject.php';
+    
+    // 2. Element classes (hierarchy: Element -> ElementString -> ElementDate)
+    require_once $base_path . 'Element/Element.php';
+    require_once $base_path . 'Element/ElementString.php';
+    require_once $base_path . 'Element/ElementDate.php';
+    require_once $base_path . 'Element/ElementArray.php';
+    require_once $base_path . 'Element/ElementBoolean.php';
+    require_once $base_path . 'Element/ElementHexa.php';
+    require_once $base_path . 'Element/ElementMissing.php';
+    require_once $base_path . 'Element/ElementNull.php';
+    require_once $base_path . 'Element/ElementNumber.php';
+    require_once $base_path . 'Element/ElementStruct.php';
+    require_once $base_path . 'Element/ElementXRef.php';
+    
+    // 3. Core parser classes
+    require_once $base_path . 'Page.php';
+    require_once $base_path . 'Pages.php';
+    require_once $base_path . 'Parser.php';
+    require_once $base_path . 'Exception/Exception.php';
 
     $parser = new \Smalot\PdfParser\Parser();
     try {
@@ -115,7 +126,6 @@ function extractPDF($file_path) {
         return false;
     }
 }
-
 function extractDOCX($file_path) {
     $zip = zip_open($file_path);
     if (!$zip || is_numeric($zip)) return false;
