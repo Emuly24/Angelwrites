@@ -126,21 +126,6 @@ function extractPDF($file_path) {
         return false;
     }
 }
-function extractPDF($file_path) {
-    // Try using pdftotext (command line)
-    if (function_exists('exec')) {
-        $txt_path = dirname($file_path) . '/' . pathinfo($file_path, PATHINFO_FILENAME) . '.txt';
-        exec("pdftotext -layout -enc UTF-8 '$file_path' '$txt_path' 2>&1", $output, $return_var);
-        if ($return_var === 0 && file_exists($txt_path)) {
-            $text = file_get_contents($txt_path);
-            @unlink($txt_path);
-            return fixEncoding($text);
-        }
-    }
-    
-    // If no pdftotext, return a helpful message
-    return '⚠️ PDF processing requires pdftotext. Please convert your PDF to EPUB or DOCX format.';
-}
 
 function extractDOCX($file_path) {
     $zip = zip_open($file_path);
