@@ -98,53 +98,147 @@ if ($isLoggedIn) {
             }
         }
 
-        /* ===== NAVIGATION ===== */
-        .nav-links {
-            display: none;
+        /* ===== HAMBURGER MENU (Mobile Only) ===== */
+        .hamburger {
+            display: none !important; /* Hidden by default on desktop */
             flex-direction: column;
-            position: fixed;
-            top: 0;
-            right: -100%;
-            width: 320px;
-            height: 100vh;
-            background: var(--card-bg);
-            border-left: 1px solid var(--border);
-            padding: 80px 24px 24px;
-            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            overflow-y: auto;
-            transition: right 0.3s ease;
+            justify-content: space-between;
+            width: 28px;
+            height: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            z-index: 1001;
         }
-        .nav-links.open {
-            right: 0;
-            display: flex;
+        .hamburger span {
+            display: block;
+            width: 100%;
+            height: 2px;
+            background: var(--text);
+            transition: all 0.3s ease;
+            border-radius: 2px;
+        }
+        .hamburger.active span:nth-child(1) {
+            transform: rotate(45deg) translate(6px, 6px);
+        }
+        .hamburger.active span:nth-child(2) {
+            opacity: 0;
+        }
+        .hamburger.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* ===== DESKTOP NAVIGATION ===== */
+        .nav-links {
+            display: flex !important;
+            align-items: center;
+            gap: 8px;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            flex: 1;
+            justify-content: center;
+            position: static; /* Part of the document flow on desktop */
+            width: auto;
+            height: auto;
+            background: transparent;
+            box-shadow: none;
+            border: none;
+            z-index: auto;
+            overflow: visible;
+            padding: 0;
+            right: auto;
+            transition: none;
         }
         .nav-links li {
-            margin: 4px 0;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-        }
-        .nav-links li:last-child {
+            margin: 0;
+            padding: 0;
             border-bottom: none;
         }
         .nav-links a {
-            padding: 4px 0;
-            display: block;
-            width: 100%;
-            font-size: 1rem;
+            padding: 6px 12px;
+            font-size: 0.95rem;
             color: var(--text);
             text-decoration: none;
             transition: color 0.2s;
+            border-radius: 6px;
         }
         .nav-links a:hover {
             color: var(--rose);
+            background: rgba(219, 161, 162, 0.08);
         }
         .nav-links a.active {
             color: var(--rose);
             font-weight: 600;
         }
         .nav-links .nav-separator {
-            display: none;
+            display: inline;
+            color: var(--border);
+            padding: 0 4px;
+        }
+
+        /* ===== MOBILE NAVIGATION (992px and below) ===== */
+        @media (max-width: 992px) {
+            .hamburger {
+                display: flex !important;
+            }
+
+            .nav-links {
+                display: flex !important;
+                flex-direction: column;
+                position: fixed; /* FIX: Removed from document flow */
+                top: 0;
+                right: -100%; /* Hidden off-screen initially */
+                width: 320px;
+                height: 100vh;
+                background: var(--card-bg);
+                border-left: 1px solid var(--border);
+                padding: 80px 24px 24px;
+                box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+                overflow-y: auto;
+                transition: right 0.3s ease;
+                justify-content: flex-start;
+                flex: none;
+                margin: 0;
+            }
+
+            .nav-links.open {
+                right: 0; /* Slides into view */
+            }
+
+            .nav-links li {
+                margin: 4px 0;
+                padding: 8px 0;
+                border-bottom: 1px solid var(--border);
+                width: 100%;
+            }
+            .nav-links li:last-child {
+                border-bottom: none;
+            }
+            .nav-links a {
+                padding: 4px 0;
+                width: 100%;
+                font-size: 1rem;
+            }
+            .nav-links .nav-separator {
+                display: none;
+            }
+
+            .menu-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+            }
+            .menu-overlay.open {
+                display: block;
+            }
         }
 
         /* ===== NAV ACTIONS ===== */
@@ -175,51 +269,6 @@ if ($isLoggedIn) {
         .nav-action-icon:hover {
             color: var(--rose);
             background: rgba(219, 161, 162, 0.1);
-        }
-
-        /* ===== HAMBURGER ===== */
-        .hamburger {
-            display: flex !important;
-            flex-direction: column;
-            justify-content: space-between;
-            width: 28px;
-            height: 20px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0;
-            z-index: 1001;
-        }
-        .hamburger span {
-            display: block;
-            width: 100%;
-            height: 2px;
-            background: var(--text);
-            transition: all 0.3s ease;
-        }
-        .hamburger.active span:nth-child(1) {
-            transform: rotate(45deg) translate(6px, 6px);
-        }
-        .hamburger.active span:nth-child(2) {
-            opacity: 0;
-        }
-        .hamburger.active span:nth-child(3) {
-            transform: rotate(-45deg) translate(6px, -6px);
-        }
-
-        /* ===== MENU OVERLAY ===== */
-        .menu-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-        .menu-overlay.open {
-            display: block;
         }
 
         /* ===== NOTIFICATION BADGE ===== */
@@ -262,9 +311,6 @@ if ($isLoggedIn) {
             padding: 8px 0;
             border-bottom: 1px solid var(--border);
             font-size: 0.85rem;
-        }
-        .notification-dropdown .notif-item:last-child {
-            border-bottom: none;
         }
         .notification-dropdown .notif-title {
             font-weight: 600;
@@ -407,10 +453,6 @@ if ($isLoggedIn) {
 
         /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
-            .nav-links {
-                width: 280px;
-                padding: 70px 20px 20px;
-            }
             .search-dropdown {
                 width: 260px;
             }
@@ -452,7 +494,7 @@ if ($isLoggedIn) {
                     <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites – Christian writing and community" class="logo-img">
                 </a>
 
-                <!-- ===== NAVIGATION LINKS (Slide-in drawer) ===== -->
+                <!-- ===== NAVIGATION LINKS ===== -->
                 <ul class="nav-links" id="navLinks" role="menubar">
                     <?php if (!$isLoggedIn): ?>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
@@ -487,10 +529,11 @@ if ($isLoggedIn) {
                     <?php endif; ?>
                 </ul>
 
+                <!-- ===== NAV ACTIONS ===== -->
                 <div class="nav-actions">
-                    <!-- ===== SEARCH ===== -->
+                    <!-- Search -->
                     <div class="search-wrapper">
-                        <button class="search-trigger nav-action-icon" aria-label="Search" onclick="toggleSearch()">
+                        <button class="search-trigger nav-action-icon" aria-label="Search" onclick="document.getElementById('searchDropdown').classList.toggle('open'); document.getElementById('searchInput').focus();">
                             <i class="fas fa-search"></i>
                         </button>
                         <form action="<?php echo SITE_URL; ?>/search_results.php" method="GET" class="search-dropdown" id="searchDropdown">
@@ -499,18 +542,18 @@ if ($isLoggedIn) {
                         </form>
                     </div>
 
-                    <!-- ===== BIBLE READER ===== -->
+                    <!-- Bible Reader -->
                     <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
                         <i class="fas fa-book-bible"></i>
                     </a>
 
-                    <!-- ===== NOTIFICATIONS ===== -->
+                    <!-- Notifications -->
                     <?php if ($isLoggedIn): ?>
                         <div class="notification-wrapper">
-                            <button class="nav-action-icon" aria-label="Notifications" onclick="toggleNotifications()">
+                            <button class="nav-action-icon" aria-label="Notifications" onclick="document.getElementById('notificationDropdown').classList.toggle('open');">
                                 <i class="fas fa-bell"></i>
                                 <?php if ($unreadNotifications > 0): ?>
-                                    <span class="notification-badge" aria-label="<?php echo $unreadNotifications; ?> unread notifications"><?php echo $unreadNotifications; ?></span>
+                                    <span class="notification-badge"><?php echo $unreadNotifications; ?></span>
                                 <?php endif; ?>
                             </button>
                             <div class="notification-dropdown" id="notificationDropdown">
@@ -530,14 +573,14 @@ if ($isLoggedIn) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- ===== THEME TOGGLE ===== -->
+                    <!-- Theme Toggle -->
                     <button class="nav-action-icon theme-toggle" id="themeToggle" aria-label="Toggle theme">
                         <i class="fas fa-moon"></i>
                     </button>
 
-                    <!-- ===== USER DROPDOWN (Logged in only) ===== -->
+                    <!-- User Dropdown (Logged in only) -->
                     <?php if ($isLoggedIn): ?>
-                        <div class="user-wrapper" onclick="toggleUserMenu()">
+                        <div class="user-wrapper" onclick="document.getElementById('userDropdown').classList.toggle('open');">
                             <i class="fas fa-user-circle" style="font-size: 1.2rem; color: var(--text);"></i>
                             <span style="font-size: 0.9rem; color: var(--text);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'User'); ?></span>
                             <div class="user-dropdown" id="userDropdown">
@@ -548,10 +591,18 @@ if ($isLoggedIn) {
                                 <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #e74c3c;">Logout</a>
                             </div>
                         </div>
+                    <?php else: ?>
+                        <!-- Guest: login/signup icons -->
+                        <a href="<?php echo SITE_URL; ?>/login.php" class="nav-action-icon" aria-label="Login">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </a>
+                        <a href="<?php echo SITE_URL; ?>/register.php" class="nav-action-icon" aria-label="Sign up">
+                            <i class="fas fa-user-plus"></i>
+                        </a>
                     <?php endif; ?>
 
-                    <!-- ===== HAMBURGER (Visible on ALL screens) ===== -->
-                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false" onclick="toggleMobileMenu()">
+                    <!-- ===== HAMBURGER (Only visible on mobile) ===== -->
+                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" onclick="toggleMobileMenu()">
                         <span></span>
                         <span></span>
                         <span></span>
@@ -560,6 +611,7 @@ if ($isLoggedIn) {
             </div>
         </nav>
 
+        <!-- Overlay -->
         <div class="menu-overlay" id="menuOverlay" onclick="closeMobileMenu()"></div>
     </header>
 
@@ -586,25 +638,56 @@ if ($isLoggedIn) {
         <?php endif; ?>
     </main>
 
-    <!-- ===== JAVASCRIPT ===== -->
+    <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // ===== SCROLL SHADOW =====
-        const header = document.getElementById('siteHeader');
-        window.addEventListener('scroll', function() {
-            if (window.scrollY > 10) {
-                header.classList.add('scrolled');
-            } else {
-                header.classList.remove('scrolled');
-            }
-        });
+    // ===== GLOBAL FUNCTIONS – ALWAYS AVAILABLE =====
+    function toggleMobileMenu() {
+        const navLinks = document.getElementById('navLinks');
+        const overlay = document.getElementById('menuOverlay');
+        const hamburger = document.getElementById('hamburger');
+        const body = document.body;
 
-        // ===== THEME TOGGLE =====
+        if (!navLinks) return;
+        const isOpen = navLinks.classList.contains('open');
+
+        if (isOpen) {
+            closeMobileMenu();
+        } else {
+            navLinks.classList.add('open');
+            if (overlay) overlay.classList.add('open');
+            if (hamburger) hamburger.classList.add('active');
+            body.style.overflow = 'hidden'; /* Prevents background scrolling */
+        }
+    }
+
+    function closeMobileMenu() {
+        const navLinks = document.getElementById('navLinks');
+        const overlay = document.getElementById('menuOverlay');
+        const hamburger = document.getElementById('hamburger');
+        const body = document.body;
+
+        if (!navLinks) return;
+        navLinks.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
+        if (hamburger) hamburger.classList.remove('active');
+        body.style.overflow = '';
+    }
+
+    // ===== DOM READY =====
+    document.addEventListener('DOMContentLoaded', function() {
+        // Scroll shadow
+        const header = document.getElementById('siteHeader');
+        if (header) {
+            window.addEventListener('scroll', function() {
+                header.classList.toggle('scrolled', window.scrollY > 10);
+            });
+        }
+
+        // Theme toggle
         const themeToggle = document.getElementById('themeToggle');
         const html = document.documentElement;
         const themes = ['light', 'dark', 'system'];
         let currentThemeIndex = 0;
-
         const storedTheme = localStorage.getItem('angelwrites_theme');
         if (storedTheme && themes.includes(storedTheme)) {
             currentThemeIndex = themes.indexOf(storedTheme);
@@ -623,17 +706,22 @@ if ($isLoggedIn) {
         }
 
         function updateIcon(theme) {
-            const icon = themeToggle.querySelector('i');
-            if (theme === 'dark') {
-                icon.className = 'fas fa-sun';
-            } else if (theme === 'light') {
-                icon.className = 'fas fa-moon';
-            } else {
-                icon.className = 'fas fa-circle-half-stroke';
+            if (themeToggle) {
+                const icon = themeToggle.querySelector('i');
+                if (theme === 'dark') icon.className = 'fas fa-sun';
+                else if (theme === 'light') icon.className = 'fas fa-moon';
+                else icon.className = 'fas fa-circle-half-stroke';
             }
         }
 
         applyTheme(themes[currentThemeIndex]);
+
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function() {
+                currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+                applyTheme(themes[currentThemeIndex]);
+            });
+        }
 
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
             if (localStorage.getItem('angelwrites_theme') === 'system') {
@@ -641,90 +729,29 @@ if ($isLoggedIn) {
             }
         });
 
-        themeToggle.addEventListener('click', function() {
-            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-            applyTheme(themes[currentThemeIndex]);
-        });
-
-        // ===== SEARCH DROPDOWN =====
-        document.querySelector('.search-trigger').addEventListener('click', function() {
-            const dropdown = document.getElementById('searchDropdown');
-            const input = document.getElementById('searchInput');
-            dropdown.classList.toggle('open');
-            if (dropdown.classList.contains('open')) {
-                input.focus();
-            }
-        });
-
-        document.addEventListener('click', function(e) {
-            const wrapper = document.querySelector('.search-wrapper');
-            const dropdown = document.getElementById('searchDropdown');
-            if (wrapper && dropdown && !wrapper.contains(e.target)) {
-                dropdown.classList.remove('open');
-            }
-        });
-
-        // ===== NOTIFICATIONS DROPDOWN =====
-        document.querySelector('.notification-wrapper .nav-action-icon').addEventListener('click', function() {
-            const dropdown = document.getElementById('notificationDropdown');
-            dropdown.classList.toggle('open');
-        });
-
-        document.addEventListener('click', function(e) {
-            const wrapper = document.querySelector('.notification-wrapper');
-            const dropdown = document.getElementById('notificationDropdown');
-            if (wrapper && dropdown && !wrapper.contains(e.target)) {
-                dropdown.classList.remove('open');
-            }
-        });
-
-        // ===== USER DROPDOWN =====
-        document.querySelector('.user-wrapper').addEventListener('click', function() {
-            const dropdown = document.getElementById('userDropdown');
-            dropdown.classList.toggle('open');
-        });
-
-        document.addEventListener('click', function(e) {
-            const wrapper = document.querySelector('.user-wrapper');
-            const dropdown = document.getElementById('userDropdown');
-            if (wrapper && dropdown && !wrapper.contains(e.target)) {
-                dropdown.classList.remove('open');
-            }
-        });
-
-        // ===== MOBILE MENU (Works on all screens) =====
-        const navLinks = document.getElementById('navLinks');
-        const overlay = document.getElementById('menuOverlay');
-        const hamburger = document.getElementById('hamburger');
-        const body = document.body;
-
-        window.toggleMobileMenu = function() {
-            const isOpen = navLinks.classList.contains('open');
-
-            if (isOpen) {
-                closeMobileMenu();
-            } else {
-                navLinks.classList.add('open');
-                overlay.classList.add('open');
-                hamburger.classList.add('active');
-                hamburger.setAttribute('aria-expanded', 'true');
-                body.style.overflow = 'hidden';
-            }
-        };
-
-        window.closeMobileMenu = function() {
-            navLinks.classList.remove('open');
-            overlay.classList.remove('open');
-            hamburger.classList.remove('active');
-            hamburger.setAttribute('aria-expanded', 'false');
-            body.style.overflow = '';
-        };
-
-        // Close menu on link click (for single-page navigation)
-        navLinks.querySelectorAll('a').forEach(link => {
+        // Close mobile menu when a link is clicked
+        document.querySelectorAll('#navLinks a').forEach(function(link) {
             link.addEventListener('click', function() {
                 closeMobileMenu();
             });
+        });
+
+        // Close mobile menu on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeMobileMenu();
+        });
+
+        // Close all dropdowns on outside click
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-wrapper')) {
+                document.getElementById('searchDropdown').classList.remove('open');
+            }
+            if (!e.target.closest('.notification-wrapper')) {
+                document.getElementById('notificationDropdown').classList.remove('open');
+            }
+            if (!e.target.closest('.user-wrapper')) {
+                document.getElementById('userDropdown').classList.remove('open');
+            }
         });
     });
     </script>
