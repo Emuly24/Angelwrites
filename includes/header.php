@@ -55,7 +55,7 @@ if ($isLoggedIn) {
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
     <meta name="theme-color" content="#DBA1A2">
     <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
-    
+
     <style>
         /* ===== SKIP LINK ===== */
         .skip-link {
@@ -98,7 +98,7 @@ if ($isLoggedIn) {
             }
         }
 
-        /* ===== DESKTOP NAVIGATION (shown always) ===== */
+        /* ===== DESKTOP NAVIGATION (displayed normally) ===== */
         .nav-links {
             display: flex !important;
             align-items: center;
@@ -108,17 +108,6 @@ if ($isLoggedIn) {
             padding: 0;
             flex: 1;
             justify-content: center;
-            position: static;
-            height: auto;
-            width: auto;
-            box-shadow: none;
-            border-left: none;
-            background: transparent;
-            padding: 0;
-            right: auto;
-            transition: none;
-            overflow: visible;
-            z-index: auto;
         }
         .nav-links li {
             margin: 0;
@@ -222,9 +211,6 @@ if ($isLoggedIn) {
             padding: 8px 0;
             border-bottom: 1px solid var(--border);
             font-size: 0.85rem;
-        }
-        .notification-dropdown .notif-item:last-child {
-            border-bottom: none;
         }
         .notification-dropdown .notif-title {
             font-weight: 600;
@@ -367,6 +353,7 @@ if ($isLoggedIn) {
 
         /* ===== MOBILE STYLES (992px and below) ===== */
         @media (max-width: 992px) {
+            /* HAMBURGER - visible on mobile */
             .hamburger {
                 display: flex !important;
                 flex-direction: column;
@@ -387,26 +374,17 @@ if ($isLoggedIn) {
                 border-radius: 2px;
                 transition: all 0.3s ease;
             }
-            body.dark-mode .hamburger span,
-            [data-theme="dark"] .hamburger span {
-                box-shadow: 0 0 8px rgba(192, 57, 43, 0.4);
-            }
-            .hamburger.active span:nth-child(1) {
-                transform: rotate(45deg) translate(6px, 6px);
-            }
-            .hamburger.active span:nth-child(2) {
-                opacity: 0;
-            }
-            .hamburger.active span:nth-child(3) {
-                transform: rotate(-45deg) translate(6px, -6px);
-            }
+            .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(6px, 6px); }
+            .hamburger.active span:nth-child(2) { opacity: 0; }
+            .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(6px, -6px); }
 
+            /* NAVIGATION - hidden by default, slides in when .open */
             .nav-links {
                 display: none !important;
                 flex-direction: column;
                 position: fixed;
                 top: 0;
-                right: -100%;
+                right: -320px;
                 width: 320px;
                 height: 100vh;
                 background: var(--card-bg);
@@ -416,8 +394,6 @@ if ($isLoggedIn) {
                 z-index: 1000;
                 overflow-y: auto;
                 transition: right 0.3s ease;
-                flex: none;
-                justify-content: flex-start;
             }
             .nav-links.open {
                 display: flex !important;
@@ -440,6 +416,7 @@ if ($isLoggedIn) {
                 display: none;
             }
 
+            /* OVERLAY */
             .menu-overlay {
                 display: none;
                 position: fixed;
@@ -466,45 +443,46 @@ if ($isLoggedIn) {
                     <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites – Christian writing and community" class="logo-img">
                 </a>
 
-                <!-- ===== NAVIGATION LINKS (Show on desktop, slide-in on mobile) ===== -->
+                <!-- ===== NAVIGATION LINKS ===== -->
                 <ul class="nav-links" id="navLinks" role="menubar">
                     <?php if (!$isLoggedIn): ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>" role="menuitem">Books</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>" role="menuitem">Poems</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/blog.php" class="<?php echo $currentPage === 'blog.php' ? 'active' : ''; ?>" role="menuitem">Blog</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/about.php" class="<?php echo $currentPage === 'about.php' ? 'active' : ''; ?>" role="menuitem">About</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/contact.php" class="<?php echo $currentPage === 'contact.php' ? 'active' : ''; ?>" role="menuitem">Contact</a></li>
-                        <li class="nav-separator" role="separator">|</li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/login.php" class="btn-login" role="menuitem"><i class="fas fa-sign-in-alt"></i> Login</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/register.php" class="btn-signup" role="menuitem">Sign Up</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>">Home</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>">Books</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>">Poems</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/blog.php" class="<?php echo $currentPage === 'blog.php' ? 'active' : ''; ?>">Blog</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/about.php" class="<?php echo $currentPage === 'about.php' ? 'active' : ''; ?>">About</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/contact.php" class="<?php echo $currentPage === 'contact.php' ? 'active' : ''; ?>">Contact</a></li>
+                        <li class="nav-separator">|</li>
+                        <li><a href="<?php echo SITE_URL; ?>/login.php" class="btn-login"><i class="fas fa-sign-in-alt"></i> Login</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/register.php" class="btn-signup">Sign Up</a></li>
                     <?php elseif ($isAdmin): ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_books.php" role="menuitem">📖 Books</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" role="menuitem">📝 Poems</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" role="menuitem">📅 Sessions</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_users.php" role="menuitem">👥 Users</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/settings.php" role="menuitem">⚙️ Settings</a></li>
-                        <li class="nav-separator" role="separator">|</li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_books.php">📖 Books</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_poems.php">📝 Poems</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php">📅 Sessions</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/admin/manage_users.php">👥 Users</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/admin/settings.php">⚙️ Settings</a></li>
+                        <li class="nav-separator">|</li>
+                        <li><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                     <?php else: ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/library.php" class="<?php echo $currentPage === 'library.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-book-reader"></i> My Library</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>" role="menuitem">Books</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>" role="menuitem">Poems</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/community.php" class="<?php echo $currentPage === 'community.php' ? 'active' : ''; ?>" role="menuitem">Community</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/book_session.php" class="<?php echo $currentPage === 'book_session.php' ? 'active' : ''; ?>" role="menuitem">Book Session</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/profile.php" class="<?php echo $currentPage === 'profile.php' ? 'active' : ''; ?>" role="menuitem">Profile</a></li>
-                        <li class="nav-separator" role="separator">|</li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>">Home</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/library.php" class="<?php echo $currentPage === 'library.php' ? 'active' : ''; ?>"><i class="fas fa-book-reader"></i> My Library</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>">Books</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>">Poems</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/community.php" class="<?php echo $currentPage === 'community.php' ? 'active' : ''; ?>">Community</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/book_session.php" class="<?php echo $currentPage === 'book_session.php' ? 'active' : ''; ?>">Book Session</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/profile.php" class="<?php echo $currentPage === 'profile.php' ? 'active' : ''; ?>">Profile</a></li>
+                        <li class="nav-separator">|</li>
+                        <li><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                     <?php endif; ?>
                 </ul>
 
+                <!-- ===== NAV ACTIONS ===== -->
                 <div class="nav-actions">
-                    <!-- ===== SEARCH ===== -->
+                    <!-- Search -->
                     <div class="search-wrapper">
-                        <button class="search-trigger nav-action-icon" aria-label="Search" onclick="toggleSearch()">
+                        <button class="search-trigger nav-action-icon" aria-label="Search" onclick="document.getElementById('searchDropdown').classList.toggle('open'); document.getElementById('searchInput').focus();">
                             <i class="fas fa-search"></i>
                         </button>
                         <form action="<?php echo SITE_URL; ?>/search_results.php" method="GET" class="search-dropdown" id="searchDropdown">
@@ -513,18 +491,18 @@ if ($isLoggedIn) {
                         </form>
                     </div>
 
-                    <!-- ===== BIBLE READER ===== -->
+                    <!-- Bible Reader -->
                     <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
                         <i class="fas fa-book-bible"></i>
                     </a>
 
-                    <!-- ===== NOTIFICATIONS ===== -->
+                    <!-- Notifications -->
                     <?php if ($isLoggedIn): ?>
                         <div class="notification-wrapper">
-                            <button class="nav-action-icon" aria-label="Notifications" onclick="toggleNotifications()">
+                            <button class="nav-action-icon" aria-label="Notifications" onclick="document.getElementById('notificationDropdown').classList.toggle('open');">
                                 <i class="fas fa-bell"></i>
                                 <?php if ($unreadNotifications > 0): ?>
-                                    <span class="notification-badge" aria-label="<?php echo $unreadNotifications; ?> unread notifications"><?php echo $unreadNotifications; ?></span>
+                                    <span class="notification-badge"><?php echo $unreadNotifications; ?></span>
                                 <?php endif; ?>
                             </button>
                             <div class="notification-dropdown" id="notificationDropdown">
@@ -544,14 +522,14 @@ if ($isLoggedIn) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- ===== THEME TOGGLE ===== -->
+                    <!-- Theme Toggle -->
                     <button class="nav-action-icon theme-toggle" id="themeToggle" aria-label="Toggle theme">
                         <i class="fas fa-moon"></i>
                     </button>
 
-                    <!-- ===== USER DROPDOWN (Logged in only) ===== -->
+                    <!-- User Dropdown (Logged in only) -->
                     <?php if ($isLoggedIn): ?>
-                        <div class="user-wrapper" onclick="toggleUserMenu()">
+                        <div class="user-wrapper" onclick="document.getElementById('userDropdown').classList.toggle('open');">
                             <i class="fas fa-user-circle" style="font-size: 1.2rem; color: var(--text);"></i>
                             <span style="font-size: 0.9rem; color: var(--text);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'User'); ?></span>
                             <div class="user-dropdown" id="userDropdown">
@@ -572,8 +550,8 @@ if ($isLoggedIn) {
                         </a>
                     <?php endif; ?>
 
-                    <!-- ===== HAMBURGER (Only visible on mobile) ===== -->
-                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false" onclick="toggleMobileMenu()">
+                    <!-- HAMBURGER (Only on mobile) -->
+                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" onclick="toggleMobileMenu()">
                         <span></span>
                         <span></span>
                         <span></span>
@@ -582,6 +560,7 @@ if ($isLoggedIn) {
             </div>
         </nav>
 
+        <!-- Overlay -->
         <div class="menu-overlay" id="menuOverlay" onclick="closeMobileMenu()"></div>
     </header>
 
@@ -608,25 +587,24 @@ if ($isLoggedIn) {
         <?php endif; ?>
     </main>
 
-    <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
+    <!-- ===== JAVASCRIPT – SIMPLE & RELIABLE ===== -->
     <script>
-    // ===== GLOBAL FUNCTIONS FOR MOBILE MENU =====
+    // ===== GLOBAL FUNCTIONS – ALWAYS AVAILABLE =====
     function toggleMobileMenu() {
         const navLinks = document.getElementById('navLinks');
         const overlay = document.getElementById('menuOverlay');
         const hamburger = document.getElementById('hamburger');
         const body = document.body;
 
-        if (!navLinks || !hamburger) return;
+        if (!navLinks) return;
         const isOpen = navLinks.classList.contains('open');
 
         if (isOpen) {
             closeMobileMenu();
         } else {
             navLinks.classList.add('open');
-            overlay.classList.add('open');
-            hamburger.classList.add('active');
-            hamburger.setAttribute('aria-expanded', 'true');
+            if (overlay) overlay.classList.add('open');
+            if (hamburger) hamburger.classList.add('active');
             body.style.overflow = 'hidden';
         }
     }
@@ -637,34 +615,28 @@ if ($isLoggedIn) {
         const hamburger = document.getElementById('hamburger');
         const body = document.body;
 
-        if (!navLinks || !hamburger) return;
+        if (!navLinks) return;
         navLinks.classList.remove('open');
-        overlay.classList.remove('open');
-        hamburger.classList.remove('active');
-        hamburger.setAttribute('aria-expanded', 'false');
+        if (overlay) overlay.classList.remove('open');
+        if (hamburger) hamburger.classList.remove('active');
         body.style.overflow = '';
     }
 
+    // ===== DOM READY =====
     document.addEventListener('DOMContentLoaded', function() {
-
-        // ===== SCROLL SHADOW =====
+        // Scroll shadow
         const header = document.getElementById('siteHeader');
         if (header) {
             window.addEventListener('scroll', function() {
-                if (window.scrollY > 10) {
-                    header.classList.add('scrolled');
-                } else {
-                    header.classList.remove('scrolled');
-                }
+                header.classList.toggle('scrolled', window.scrollY > 10);
             });
         }
 
-        // ===== THEME TOGGLE =====
+        // Theme toggle
         const themeToggle = document.getElementById('themeToggle');
         const html = document.documentElement;
         const themes = ['light', 'dark', 'system'];
         let currentThemeIndex = 0;
-
         const storedTheme = localStorage.getItem('angelwrites_theme');
         if (storedTheme && themes.includes(storedTheme)) {
             currentThemeIndex = themes.indexOf(storedTheme);
@@ -685,13 +657,9 @@ if ($isLoggedIn) {
         function updateIcon(theme) {
             if (themeToggle) {
                 const icon = themeToggle.querySelector('i');
-                if (theme === 'dark') {
-                    icon.className = 'fas fa-sun';
-                } else if (theme === 'light') {
-                    icon.className = 'fas fa-moon';
-                } else {
-                    icon.className = 'fas fa-circle-half-stroke';
-                }
+                if (theme === 'dark') icon.className = 'fas fa-sun';
+                else if (theme === 'light') icon.className = 'fas fa-moon';
+                else icon.className = 'fas fa-circle-half-stroke';
             }
         }
 
@@ -704,75 +672,40 @@ if ($isLoggedIn) {
             });
         }
 
-        // Listen for system theme changes
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
             if (localStorage.getItem('angelwrites_theme') === 'system') {
                 html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
             }
         });
 
-        // ===== SEARCH DROPDOWN =====
-        const searchTrigger = document.querySelector('.search-trigger');
-        const searchDropdown = document.getElementById('searchDropdown');
-        const searchInput = document.getElementById('searchInput');
-
-        if (searchTrigger && searchDropdown) {
-            searchTrigger.addEventListener('click', function() {
-                searchDropdown.classList.toggle('open');
-                if (searchDropdown.classList.contains('open') && searchInput) {
-                    searchInput.focus();
-                }
-            });
-
-            document.addEventListener('click', function(e) {
-                const wrapper = document.querySelector('.search-wrapper');
-                if (wrapper && !wrapper.contains(e.target)) {
-                    searchDropdown.classList.remove('open');
-                }
-            });
-        }
-
-        // ===== NOTIFICATIONS DROPDOWN =====
-        const notifTrigger = document.querySelector('.notification-wrapper .nav-action-icon');
-        const notifDropdown = document.getElementById('notificationDropdown');
-
-        if (notifTrigger && notifDropdown) {
-            notifTrigger.addEventListener('click', function() {
-                notifDropdown.classList.toggle('open');
-            });
-
-            document.addEventListener('click', function(e) {
-                const wrapper = document.querySelector('.notification-wrapper');
-                if (wrapper && !wrapper.contains(e.target)) {
-                    notifDropdown.classList.remove('open');
-                }
-            });
-        }
-
-        // ===== USER DROPDOWN =====
-        const userWrapper = document.querySelector('.user-wrapper');
-        const userDropdown = document.getElementById('userDropdown');
-
-        if (userWrapper && userDropdown) {
-            userWrapper.addEventListener('click', function() {
-                userDropdown.classList.toggle('open');
-            });
-
-            document.addEventListener('click', function(e) {
-                if (userWrapper && !userWrapper.contains(e.target)) {
-                    userDropdown.classList.remove('open');
-                }
-            });
-        }
-
-        // ===== ESCAPE KEY CLOSE =====
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
+        // Close mobile menu when a link is clicked
+        document.querySelectorAll('#navLinks a').forEach(function(link) {
+            link.addEventListener('click', function() {
                 closeMobileMenu();
-            }
+            });
         });
 
-    }); // end DOMContentLoaded
+        // Close mobile menu on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeMobileMenu();
+        });
+
+        // Close all dropdowns on outside click
+        document.addEventListener('click', function(e) {
+            // Search dropdown
+            if (!e.target.closest('.search-wrapper')) {
+                document.getElementById('searchDropdown').classList.remove('open');
+            }
+            // Notification dropdown
+            if (!e.target.closest('.notification-wrapper')) {
+                document.getElementById('notificationDropdown').classList.remove('open');
+            }
+            // User dropdown
+            if (!e.target.closest('.user-wrapper')) {
+                document.getElementById('userDropdown').classList.remove('open');
+            }
+        });
+    });
     </script>
 </body>
 </html>
