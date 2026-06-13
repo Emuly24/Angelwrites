@@ -607,7 +607,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="dashboard-section-card">
                 <div class="dashboard-section-header">
                     <h3><i class="fas fa-trophy"></i> Top Completion Rates</h3>
-                    <a href="<?php echo SITE_URL; ?>/reader/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
+                    <a href="<?php echo SITE_URL; ?>/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
                 </div>
                 <div class="dashboard-section-body">
                     <?php if (count($stats['book_completion_rates']) > 0): ?>
@@ -633,7 +633,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="dashboard-section-card">
                 <div class="dashboard-section-header">
                     <h3><i class="fas fa-exclamation-triangle"></i> Drop-off Points</h3>
-                    <a href="<?php echo SITE_URL; ?>/reader/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
+                    <a href="<?php echo SITE_URL; ?>/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
                 </div>
                 <div class="dashboard-section-body">
                     <?php if (count($stats['drop_off_points']) > 0): ?>
@@ -659,7 +659,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="dashboard-section-card">
                 <div class="dashboard-section-header">
                     <h3><i class="fas fa-fire"></i> Most Active Readers</h3>
-                    <a href="<?php echo SITE_URL; ?>/reader/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
+                    <a href="<?php echo SITE_URL; ?>/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
                 </div>
                 <div class="dashboard-section-body">
                     <?php if (count($stats['most_active_readers']) > 0): ?>
@@ -685,7 +685,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="dashboard-section-card" style="grid-column: 1 / -1;">
                 <div class="dashboard-section-header">
                     <h3><i class="fas fa-book-reader"></i> Recent Reading Activity</h3>
-                    <a href="<?php echo SITE_URL; ?>/reader/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
+                    <a href="<?php echo SITE_URL; ?>/admin/reader_analytics.php" class="view-all-link">View All &rarr;</a>
                 </div>
                 <div class="dashboard-section-body">
                     <?php if (count($recent_reading_activity) > 0): ?>
@@ -1084,6 +1084,59 @@ $pageTitle = 'Admin Dashboard';
     margin: 0;
     font-size: 0.85rem;
     font-weight: 400;
+}
+
+/* ===== SUBTLE EFFECTS ===== */
+.stat-card:hover .stat-number {
+    color: var(--rose);
+    transition: color 0.3s ease;
+}
+
+.action-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.action-card::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(192, 57, 43, 0.1);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+}
+
+.action-card:hover::after {
+    width: 300px;
+    height: 300px;
+}
+
+.dashboard-section-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dashboard-section-card:hover {
+    transform: translateY(-4px);
+}
+
+.dashboard-list-item {
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.dashboard-list-item:hover {
+    transform: translateX(4px);
+}
+
+.stat-card .stat-icon {
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover .stat-icon {
+    transform: scale(1.05) rotate(-3deg);
 }
 
 /* ===== RESPONSIVE ===== */

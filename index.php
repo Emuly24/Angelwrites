@@ -141,7 +141,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             <span class="hero-badge">✧ A Safe Place for Your Heart</span>
             <h1>
                 <?php if ($isLoggedIn): ?>
-                    Welcome back, <span class="rose-text">beloved</span>.
+                    Welcome Back, <span class="rose-text">Home</span>.
                 <?php else: ?>
                     Your Story <span class="rose-text">Lives Here</span>
                 <?php endif; ?>
@@ -194,7 +194,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                 <h2>Welcome to <span class="rose-text">AngelWrites</span></h2>
                 <p class="about-lead">You're here because something inside you is crying out for hope. You've been carrying pain, confusion, or loneliness — and you're looking for a place where you can just be real. You've found it.</p>
                 
-                <p>AngelWrites is not about one person. It's about <strong>you</strong> — and every young woman like you who needs to know that God hasn't given up on you. This is a <strong>community</strong> where you can heal, grow, and discover that your story matters.</p>
+                <p>AngelWrites is not about one person. It's about <strong>you</strong> and every human like you who needs to know that God hasn't given up on you. This is a <strong>community</strong> where you can heal, grow, and discover that your story matters.</p>
                 
                 <p>Here, you will find:</p>
                 
@@ -250,12 +250,6 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                     <?php else: ?>
                         <a href="<?php echo SITE_URL; ?>/dashboard.php" class="btn btn-primary">Go to My Dashboard</a>
                     <?php endif; ?>
-                </div>
-            </div>
-            <div class="about-image">
-                <div class="about-placeholder">
-                    <i class="fas fa-heart"></i>
-                    <span>Faith. Writing. Healing.</span>
                 </div>
             </div>
         </div>
