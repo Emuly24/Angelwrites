@@ -1209,4 +1209,4 @@ $pageTitle = 'Admin Dashboard';
 }
 </style>
 
-<?php require_once '../includes/footer.php'; ?>
+<?php require_once '../includesfooter.php'; ?>

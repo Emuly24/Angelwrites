@@ -144,9 +144,7 @@ function extractEPUB($file_path) {
     return $html_content;
 }
 
-// ============================================================
-//  PARAGRAPH & PAGE BREAK DETECTION
-// ============================================================
+// ===== PARAGRAPH & PAGE BREAK DETECTION =====
 
 function splitParagraphs($text) {
     $paragraphs = preg_split('/\n\s*\n/', $text, -1, PREG_SPLIT_NO_EMPTY);
@@ -245,7 +243,6 @@ function parseBook($raw_text) {
             }
         }
         $chapter['paragraphs'] = $final_paragraphs;
-        unset($chapter['content']);
     }
 
     return ['chapters' => $chapters, 'toc' => $toc, 'page_breaks' => $page_break_lines];
@@ -280,7 +277,6 @@ function renderBookFromParsed($parsed, $book) {
 }
 
 function renderBook($parsed, $book) {
-    // Use stored content_html if available
     global $db, $book_id;
     $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
     $stmt->execute([$book_id]);
@@ -291,9 +287,8 @@ function renderBook($parsed, $book) {
         return renderBookFromParsed($parsed, $book);
     }
 
-    // Inject data-page attributes based on <div class="page-break">
     $dom = new DOMDocument();
-    $dom->loadHTML(mb_convert_encoding($content_html, 'HTML-ENTITIES', 'UTF-8'));
+    @$dom->loadHTML(mb_convert_encoding($content_html, 'HTML-ENTITIES', 'UTF-8'));
     $xpath = new DOMXPath($dom);
     $paragraphs = $xpath->query('//p | //div[@class="chapter-container"]');
     $page_num = 1;
@@ -323,35 +318,8 @@ function renderBook($parsed, $book) {
     $html .= "</div>";
     return $html;
 }
-
-function extractKeywords($text, $limit = 10) {
-    $stop_words = ['the', 'and', 'to', 'of', 'a', 'in', 'that', 'it', 'for', 'with', 'on', 'was', 'as', 'by', 'at', 'an'];
-    $words = str_word_count(strtolower($text), 1);
-    $words = array_diff($words, $stop_words);
-    $counts = array_count_values($words);
-    arsort($counts);
-    return array_slice(array_keys($counts), 0, $limit);
-}
-
-function saveVersionHistory($book_id, $content_html, $toc_json, $metadata_json, $note = '') {
-    global $db;
-    $stmt = $db->prepare("SELECT MAX(version) FROM book_content_history WHERE book_id = ?");
-    $stmt->execute([$book_id]);
-    $current_version = $stmt->fetchColumn() ?? 0;
-    $new_version = $current_version + 1;
-
-    $stmt = $db->prepare("INSERT INTO book_content_history (book_id, content_html, toc_json, metadata_json, version, note) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$book_id, $content_html, $toc_json, $metadata_json, $new_version, $note]);
-    return $new_version;
-}
-
-function addToQueue($book_id) {
-    global $db;
-    $stmt = $db->prepare("INSERT OR IGNORE INTO book_processing_queue (book_id) VALUES (?)");
-    $stmt->execute([$book_id]);
-}
 // ============================================================
-//  DIFF, PREVIEW & RESTORE FUNCTIONS
+//  DIFF & COMPARISON FUNCTIONS (MISSING)
 // ============================================================
 
 function renderUnifiedDiff($old_html, $new_html, $usePatterns = false) {
@@ -503,6 +471,10 @@ function renderSideBySideDiff($old_html, $new_html, $usePatterns = false) {
     return $html;
 }
 
+// ============================================================
+//  TEXT DIFF FUNCTIONS (MISSING)
+// ============================================================
+
 function renderTextDiff($original_paragraphs, $current_paragraphs) {
     $added = 0; $removed = 0; $changed = 0; $same = 0;
     $max = max(count($original_paragraphs), count($current_paragraphs));
@@ -566,17 +538,21 @@ function renderTextDiff($original_paragraphs, $current_paragraphs) {
     return $html;
 }
 
+// ============================================================
+//  VERSION SIDE-BY-SIDE COMPARISON (MISSING)
+// ============================================================
+
 function renderVersionSideBySide($html_a, $html_b, $version_a, $version_b) {
     $clean_a = preg_replace('/ data-page="\d+"/', '', $html_a);
     $clean_b = preg_replace('/ data-page="\d+"/', '', $html_b);
 
     $dom_a = new DOMDocument();
-    $dom_a->loadHTML(mb_convert_encoding($clean_a, 'HTML-ENTITIES', 'UTF-8'));
+    @$dom_a->loadHTML(mb_convert_encoding($clean_a, 'HTML-ENTITIES', 'UTF-8'));
     $xpath_a = new DOMXPath($dom_a);
     $paras_a = $xpath_a->query('//p');
 
     $dom_b = new DOMDocument();
-    $dom_b->loadHTML(mb_convert_encoding($clean_b, 'HTML-ENTITIES', 'UTF-8'));
+    @$dom_b->loadHTML(mb_convert_encoding($clean_b, 'HTML-ENTITIES', 'UTF-8'));
     $xpath_b = new DOMXPath($dom_b);
     $paras_b = $xpath_b->query('//p');
 
@@ -641,9 +617,13 @@ function renderVersionSideBySide($html_a, $html_b, $version_a, $version_b) {
     return $html;
 }
 
+// ============================================================
+//  MERGE & RESTORE FUNCTIONS (MISSING)
+// ============================================================
+
 function mergePreservingEdits($current_html, $original_paragraphs) {
     $dom = new DOMDocument();
-    $dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
+    @$dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
     $xpath = new DOMXPath($dom);
 
     $paragraphs = $xpath->query('//p');
@@ -693,7 +673,7 @@ function mergePreservingEdits($current_html, $original_paragraphs) {
 
 function selectiveRestore($current_html, $original_paragraphs, $selected_indices) {
     $dom = new DOMDocument();
-    $dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
+    @$dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
     $xpath = new DOMXPath($dom);
 
     $paragraphs = $xpath->query('//p');
@@ -739,7 +719,7 @@ function selectiveRestore($current_html, $original_paragraphs, $selected_indices
 
 function restoreAllParagraphs($current_html, $original_paragraphs) {
     $dom = new DOMDocument();
-    $dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
+    @$dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
     $xpath = new DOMXPath($dom);
 
     $paragraphs = $xpath->query('//p');
@@ -789,7 +769,7 @@ function restoreAllParagraphs($current_html, $original_paragraphs) {
 
 function generatePreview($current_html, $original_paragraphs, $selected_indices, $preview_all = false) {
     $dom = new DOMDocument();
-    $dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
+    @$dom->loadHTML(mb_convert_encoding($current_html, 'HTML-ENTITIES', 'UTF-8'));
     $xpath = new DOMXPath($dom);
 
     $summary = $dom->createElement('div');
@@ -853,6 +833,10 @@ function generatePreview($current_html, $original_paragraphs, $selected_indices,
     $preview_html = preg_replace('/<\/body><\/html>$/s', '', $preview_html);
     return $preview_html;
 }
+
+// ============================================================
+//  REPORT GENERATION FUNCTIONS (MISSING)
+// ============================================================
 
 function generateReportHTML($diffContent, $title, $book_id) {
     return '<!DOCTYPE html>
@@ -922,54 +906,49 @@ function generateFullHistoryReport($historyContent, $book_id) {
 </body>
 </html>';
 }
+
+function extractKeywords($text, $limit = 10) {
+    $stop_words = ['the', 'and', 'to', 'of', 'a', 'in', 'that', 'it', 'for', 'with', 'on', 'was', 'as', 'by', 'at', 'an'];
+    $words = str_word_count(strtolower($text), 1);
+    $words = array_diff($words, $stop_words);
+    $counts = array_count_values($words);
+    arsort($counts);
+    return array_slice(array_keys($counts), 0, $limit);
+}
+
+function saveVersionHistory($book_id, $content_html, $toc_json, $metadata_json, $note = '') {
+    global $db;
+    $stmt = $db->prepare("SELECT MAX(version) FROM book_content_history WHERE book_id = ?");
+    $stmt->execute([$book_id]);
+    $current_version = $stmt->fetchColumn() ?? 0;
+    $new_version = $current_version + 1;
+
+    $stmt = $db->prepare("INSERT INTO book_content_history (book_id, content_html, toc_json, metadata_json, version, note) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$book_id, $content_html, $toc_json, $metadata_json, $new_version, $note]);
+    return $new_version;
+}
+
+function addToQueue($book_id) {
+    global $db;
+    $stmt = $db->prepare("INSERT OR IGNORE INTO book_processing_queue (book_id) VALUES (?)");
+    $stmt->execute([$book_id]);
+}
+
 // ============================================================
 //  POST HANDLERS
 // ============================================================
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['extract'])) {
-        $file_path = '../' . $book['file_path'];
-        if (!file_exists($file_path)) {
-            $error = 'Book file not found.';
-        } else {
-            $raw_text = extractRawText($file_path);
-            if ($raw_text) {
-                $parsed = parseBook($raw_text);
-                $html_content = renderBook($parsed, $book);
-                $toc_json = json_encode($parsed['toc']);
-                $metadata = [
-                    'keywords' => extractKeywords($raw_text),
-                    'page_breaks' => $parsed['page_breaks']
-                ];
-                $metadata_json = json_encode($metadata);
-
-                $stmt = $db->prepare("INSERT OR REPLACE INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status) VALUES (?, ?, ?, ?, ?, 1, 'complete')");
-                $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json]);
-
-                saveVersionHistory($book_id, $html_content, $toc_json, $metadata_json, 'Initial extraction');
-                $success = '✅ Content extracted, parsed, and rendered successfully.';
-            } else {
-                $error = 'Failed to extract content from the file.';
-            }
-        }
-    }
-    if (!empty($_FILES['live_cover']['name'])) {
-    $upload_dir = '../assets/uploads/books/';
-    if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-    $cover_filename = 'live_cover_' . time() . '.jpg';
-    if (move_uploaded_file($_FILES['live_cover']['tmp_name'], $upload_dir . $cover_filename)) {
-        $cover_path = 'assets/uploads/books/' . $cover_filename;
-        // Update book record with new cover
-        $stmt = $db->prepare("UPDATE books SET cover_path = ? WHERE id = ?");
-        $stmt->execute([$cover_path, $book_id]);
-    }
-}
-
-    if (isset($_POST['queue_book'])) {
-        addToQueue($book_id);
-        $success = '✅ Book added to processing queue.';
+    // Handle TOC Correction (direct POST without action)
+    if (isset($_POST['corrected_toc'])) {
+        $corrected_toc = json_decode($_POST['corrected_toc'], true);
+        $stmt = $db->prepare("UPDATE book_content SET toc_json = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
+        $stmt->execute([json_encode($corrected_toc), $book_id]);
+        echo json_encode(['success' => true]);
+        exit;
     }
 
+    // Handle Content Save
     if (isset($_POST['save_content'])) {
         $content_html = trim($_POST['content_html']);
         if (!empty($content_html)) {
@@ -981,82 +960,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             saveVersionHistory($book_id, $content_html, $row['toc_json'], $row['metadata_json'], 'Manual edit');
 
-            $success = '✅ Content saved successfully.';
+            echo json_encode(['success' => true]);
+            exit;
         } else {
-            $error = 'Content cannot be empty.';
+            echo json_encode(['success' => false, 'error' => 'Content cannot be empty.']);
+            exit;
         }
     }
 
-    if (isset($_POST['apply_corrections'])) {
-        $corrected_toc = json_decode($_POST['corrected_toc'], true);
-        $stmt = $db->prepare("UPDATE book_content SET toc_json = ?, version = version + 1 WHERE book_id = ?");
-        $stmt->execute([json_encode($corrected_toc), $book_id]);
+    // Handle Extraction
+    if (isset($_POST['extract'])) {
+        $file_path = '../' . $book['file_path'];
+        if (!file_exists($file_path)) {
+            echo json_encode(['success' => false, 'error' => 'Book file not found.']);
+            exit;
+        }
+        $raw_text = extractRawText($file_path);
+        if ($raw_text) {
+            $parsed = parseBook($raw_text);
+            $html_content = renderBook($parsed, $book);
+            $toc_json = json_encode($parsed['toc']);
+            $metadata = ['keywords' => extractKeywords($raw_text), 'page_breaks' => $parsed['page_breaks']];
+            $metadata_json = json_encode($metadata);
+
+            $stmt = $db->prepare("INSERT OR REPLACE INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status) VALUES (?, ?, ?, ?, ?, 1, 'complete')");
+            $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json]);
+
+            saveVersionHistory($book_id, $html_content, $toc_json, $metadata_json, 'Initial extraction');
+            echo json_encode(['success' => true, 'content' => $html_content]);
+            exit;
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Failed to extract content from the file.']);
+            exit;
+        }
+    }
+
+    // Handle Queue
+    if (isset($_POST['queue_book'])) {
+        addToQueue($book_id);
         echo json_encode(['success' => true]);
         exit;
     }
 
+    // Handle Reset Page Breaks
     if (isset($_POST['reset_page_breaks'])) {
         $file_path = '../' . $book['file_path'];
         if (!file_exists($file_path)) {
-            $error = 'Book file not found. Cannot reset page breaks.';
-        } else {
-            $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
-            $stmt->execute([$book_id]);
-            $old_content = $stmt->fetchColumn();
-
-            $raw_text = extractRawText($file_path);
-            if (!$raw_text) {
-                $error = 'Failed to extract content from the original file.';
-            } else {
-                $parsed = parseBook($raw_text);
-                $new_content = renderBookFromParsed($parsed, $book);
-                $metadata = [
-                    'keywords' => extractKeywords($raw_text),
-                    'page_breaks' => $parsed['page_breaks']
-                ];
-                $metadata_json = json_encode($metadata);
-                $toc_json = json_encode($parsed['toc']);
-
-                $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, metadata_json = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
-                $stmt->execute([$new_content, $toc_json, $metadata_json, $book_id]);
-
-                saveVersionHistory($book_id, $new_content, $toc_json, $metadata_json, 'Reset page breaks');
-
-                $_SESSION['page_break_diff_old'] = $old_content;
-                $_SESSION['page_break_diff_new'] = $new_content;
-                $_SESSION['show_diff'] = true;
-
-                $success = '✅ Page breaks reset successfully. <a href="#" onclick="showDiffModal()">View changes</a>';
-            }
+            echo json_encode(['success' => false, 'error' => 'Book file not found.']);
+            exit;
         }
+        $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
+        $stmt->execute([$book_id]);
+        $old_content = $stmt->fetchColumn();
+
+        $raw_text = extractRawText($file_path);
+        if (!$raw_text) {
+            echo json_encode(['success' => false, 'error' => 'Failed to extract content from the original file.']);
+            exit;
+        }
+        $parsed = parseBook($raw_text);
+        $new_content = renderBookFromParsed($parsed, $book);
+        $metadata = ['keywords' => extractKeywords($raw_text), 'page_breaks' => $parsed['page_breaks']];
+        $metadata_json = json_encode($metadata);
+        $toc_json = json_encode($parsed['toc']);
+
+        $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, metadata_json = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
+        $stmt->execute([$new_content, $toc_json, $metadata_json, $book_id]);
+
+        saveVersionHistory($book_id, $new_content, $toc_json, $metadata_json, 'Reset page breaks');
+        echo json_encode(['success' => true, 'content' => $new_content]);
+        exit;
     }
 
+    // Handle AJAX actions via 'action' parameter
     if (isset($_POST['action'])) {
         $action = $_POST['action'];
 
-        if ($action === 'accept') {
-            echo json_encode(['success' => true]);
-            exit;
-        }
-
-        if ($action === 'revert') {
-            if (!isset($_SESSION['page_break_diff_old'])) {
-                echo json_encode(['success' => false, 'error' => 'No old version found in session.']);
-                exit;
-            }
-            $old_content = $_SESSION['page_break_diff_old'];
-            $old_content = preg_replace('/ data-page="\d+"/', '', $old_content);
-            $stmt = $db->prepare("UPDATE book_content SET content_html = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
-            $stmt->execute([$old_content, $book_id]);
-
-            unset($_SESSION['page_break_diff_old']);
-            unset($_SESSION['page_break_diff_new']);
-            unset($_SESSION['show_diff']);
-
-            echo json_encode(['success' => true]);
-            exit;
-        }
-
+        // === COMPARE ORIGINAL ===
         if ($action === 'compare_original') {
             $current_content = $_POST['current_content'] ?? '';
             $file_path = '../' . $book['file_path'];
@@ -1082,6 +1062,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // === RESTORE FROM ORIGINAL (PRESERVING EDITS) ===
         if ($action === 'restore_original') {
             $current_content = $_POST['current_content'] ?? '';
             $file_path = '../' . $book['file_path'];
@@ -1112,8 +1093,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // === RESTORE TO ORIGINAL (FULL) ===
+        if ($action === 'restore_to_original_full') {
+            $file_path = '../' . $book['file_path'];
+            if (!file_exists($file_path)) {
+                echo json_encode(['success' => false, 'error' => 'Original file not found.']);
+                exit;
+            }
+            $raw_text = extractRawText($file_path);
+            if (!$raw_text) {
+                echo json_encode(['success' => false, 'error' => 'Failed to extract content from original file.']);
+                exit;
+            }
+            $parsed_original = parseBook($raw_text);
+            $new_content = renderBookFromParsed($parsed_original, $book);
+
+            $stmt = $db->prepare("UPDATE book_content SET content_html = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
+            $stmt->execute([$new_content, $book_id]);
+
+            $stmt = $db->prepare("SELECT toc_json, metadata_json FROM book_content WHERE book_id = ?");
+            $stmt->execute([$book_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            saveVersionHistory($book_id, $new_content, $row['toc_json'], $row['metadata_json'], 'Restored to original (full)');
+
+            echo json_encode(['success' => true, 'content' => $new_content]);
+            exit;
+        }
+
+        // === REVERT RESTORE ===
+        if ($action === 'revert_restore_original') {
+            $stmt = $db->prepare("SELECT content_html FROM book_content_history WHERE book_id = ? ORDER BY version DESC LIMIT 1 OFFSET 1");
+            $stmt->execute([$book_id]);
+            $previous_content = $stmt->fetchColumn();
+            if (!$previous_content) {
+                echo json_encode(['success' => false, 'error' => 'No previous version found.']);
+                exit;
+            }
+            $stmt = $db->prepare("UPDATE book_content SET content_html = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
+            $stmt->execute([$previous_content, $book_id]);
+
+            $stmt = $db->prepare("SELECT toc_json, metadata_json FROM book_content WHERE book_id = ?");
+            $stmt->execute([$book_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            saveVersionHistory($book_id, $previous_content, $row['toc_json'], $row['metadata_json'], 'Reverted restore');
+
+            echo json_encode(['success' => true, 'content' => $previous_content]);
+            exit;
+        }
+
+        // === PREVIEW RESTORE ===
         if ($action === 'preview_restore') {
-            $book_id = (int)$_POST['book_id'];
             $selected = json_decode($_POST['selected'], true);
             $preview_all = isset($_POST['preview_all']) && $_POST['preview_all'] === '1';
 
@@ -1141,8 +1170,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // === SELECTIVE RESTORE ===
         if ($action === 'selective_restore') {
-            $book_id = (int)$_POST['book_id'];
             $selected = json_decode($_POST['selected'], true);
             $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
             $stmt->execute([$book_id]);
@@ -1176,8 +1205,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // === RESTORE ALL ===
         if ($action === 'restore_all') {
-            $book_id = (int)$_POST['book_id'];
             $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
             $stmt->execute([$book_id]);
             $current_html = $stmt->fetchColumn();
@@ -1210,8 +1239,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // === GET VERSION HISTORY ===
         if ($action === 'get_version_history') {
-            $book_id = (int)$_POST['book_id'];
             $stmt = $db->prepare("SELECT * FROM book_content_history WHERE book_id = ? ORDER BY version DESC");
             $stmt->execute([$book_id]);
             $versions = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1257,8 +1286,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // === PREVIEW VERSION ===
         if ($action === 'preview_version') {
-            $book_id = (int)$_POST['book_id'];
             $version = (int)$_POST['version'];
             $stmt = $db->prepare("SELECT content_html, created_at, note FROM book_content_history WHERE book_id = ? AND version = ?");
             $stmt->execute([$book_id, $version]);
@@ -1285,8 +1314,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // === RESTORE VERSION ===
         if ($action === 'restore_version') {
-            $book_id = (int)$_POST['book_id'];
             $version = (int)$_POST['version'];
             $stmt = $db->prepare("SELECT content_html, toc_json, metadata_json FROM book_content_history WHERE book_id = ? AND version = ?");
             $stmt->execute([$book_id, $version]);
@@ -1318,39 +1347,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        if ($action === 'send_report_email') {
-            $book_id = (int)$_POST['book_id'];
-            $to_email = trim($_POST['email']);
-            $title = trim($_POST['title']);
-            $diff_content = $_POST['diff_content'];
-
-            if (!filter_var($to_email, FILTER_VALIDATE_EMAIL)) {
-                echo json_encode(['success' => false, 'error' => 'Invalid email address.']);
-                exit;
-            }
-
-            $report_html = generateReportHTML($diff_content, $title, $book_id);
-            $temp_dir = __DIR__ . '/../tmp/reports/';
-            if (!is_dir($temp_dir)) mkdir($temp_dir, 0755, true);
-            $filename = 'report_' . date('Ymd_His') . '.html';
-            $file_path = $temp_dir . $filename;
-            file_put_contents($file_path, $report_html);
-
-            $subject = 'Version Comparison Report: ' . $title;
-            $body = "<p>Please find attached the version comparison report for Book ID {$book_id}.</p>";
-            $body .= "<p>Title: <strong>{$title}</strong></p>";
-            $body .= "<p>Generated: " . date('Y-m-d H:i:s') . "</p>";
-            $body .= "<p>This report was automatically generated by AngelWrites.</p>";
-
-            $result = sendEmailWithAttachment($to_email, $subject, $body, $file_path, $filename);
-            @unlink($file_path);
-
-            echo json_encode(['success' => $result, 'error' => $result ? null : 'Failed to send email.']);
-            exit;
-        }
-
+        // === SEND FULL HISTORY EMAIL ===
         if ($action === 'send_full_history_email') {
-            $book_id = (int)$_POST['book_id'];
             $to_email = trim($_POST['email']);
             $history_content = $_POST['history_content'];
 
@@ -1392,11 +1390,6 @@ require_once '../includes/header.php';
     <div class="container">
         <div class="admin-header">
             <h1>Process Book: <?php echo htmlspecialchars($book['title']); ?></h1>
-            <div class="form-group">
-                <label>Live Book Cover</label>
-                <div class="camera-section">...</div>
-                <input type="file" name="live_cover" id="liveCoverInput" accept="image/*" style="display:none;">
-            </div>
             <div class="admin-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Books
@@ -1414,15 +1407,14 @@ require_once '../includes/header.php';
         <div class="card">
             <div class="card-header"><h2>📥 Stage 1: Extract & Parse</h2></div>
             <div class="card-body">
-                <form method="POST">
-                    <button type="submit" name="extract" class="btn btn-primary btn-large">
-                        <i class="fas fa-magic"></i> Extract & Parse Content
-                    </button>
-                    <button type="submit" name="queue_book" class="btn btn-secondary btn-large">
-                        <i class="fas fa-clock"></i> Add to Processing Queue
-                    </button>
-                    <p class="field-hint">The extractor uses `pdftotext` if available; otherwise, it falls back to pure PHP.</p>
-                </form>
+                <button onclick="extractAndParse()" class="btn btn-primary btn-large">
+                    <i class="fas fa-magic"></i> Extract & Parse Content
+                </button>
+                <button onclick="queueBook()" class="btn btn-secondary btn-large">
+                    <i class="fas fa-clock"></i> Add to Processing Queue
+                </button>
+                <p class="field-hint">The extractor uses `pdftotext` if available; otherwise, it falls back to pure PHP.</p>
+                <div id="extract-status" style="display:none;padding:12px;border-radius:8px;margin-top:12px;"></div>
             </div>
         </div>
 
@@ -1431,10 +1423,7 @@ require_once '../includes/header.php';
         <div class="card">
             <div class="card-header"><h2>✏️ Stage 2: Correction Interface</h2></div>
             <div class="card-body">
-                <?php
-                // Render TOC correction
-                $toc = json_decode($existing['toc_json'] ?? '[]', true);
-                ?>
+                <?php $toc = json_decode($existing['toc_json'] ?? '[]', true); ?>
                 <div style="background:var(--vanilla);padding:16px;border-radius:12px;border:1px solid var(--border);margin:16px 0;">
                     <h4 style="margin-top:0;">📑 Table of Contents</h4>
                     <div class="toc-editor" style="display:flex;flex-direction:column;gap:4px;">
@@ -1443,7 +1432,7 @@ require_once '../includes/header.php';
                                 <input type="text" value="<?php echo htmlspecialchars($item['title']); ?>" 
                                        data-index="<?php echo $i; ?>" class="toc-edit-field" 
                                        style="flex:1;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;">
-                                <button class="btn btn-sm btn-danger remove-toc" data-index="<?php echo $i; ?>" 
+                                <button class="btn btn-sm btn-danger remove-toc" onclick="this.parentElement.remove()" 
                                         style="padding:2px 8px;font-size:0.7rem;">✕</button>
                             </div>
                         <?php endforeach; ?>
@@ -1453,6 +1442,7 @@ require_once '../includes/header.php';
                         <button class="btn btn-sm btn-primary" onclick="applyTocCorrections()">✅ Apply Corrections</button>
                     </div>
                 </div>
+                <div id="toc-status" style="display:none;padding:12px;border-radius:8px;margin-top:8px;"></div>
                 <script>
                 function addTocEntry() {
                     const container = document.querySelector('.toc-editor');
@@ -1471,42 +1461,25 @@ require_once '../includes/header.php';
                     });
                     const formData = new FormData();
                     formData.append('corrected_toc', JSON.stringify(toc));
+                    const statusDiv = document.getElementById('toc-status');
+                    statusDiv.style.display = 'block';
+                    statusDiv.innerHTML = '⏳ Applying corrections...';
+                    statusDiv.style.background = '#e9ecef';
                     fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
                         method: 'POST',
                         body: formData
                     }).then(r => r.json()).then(data => {
-                        if (data.success) location.reload();
-                        else alert('Failed to apply corrections.');
+                        if (data.success) {
+                            statusDiv.innerHTML = '✅ TOC corrected successfully!';
+                            statusDiv.style.background = '#d4edda';
+                            statusDiv.style.color = '#155724';
+                            setTimeout(() => location.reload(), 1000);
+                        } else {
+                            statusDiv.innerHTML = '❌ Failed to apply corrections.';
+                            statusDiv.style.background = '#f8d7da';
+                            statusDiv.style.color = '#721c24';
+                        }
                     });
-                }
-                </script>
-
-                <!-- Page break correction -->
-                <?php
-                $content = $existing['content_html'] ?? '';
-                $break_count = substr_count($content, 'class="page-break"');
-                ?>
-                <div style="background:var(--vanilla);padding:16px;border-radius:12px;border:1px solid var(--border);margin:16px 0;">
-                    <h4 style="margin-top:0;">📄 Page Breaks</h4>
-                    <p style="color:var(--text-light);font-size:0.9rem;">
-                        Current page breaks: <strong><?php echo $break_count; ?></strong>.
-                        Use the editor to insert or remove breaks. Click "Save Changes" below to apply.
-                    </p>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <button class="btn btn-sm btn-primary" onclick="insertPageBreakInEditor()">➕ Insert Page Break</button>
-                        <button class="btn btn-sm btn-danger" onclick="removePageBreakInEditor()">➖ Remove Nearest Break</button>
-                    </div>
-                </div>
-                <script>
-                function insertPageBreakInEditor() {
-                    if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
-                        tinymce.activeEditor.execCommand('insertpagebreak');
-                    }
-                }
-                function removePageBreakInEditor() {
-                    if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
-                        tinymce.activeEditor.execCommand('removepagebreak');
-                    }
                 }
                 </script>
             </div>
@@ -1518,46 +1491,6 @@ require_once '../includes/header.php';
             <div class="card-header"><h2>📝 Stage 3: Edit & Refine</h2></div>
             <div class="card-body">
                 <textarea id="editor" name="content_html" style="width:100%;height:500px;"><?php echo htmlspecialchars($existing['content_html'] ?? ''); ?></textarea>
-                <?php
-                // TinyMCE with page break support
-                ?>
-                <script>
-                tinymce.init({
-                    selector: '#editor',
-                    height: 500,
-                    menubar: true,
-                    plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
-                    toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code | insertpagebreak removepagebreak',
-                    content_style: 'body { font-family: Inter, sans-serif; font-size: 18px; line-height: 2; } .page-break { display: block; width: 100%; border-top: 2px dashed #c0392b; margin: 20px 0; text-align: center; color: #c0392b; font-size: 0.8rem; } .page-break::before { content: "⏎ Page Break"; }',
-                    forced_root_block: 'p',
-                    setup: function(editor) {
-                        editor.ui.registry.addButton('insertpagebreak', {
-                            text: '📄 Insert Page Break',
-                            icon: 'newpage',
-                            onAction: function() {
-                                editor.insertContent('<div class="page-break" data-page-break="true"></div>');
-                            }
-                        });
-                        editor.ui.registry.addButton('removepagebreak', {
-                            text: '🗑️ Remove Page Break',
-                            icon: 'remove',
-                            onAction: function() {
-                                const node = editor.selection.getNode();
-                                if (node.classList && node.classList.contains('page-break')) {
-                                    node.remove();
-                                    return;
-                                }
-                                const parent = node.closest('.page-break');
-                                if (parent) {
-                                    parent.remove();
-                                    return;
-                                }
-                                alert('No page break found at cursor position.');
-                            }
-                        });
-                    }
-                });
-                </script>
                 <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
                     <button class="btn btn-primary" onclick="saveContent()">💾 Save Changes</button>
                     <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-secondary" target="_blank">
@@ -1582,26 +1515,18 @@ require_once '../includes/header.php';
         <div class="card">
             <div class="card-header"><h2>📤 Stage 4: Export</h2></div>
             <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;">
-                <form method="POST" style="display:inline;">
-                    <button type="submit" name="export_txt" class="btn btn-sm btn-outline">
-                        <i class="fas fa-file-alt"></i> TXT
-                    </button>
-                </form>
-                <form method="POST" style="display:inline;">
-                    <button type="submit" name="export_html" class="btn btn-sm btn-outline">
-                        <i class="fas fa-file-code"></i> HTML
-                    </button>
-                </form>
-                <form method="POST" style="display:inline;">
-                    <button type="submit" name="export_toc" class="btn btn-sm btn-outline">
-                        <i class="fas fa-table"></i> TOC CSV
-                    </button>
-                </form>
-                <form method="POST" style="display:inline;">
-                    <button type="submit" name="export_multi" class="btn btn-sm btn-outline">
-                        <i class="fas fa-folder-open"></i> Multi-Page ZIP
-                    </button>
-                </form>
+                <button class="btn btn-sm btn-outline" onclick="alert('Export TXT feature coming soon.')">
+                    <i class="fas fa-file-alt"></i> TXT
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="alert('Export HTML feature coming soon.')">
+                    <i class="fas fa-file-code"></i> HTML
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="alert('Export TOC CSV feature coming soon.')">
+                    <i class="fas fa-table"></i> TOC CSV
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="alert('Export Multi-Page ZIP feature coming soon.')">
+                    <i class="fas fa-folder-open"></i> Multi-Page ZIP
+                </button>
             </div>
         </div>
         <?php endif; ?>
@@ -1636,12 +1561,10 @@ require_once '../includes/header.php';
                     This will <strong>discard all manual page breaks</strong> and re‑parse the original file.
                     Any custom edits to the content (text changes, paragraph splits) will be lost.
                 </p>
-                <form method="POST" onsubmit="return confirm('Are you sure? This will overwrite all content with a fresh extraction.');">
-                    <input type="hidden" name="reset_page_breaks" value="1">
-                    <button type="submit" class="btn btn-danger btn-large">
-                        <i class="fas fa-redo-alt"></i> Reset Page Breaks
-                    </button>
-                </form>
+                <button class="btn btn-danger btn-large" onclick="resetPageBreaks()">
+                    <i class="fas fa-redo-alt"></i> Reset Page Breaks
+                </button>
+                <div id="reset-status" style="display:none;padding:12px;border-radius:8px;margin-top:12px;"></div>
             </div>
         </div>
         <?php endif; ?>
@@ -1694,6 +1617,7 @@ require_once '../includes/header.php';
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.4.2/tinymce.min.js"></script>
 <script>
 // ============================================================
 //  GLOBAL JAVASCRIPT
@@ -1702,128 +1626,76 @@ require_once '../includes/header.php';
 let diffMode = 'unified';
 let colorBlindMode = false;
 
-function showDiffModal() {
-    document.getElementById('diffModal').style.display = 'block';
-    document.body.style.overflow = 'hidden';
-    diffMode = 'unified';
-    colorBlindMode = false;
-    updateDiffView();
-    updateToggleUI();
-    updateColorBlindUI();
-}
+// ===== TINYMCE INIT =====
+tinymce.init({
+    selector: '#editor',
+    height: 500,
+    menubar: true,
+    plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+    toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
+    content_style: 'body { font-family: Inter, sans-serif; font-size: 18px; line-height: 2; } .page-break { display: block; width: 100%; border-top: 2px dashed #c0392b; margin: 20px 0; text-align: center; color: #c0392b; font-size: 0.8rem; } .page-break::before { content: "⏎ Page Break"; }',
+    forced_root_block: 'p'
+});
 
-function closeDiffModal() {
-    document.getElementById('diffModal').style.display = 'none';
-    document.body.style.overflow = 'auto';
-}
-
-function toggleDiffMode() {
-    diffMode = diffMode === 'unified' ? 'sidebyside' : 'unified';
-    updateDiffView();
-    updateToggleUI();
-}
-
-function toggleColorBlindMode() {
-    colorBlindMode = !colorBlindMode;
-    updateDiffView();
-    updateColorBlindUI();
-}
-
-function updateDiffView() {
-    const container = document.getElementById('diffContent');
-    container.innerHTML = '<p style="text-align:center;color:#999;">Loading diff view...</p>';
+// ===== STAGE 1: EXTRACT & PARSE =====
+function extractAndParse() {
+    const statusDiv = document.getElementById('extract-status');
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '⏳ Extracting and parsing content...';
+    statusDiv.style.background = '#e9ecef';
     const formData = new FormData();
-    formData.append('mode', diffMode);
-    formData.append('color_blind', colorBlindMode ? '1' : '0');
-    fetch('<?php echo SITE_URL; ?>/admin/diff_ajax.php', {
-        method: 'POST',
-        body: formData
-    }).then(response => response.text()).then(html => { container.innerHTML = html; });
-}
-
-function updateToggleUI() {
-    const btn = document.getElementById('diffToggleBtn');
-    const text = document.getElementById('diffToggleText');
-    const icon = document.getElementById('diffToggleIcon');
-    if (diffMode === 'unified') {
-        text.textContent = 'Unified';
-        icon.textContent = '📄';
-        btn.classList.remove('active');
-    } else {
-        text.textContent = 'Side-by-Side';
-        icon.textContent = '📑';
-        btn.classList.add('active');
-    }
-}
-
-function updateColorBlindUI() {
-    const btn = document.getElementById('colorBlindBtn');
-    const text = document.getElementById('colorBlindText');
-    const icon = document.getElementById('colorBlindIcon');
-    if (colorBlindMode) {
-        text.textContent = 'Pattern mode';
-        icon.textContent = '🔲';
-        btn.classList.add('active');
-    } else {
-        text.textContent = 'Color mode';
-        icon.textContent = '👁️';
-        btn.classList.remove('active');
-    }
-}
-
-function downloadDiff() {
-    const formData = new FormData();
-    formData.append('mode', diffMode);
-    formData.append('color_blind', colorBlindMode ? '1' : '0');
-    formData.append('download', '1');
-    fetch('<?php echo SITE_URL; ?>/admin/diff_ajax.php', {
-        method: 'POST',
-        body: formData
-    }).then(response => response.text()).then(text => {
-        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'page_break_diff.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    });
-}
-
-function acceptChanges() {
-    if (confirm('✅ The new version has already been saved. Do you want to keep it?')) {
-        const formData = new FormData();
-        formData.append('action', 'accept');
-        fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
-            method: 'POST',
-            body: formData
-        }).then(response => response.json()).then(data => {
-            if (data.success) {
-                alert('✅ Changes accepted. New version is now the active content.');
-                closeDiffModal();
-            } else {
-                alert('❌ Failed to accept changes: ' + data.error);
-            }
-        });
-    }
-}
-
-function revertChanges() {
-    if (!confirm('⚠️ This will undo the reset and restore the old version. All manual edits will be lost. Continue?')) return;
-    const formData = new FormData();
-    formData.append('action', 'revert');
+    formData.append('extract', '1');
     fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
         method: 'POST',
         body: formData
-    }).then(response => response.json()).then(data => {
+    }).then(r => r.json()).then(data => {
         if (data.success) {
-            alert('✅ Reverted to old version successfully. Page breaks restored.');
-            location.reload();
+            statusDiv.innerHTML = '✅ Content extracted and parsed successfully!';
+            statusDiv.style.background = '#d4edda';
+            statusDiv.style.color = '#155724';
+            setTimeout(() => location.reload(), 1500);
         } else {
-            alert('❌ Failed to revert: ' + (data.error || 'Unknown error'));
-            location.reload();
+            statusDiv.innerHTML = '❌ Error: ' + (data.error || 'Unknown error');
+            statusDiv.style.background = '#f8d7da';
+            statusDiv.style.color = '#721c24';
+        }
+    });
+}
+
+function queueBook() {
+    const statusDiv = document.getElementById('extract-status');
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '⏳ Adding to queue...';
+    const formData = new FormData();
+    formData.append('queue_book', '1');
+    fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
+        method: 'POST',
+        body: formData
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '✅ Book added to processing queue!';
+            statusDiv.style.background = '#d4edda';
+        } else {
+            statusDiv.innerHTML = '❌ Error: ' + (data.error || 'Unknown error');
+            statusDiv.style.background = '#f8d7da';
+        }
+    });
+}
+
+// ===== STAGE 3: EDIT & REFINE =====
+function saveContent() {
+    const content = tinymce.get('editor').getContent();
+    const formData = new FormData();
+    formData.append('save_content', '1');
+    formData.append('content_html', content);
+    fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
+        method: 'POST',
+        body: formData
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            alert('✅ Content saved.');
+        } else {
+            alert('❌ Failed to save: ' + (data.error || 'Unknown error'));
         }
     });
 }
@@ -1890,7 +1762,6 @@ function restoreToOriginalFull() {
     statusDiv.style.display = 'block';
     statusDiv.innerHTML = '⏳ Restoring to original file...';
     statusDiv.style.background = '#e9ecef';
-    statusDiv.style.color = '#333';
     fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
         method: 'POST',
         body: formData
@@ -1928,21 +1799,33 @@ function revertRestoreToOriginal() {
     });
 }
 
-function saveContent() {
-    const content = tinymce.get('editor').getContent();
+function resetPageBreaks() {
+    if (!confirm('⚠️ This will discard all manual page breaks and re-parse the original file. Continue?')) return;
+    const statusDiv = document.getElementById('reset-status');
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '⏳ Resetting page breaks...';
+    statusDiv.style.background = '#e9ecef';
     const formData = new FormData();
-    formData.append('save_content', '1');
-    formData.append('content_html', content);
+    formData.append('reset_page_breaks', '1');
     fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
         method: 'POST',
         body: formData
-    }).then(response => response.text()).then(() => {
-        alert('✅ Content saved.');
-    }).catch(() => {
-        alert('❌ Failed to save.');
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            tinymce.get('editor').setContent(data.content);
+            statusDiv.innerHTML = '✅ Page breaks reset successfully!';
+            statusDiv.style.background = '#d4edda';
+            statusDiv.style.color = '#155724';
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+        } else {
+            statusDiv.innerHTML = '❌ Failed to reset: ' + (data.error || 'Unknown error');
+            statusDiv.style.background = '#f8d7da';
+            statusDiv.style.color = '#721c24';
+        }
     });
 }
 
+// ===== VERSION HISTORY =====
 function loadVersionHistory() {
     const container = document.getElementById('version-history-container');
     container.innerHTML = '<p style="color:var(--text-light);font-size:0.9rem;">Loading version history...</p>';
@@ -2057,6 +1940,133 @@ function generateFullHistoryReport(content, bookId) {
         ${content}
         <p style="margin-top:30px;color:#999;text-align:center;">AngelWrites</p>
     </body></html>`;
+}
+
+// ===== DIFF MODAL =====
+function showDiffModal() {
+    document.getElementById('diffModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    diffMode = 'unified';
+    colorBlindMode = false;
+    updateDiffView();
+    updateToggleUI();
+    updateColorBlindUI();
+}
+
+function closeDiffModal() {
+    document.getElementById('diffModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+function toggleDiffMode() {
+    diffMode = diffMode === 'unified' ? 'sidebyside' : 'unified';
+    updateDiffView();
+    updateToggleUI();
+}
+
+function toggleColorBlindMode() {
+    colorBlindMode = !colorBlindMode;
+    updateDiffView();
+    updateColorBlindUI();
+}
+
+function updateDiffView() {
+    const container = document.getElementById('diffContent');
+    container.innerHTML = '<p style="text-align:center;color:#999;">Loading diff view...</p>';
+    const formData = new FormData();
+    formData.append('mode', diffMode);
+    formData.append('color_blind', colorBlindMode ? '1' : '0');
+    fetch('<?php echo SITE_URL; ?>/admin/diff_ajax.php', {
+        method: 'POST',
+        body: formData
+    }).then(response => response.text()).then(html => { container.innerHTML = html; });
+}
+
+function updateToggleUI() {
+    const btn = document.getElementById('diffToggleBtn');
+    const text = document.getElementById('diffToggleText');
+    const icon = document.getElementById('diffToggleIcon');
+    if (diffMode === 'unified') {
+        text.textContent = 'Unified';
+        icon.textContent = '📄';
+        btn.classList.remove('active');
+    } else {
+        text.textContent = 'Side-by-Side';
+        icon.textContent = '📑';
+        btn.classList.add('active');
+    }
+}
+
+function updateColorBlindUI() {
+    const btn = document.getElementById('colorBlindBtn');
+    const text = document.getElementById('colorBlindText');
+    const icon = document.getElementById('colorBlindIcon');
+    if (colorBlindMode) {
+        text.textContent = 'Pattern mode';
+        icon.textContent = '🔲';
+        btn.classList.add('active');
+    } else {
+        text.textContent = 'Color mode';
+        icon.textContent = '👁️';
+        btn.classList.remove('active');
+    }
+}
+
+function downloadDiff() {
+    const formData = new FormData();
+    formData.append('mode', diffMode);
+    formData.append('color_blind', colorBlindMode ? '1' : '0');
+    formData.append('download', '1');
+    fetch('<?php echo SITE_URL; ?>/admin/diff_ajax.php', {
+        method: 'POST',
+        body: formData
+    }).then(response => response.text()).then(text => {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'page_break_diff.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+}
+
+function acceptChanges() {
+    if (confirm('✅ The new version has already been saved. Do you want to keep it?')) {
+        const formData = new FormData();
+        formData.append('action', 'accept');
+        fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json()).then(data => {
+            if (data.success) {
+                alert('✅ Changes accepted. New version is now the active content.');
+                closeDiffModal();
+            } else {
+                alert('❌ Failed to accept changes: ' + (data.error || 'Unknown error'));
+            }
+        });
+    }
+}
+
+function revertChanges() {
+    if (!confirm('⚠️ This will undo the reset and restore the old version. All manual edits will be lost. Continue?')) return;
+    const formData = new FormData();
+    formData.append('action', 'revert');
+    fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
+        method: 'POST',
+        body: formData
+    }).then(response => response.json()).then(data => {
+        if (data.success) {
+            alert('✅ Reverted to old version successfully. Page breaks restored.');
+            location.reload();
+        } else {
+            alert('❌ Failed to revert: ' + (data.error || 'Unknown error'));
+            location.reload();
+        }
+    });
 }
 
 // Load history on page load
