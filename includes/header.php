@@ -573,7 +573,7 @@ if ($isLoggedIn) {
                     <?php endif; ?>
 
                     <!-- ===== HAMBURGER (Only visible on mobile) ===== -->
-                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false">
+                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" role="button" tabindex="0" aria-expanded="false" onclick="toggleMobileMenu()">
                         <span></span>
                         <span></span>
                         <span></span>
@@ -610,192 +610,169 @@ if ($isLoggedIn) {
 
     <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
-    (function() {
-        'use strict';
+    // ===== GLOBAL FUNCTIONS FOR MOBILE MENU =====
+    function toggleMobileMenu() {
+        const navLinks = document.getElementById('navLinks');
+        const overlay = document.getElementById('menuOverlay');
+        const hamburger = document.getElementById('hamburger');
+        const body = document.body;
 
-        // ===== DOM READY =====
-        document.addEventListener('DOMContentLoaded', function() {
+        if (!navLinks || !hamburger) return;
+        const isOpen = navLinks.classList.contains('open');
 
-            // ===== SCROLL SHADOW =====
-            const header = document.getElementById('siteHeader');
-            if (header) {
-                window.addEventListener('scroll', function() {
-                    if (window.scrollY > 10) {
-                        header.classList.add('scrolled');
-                    } else {
-                        header.classList.remove('scrolled');
-                    }
-                });
-            }
+        if (isOpen) {
+            closeMobileMenu();
+        } else {
+            navLinks.classList.add('open');
+            overlay.classList.add('open');
+            hamburger.classList.add('active');
+            hamburger.setAttribute('aria-expanded', 'true');
+            body.style.overflow = 'hidden';
+        }
+    }
 
-            // ===== THEME TOGGLE =====
-            const themeToggle = document.getElementById('themeToggle');
-            const html = document.documentElement;
-            const themes = ['light', 'dark', 'system'];
-            let currentThemeIndex = 0;
+    function closeMobileMenu() {
+        const navLinks = document.getElementById('navLinks');
+        const overlay = document.getElementById('menuOverlay');
+        const hamburger = document.getElementById('hamburger');
+        const body = document.body;
 
-            const storedTheme = localStorage.getItem('angelwrites_theme');
-            if (storedTheme && themes.includes(storedTheme)) {
-                currentThemeIndex = themes.indexOf(storedTheme);
-            }
+        if (!navLinks || !hamburger) return;
+        navLinks.classList.remove('open');
+        overlay.classList.remove('open');
+        hamburger.classList.remove('active');
+        hamburger.setAttribute('aria-expanded', 'false');
+        body.style.overflow = '';
+    }
 
-            function applyTheme(theme) {
-                if (theme === 'system') {
-                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    document.addEventListener('DOMContentLoaded', function() {
+
+        // ===== SCROLL SHADOW =====
+        const header = document.getElementById('siteHeader');
+        if (header) {
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 10) {
+                    header.classList.add('scrolled');
                 } else {
-                    html.setAttribute('data-theme', theme);
+                    header.classList.remove('scrolled');
                 }
-                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-                updateIcon(theme);
-                localStorage.setItem('angelwrites_theme', theme);
+            });
+        }
+
+        // ===== THEME TOGGLE =====
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        const themes = ['light', 'dark', 'system'];
+        let currentThemeIndex = 0;
+
+        const storedTheme = localStorage.getItem('angelwrites_theme');
+        if (storedTheme && themes.includes(storedTheme)) {
+            currentThemeIndex = themes.indexOf(storedTheme);
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+            } else {
+                html.setAttribute('data-theme', theme);
             }
+            document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+            updateIcon(theme);
+            localStorage.setItem('angelwrites_theme', theme);
+        }
 
-            function updateIcon(theme) {
-                if (themeToggle) {
-                    const icon = themeToggle.querySelector('i');
-                    if (theme === 'dark') {
-                        icon.className = 'fas fa-sun';
-                    } else if (theme === 'light') {
-                        icon.className = 'fas fa-moon';
-                    } else {
-                        icon.className = 'fas fa-circle-half-stroke';
-                    }
-                }
-            }
-
-            applyTheme(themes[currentThemeIndex]);
-
+        function updateIcon(theme) {
             if (themeToggle) {
-                themeToggle.addEventListener('click', function() {
-                    currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-                    applyTheme(themes[currentThemeIndex]);
-                });
+                const icon = themeToggle.querySelector('i');
+                if (theme === 'dark') {
+                    icon.className = 'fas fa-sun';
+                } else if (theme === 'light') {
+                    icon.className = 'fas fa-moon';
+                } else {
+                    icon.className = 'fas fa-circle-half-stroke';
+                }
             }
+        }
 
-            // Listen for system theme changes
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                if (localStorage.getItem('angelwrites_theme') === 'system') {
-                    html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        applyTheme(themes[currentThemeIndex]);
+
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function() {
+                currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+                applyTheme(themes[currentThemeIndex]);
+            });
+        }
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            if (localStorage.getItem('angelwrites_theme') === 'system') {
+                html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+            }
+        });
+
+        // ===== SEARCH DROPDOWN =====
+        const searchTrigger = document.querySelector('.search-trigger');
+        const searchDropdown = document.getElementById('searchDropdown');
+        const searchInput = document.getElementById('searchInput');
+
+        if (searchTrigger && searchDropdown) {
+            searchTrigger.addEventListener('click', function() {
+                searchDropdown.classList.toggle('open');
+                if (searchDropdown.classList.contains('open') && searchInput) {
+                    searchInput.focus();
                 }
             });
 
-            // ===== SEARCH DROPDOWN =====
-            const searchTrigger = document.querySelector('.search-trigger');
-            const searchDropdown = document.getElementById('searchDropdown');
-            const searchInput = document.getElementById('searchInput');
+            document.addEventListener('click', function(e) {
+                const wrapper = document.querySelector('.search-wrapper');
+                if (wrapper && !wrapper.contains(e.target)) {
+                    searchDropdown.classList.remove('open');
+                }
+            });
+        }
 
-            if (searchTrigger && searchDropdown) {
-                searchTrigger.addEventListener('click', function() {
-                    searchDropdown.classList.toggle('open');
-                    if (searchDropdown.classList.contains('open') && searchInput) {
-                        searchInput.focus();
-                    }
-                });
+        // ===== NOTIFICATIONS DROPDOWN =====
+        const notifTrigger = document.querySelector('.notification-wrapper .nav-action-icon');
+        const notifDropdown = document.getElementById('notificationDropdown');
 
-                document.addEventListener('click', function(e) {
-                    const wrapper = document.querySelector('.search-wrapper');
-                    if (wrapper && !wrapper.contains(e.target)) {
-                        searchDropdown.classList.remove('open');
-                    }
-                });
+        if (notifTrigger && notifDropdown) {
+            notifTrigger.addEventListener('click', function() {
+                notifDropdown.classList.toggle('open');
+            });
+
+            document.addEventListener('click', function(e) {
+                const wrapper = document.querySelector('.notification-wrapper');
+                if (wrapper && !wrapper.contains(e.target)) {
+                    notifDropdown.classList.remove('open');
+                }
+            });
+        }
+
+        // ===== USER DROPDOWN =====
+        const userWrapper = document.querySelector('.user-wrapper');
+        const userDropdown = document.getElementById('userDropdown');
+
+        if (userWrapper && userDropdown) {
+            userWrapper.addEventListener('click', function() {
+                userDropdown.classList.toggle('open');
+            });
+
+            document.addEventListener('click', function(e) {
+                if (userWrapper && !userWrapper.contains(e.target)) {
+                    userDropdown.classList.remove('open');
+                }
+            });
+        }
+
+        // ===== ESCAPE KEY CLOSE =====
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMobileMenu();
             }
+        });
 
-            // ===== NOTIFICATIONS DROPDOWN =====
-            const notifTrigger = document.querySelector('.notification-wrapper .nav-action-icon');
-            const notifDropdown = document.getElementById('notificationDropdown');
-
-            if (notifTrigger && notifDropdown) {
-                notifTrigger.addEventListener('click', function() {
-                    notifDropdown.classList.toggle('open');
-                });
-
-                document.addEventListener('click', function(e) {
-                    const wrapper = document.querySelector('.notification-wrapper');
-                    if (wrapper && !wrapper.contains(e.target)) {
-                        notifDropdown.classList.remove('open');
-                    }
-                });
-            }
-
-            // ===== USER DROPDOWN =====
-            const userWrapper = document.querySelector('.user-wrapper');
-            const userDropdown = document.getElementById('userDropdown');
-
-            if (userWrapper && userDropdown) {
-                userWrapper.addEventListener('click', function() {
-                    userDropdown.classList.toggle('open');
-                });
-
-                document.addEventListener('click', function(e) {
-                    if (userWrapper && !userWrapper.contains(e.target)) {
-                        userDropdown.classList.remove('open');
-                    }
-                });
-            }
-
-            // ===== HAMBURGER MENU (Mobile only) =====
-            const hamburger = document.getElementById('hamburger');
-            const navLinks = document.getElementById('navLinks');
-            const overlay = document.getElementById('menuOverlay');
-            const body = document.body;
-
-            // Only initialize mobile menu if elements exist (they will)
-            if (hamburger && navLinks && overlay) {
-                // Expose functions globally so inline onclick works
-                window.toggleMobileMenu = function() {
-                    const isOpen = navLinks.classList.contains('open');
-
-                    if (isOpen) {
-                        closeMobileMenu();
-                    } else {
-                        navLinks.classList.add('open');
-                        overlay.classList.add('open');
-                        hamburger.classList.add('active');
-                        hamburger.setAttribute('aria-expanded', 'true');
-                        body.style.overflow = 'hidden';
-                    }
-                };
-
-                window.closeMobileMenu = function() {
-                    navLinks.classList.remove('open');
-                    overlay.classList.remove('open');
-                    hamburger.classList.remove('active');
-                    hamburger.setAttribute('aria-expanded', 'false');
-                    body.style.overflow = '';
-                };
-
-                // Attach click event to hamburger
-                hamburger.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    window.toggleMobileMenu();
-                });
-
-                // Close menu on overlay click
-                overlay.addEventListener('click', function() {
-                    window.closeMobileMenu();
-                });
-
-                // Close menu on any nav link click
-                navLinks.querySelectorAll('a').forEach(function(link) {
-                    link.addEventListener('click', function() {
-                        window.closeMobileMenu();
-                    });
-                });
-
-                // Close menu on Escape key
-                document.addEventListener('keydown', function(e) {
-                    if (e.key === 'Escape') {
-                        window.closeMobileMenu();
-                    }
-                });
-            }
-
-            // ===== DYNAMIC BACK BUTTON (already in PHP) =====
-            // No extra JS needed – it's handled by the PHP conditional in the header.
-
-        }); // end DOMContentLoaded
-    })();
+    }); // end DOMContentLoaded
     </script>
 </body>
 </html>

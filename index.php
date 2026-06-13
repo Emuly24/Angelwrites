@@ -675,7 +675,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .hero-search .search-form input { flex: 1; padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .hero-search .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .hero-image { display: flex; justify-content: center; align-items: center; flex-direction: column; }
-.hero-placeholder { width: 280px; height: 280px; border-radius: 50%; background: var(--rose-light); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 4rem; color: var(--rose); border: 4px solid var(--rose); box-shadow: var(--shadow-hover); }
+.hero-placeholder { width: 350px; height: 350px; border-radius: 50%; background: var(--rose-light); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 4rem; color: var(--rose); border: 4px solid var(--rose); box-shadow: var(--shadow-hover); }
 .hero-placeholder span { font-size: 1rem; color: var(--text); margin-top: 8px; font-weight: 500; }
 
 /* ===== ABOUT SECTION ===== */
@@ -690,10 +690,8 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .about-feature h4 { font-size: 0.95rem; margin-bottom: 2px; }
 .about-feature p { font-size: 0.85rem; color: var(--text-light); margin: 0; }
 .about-cta { margin-top: 20px; }
-.about-small { margin-top: 8px; font-size: 0.9rem; color: var(--text-light); }
-.about-image { display: flex; justify-content: center; align-items: center; }
-.about-placeholder { width: 300px; height: 300px; border-radius: 50%; background: var(--rose-light); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 5rem; color: var(--rose); border: 4px solid var(--rose); box-shadow: var(--shadow-hover); }
-.about-placeholder span { font-size: 1.2rem; color: var(--text); margin-top: 8px; font-weight: 600; }
+.about-small { margin-top: 10px; font-size: 0.9rem; color: var(--text-light); }
+
 
 /* ===== STATS SECTION ===== */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 24px; text-align: center; }
