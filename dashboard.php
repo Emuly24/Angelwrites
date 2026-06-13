@@ -711,18 +711,15 @@ body.dark-mode .hero-stat strong, [data-theme="dark"] .hero-stat strong { color:
 body.dark-mode .profile-details h3, [data-theme="dark"] .profile-details h3 { color: var(--text) !important; }
 body.dark-mode .profile-details .user-email, [data-theme="dark"] .profile-details .user-email { color: var(--text-light) !important; }
 
-/* ===== STATS ROW ===== */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
-
-.stat-card { background: var(--card-bg); border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); box-shadow: var(--shadow); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; min-height: 80px; }
-.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: 16px 16px 0 0; }
-.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
-
-.stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
-.stat-content { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-.stat-number { font-size: 1.6rem; font-weight: 700; color: var(--text); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stat-label { font-size: 0.7rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; line-height: 1.2; word-break: break-word; white-space: normal; max-width: 100%; }
-
+/* ===== STATS ROW – HORIZONTAL, COMPACT, NO OVERFLOW ===== */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.stat-card { background: var(--card-bg); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); box-shadow: var(--shadow); transition: all 0.2s ease; position: relative; overflow: hidden; min-height: 55px; }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 10px 10px 0 0; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.stat-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; }
+.stat-content { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+.stat-number { font-size: 1.1rem; font-weight: 700; color: var(--text); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-label { font-size: 0.5rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; line-height: 1.1; word-break: break-word; white-space: normal; max-width: 100%; }
 /* ===== STAT CARD COLORS ===== */
 .stat-users::before { background: #3498db; }
 .stat-users .stat-icon { background: rgba(52,152,219,0.15); color: #3498db; }
