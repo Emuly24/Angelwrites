@@ -92,14 +92,13 @@ function extractPDF($file_path) {
     require_once $parser_path . 'Element.php';
     
     // --- 2. ELEMENT SUBCLASSES (CORRECT ORDER) ---
-    // ElementString must be loaded BEFORE ElementDate (which extends it)
     require_once $parser_path . 'Element/ElementArray.php';
     require_once $parser_path . 'Element/ElementBoolean.php';
     require_once $parser_path . 'Element/ElementName.php';
     require_once $parser_path . 'Element/ElementNumeric.php';
     require_once $parser_path . 'Element/ElementNull.php';
-    require_once $parser_path . 'Element/ElementString.php';    // ← CRITICAL: Must be before ElementDate
-    require_once $parser_path . 'Element/ElementDate.php';      // Extends ElementString
+    require_once $parser_path . 'Element/ElementString.php';
+    require_once $parser_path . 'Element/ElementDate.php';
     require_once $parser_path . 'Element/ElementHexa.php';
     require_once $parser_path . 'Element/ElementMissing.php';
     require_once $parser_path . 'Element/ElementStruct.php';
@@ -116,9 +115,8 @@ function extractPDF($file_path) {
     require_once $parser_path . 'XObject/Form.php';
     require_once $parser_path . 'XObject/Image.php';
     
-    // --- 5. CORE PARSER AND EXCEPTIONS ---
+    // --- 5. CORE PARSER ---
     require_once $parser_path . 'Parser.php';
-    require_once $parser_path . 'Exception/Exception.php';
 
     $parser = new \Smalot\PdfParser\Parser();
     try {
