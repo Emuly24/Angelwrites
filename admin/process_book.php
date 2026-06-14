@@ -82,37 +82,36 @@ function extractRawText($file_path) {
 }
 
 function extractPDF($file_path) {
-    // Base path
-    $base_path = LIB_PATH . 'Smalot/PdfParser/';
+    // Base path - adjust if your structure is slightly different
+    $base_path = __DIR__ . '/../libs/pdfparser-master/src/';
+    $parser_path = $base_path . 'Smalot/PdfParser/';
     
-    // --- LOAD DEPENDENCIES IN THE CORRECT ORDER ---
+    // --- 1. BASE CORE CLASSES ---
+    require_once $parser_path . 'Config.php';
+    require_once $parser_path . 'PDFObject.php';      // CRITICAL: Must be loaded early
+    require_once $parser_path . 'XObject.php';        // Extends PDFObject
+    require_once $parser_path . 'Element/Element.php';
+    require_once $parser_path . 'Element/ElementArray.php';
+    require_once $parser_path . 'Element/ElementBoolean.php';
+    require_once $parser_path . 'Element/ElementDate.php';    // Extends ElementString
+    require_once $parser_path . 'Element/ElementHexa.php';
+    require_once $parser_path . 'Element/ElementMissing.php';
+    require_once $parser_path . 'Element/ElementNull.php';
+    require_once $parser_path . 'Element/ElementNumber.php';
+    require_once $parser_path . 'Element/ElementString.php';
+    require_once $parser_path . 'Element/ElementStruct.php';
+    require_once $parser_path . 'Element/ElementXRef.php';
     
-    // 1. Core base classes
-    require_once $base_path . 'Config.php';
-    require_once $base_path . 'Encoding.php';      // Extends PDFObject
-    require_once $base_path . 'Font.php';          // Extends PDFObject
-    require_once $base_path . 'Header.php';        // Extends PDFObject
-    require_once $base_path . 'PDFObject.php';     // Base class for many
-    require_once $base_path . 'XObject.php';       // Extends PDFObject
+    // --- 2. CLASSES THAT EXTEND PDFOBJECT ---
+    require_once $parser_path . 'Encoding.php';       // Extends PDFObject
+    require_once $parser_path . 'Font.php';           // Extends PDFObject
+    require_once $parser_path . 'Header.php';         // Extends PDFObject
+    require_once $parser_path . 'Page.php';           // Extends PDFObject
+    require_once $parser_path . 'Pages.php';          // Extends PDFObject
     
-    // 2. Element classes
-    require_once $base_path . 'Element/Element.php';
-    require_once $base_path . 'Element/ElementArray.php';
-    require_once $base_path . 'Element/ElementBoolean.php';
-    require_once $base_path . 'Element/ElementDate.php';
-    require_once $base_path . 'Element/ElementHexa.php';
-    require_once $base_path . 'Element/ElementMissing.php';
-    require_once $base_path . 'Element/ElementNull.php';
-    require_once $base_path . 'Element/ElementNumber.php';
-    require_once $base_path . 'Element/ElementString.php';
-    require_once $base_path . 'Element/ElementStruct.php';
-    require_once $base_path . 'Element/ElementXRef.php';
-    
-    // 3. Core parser classes
-    require_once $base_path . 'Page.php';          // Extends PDFObject
-    require_once $base_path . 'Pages.php';         // Extends PDFObject
-    require_once $base_path . 'Parser.php';
-    require_once $base_path . 'Exception/Exception.php';
+    // --- 3. CORE PARSER ---
+    require_once $parser_path . 'Parser.php';
+    require_once $parser_path . 'Exception/Exception.php';
 
     $parser = new \Smalot\PdfParser\Parser();
     try {
