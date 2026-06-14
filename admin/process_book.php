@@ -82,15 +82,16 @@ function extractRawText($file_path) {
 }
 
 function extractPDF($file_path) {
-    // Base path - adjust if your structure is slightly different
+    // Base path to the pdfparser-master/src/ directory
     $base_path = __DIR__ . '/../libs/pdfparser-master/src/';
     $parser_path = $base_path . 'Smalot/PdfParser/';
     
-    // --- 1. BASE CORE CLASSES ---
+    // --- 1. CORE BASE CLASSES ---
     require_once $parser_path . 'Config.php';
-    require_once $parser_path . 'PDFObject.php';      // CRITICAL: Must be loaded early
-    require_once $parser_path . 'XObject.php';        // Extends PDFObject
+    require_once $parser_path . 'PDFObject.php';      // Base class for many others
     require_once $parser_path . 'Element/Element.php';
+    
+    // --- 2. ELEMENT CLASSES ---
     require_once $parser_path . 'Element/ElementArray.php';
     require_once $parser_path . 'Element/ElementBoolean.php';
     require_once $parser_path . 'Element/ElementDate.php';    // Extends ElementString
@@ -102,14 +103,18 @@ function extractPDF($file_path) {
     require_once $parser_path . 'Element/ElementStruct.php';
     require_once $parser_path . 'Element/ElementXRef.php';
     
-    // --- 2. CLASSES THAT EXTEND PDFOBJECT ---
+    // --- 3. CLASSES THAT EXTEND PDFOBJECT ---
     require_once $parser_path . 'Encoding.php';       // Extends PDFObject
     require_once $parser_path . 'Font.php';           // Extends PDFObject
     require_once $parser_path . 'Header.php';         // Extends PDFObject
     require_once $parser_path . 'Page.php';           // Extends PDFObject
     require_once $parser_path . 'Pages.php';          // Extends PDFObject
     
-    // --- 3. CORE PARSER ---
+    // --- 4. XOBJECT FILES (CORRECTED) ---
+    require_once $parser_path . 'XObject/Form.php';   // Correct path (Folder/File)
+    require_once $parser_path . 'XObject/Image.php';  // Correct path (Folder/File)
+    
+    // --- 5. CORE PARSER ---
     require_once $parser_path . 'Parser.php';
     require_once $parser_path . 'Exception/Exception.php';
 
