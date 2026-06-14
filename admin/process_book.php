@@ -96,7 +96,7 @@ function extractPDF($file_path) {
     require_once $parser_path . 'Element/ElementArray.php';
     require_once $parser_path . 'Element/ElementBoolean.php';
     require_once $parser_path . 'Element/ElementName.php';
-    require_once $parser_path . 'Element/ElementNumber.php';
+    require_once $parser_path . 'Element/ElementNumeric.php';
     require_once $parser_path . 'Element/ElementNull.php';
     require_once $parser_path . 'Element/ElementString.php';    // ← CRITICAL: Must be before ElementDate
     require_once $parser_path . 'Element/ElementDate.php';      // Extends ElementString
