@@ -121,6 +121,7 @@ function renderToc($toc, $level = 0) {
 
 $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
 
 <!-- ===== READER CONTAINER ===== -->
 <div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>" data-file-path="<?php echo htmlspecialchars($book['file_path']); ?>" data-file-type="<?php echo $file_type; ?>" data-file-exists="<?php echo $file_exists ? '1' : '0'; ?>">
