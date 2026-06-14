@@ -1,6 +1,7 @@
 {
     "require": {
         "hybridauth/hybridauth": "^3.13",
-        "phpmailer/phpmailer": "^6.8"
+        "phpmailer/phpmailer": "^6.8",
+        "smalot/pdfparser": "^2.12"
     }
 }

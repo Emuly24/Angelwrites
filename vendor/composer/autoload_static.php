@@ -6,7 +6,15 @@ namespace Composer\Autoload;
 
 class ComposerStaticInit77b6553b1e065991ff949c51d8674a48
 {
+    public static $files = array (
+        '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/bootstrap.php',
+    );
+
     public static $prefixLengthsPsr4 = array (
+        'S' =>
+        array (
+            'Symfony\\Polyfill\\Mbstring\\' => 26,
+        ),
         'P' =>
         array (
             'PHPMailer\\PHPMailer\\' => 20,
@@ -18,6 +26,10 @@ class ComposerStaticInit77b6553b1e065991ff949c51d8674a48
     );
 
     public static $prefixDirsPsr4 = array (
+        'Symfony\\Polyfill\\Mbstring\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/symfony/polyfill-mbstring',
+        ),
         'PHPMailer\\PHPMailer\\' =>
         array (
             0 => __DIR__ . '/..' . '/phpmailer/phpmailer/src',
@@ -25,6 +37,16 @@ class ComposerStaticInit77b6553b1e065991ff949c51d8674a48
         'Hybridauth\\' =>
         array (
             0 => __DIR__ . '/..' . '/hybridauth/hybridauth/src',
+        ),
+    );
+
+    public static $prefixesPsr0 = array (
+        'S' =>
+        array (
+            'Smalot\\PdfParser\\' =>
+            array (
+                0 => __DIR__ . '/..' . '/smalot/pdfparser/src',
+            ),
         ),
     );
 
@@ -37,6 +59,7 @@ class ComposerStaticInit77b6553b1e065991ff949c51d8674a48
         return \Closure::bind(function () use ($loader) {
             $loader->prefixLengthsPsr4 = ComposerStaticInit77b6553b1e065991ff949c51d8674a48::$prefixLengthsPsr4;
             $loader->prefixDirsPsr4 = ComposerStaticInit77b6553b1e065991ff949c51d8674a48::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInit77b6553b1e065991ff949c51d8674a48::$prefixesPsr0;
             $loader->classMap = ComposerStaticInit77b6553b1e065991ff949c51d8674a48::$classMap;
 
         }, null, ClassLoader::class);
