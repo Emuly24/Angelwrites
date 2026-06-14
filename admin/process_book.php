@@ -89,32 +89,33 @@ function extractPDF($file_path) {
     // --- 1. CORE BASE CLASSES ---
     require_once $parser_path . 'Config.php';
     require_once $parser_path . 'PDFObject.php';      // Base class for many others
-    require_once $parser_path . 'Element.php';        // Base Element class (directly in PdfParser folder)
-    require_once $parser_path . 'XObject/Form.php';   // Inside XObject folder
-    require_once $parser_path . 'XObject/Image.php';  // Inside XObject folder
+    require_once $parser_path . 'Element.php';        // Base Element class
     
     // --- 2. ELEMENT SUBCLASSES (INSIDE Element/ FOLDER) ---
-    // These must be loaded AFTER the base Element.php
     require_once $parser_path . 'Element/ElementArray.php';
     require_once $parser_path . 'Element/ElementBoolean.php';
     require_once $parser_path . 'Element/ElementDate.php';
     require_once $parser_path . 'Element/ElementHexa.php';
     require_once $parser_path . 'Element/ElementMissing.php';
-    require_once $parser_path . 'Element/ElementName.php';      // Added (required for PDF Name objects)
+    require_once $parser_path . 'Element/ElementName.php';
     require_once $parser_path . 'Element/ElementNull.php';
     require_once $parser_path . 'Element/ElementNumber.php';
     require_once $parser_path . 'Element/ElementString.php';
     require_once $parser_path . 'Element/ElementStruct.php';
     require_once $parser_path . 'Element/ElementXRef.php';
     
-    // --- 3. CLASSES THAT EXTEND PDFOBJECT ---
+    // --- 3. CLASSES THAT EXTEND PDFOBJECT (Loaded before XObjects) ---
     require_once $parser_path . 'Encoding.php';
     require_once $parser_path . 'Font.php';
     require_once $parser_path . 'Header.php';
-    require_once $parser_path . 'Page.php';
-    require_once $parser_path . 'Pages.php';
+    require_once $parser_path . 'Page.php';           // FIXED: Loaded BEFORE XObject/Form
+    require_once $parser_path . 'Pages.php';          // FIXED: Loaded BEFORE XObject/Form
     
-    // --- 4. CORE PARSER AND EXCEPTIONS ---
+    // --- 4. XOBJECT CLASSES (EXTEND Page) ---
+    require_once $parser_path . 'XObject/Form.php';   // Extends Page
+    require_once $parser_path . 'XObject/Image.php';  // Extends Page
+    
+    // --- 5. CORE PARSER AND EXCEPTIONS ---
     require_once $parser_path . 'Parser.php';
     require_once $parser_path . 'Exception/Exception.php';
 
@@ -130,7 +131,6 @@ function extractPDF($file_path) {
         return false;
     }
 }
-
 function extractDOCX($file_path) {
     $zip = zip_open($file_path);
     if (!$zip || is_numeric($zip)) return false;
