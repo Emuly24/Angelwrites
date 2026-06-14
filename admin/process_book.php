@@ -44,7 +44,9 @@ function detectFileType($file_path) {
     if (function_exists('mime_content_type')) {
         $mime = mime_content_type($file_path);
         if (strpos($mime, 'pdf') !== false) return 'pdf';
-        if (strpos($mime, 'word') !== false || strpos($mime, 'document') !== false) return 'docx';
+        if (in_array($mime, ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'])) {
+            return 'docx';
+        }
         if (strpos($mime, 'epub') !== false) return 'epub';
     }
     return strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
@@ -1233,8 +1235,8 @@ function sendEmailWithAttachment($to, $subject, $body, $file_path, $filename) {
         $mail->isSMTP();
         $mail->Host       = 'smtp.zoho.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'angelwrites@zohomail.com';
-        $mail->Password   = 'HKE07cHm8Hr8';
+        $mail->Username   = SMTP_USERNAME;
+        $mail->Password   = SMTP_PASSWORD;
         $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
@@ -1304,9 +1306,14 @@ if (isset($_POST['extract'])) {
             // Save to database
             $stmt = $db->prepare("INSERT OR REPLACE INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status) VALUES (?, ?, ?, ?, ?, 1, 'complete')");
             $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json]);
+            $stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
+            $stmt->execute([$book_id]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
             
             saveVersionHistory($book_id, $html_content, $toc_json, $metadata_json, 'Initial extraction');
             $success = '✅ Content extracted, split into ' . count($pages) . ' pages, and saved successfully.';
+            echo json_encode(['success' => true, 'message' => $success]);
+exit;
         } else {
             $error = $raw_text ?: 'Failed to extract content from the file.';
         }
