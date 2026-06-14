@@ -54,7 +54,7 @@ function fixEncoding($text) {
     $replacements = [
         'â€œ' => '“', 'â€' => '”', 'â€™' => '’',
         'â€˜' => '‘', 'â€"’' => '—', 'â€”' => '—',
-        'â€“' => '–', 'â€¦' => '…', 'â€¢' => '•',
+        'â€“' => '–', 'â€…' => '…', 'â€¢' => '•',
         'â€¹' => '‹', 'â€º' => '›', 'â‚¬' => '€',
         'â„¢' => '™', 'â€¡' => '‡', 'â€°' => '‰',
         'â€š' => '‚', 'â€ž' => '„'
@@ -82,21 +82,25 @@ function extractRawText($file_path) {
 }
 
 function extractPDF($file_path) {
-    // Base path to the pdfparser-master/src/ directory
+    // Base path
     $base_path = __DIR__ . '/../libs/pdfparser-master/src/';
     $parser_path = $base_path . 'Smalot/PdfParser/';
     
     // --- 1. CORE BASE CLASSES ---
     require_once $parser_path . 'Config.php';
     require_once $parser_path . 'PDFObject.php';      // Base class for many others
-    require_once $parser_path . 'Element/Element.php';
+    require_once $parser_path . 'Element.php';        // Base Element class (directly in PdfParser folder)
+    require_once $parser_path . 'XObject/Form.php';   // Inside XObject folder
+    require_once $parser_path . 'XObject/Image.php';  // Inside XObject folder
     
-    // --- 2. ELEMENT CLASSES ---
+    // --- 2. ELEMENT SUBCLASSES (INSIDE Element/ FOLDER) ---
+    // These must be loaded AFTER the base Element.php
     require_once $parser_path . 'Element/ElementArray.php';
     require_once $parser_path . 'Element/ElementBoolean.php';
-    require_once $parser_path . 'Element/ElementDate.php';    // Extends ElementString
+    require_once $parser_path . 'Element/ElementDate.php';
     require_once $parser_path . 'Element/ElementHexa.php';
     require_once $parser_path . 'Element/ElementMissing.php';
+    require_once $parser_path . 'Element/ElementName.php';      // Added (required for PDF Name objects)
     require_once $parser_path . 'Element/ElementNull.php';
     require_once $parser_path . 'Element/ElementNumber.php';
     require_once $parser_path . 'Element/ElementString.php';
@@ -104,17 +108,13 @@ function extractPDF($file_path) {
     require_once $parser_path . 'Element/ElementXRef.php';
     
     // --- 3. CLASSES THAT EXTEND PDFOBJECT ---
-    require_once $parser_path . 'Encoding.php';       // Extends PDFObject
-    require_once $parser_path . 'Font.php';           // Extends PDFObject
-    require_once $parser_path . 'Header.php';         // Extends PDFObject
-    require_once $parser_path . 'Page.php';           // Extends PDFObject
-    require_once $parser_path . 'Pages.php';          // Extends PDFObject
+    require_once $parser_path . 'Encoding.php';
+    require_once $parser_path . 'Font.php';
+    require_once $parser_path . 'Header.php';
+    require_once $parser_path . 'Page.php';
+    require_once $parser_path . 'Pages.php';
     
-    // --- 4. XOBJECT FILES (CORRECTED) ---
-    require_once $parser_path . 'XObject/Form.php';   // Correct path (Folder/File)
-    require_once $parser_path . 'XObject/Image.php';  // Correct path (Folder/File)
-    
-    // --- 5. CORE PARSER ---
+    // --- 4. CORE PARSER AND EXCEPTIONS ---
     require_once $parser_path . 'Parser.php';
     require_once $parser_path . 'Exception/Exception.php';
 
