@@ -106,26 +106,53 @@ $share_page = isset($_GET['page']) ? (int)$_GET['page'] : null;
 $is_share = isset($_GET['share']) && $_GET['share'] == 1;
 
 // ===== TOC RENDER FUNCTION =====
-// Load the TOC from the JSON stored in the database
+<?php
+// ===== 1. PHP LOGIC AT THE VERY TOP (BEFORE ANY HTML) =====
+$pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
+require_once __DIR__ . '/../includes/header.php';
+?>
+
+<!-- ===== 2. HTML FOR THE READER ===== -->
+<div id="reader-container">
+    <!-- TOC Sidebar -->
+    <div id="toc-sidebar"></div>
+    <!-- Main Reader Content -->
+    <div id="page-content"></div>
+</div>
+
+<!-- ===== 3. JAVASCRIPT ===== -->
+<script>
+// SAFELY LOAD TOC DATA from PHP
+// Wrapping json_encode() with json_encode ensures it becomes a valid JavaScript object/array.
 const toc = <?php echo json_encode($toc); ?>;
 
 function goToChapter(pageNum) {
-    // Your existing goToPage function is 0-based, TOC is 1-based
-    goToPage(pageNum - 1);
+    // Your existing goToPage function (must exist elsewhere) is 0-based, TOC is 1-based
+    if (typeof goToPage === 'function') {
+        goToPage(pageNum - 1);
+    } else {
+        console.error('goToPage function not found.');
+    }
 }
 
 function renderTOC() {
     const tocContainer = document.getElementById('toc-sidebar');
-    tocContainer.innerHTML = '<ul>';
+    if (!tocContainer) {
+        console.warn('TOC sidebar element not found.');
+        return;
+    }
+    let html = '<ul>';
     toc.forEach(entry => {
-        tocContainer.innerHTML += `<li><a href="#" onclick="goToChapter(${entry.page})">${entry.title}</a></li>`;
+        html += `<li><a href="#" onclick="goToChapter(${entry.page})">${entry.title}</a></li>`;
     });
-    tocContainer.innerHTML += '</ul>';
+    html += '</ul>';
+    tocContainer.innerHTML = html;
 }
+
 document.addEventListener('DOMContentLoaded', renderTOC);
-$pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
-?>
-<?php require_once __DIR__ . '/../includes/header.php'; ?>
+</script>
+
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
 <!-- ===== READER CONTAINER ===== -->
 <div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>" data-file-path="<?php echo htmlspecialchars($book['file_path']); ?>" data-file-type="<?php echo $file_type; ?>" data-file-exists="<?php echo $file_exists ? '1' : '0'; ?>">
