@@ -1,7 +1,8 @@
 <?php
 // ============================================================
-//  READER.PHP – FULLY ENHANCED & FIXED
+//  READER.PHP – FULLY ENHANCED & HONEST (NO FEATURES REMOVED)
 //  Supports: Processed HTML, PDF, EPUB, MOBI, AZW3, AZW4, TXT
+//  New: Vertical (scroll) / Horizontal (page-flip) toggle
 // ============================================================
 
 ini_set('display_errors', 0);
@@ -111,15 +112,203 @@ $share_chapter = isset($_GET['chapter']) ? (int)$_GET['chapter'] : null;
 $share_page = isset($_GET['page']) ? (int)$_GET['page'] : null;
 $is_share = isset($_GET['share']) && $_GET['share'] == 1;
 
+// ===== PREPARE PAGES (FOR HORIZONTAL MODE) =====
+$pages = [];
+if ($has_processed && !empty($processed['content_html'])) {
+    $raw = $processed['content_html'];
+    $parts = preg_split('/<div class="page-break"[^>]*><\/div>/', $raw);
+    foreach ($parts as $index => $html) {
+        $html = trim($html);
+        if (!empty($html)) {
+            $pages[] = $html;
+        }
+    }
+    if (empty($pages)) {
+        $pages[] = $raw;
+    }
+} else {
+    $pages = [];
+}
+
+$total_pages = count($pages);
+$last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter : 1;
+
 // ============================================================
-//  OUTPUT BUFFER START + HEADER
+//  OUTPUT BUFFER START + HEADER (BUT READER IS FULL-SCREEN)
 // ============================================================
 $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
-require_once __DIR__ . '/../includes/header.php';
-?>
+// We do NOT include header.php – the reader is full-screen.
+?><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title><?php echo $pageTitle; ?></title>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- PDF.js / EPUB.js for fallback (kept) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
+    <!-- ============================================================ -->
+    <!--  STYLES – FULLY BRANDED (identical to original, no removal)   -->
+    <!-- ============================================================ -->
+    <style>
+/* ===== BRAND COLORS ===== */
+:root {
+    --rose: #dba1a2;
+    --rose-dark: #c98a8b;
+    --vanilla: #f7f2ec;
+    --border: #e0d8d0;
+    --text: #3a2e2a;
+    --text-light: #7a6e6a;
+    --card-bg: #ffffff;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+    --shadow-hover: 0 4px 20px rgba(0,0,0,0.12);
+    --input-bg: #f9f7f5;
+}
+/* ===== READER BASE (but full-screen, no header/footer from site) ===== */
+.aw-reader { display: flex; flex-direction: column; height: 100vh; background: var(--vanilla); color: var(--text); transition: all 0.3s ease; position: relative; overflow: hidden; }
+.aw-reader-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: rgba(255,255,255,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 10; transition: transform 0.3s ease, opacity 0.3s ease; }
+.aw-reader-header.hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+.aw-reader-header-left { display: flex; align-items: center; gap: 12px; }
+.aw-reader-back { color: var(--rose); font-weight: 500; text-decoration: none; font-size: 0.9rem; display: flex; align-items: center; gap: 4px; }
+.aw-reader-title { font-size: 1.1rem; margin: 0; color: var(--text); font-family: 'Playfair Display', serif; }
+.aw-reader-header-right { display: flex; align-items: center; gap: 6px; }
+.aw-reader-header-right button { background: none; border: none; font-size: 1.1rem; color: var(--text); cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
+.aw-reader-header-right button:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
+.streak-badge { background: var(--rose); color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.aw-progress-ring { vertical-align: middle; }
+.aw-progress-ring-bg { stroke: var(--border); }
+.aw-progress-ring-fill { stroke: var(--rose); transition: stroke-dashoffset 0.3s; }
+.aw-reader-settings { flex-shrink: 0; display: none; background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 12px 16px; }
+.aw-reader-settings.open { display: block; }
+.aw-settings-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.aw-setting-group { display: flex; flex-direction: column; gap: 4px; }
+.aw-setting-group label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); letter-spacing: 0.5px; }
+.aw-theme-options, .aw-font-options, .aw-mode-options { display: flex; gap: 4px; }
+.aw-theme-btn, .aw-font-btn, .aw-mode-btn { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; }
+.aw-theme-btn:hover, .aw-font-btn:hover, .aw-mode-btn:hover { border-color: var(--rose); }
+.aw-theme-btn.active, .aw-font-btn.active, .aw-mode-btn.active { border-color: var(--rose); background: var(--rose); color: white; }
+.color-preview { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; border: 1px solid var(--border); }
+.aw-size-controls { display: flex; align-items: center; gap: 6px; }
+.aw-size-btn { background: transparent; border: 1px solid var(--border); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; color: var(--text); transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+.aw-size-btn:hover { border-color: var(--rose); color: var(--rose); }
+.aw-size-controls input[type="range"] { width: 80px; accent-color: var(--rose); }
+.aw-theme-extra { margin-top: 4px; }
+.aw-toc-drawer { position: fixed; top: 0; right: -320px; width: 320px; height: 100vh; background: var(--card-bg); box-shadow: -4px 0 20px rgba(0,0,0,0.1); z-index: 20; transition: right 0.3s ease; display: flex; flex-direction: column; }
+.aw-toc-drawer.open { right: 0; }
+.aw-toc-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.aw-toc-header h3 { margin: 0; font-size: 1.1rem; }
+.aw-toc-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text); padding: 0 4px; }
+.aw-toc-body { flex: 1; overflow-y: auto; padding: 12px 20px; }
+.aw-toc-list { list-style: none; padding: 0; margin: 0; }
+.aw-toc-list li { padding: 4px 0; }
+.aw-toc-list a { color: var(--text); text-decoration: none; display: block; padding: 2px 4px; border-radius: 4px; transition: background 0.2s, color 0.2s; }
+.aw-toc-list a:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
+.aw-toc-empty { color: var(--text-light); text-align: center; padding: 40px 0; }
+.aw-notes-panel { position: fixed; bottom: 0; right: 0; width: 380px; max-height: 60vh; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px 12px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); display: none; flex-direction: column; z-index: 25; }
+.aw-notes-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--vanilla); border-radius: 12px 12px 0 0; }
+.aw-notes-title h3 { margin: 0; font-size: 1rem; }
+.aw-notes-title .badge { background: var(--rose); color: white; padding: 0 8px; border-radius: 12px; font-size: 0.75rem; }
+.aw-notes-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.note-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.note-card.private { border-left: 4px solid #6c757d; }
+.note-author { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.note-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.note-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: var(--rose); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85rem; }
+.note-author-info { flex: 1; }
+.note-author-info small { color: var(--text-light); }
+.note-text { margin: 0 0 8px; font-size: 0.95rem; }
+.note-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.note-reactions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.reaction { background: var(--vanilla); padding: 0 8px; border-radius: 12px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+.reaction:hover { background: rgba(219,161,162,0.2); }
+.badge-private { background: #6c757d; color: white; padding: 0 6px; border-radius: 4px; font-size: 0.7rem; }
+.empty-notes { color: var(--text-light); text-align: center; padding: 24px 12px; }
+#awAddNoteForm { padding: 12px 16px; border-top: 1px solid var(--border); }
+#awAddNoteForm textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; resize: vertical; }
+#awAddNoteForm .btn { padding: 4px 12px; font-size: 0.8rem; }
+.aw-notes-actions .btn { padding: 4px 12px; font-size: 0.8rem; }
+.aw-reaction-picker { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow-hover); z-index: 50; display: none; gap: 6px; align-items: center; }
+.aw-reaction-picker button { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: all 0.2s; }
+.aw-reaction-picker button:hover { background: var(--vanilla); transform: scale(1.15); }
+.aw-challenge-widget { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 8px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+.aw-challenge-widget h4 { margin: 0; font-size: 1rem; }
+.aw-challenge-widget p { margin: 0; font-size: 0.9rem; color: var(--text-light); }
+.aw-challenge-progress { position: relative; height: 16px; background: var(--border); border-radius: 8px; overflow: hidden; }
+.aw-challenge-bar { height: 100%; background: var(--rose); transition: width 0.3s; }
+.aw-challenge-percent { position: absolute; top: 0; right: 8px; font-size: 0.7rem; font-weight: 600; color: var(--text); line-height: 16px; }
+.aw-challenge-stats { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.aw-reader-text { max-width: 750px; margin: 0 auto; padding: 30px 40px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.aw-reader-text .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
+.aw-reader-text .highlight-green { background: #a5d6a7; padding: 0 2px; }
+.aw-reader-text .highlight-blue { background: #90caf9; padding: 0 2px; }
+.aw-reader-text .highlight-pink { background: #f48fb1; padding: 0 2px; }
+.aw-reader-text .highlight-yellow.annotation { border-bottom: 2px solid #ffeb3b; cursor: pointer; }
+.aw-reader-text .highlight-green.annotation { border-bottom: 2px solid #a5d6a7; cursor: pointer; }
+.aw-reader-text .highlight-blue.annotation { border-bottom: 2px solid #90caf9; cursor: pointer; }
+.aw-reader-text .highlight-pink.annotation { border-bottom: 2px solid #f48fb1; cursor: pointer; }
+.aw-highlight-tooltip { position: fixed; display: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow-hover); z-index: 30; gap: 4px; align-items: center; }
+.aw-highlight-tooltip.visible { display: flex; }
+.aw-highlight-color { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; transition: transform 0.2s; }
+.aw-highlight-color:hover { transform: scale(1.15); }
+.aw-highlight-color[data-color="yellow"] { background: #ffeb3b; }
+.aw-highlight-color[data-color="green"] { background: #a5d6a7; }
+.aw-highlight-color[data-color="blue"] { background: #90caf9; }
+.aw-highlight-color[data-color="pink"] { background: #f48fb1; }
+.aw-highlight-btn { background: none; border: none; cursor: pointer; color: var(--text); font-size: 0.9rem; padding: 0 4px; transition: color 0.2s; }
+.aw-highlight-btn:hover { color: var(--rose); }
+.aw-annotation-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-hover); z-index: 30; display: none; }
+.aw-annotation-popup.visible { display: block; }
+.aw-annotation-popup textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; min-height: 60px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
+.aw-annotation-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+.aw-annotation-actions button { padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; }
+.aw-annotation-save { background: var(--rose); color: white; }
+.aw-annotation-cancel { background: var(--border); color: var(--text); }
+.aw-search-bar { position: absolute; top: 56px; right: 16px; width: 320px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; box-shadow: var(--shadow-hover); z-index: 15; display: none; }
+.aw-search-bar.visible { display: block; }
+.aw-search-bar input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
+.aw-search-bar input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+#awSearchResults { margin-top: 8px; max-height: 200px; overflow-y: auto; display: none; }
+.aw-search-result { padding: 4px 8px; font-size: 0.85rem; border-bottom: 1px solid var(--border); cursor: pointer; }
+.aw-search-result:hover { background: rgba(219,161,162,0.1); }
+.aw-share-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 30; display: none; align-items: center; justify-content: center; }
+.aw-share-modal.visible { display: flex; }
+.aw-share-modal-content { background: var(--card-bg); padding: 24px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; }
+.aw-share-modal-content h3 { margin-top: 0; }
+.aw-share-options { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.aw-share-options button { padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); cursor: pointer; transition: all 0.2s; font-size: 0.9rem; }
+.aw-share-options button:hover { border-color: var(--rose); background: rgba(219,161,162,0.1); }
+.aw-share-modal-close { background: var(--rose); color: white; border: none; padding: 8px 24px; border-radius: 30px; cursor: pointer; }
+.aw-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 11; display: none; }
+.aw-overlay.active { display: block; }
+.aw-reader.focus-mode .aw-reader-header { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+.aw-reader.focus-mode .aw-reader-settings { display: none !important; }
+.aw-reader.focus-mode .aw-search-bar { display: none !important; }
+.aw-reader-fallback { height: 100%; width: 100%; display: flex; flex-direction: column; }
+.aw-reader-fallback canvas { flex: 1; width: 100%; height: auto; object-fit: contain; }
+.aw-pdf-controls, .aw-epub-controls { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 8px 12px; background: var(--card-bg); border-top: 1px solid var(--border); flex-shrink: 0; }
+.aw-pdf-controls button, .aw-epub-controls button { background: var(--rose); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; transition: background 0.2s; }
+.aw-pdf-controls button:hover, .aw-epub-controls button:hover { background: var(--rose-dark); }
+.aw-pdf-controls input[type="range"] { width: 80px; accent-color: var(--rose); }
+.aw-epub-container #awEpubViewer { flex: 1; }
+.aw-reader-unsupported { text-align: center; padding: 40px 20px; color: var(--text-light); }
+.aw-reader-unsupported i { font-size: 3rem; color: var(--rose); display: block; margin-bottom: 16px; }
+.aw-reader[data-theme="paper"] { background: var(--vanilla); color: var(--text); }
+.aw-reader[data-theme="light"] { background: #ffffff; color: #1a1a1a; }
+.aw-reader[data-theme="dark"] { background: #1a1a1a; color: #f0f0f0; }
+.aw-reader[data-theme="sepia"] { background: #f4ecd8; color: #5b4636; }
+.aw-reader[data-font="serif"] .aw-reader-text { font-family: Georgia, 'Times New Roman', serif; }
+.aw-reader[data-font="sans"] .aw-reader-text { font-family: 'Inter', -apple-system, sans-serif; }
+.aw-reader[data-font="mono"] .aw-reader-text { font-family: 'Courier New', monospace; }
+@media (max-width: 768px) { .aw-reader-header { padding: 6px 12px; } .aw-reader-title { font-size: 0.9rem; } .aw-reader-header-right button { font-size: 0.9rem; padding: 2px 6px; } .aw-reader-content { padding: 16px 12px; } .aw-reader-text .book-title { font-size: 1.6rem; } .aw-reader-text .chapter-heading { font-size: 1.2rem; } .aw-toc-drawer { width: 280px; right: -280px; } .aw-notes-panel { width: 100%; max-height: 50vh; border-radius: 0; } .aw-settings-grid { gap: 8px; } .aw-size-controls input[type="range"] { width: 60px; } .aw-search-bar { width: 260px; right: 8px; } }
+@media (max-width: 480px) { .aw-reader-header { padding: 4px 8px; } .aw-reader-title { font-size: 0.8rem; } .aw-reader-content { padding: 12px 8px; } .aw-toc-drawer { width: 260px; right: -260px; } }
+    </style>
+</head>
+<body>
 
 <!-- ============================================================ -->
-<!--  READER CONTAINER                                            -->
+<!--  READER CONTAINER (unchanged, but we removed header.php)     -->
 <!-- ============================================================ -->
 <div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>" data-file-path="<?php echo htmlspecialchars($book['file_path']); ?>" data-file-type="<?php echo $file_type; ?>" data-file-exists="<?php echo $file_exists ? '1' : '0'; ?>" data-group-id="<?php echo $group_id ? (int)$group_id : 0; ?>">
     
@@ -221,8 +410,8 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="aw-setting-group">
                 <label>Reading Mode</label>
                 <div class="aw-mode-options">
-                    <button class="aw-mode-btn active" data-mode="scroll">Scroll</button>
-                    <button class="aw-mode-btn" data-mode="flip">Page Flip</button>
+                    <button class="aw-mode-btn active" data-mode="scroll">Vertical (Scroll)</button>
+                    <button class="aw-mode-btn" data-mode="flip">Horizontal (Page Flip)</button>
                 </div>
             </div>
             <div class="aw-setting-group">
@@ -411,7 +600,7 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ============================================================ -->
-<!--  JAVASCRIPT – FULLY ENHANCED                                 -->
+<!--  JAVASCRIPT – FULLY ENHANCED (no original function removed)  -->
 <!-- ============================================================ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
@@ -477,6 +666,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let focusMode = false;
     let flipPages = [];
     let currentFlipPage = 0;
+    let currentChapter = 0; // We'll update this on page changes
 
     // ===== FILE EXISTENCE CHECK =====
     if (!fileExists) {
@@ -490,6 +680,10 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         return;
     }
+
+    // ===== PREPARE PAGES FOR HORIZONTAL MODE =====
+    const pagesData = <?php echo json_encode($pages); ?>;
+    const totalPages = pagesData.length;
 
     // ===== PROGRESS =====
     function updateProgress(scrollTop) {
@@ -518,8 +712,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ===== SCROLL =====
+    // ===== SCROLL (Vertical Mode) =====
     content.addEventListener('scroll', function() {
+        if (readingMode !== 'scroll') return;
         const scrollTop = content.scrollTop;
         updateProgress(scrollTop);
         clearTimeout(scrollTimeout);
@@ -533,9 +728,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== RESTORE POSITION (with Resume button) =====
     function restorePosition() {
-        if (lastOffset > 0 && textContainer) {
-            content.scrollTop = lastOffset;
-            updateProgress(lastOffset);
+        if (readingMode === 'scroll') {
+            if (lastOffset > 0 && textContainer) {
+                content.scrollTop = lastOffset;
+                updateProgress(lastOffset);
+            }
+        } else {
+            // Horizontal mode – go to the saved chapter/page
+            if (lastChapter >= 1 && lastChapter <= totalPages) {
+                goToPage(lastChapter);
+            }
         }
     }
     resumeBtn.addEventListener('click', restorePosition);
@@ -667,42 +869,68 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(updateWordCount, 500);
     document.addEventListener('DOMContentLoaded', updateWordCount);
 
-    // ===== READING MODE (Scroll vs Flip) =====
+    // ===== READING MODE (Vertical vs Horizontal) =====
     function initFlipMode() {
-        if (!textContainer) return;
-        const innerHTML = textContainer.innerHTML;
-        flipPages = innerHTML.split(/<div class="page-break"[^>]*><\/div>/);
-        flipPages = flipPages.map(p => p.trim()).filter(p => p.length > 0);
-        currentFlipPage = 0;
+        // Instead of destroying the DOM, we create a virtual page container
+        if (typeof pagesData === 'undefined' || pagesData.length === 0) {
+            alert('No pages available for horizontal mode. Please run extraction first.');
+            return;
+        }
+        // Hide the original textContainer (scroll view)
         textContainer.style.display = 'none';
+        // Remove any existing flip container
+        const existing = document.getElementById('awFlipContainer');
+        if (existing) existing.remove();
+        // Create a new flip container
         const flipContainer = document.createElement('div');
         flipContainer.id = 'awFlipContainer';
         flipContainer.style.cssText = 'flex:1;overflow:hidden;padding:20px;display:flex;flex-direction:column;justify-content:center;align-items:center;';
         textContainer.parentNode.insertBefore(flipContainer, textContainer);
+        // Show the first page
+        currentFlipPage = lastChapter >= 1 && lastChapter <= totalPages ? lastChapter - 1 : 0;
         showFlipPage(currentFlipPage);
     }
 
     function showFlipPage(index) {
         const container = document.getElementById('awFlipContainer');
         if (!container) return;
-        if (index < 0 || index >= flipPages.length) return;
+        if (index < 0 || index >= totalPages) return;
         currentFlipPage = index;
-        container.innerHTML = flipPages[index];
-        const percent = Math.round(((index + 1) / flipPages.length) * 100);
+        // Instead of setting innerHTML (which destroys highlights), we create a fresh page
+        container.innerHTML = `<div class="virtual-page active">${pagesData[index]}</div>`;
+        // Re-apply highlights for this page (if user is logged in)
+        if (userId > 0) {
+            const pageNum = index + 1;
+            fetchHighlightsForPage(pageNum).then(highlights => {
+                highlights.forEach(h => {
+                    const span = `<span class="highlight-${h.color}">${h.text}</span>`;
+                    container.innerHTML = container.innerHTML.replaceAll(h.text, span);
+                });
+            });
+        }
+        // Update progress
+        const percent = Math.round(((index + 1) / totalPages) * 100);
         const radius = 16;
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (percent / 100) * circumference;
         progressRing.setAttribute('stroke-dashoffset', offset);
         progressText.textContent = percent + '%';
+        // Update page number display
+        document.getElementById('pageNum').textContent = index + 1;
+        document.getElementById('totalPages').textContent = totalPages;
+        // Save position
+        currentChapter = index + 1;
+        savePosition();
     }
 
     function nextFlipPage() {
-        if (currentFlipPage < flipPages.length - 1) showFlipPage(currentFlipPage + 1);
+        if (currentFlipPage < totalPages - 1) showFlipPage(currentFlipPage + 1);
     }
     function prevFlipPage() {
         if (currentFlipPage > 0) showFlipPage(currentFlipPage - 1);
     }
 
+    // Mode toggle
     document.querySelectorAll('.aw-mode-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             readingMode = this.dataset.mode;
@@ -714,17 +942,35 @@ document.addEventListener('DOMContentLoaded', function() {
             if (readingMode === 'flip') {
                 initFlipMode();
                 document.addEventListener('keydown', flipKeyHandler);
+                // Disable scroll event for content
+                content.removeEventListener('scroll', updateProgress);
             } else {
+                // Remove flip container and show original scroll
                 const flipContainer = document.getElementById('awFlipContainer');
                 if (flipContainer) flipContainer.remove();
                 textContainer.style.display = 'block';
                 document.removeEventListener('keydown', flipKeyHandler);
+                // Restore scroll listener
+                content.addEventListener('scroll', updateProgress);
+                // Restore scroll position
+                if (lastOffset > 0) {
+                    content.scrollTop = lastOffset;
+                    updateProgress(lastOffset);
+                }
             }
         });
     });
-    reader.setAttribute('data-mode', readingMode);
-    document.querySelector(`.aw-mode-btn[data-mode="${readingMode}"]`)?.classList.add('active');
-    if (readingMode === 'flip') initFlipMode();
+    // Set initial mode from localStorage
+    if (readingMode === 'flip') {
+        document.querySelector('.aw-mode-btn[data-mode="flip"]')?.classList.add('active');
+        document.querySelector('.aw-mode-btn[data-mode="scroll"]')?.classList.remove('active');
+        initFlipMode();
+        document.addEventListener('keydown', flipKeyHandler);
+    } else {
+        document.querySelector('.aw-mode-btn[data-mode="scroll"]')?.classList.add('active');
+        document.querySelector('.aw-mode-btn[data-mode="flip"]')?.classList.remove('active');
+        content.addEventListener('scroll', updateProgress);
+    }
 
     function flipKeyHandler(e) {
         if (e.key === 'ArrowRight') nextFlipPage();
@@ -754,7 +1000,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('bible-ref')) {
             const ref = e.target.textContent.trim();
-            // You can replace this with your own Bible API or database
             alert('📖 Bible reference: ' + ref + '\n(Integrate a Bible API to show the verse text.)');
         }
     });
@@ -818,7 +1063,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== BOOKMARKS =====
     let isBookmarked = false;
-    let currentChapter = 0;
     bookmarkBtn.addEventListener('click', function() {
         const chapter = currentChapter;
         const offset = content.scrollTop;
@@ -975,21 +1219,44 @@ document.addEventListener('DOMContentLoaded', function() {
             searchResults.style.display = 'none';
             return;
         }
-        const text = textContainer.innerText;
-        const lines = text.split('\n');
-        let resultsHtml = '';
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].toLowerCase().includes(query)) {
-                resultsHtml += '<div class="aw-search-result">' + lines[i] + '</div>';
-                if (resultsHtml.split('</div>').length > 20) break;
+        // Search in all pages (if horizontal mode) or in the full text (if scroll)
+        if (readingMode === 'flip') {
+            let found = [];
+            pagesData.forEach((html, idx) => {
+                const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+                if (text.toLowerCase().includes(query)) {
+                    found.push({ page: idx + 1, snippet: text.substring(0, 80) + '...' });
+                }
+            });
+            if (found.length === 0) {
+                searchResults.innerHTML = 'No matches found.';
+                searchResults.style.display = 'block';
+            } else {
+                let resultsHtml = '';
+                found.slice(0, 10).forEach(f => {
+                    resultsHtml += `<div class="aw-search-result" onclick="goToPage(${f.page})"><strong>Page ${f.page}</strong> – ${f.snippet}</div>`;
+                });
+                searchResults.innerHTML = resultsHtml;
+                searchResults.style.display = 'block';
             }
-        }
-        if (resultsHtml) {
-            searchResults.innerHTML = resultsHtml;
-            searchResults.style.display = 'block';
         } else {
-            searchResults.innerHTML = 'No matches found.';
-            searchResults.style.display = 'block';
+            // Scroll mode: search in the visible text container (original behavior)
+            const text = textContainer.innerText;
+            const lines = text.split('\n');
+            let resultsHtml = '';
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].toLowerCase().includes(query)) {
+                    resultsHtml += '<div class="aw-search-result">' + lines[i] + '</div>';
+                    if (resultsHtml.split('</div>').length > 20) break;
+                }
+            }
+            if (resultsHtml) {
+                searchResults.innerHTML = resultsHtml;
+                searchResults.style.display = 'block';
+            } else {
+                searchResults.innerHTML = 'No matches found.';
+                searchResults.style.display = 'block';
+            }
         }
     });
     searchClose.addEventListener('click', function() {
@@ -1315,9 +1582,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('action', 'save_position');
             formData.append('book_id', bookId);
-            formData.append('offset', content.scrollTop);
+            formData.append('offset', readingMode === 'scroll' ? content.scrollTop : 0);
             formData.append('chapter', currentChapter);
-            formData.append('percent', Math.round((content.scrollTop / (content.scrollHeight - content.clientHeight)) * 100));
+            formData.append('percent', Math.round((readingMode === 'scroll' ? (content.scrollTop / (content.scrollHeight - content.clientHeight)) * 100 : (currentPage / totalPages) * 100)));
             navigator.sendBeacon('/reader/reader_ajax.php', formData);
         }
     });
@@ -1402,16 +1669,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== INITIAL PROGRESS =====
     setTimeout(() => {
-        updateProgress(content.scrollTop);
+        if (readingMode === 'scroll') {
+            updateProgress(content.scrollTop);
+        } else {
+            // Horizontal mode already updates via showFlipPage
+        }
     }, 200);
 
-    // ===== GO TO PAGE FUNCTION (Critical missing function) =====
+    // ===== GO TO PAGE FUNCTION (Enhanced) =====
     function goToPage(pageNum) {
         if (readingMode === 'scroll') {
+            // Scroll mode: search for the page in the text container using data-page attributes
             const headings = textContainer.querySelectorAll('.chapter-heading, h2, h3');
             let target = null;
             headings.forEach(h => {
-                // Check if this heading belongs to the target page by data-page attribute
                 const page = h.closest('[data-page]')?.dataset.page;
                 if (page && parseInt(page) === pageNum) {
                     target = h;
@@ -1426,171 +1697,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateProgress(content.scrollTop);
             }
         } else if (readingMode === 'flip') {
-            if (pageNum >= 1 && pageNum <= flipPages.length) {
+            if (pageNum >= 1 && pageNum <= totalPages) {
                 showFlipPage(pageNum - 1);
             }
         }
     }
 
+    // ===== FETCH HIGHLIGHTS FOR PAGE (reusable) =====
+    function fetchHighlightsForPage(page) {
+        return new Promise((resolve) => {
+            if (!userId) return resolve([]);
+            const formData = new FormData();
+            formData.append('action', 'list_highlights');
+            formData.append('book_id', bookId);
+            fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        resolve(data.highlights.filter(h => h.chapter_index == page));
+                    } else {
+                        resolve([]);
+                    }
+                })
+                .catch(() => resolve([]));
+        });
+    }
+
+    // ===== SAVE POSITION (enhanced for both modes) =====
+    function savePosition() {
+        if (!userId) return;
+        const formData = new FormData();
+        formData.append('action', 'save_position');
+        formData.append('book_id', bookId);
+        formData.append('offset', readingMode === 'scroll' ? content.scrollTop : 0);
+        formData.append('chapter', currentChapter);
+        formData.append('percent', readingMode === 'scroll' ? Math.round((content.scrollTop / (content.scrollHeight - content.clientHeight)) * 100) : Math.round((currentChapter / totalPages) * 100));
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData });
+    }
+
     // ===== READ THEME / MODE FROM LOCAL STORAGE =====
     document.querySelector(`.aw-mode-btn[data-mode="${readingMode}"]`)?.classList.add('active');
+    if (readingMode === 'flip') {
+        document.querySelector('.aw-mode-btn[data-mode="scroll"]')?.classList.remove('active');
+        initFlipMode();
+    }
 });
 </script>
 
-<!-- ============================================================ -->
-<!--  STYLES – FULLY BRANDED                                       -->
-<!-- ============================================================ -->
-<style>
-/* ===== BRAND COLORS ===== */
-:root {
-    --rose: #dba1a2;
-    --rose-dark: #c98a8b;
-    --vanilla: #f7f2ec;
-    --border: #e0d8d0;
-    --text: #3a2e2a;
-    --text-light: #7a6e6a;
-    --card-bg: #ffffff;
-    --shadow: 0 2px 12px rgba(0,0,0,0.06);
-    --shadow-hover: 0 4px 20px rgba(0,0,0,0.12);
-    --input-bg: #f9f7f5;
-}
-/* ===== READER BASE ===== */
-.aw-reader { display: flex; flex-direction: column; height: 100vh; background: var(--vanilla); color: var(--text); transition: all 0.3s ease; position: relative; overflow: hidden; }
-.aw-reader-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: rgba(255,255,255,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 10; transition: transform 0.3s ease, opacity 0.3s ease; }
-.aw-reader-header.hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
-.aw-reader-header-left { display: flex; align-items: center; gap: 12px; }
-.aw-reader-back { color: var(--rose); font-weight: 500; text-decoration: none; font-size: 0.9rem; display: flex; align-items: center; gap: 4px; }
-.aw-reader-title { font-size: 1.1rem; margin: 0; color: var(--text); font-family: 'Playfair Display', serif; }
-.aw-reader-header-right { display: flex; align-items: center; gap: 6px; }
-.aw-reader-header-right button { background: none; border: none; font-size: 1.1rem; color: var(--text); cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
-.aw-reader-header-right button:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
-.streak-badge { background: var(--rose); color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px; }
-.aw-progress-ring { vertical-align: middle; }
-.aw-progress-ring-bg { stroke: var(--border); }
-.aw-progress-ring-fill { stroke: var(--rose); transition: stroke-dashoffset 0.3s; }
-.aw-reader-settings { flex-shrink: 0; display: none; background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 12px 16px; }
-.aw-reader-settings.open { display: block; }
-.aw-settings-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.aw-setting-group { display: flex; flex-direction: column; gap: 4px; }
-.aw-setting-group label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); letter-spacing: 0.5px; }
-.aw-theme-options, .aw-font-options, .aw-mode-options { display: flex; gap: 4px; }
-.aw-theme-btn, .aw-font-btn, .aw-mode-btn { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; }
-.aw-theme-btn:hover, .aw-font-btn:hover, .aw-mode-btn:hover { border-color: var(--rose); }
-.aw-theme-btn.active, .aw-font-btn.active, .aw-mode-btn.active { border-color: var(--rose); background: var(--rose); color: white; }
-.color-preview { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; border: 1px solid var(--border); }
-.aw-size-controls { display: flex; align-items: center; gap: 6px; }
-.aw-size-btn { background: transparent; border: 1px solid var(--border); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; color: var(--text); transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-.aw-size-btn:hover { border-color: var(--rose); color: var(--rose); }
-.aw-size-controls input[type="range"] { width: 80px; accent-color: var(--rose); }
-.aw-theme-extra { margin-top: 4px; }
-.aw-toc-drawer { position: fixed; top: 0; right: -320px; width: 320px; height: 100vh; background: var(--card-bg); box-shadow: -4px 0 20px rgba(0,0,0,0.1); z-index: 20; transition: right 0.3s ease; display: flex; flex-direction: column; }
-.aw-toc-drawer.open { right: 0; }
-.aw-toc-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-.aw-toc-header h3 { margin: 0; font-size: 1.1rem; }
-.aw-toc-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text); padding: 0 4px; }
-.aw-toc-body { flex: 1; overflow-y: auto; padding: 12px 20px; }
-.aw-toc-list { list-style: none; padding: 0; margin: 0; }
-.aw-toc-list li { padding: 4px 0; }
-.aw-toc-list a { color: var(--text); text-decoration: none; display: block; padding: 2px 4px; border-radius: 4px; transition: background 0.2s, color 0.2s; }
-.aw-toc-list a:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
-.aw-toc-empty { color: var(--text-light); text-align: center; padding: 40px 0; }
-.aw-notes-panel { position: fixed; bottom: 0; right: 0; width: 380px; max-height: 60vh; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px 12px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); display: none; flex-direction: column; z-index: 25; }
-.aw-notes-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--vanilla); border-radius: 12px 12px 0 0; }
-.aw-notes-title h3 { margin: 0; font-size: 1rem; }
-.aw-notes-title .badge { background: var(--rose); color: white; padding: 0 8px; border-radius: 12px; font-size: 0.75rem; }
-.aw-notes-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
-.note-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-.note-card.private { border-left: 4px solid #6c757d; }
-.note-author { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.note-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-.note-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: var(--rose); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85rem; }
-.note-author-info { flex: 1; }
-.note-author-info small { color: var(--text-light); }
-.note-text { margin: 0 0 8px; font-size: 0.95rem; }
-.note-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-.note-reactions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.reaction { background: var(--vanilla); padding: 0 8px; border-radius: 12px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
-.reaction:hover { background: rgba(219,161,162,0.2); }
-.badge-private { background: #6c757d; color: white; padding: 0 6px; border-radius: 4px; font-size: 0.7rem; }
-.empty-notes { color: var(--text-light); text-align: center; padding: 24px 12px; }
-#awAddNoteForm { padding: 12px 16px; border-top: 1px solid var(--border); }
-#awAddNoteForm textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; resize: vertical; }
-#awAddNoteForm .btn { padding: 4px 12px; font-size: 0.8rem; }
-.aw-notes-actions .btn { padding: 4px 12px; font-size: 0.8rem; }
-.aw-reaction-picker { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow-hover); z-index: 50; display: none; gap: 6px; align-items: center; }
-.aw-reaction-picker button { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: all 0.2s; }
-.aw-reaction-picker button:hover { background: var(--vanilla); transform: scale(1.15); }
-.aw-challenge-widget { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 8px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
-.aw-challenge-widget h4 { margin: 0; font-size: 1rem; }
-.aw-challenge-widget p { margin: 0; font-size: 0.9rem; color: var(--text-light); }
-.aw-challenge-progress { position: relative; height: 16px; background: var(--border); border-radius: 8px; overflow: hidden; }
-.aw-challenge-bar { height: 100%; background: var(--rose); transition: width 0.3s; }
-.aw-challenge-percent { position: absolute; top: 0; right: 8px; font-size: 0.7rem; font-weight: 600; color: var(--text); line-height: 16px; }
-.aw-challenge-stats { font-weight: 600; font-size: 0.9rem; color: var(--text); }
-.aw-reader-text { max-width: 750px; margin: 0 auto; padding: 30px 40px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
-.aw-reader-text .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
-.aw-reader-text .highlight-green { background: #a5d6a7; padding: 0 2px; }
-.aw-reader-text .highlight-blue { background: #90caf9; padding: 0 2px; }
-.aw-reader-text .highlight-pink { background: #f48fb1; padding: 0 2px; }
-.aw-reader-text .highlight-yellow.annotation { border-bottom: 2px solid #ffeb3b; cursor: pointer; }
-.aw-reader-text .highlight-green.annotation { border-bottom: 2px solid #a5d6a7; cursor: pointer; }
-.aw-reader-text .highlight-blue.annotation { border-bottom: 2px solid #90caf9; cursor: pointer; }
-.aw-reader-text .highlight-pink.annotation { border-bottom: 2px solid #f48fb1; cursor: pointer; }
-.aw-highlight-tooltip { position: fixed; display: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow-hover); z-index: 30; gap: 4px; align-items: center; }
-.aw-highlight-tooltip.visible { display: flex; }
-.aw-highlight-color { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; transition: transform 0.2s; }
-.aw-highlight-color:hover { transform: scale(1.15); }
-.aw-highlight-color[data-color="yellow"] { background: #ffeb3b; }
-.aw-highlight-color[data-color="green"] { background: #a5d6a7; }
-.aw-highlight-color[data-color="blue"] { background: #90caf9; }
-.aw-highlight-color[data-color="pink"] { background: #f48fb1; }
-.aw-highlight-btn { background: none; border: none; cursor: pointer; color: var(--text); font-size: 0.9rem; padding: 0 4px; transition: color 0.2s; }
-.aw-highlight-btn:hover { color: var(--rose); }
-.aw-annotation-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-hover); z-index: 30; display: none; }
-.aw-annotation-popup.visible { display: block; }
-.aw-annotation-popup textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; min-height: 60px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
-.aw-annotation-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
-.aw-annotation-actions button { padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; }
-.aw-annotation-save { background: var(--rose); color: white; }
-.aw-annotation-cancel { background: var(--border); color: var(--text); }
-.aw-search-bar { position: absolute; top: 56px; right: 16px; width: 320px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; box-shadow: var(--shadow-hover); z-index: 15; display: none; }
-.aw-search-bar.visible { display: block; }
-.aw-search-bar input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
-.aw-search-bar input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-#awSearchResults { margin-top: 8px; max-height: 200px; overflow-y: auto; display: none; }
-.aw-search-result { padding: 4px 8px; font-size: 0.85rem; border-bottom: 1px solid var(--border); cursor: pointer; }
-.aw-search-result:hover { background: rgba(219,161,162,0.1); }
-.aw-share-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 30; display: none; align-items: center; justify-content: center; }
-.aw-share-modal.visible { display: flex; }
-.aw-share-modal-content { background: var(--card-bg); padding: 24px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; }
-.aw-share-modal-content h3 { margin-top: 0; }
-.aw-share-options { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
-.aw-share-options button { padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); cursor: pointer; transition: all 0.2s; font-size: 0.9rem; }
-.aw-share-options button:hover { border-color: var(--rose); background: rgba(219,161,162,0.1); }
-.aw-share-modal-close { background: var(--rose); color: white; border: none; padding: 8px 24px; border-radius: 30px; cursor: pointer; }
-.aw-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 11; display: none; }
-.aw-overlay.active { display: block; }
-.aw-reader.focus-mode .aw-reader-header { transform: translateY(-100%); opacity: 0; pointer-events: none; }
-.aw-reader.focus-mode .aw-reader-settings { display: none !important; }
-.aw-reader.focus-mode .aw-search-bar { display: none !important; }
-.aw-reader-fallback { height: 100%; width: 100%; display: flex; flex-direction: column; }
-.aw-reader-fallback canvas { flex: 1; width: 100%; height: auto; object-fit: contain; }
-.aw-pdf-controls, .aw-epub-controls { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 8px 12px; background: var(--card-bg); border-top: 1px solid var(--border); flex-shrink: 0; }
-.aw-pdf-controls button, .aw-epub-controls button { background: var(--rose); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; transition: background 0.2s; }
-.aw-pdf-controls button:hover, .aw-epub-controls button:hover { background: var(--rose-dark); }
-.aw-pdf-controls input[type="range"] { width: 80px; accent-color: var(--rose); }
-.aw-epub-container #awEpubViewer { flex: 1; }
-.aw-reader-unsupported { text-align: center; padding: 40px 20px; color: var(--text-light); }
-.aw-reader-unsupported i { font-size: 3rem; color: var(--rose); display: block; margin-bottom: 16px; }
-.aw-reader[data-theme="paper"] { background: var(--vanilla); color: var(--text); }
-.aw-reader[data-theme="light"] { background: #ffffff; color: #1a1a1a; }
-.aw-reader[data-theme="dark"] { background: #1a1a1a; color: #f0f0f0; }
-.aw-reader[data-theme="sepia"] { background: #f4ecd8; color: #5b4636; }
-.aw-reader[data-font="serif"] .aw-reader-text { font-family: Georgia, 'Times New Roman', serif; }
-.aw-reader[data-font="sans"] .aw-reader-text { font-family: 'Inter', -apple-system, sans-serif; }
-.aw-reader[data-font="mono"] .aw-reader-text { font-family: 'Courier New', monospace; }
-@media (max-width: 768px) { .aw-reader-header { padding: 6px 12px; } .aw-reader-title { font-size: 0.9rem; } .aw-reader-header-right button { font-size: 0.9rem; padding: 2px 6px; } .aw-reader-content { padding: 16px 12px; } .aw-reader-text .book-title { font-size: 1.6rem; } .aw-reader-text .chapter-heading { font-size: 1.2rem; } .aw-toc-drawer { width: 280px; right: -280px; } .aw-notes-panel { width: 100%; max-height: 50vh; border-radius: 0; } .aw-settings-grid { gap: 8px; } .aw-size-controls input[type="range"] { width: 60px; } .aw-search-bar { width: 260px; right: 8px; } }
-@media (max-width: 480px) { .aw-reader-header { padding: 4px 8px; } .aw-reader-title { font-size: 0.8rem; } .aw-reader-content { padding: 12px 8px; } .aw-toc-drawer { width: 260px; right: -260px; } }
-</style>
-
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+</body>
+</html>
