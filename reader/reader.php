@@ -1,8 +1,7 @@
 <?php
 // ============================================================
-//  READER.PHP – ULTIMATE CUSTOM BOOK READER
-//  Full‑screen, no iframes, fully branded, production‑ready.
-//  All features included except AI/API dependencies.
+//  READER.PHP – FULLY ENHANCED & FIXED
+//  Supports: Processed HTML, PDF, EPUB, MOBI, AZW3, AZW4, TXT
 // ============================================================
 
 ini_set('display_errors', 1);
@@ -93,7 +92,12 @@ if (isLoggedIn()) {
 }
 
 // ===== FILE TYPE FOR FALLBACK =====
-$file_type = $book['file_type'] ?? 'unknown';
+$file_type = strtolower($book['file_type'] ?? 'unknown');
+
+// ===== SERVER-SIDE FILE VALIDATION =====
+$file_path = __DIR__ . '/../' . $book['file_path'];
+$file_exists = file_exists($file_path);
+$file_size = $file_exists ? filesize($file_path) : 0;
 
 // ===== SHARE CHAPTER =====
 $share_chapter = isset($_GET['chapter']) ? (int)$_GET['chapter'] : null;
@@ -119,10 +123,9 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 ?>
 <?php require_once __DIR__ . '/../includes/header.php'; ?>
 
-<!-- ============================================================ -->
-<!--  READER CONTAINER – Full Screen, Fixed Layout                 -->
-<!-- ============================================================ -->
-<div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>">
+<!-- ===== READER CONTAINER ===== -->
+<div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>" data-file-path="<?php echo htmlspecialchars($book['file_path']); ?>" data-file-type="<?php echo $file_type; ?>" data-file-exists="<?php echo $file_exists ? '1' : '0'; ?>">
+    
     <!-- ===== HEADER ===== -->
     <header class="aw-reader-header" id="awReaderHeader">
         <div class="aw-reader-header-left">
@@ -140,27 +143,21 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                         transform="rotate(-90 18 18)" id="awProgressRing"/>
                 <text x="18" y="21" text-anchor="middle" font-size="8" fill="var(--text)" id="awProgressText">0%</text>
             </svg>
-            <!-- Bookmarks -->
             <button class="aw-reader-bookmark-btn" id="awBookmarkBtn" aria-label="Bookmark this page">
                 <i class="far fa-bookmark"></i>
             </button>
-            <!-- Settings -->
             <button class="aw-reader-settings-btn" id="awSettingsToggle" aria-label="Settings">
                 <i class="fas fa-cog"></i>
             </button>
-            <!-- TOC -->
             <button class="aw-reader-toc-btn" id="awTocToggle" aria-label="Table of Contents">
                 <i class="fas fa-list-ul"></i>
             </button>
-            <!-- Focus mode -->
             <button class="aw-reader-focus-btn" id="awFocusToggle" aria-label="Focus mode">
                 <i class="fas fa-expand"></i>
             </button>
-            <!-- Share -->
             <button class="aw-reader-share-btn" id="awShareBtn" aria-label="Share">
                 <i class="fas fa-share-alt"></i>
             </button>
-            <!-- Notes -->
             <button class="aw-reader-notes-btn" id="awNotesToggle" aria-label="Group notes">
                 <i class="fas fa-sticky-note"></i>
             </button>
@@ -170,7 +167,6 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
     <!-- ===== SETTINGS PANEL ===== -->
     <div class="aw-reader-settings" id="awSettingsPanel">
         <div class="aw-settings-grid">
-            <!-- Theme -->
             <div class="aw-setting-group">
                 <label>Theme</label>
                 <div class="aw-theme-options">
@@ -183,7 +179,6 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                     <label><input type="checkbox" id="awAutoTheme"> Auto‑theme (time of day)</label>
                 </div>
             </div>
-            <!-- Font -->
             <div class="aw-setting-group">
                 <label>Font</label>
                 <div class="aw-font-options">
@@ -192,7 +187,6 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                     <button class="aw-font-btn" data-font="mono">Mono</button>
                 </div>
             </div>
-            <!-- Font Size -->
             <div class="aw-setting-group">
                 <label>Font Size</label>
                 <div class="aw-size-controls">
@@ -202,7 +196,6 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                     <span id="awSizeLabel">100%</span>
                 </div>
             </div>
-            <!-- Line Height -->
             <div class="aw-setting-group">
                 <label>Line Height</label>
                 <div class="aw-size-controls">
@@ -212,7 +205,6 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                     <span id="awLineLabel">1.8</span>
                 </div>
             </div>
-            <!-- Letter Spacing -->
             <div class="aw-setting-group">
                 <label>Letter Spacing</label>
                 <div class="aw-size-controls">
@@ -222,7 +214,6 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                     <span id="awSpacingLabel">0</span>
                 </div>
             </div>
-            <!-- Reading Mode -->
             <div class="aw-setting-group">
                 <label>Reading Mode</label>
                 <div class="aw-mode-options">
@@ -302,8 +293,9 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                 <?php echo $processed['content_html']; ?>
             </div>
         <?php else: ?>
-            <!-- FALLBACK: PDF or EPUB -->
+            <!-- ===== ENHANCED FALLBACK ===== -->
             <div class="aw-reader-fallback" id="awFallbackContainer">
+                
                 <?php if ($file_type === 'pdf'): ?>
                     <canvas id="awPdfCanvas"></canvas>
                     <div class="aw-pdf-controls">
@@ -312,6 +304,7 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                         <button id="awPdfNext"><i class="fas fa-chevron-right"></i></button>
                         <input type="range" id="awPdfZoom" min="0.5" max="2" step="0.1" value="1">
                     </div>
+                
                 <?php elseif ($file_type === 'epub'): ?>
                     <div id="awEpubViewer"></div>
                     <div class="aw-epub-controls">
@@ -319,12 +312,41 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
                         <span id="awEpubPageInfo">1 / 1</span>
                         <button id="awEpubNext"><i class="fas fa-chevron-right"></i></button>
                     </div>
+
+                <?php elseif (in_array($file_type, ['mobi', 'azw3', 'azw4'])): ?>
+                    <div class="aw-reader-unsupported" style="text-align:center;padding:40px 20px;">
+                        <i class="fas fa-book" style="font-size:4rem;color:var(--rose);display:block;margin-bottom:16px;"></i>
+                        <h3><?php echo strtoupper($file_type); ?> Format Not Supported Online</h3>
+                        <p>This format is not supported for web-based reading. Please download the file to read it on your device.</p>
+                        <a href="<?php echo SITE_URL . '/' . $book['file_path']; ?>" download class="btn btn-primary" style="display:inline-block;margin-top:8px;">
+                            <i class="fas fa-download"></i> Download <?php echo strtoupper($file_type); ?>
+                        </a>
+                    </div>
+
+                <?php elseif ($file_type === 'txt'): ?>
+                    <div class="aw-reader-unsupported" style="text-align:center;padding:40px 20px;">
+                        <i class="fas fa-file-alt" style="font-size:4rem;color:var(--rose);display:block;margin-bottom:16px;"></i>
+                        <h3>TXT Format Not Supported</h3>
+                        <p>TXT files cannot be processed for online reading. Please convert to EPUB or PDF.</p>
+                    </div>
+
+                <?php elseif (!$file_exists): ?>
+                    <div class="aw-reader-unsupported" style="text-align:center;padding:40px 20px;">
+                        <i class="fas fa-file-excel" style="font-size:4rem;color:var(--rose);display:block;margin-bottom:16px;"></i>
+                        <h3>File Not Found</h3>
+                        <p>The book file could not be located on the server.</p>
+                        <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-outline">Back to Books</a>
+                    </div>
+
                 <?php else: ?>
-                    <div class="aw-reader-unsupported">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>This book format is not supported for online reading.</p>
+                    <div class="aw-reader-unsupported" style="text-align:center;padding:40px 20px;">
+                        <i class="fas fa-exclamation-triangle" style="font-size:4rem;color:var(--rose);display:block;margin-bottom:16px;"></i>
+                        <h3>Unsupported File Type</h3>
+                        <p>File type "<?php echo htmlspecialchars($file_type); ?>" cannot be read online.</p>
+                        <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-outline">Back to Books</a>
                     </div>
                 <?php endif; ?>
+                
             </div>
         <?php endif; ?>
     </div>
@@ -373,15 +395,13 @@ $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 </div>
 
 <!-- ============================================================ -->
-<!--  JAVASCRIPT – Complete Reader Logic                            -->
+<!--  JAVASCRIPT – Fully Enhanced Reader Logic                      -->
 <!-- ============================================================ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ================================================================
-    // 1. DOM REFS
-    // ================================================================
+    // ===== GET DATA FROM PHP =====
     const reader = document.getElementById('awReader');
     const content = document.getElementById('awContent');
     const textContainer = document.getElementById('awReaderText');
@@ -420,42 +440,34 @@ document.addEventListener('DOMContentLoaded', function() {
     const reactionPicker = document.getElementById('awReactionPicker');
     const challengeWidget = document.getElementById('awChallengeWidget');
 
-    // ================================================================
-    // 2. STATE
-    // ================================================================
-    let currentTheme = localStorage.getItem('reader_theme') || 'light';
-    let currentFont = localStorage.getItem('reader_font') || 'serif';
-    let fontSize = parseInt(localStorage.getItem('reader_font_size')) || 100;
-    let lineHeight = parseInt(localStorage.getItem('reader_line_height')) || 180;
-    let letterSpacing = parseInt(localStorage.getItem('reader_letter_spacing')) || 0;
-    let readingMode = localStorage.getItem('reading_mode') || 'scroll';
-    let focusMode = false;
-    let autoTheme = false;
-    let scrollTimeout;
-    let selectedText = '';
-    let selectedRange = null;
-    let isBookmarked = false;
-    let currentChapter = 0;
-    let currentPage = 1;
-    let totalPages = 1;
-    let progressPercent = <?php echo $progress_percent; ?>;
-    let lastOffset = <?php echo $last_offset; ?>;
-    let lastChapter = <?php echo $last_chapter; ?>;
-    let bookId = <?php echo $book_id; ?>;
-    let userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
-    let groupId = <?php echo $group_id ?? 0; ?>;
-    let saveTimer = null;
-    let currentNoteId = null;
-    let currentReactionPicker = null;
+    const bookId = parseInt(reader.dataset.bookId);
+    const filePath = reader.dataset.filePath;
+    const fileType = reader.dataset.fileType;
+    const fileExists = reader.dataset.fileExists === '1';
+    const userId = parseInt(reader.dataset.userId);
+    const groupId = parseInt(reader.dataset.groupId || 0);
+    const lastOffset = parseInt(reader.dataset.lastOffset || 0);
+    const lastChapter = parseInt(reader.dataset.lastChapter || 0);
+    const progressPercent = parseInt(reader.dataset.lastProgress || 0);
 
-    // ================================================================
-    // 3. PROGRESS
-    // ================================================================
+    // ===== FILE EXISTENCE CHECK =====
+    if (!fileExists) {
+        document.getElementById('awContent').innerHTML = `
+            <div style="text-align:center;padding:40px;">
+                <i class="fas fa-file-excel" style="font-size:3rem;color:var(--rose);display:block;margin-bottom:16px;"></i>
+                <h3>File Not Found</h3>
+                <p>The book file could not be located on the server.</p>
+                <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-outline">Back to Books</a>
+            </div>
+        `;
+        return;
+    }
+
+    // ===== PROGRESS =====
     function updateProgress(scrollTop) {
         const scrollHeight = content.scrollHeight - content.clientHeight;
         if (scrollHeight <= 0) return;
         let percent = Math.min(100, Math.round((scrollTop / scrollHeight) * 100));
-        progressPercent = percent;
         const radius = 16;
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (percent / 100) * circumference;
@@ -478,9 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ================================================================
-    // 4. SCROLL
-    // ================================================================
+    // ===== SCROLL =====
     content.addEventListener('scroll', function() {
         const scrollTop = content.scrollTop;
         updateProgress(scrollTop);
@@ -493,9 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     });
 
-    // ================================================================
-    // 5. RESTORE POSITION
-    // ================================================================
+    // ===== RESTORE POSITION =====
     if (lastOffset > 0 && textContainer) {
         setTimeout(() => {
             content.scrollTop = lastOffset;
@@ -503,9 +511,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 100);
     }
 
-    // ================================================================
-    // 6. THEME
-    // ================================================================
+    // ===== THEME =====
+    let currentTheme = localStorage.getItem('reader_theme') || 'light';
+    let autoTheme = false;
     function applyTheme(theme) {
         currentTheme = theme;
         reader.setAttribute('data-theme', theme);
@@ -513,15 +521,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.aw-theme-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.aw-theme-btn[data-theme="${theme}"]`)?.classList.add('active');
     }
-
-    function getAutoTheme() {
-        const hour = new Date().getHours();
-        if (hour >= 6 && hour < 12) return 'sepia';
-        if (hour >= 12 && hour < 18) return 'paper';
-        if (hour >= 18 && hour < 22) return 'dark';
-        return 'dark';
-    }
-
     document.querySelectorAll('.aw-theme-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const theme = this.dataset.theme;
@@ -532,20 +531,31 @@ document.addEventListener('DOMContentLoaded', function() {
             applyTheme(theme);
         });
     });
-
     document.getElementById('awAutoTheme').addEventListener('change', function() {
         autoTheme = this.checked;
         if (autoTheme) {
-            applyTheme(getAutoTheme());
-            setInterval(() => { if (autoTheme) applyTheme(getAutoTheme()); }, 3600000);
+            const hour = new Date().getHours();
+            let theme = 'light';
+            if (hour >= 6 && hour < 12) theme = 'sepia';
+            else if (hour >= 12 && hour < 18) theme = 'paper';
+            else if (hour >= 18 && hour < 22) theme = 'dark';
+            else theme = 'dark';
+            applyTheme(theme);
+            setInterval(() => { if (autoTheme) {
+                const h = new Date().getHours();
+                let t = 'light';
+                if (h >= 6 && h < 12) t = 'sepia';
+                else if (h >= 12 && h < 18) t = 'paper';
+                else if (h >= 18 && h < 22) t = 'dark';
+                else t = 'dark';
+                applyTheme(t);
+            } }, 3600000);
         }
     });
-
     applyTheme(currentTheme);
 
-    // ================================================================
-    // 7. FONT
-    // ================================================================
+    // ===== FONT =====
+    let currentFont = localStorage.getItem('reader_font') || 'serif';
     function applyFont(font) {
         currentFont = font;
         reader.setAttribute('data-font', font);
@@ -553,7 +563,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.aw-font-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.aw-font-btn[data-font="${font}"]`)?.classList.add('active');
     }
-
     document.querySelectorAll('.aw-font-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             applyFont(this.dataset.font);
@@ -561,9 +570,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     applyFont(currentFont);
 
-    // ================================================================
-    // 8. FONT SIZE
-    // ================================================================
+    // ===== FONT SIZE =====
+    let fontSize = parseInt(localStorage.getItem('reader_font_size')) || 100;
     function applySize(size) {
         fontSize = Math.min(160, Math.max(80, size));
         textContainer.style.fontSize = fontSize + '%';
@@ -571,7 +579,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('awSizeSlider').value = fontSize;
         localStorage.setItem('reader_font_size', fontSize);
     }
-
     document.getElementById('awSizeSlider').addEventListener('input', function() {
         applySize(parseInt(this.value));
     });
@@ -579,9 +586,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('awIncreaseSize').addEventListener('click', () => applySize(fontSize + 5));
     applySize(fontSize);
 
-    // ================================================================
-    // 9. LINE HEIGHT
-    // ================================================================
+    // ===== LINE HEIGHT =====
+    let lineHeight = parseInt(localStorage.getItem('reader_line_height')) || 180;
     function applyLine(height) {
         lineHeight = Math.min(220, Math.max(140, height));
         textContainer.style.lineHeight = lineHeight / 100;
@@ -589,7 +595,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('awLineSlider').value = lineHeight;
         localStorage.setItem('reader_line_height', lineHeight);
     }
-
     document.getElementById('awLineSlider').addEventListener('input', function() {
         applyLine(parseInt(this.value));
     });
@@ -597,9 +602,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('awIncreaseLine').addEventListener('click', () => applyLine(lineHeight + 10));
     applyLine(lineHeight);
 
-    // ================================================================
-    // 10. LETTER SPACING
-    // ================================================================
+    // ===== LETTER SPACING =====
+    let letterSpacing = parseInt(localStorage.getItem('reader_letter_spacing')) || 0;
     function applySpacing(spacing) {
         letterSpacing = Math.min(4, Math.max(-2, spacing));
         textContainer.style.letterSpacing = letterSpacing + 'px';
@@ -607,7 +611,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('awSpacingSlider').value = letterSpacing;
         localStorage.setItem('reader_letter_spacing', letterSpacing);
     }
-
     document.getElementById('awSpacingSlider').addEventListener('input', function() {
         applySpacing(parseInt(this.value));
     });
@@ -615,9 +618,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('awIncreaseSpacing').addEventListener('click', () => applySpacing(letterSpacing + 1));
     applySpacing(letterSpacing);
 
-    // ================================================================
-    // 11. READING MODE
-    // ================================================================
+    // ===== READING MODE =====
+    let readingMode = localStorage.getItem('reading_mode') || 'scroll';
+    let focusMode = false;
     document.querySelectorAll('.aw-mode-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             readingMode = this.dataset.mode;
@@ -625,19 +628,12 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.setItem('reading_mode', readingMode);
             document.querySelectorAll('.aw-mode-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
-            if (readingMode === 'flip') {
-                textContainer.classList.add('flip-mode');
-            } else {
-                textContainer.classList.remove('flip-mode');
-            }
         });
     });
-    document.querySelector(`.aw-mode-btn[data-mode="${readingMode}"]`)?.classList.add('active');
     reader.setAttribute('data-mode', readingMode);
+    document.querySelector(`.aw-mode-btn[data-mode="${readingMode}"]`)?.classList.add('active');
 
-    // ================================================================
-    // 12. SETTINGS PANEL
-    // ================================================================
+    // ===== SETTINGS PANEL =====
     settingsToggle.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
         if (settingsPanel.classList.contains('open')) {
@@ -647,9 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ================================================================
-    // 13. TOC DRAWER
-    // ================================================================
+    // ===== TOC DRAWER =====
     tocToggle.addEventListener('click', function() {
         tocDrawer.classList.toggle('open');
         if (tocDrawer.classList.contains('open')) {
@@ -662,7 +656,6 @@ document.addEventListener('DOMContentLoaded', function() {
         tocDrawer.classList.remove('open');
         overlay.classList.remove('active');
     });
-
     document.querySelectorAll('.aw-toc-link').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
@@ -676,9 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ================================================================
-    // 14. FOCUS MODE
-    // ================================================================
+    // ===== FOCUS MODE =====
     focusToggle.addEventListener('click', function() {
         focusMode = !focusMode;
         reader.classList.toggle('focus-mode', focusMode);
@@ -693,9 +684,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ================================================================
-    // 15. OVERLAY
-    // ================================================================
+    // ===== OVERLAY =====
     overlay.addEventListener('click', function() {
         settingsPanel.classList.remove('open');
         tocDrawer.classList.remove('open');
@@ -704,9 +693,9 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.classList.remove('active');
     });
 
-    // ================================================================
-    // 16. BOOKMARKS
-    // ================================================================
+    // ===== BOOKMARKS =====
+    let isBookmarked = false;
+    let currentChapter = 0;
     bookmarkBtn.addEventListener('click', function() {
         const chapter = currentChapter;
         const offset = content.scrollTop;
@@ -743,19 +732,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ================================================================
-    // 17. HIGHLIGHTS
-    // ================================================================
+    // ===== HIGHLIGHTS =====
+    let selectedText = '';
+    let selectedRange = null;
     function getSelectedText() {
         const sel = window.getSelection();
         return sel.toString().trim();
     }
-
     function getSelectionRange() {
         const sel = window.getSelection();
         return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     }
-
     function showHighlightTooltip() {
         selectedText = getSelectedText();
         selectedRange = getSelectionRange();
@@ -768,12 +755,10 @@ document.addEventListener('DOMContentLoaded', function() {
         highlightTooltip.style.left = (rect.left + rect.width / 2 - 60) + 'px';
         highlightTooltip.classList.add('visible');
     }
-
     document.addEventListener('mouseup', showHighlightTooltip);
     document.addEventListener('touchend', function() {
         setTimeout(showHighlightTooltip, 300);
     });
-
     document.querySelectorAll('.aw-highlight-color').forEach(btn => {
         btn.addEventListener('click', function() {
             const color = this.dataset.color;
@@ -799,9 +784,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ================================================================
-    // 18. ANNOTATIONS
-    // ================================================================
+    // ===== ANNOTATIONS =====
     document.getElementById('awHighlightAnnotate').addEventListener('click', function() {
         if (selectedText && selectedRange) {
             annotationPopup.classList.add('visible');
@@ -810,7 +793,6 @@ document.addEventListener('DOMContentLoaded', function() {
             highlightTooltip.classList.remove('visible');
         }
     });
-
     annotationSave.addEventListener('click', function() {
         const note = annotationText.value.trim();
         if (note && selectedText && selectedRange) {
@@ -834,11 +816,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
-
     annotationCancel.addEventListener('click', function() {
         annotationPopup.classList.remove('visible');
     });
-
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.aw-highlight-tooltip') && !e.target.closest('.aw-annotation-popup')) {
             highlightTooltip.classList.remove('visible');
@@ -846,9 +826,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ================================================================
-    // 19. SEARCH
-    // ================================================================
+    // ===== SEARCH =====
     searchInput.addEventListener('input', function() {
         const query = this.value.toLowerCase().trim();
         if (query.length < 2) {
@@ -873,16 +851,13 @@ document.addEventListener('DOMContentLoaded', function() {
             searchResults.style.display = 'block';
         }
     });
-
     searchClose.addEventListener('click', function() {
         searchBar.classList.remove('visible');
         searchResults.innerHTML = '';
         searchResults.style.display = 'none';
     });
 
-    // ================================================================
-    // 20. KEYBOARD SHORTCUTS
-    // ================================================================
+    // ===== KEYBOARD SHORTCUTS =====
     document.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.key === 'f') {
             e.preventDefault();
@@ -897,9 +872,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ================================================================
-    // 21. CLOSE ALL
-    // ================================================================
+    // ===== CLOSE ALL =====
     window.closeAllMenus = function() {
         settingsPanel.classList.remove('open');
         tocDrawer.classList.remove('open');
@@ -911,42 +884,35 @@ document.addEventListener('DOMContentLoaded', function() {
         searchBar.classList.remove('visible');
     };
 
-    // ================================================================
-    // 22. SHARE
-    // ================================================================
+    // ===== SHARE =====
     shareBtn.addEventListener('click', function() {
         shareModal.classList.add('visible');
         overlay.classList.add('active');
     });
-
     document.querySelectorAll('.aw-share-modal-close').forEach(btn => {
         btn.addEventListener('click', function() {
             shareModal.classList.remove('visible');
             overlay.classList.remove('active');
         });
     });
-
     document.querySelectorAll('.aw-share-facebook').forEach(btn => {
         btn.addEventListener('click', function() {
             const url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentChapter + '&share=1';
             window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank');
         });
     });
-
     document.querySelectorAll('.aw-share-twitter').forEach(btn => {
         btn.addEventListener('click', function() {
             const url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentChapter + '&share=1';
             window.open('https://twitter.com/intent/tweet?text=Reading&url=' + encodeURIComponent(url), '_blank');
         });
     });
-
     document.querySelectorAll('.aw-share-whatsapp').forEach(btn => {
         btn.addEventListener('click', function() {
             const url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentChapter + '&share=1';
             window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(url), '_blank');
         });
     });
-
     document.querySelectorAll('.aw-share-copy').forEach(btn => {
         btn.addEventListener('click', function() {
             const url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentChapter + '&share=1';
@@ -962,25 +928,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ================================================================
-    // 23. NOTES
-    // ================================================================
+    // ===== NOTES =====
     function toggleNotesPanel() {
         if (groupId === 0) {
             alert('You are not a member of a reading group for this book.');
             return;
         }
-        const panel = document.getElementById('awNotesPanel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            panel.style.display = 'flex';
+        if (notesPanel.style.display === 'none' || notesPanel.style.display === '') {
+            notesPanel.style.display = 'flex';
             loadNotes();
             overlay.classList.add('active');
         } else {
-            panel.style.display = 'none';
+            notesPanel.style.display = 'none';
             overlay.classList.remove('active');
         }
     }
-
     notesToggle.addEventListener('click', toggleNotesPanel);
     notesClose.addEventListener('click', function() {
         notesPanel.style.display = 'none';
@@ -990,7 +952,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadNotes() {
         if (groupId === 0) return;
         fetch('/reader/reader_ajax.php?action=get_notes&group_id=' + groupId + '&book_id=' + bookId + '&chapter=' + currentChapter)
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
                 if (data.success) {
                     let html = '';
@@ -1059,7 +1021,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
     addNoteBtn.addEventListener('click', function() {
         const form = document.getElementById('awAddNoteForm');
         form.style.display = form.style.display === 'none' ? 'block' : 'none';
@@ -1067,13 +1028,11 @@ document.addEventListener('DOMContentLoaded', function() {
             noteText.focus();
         }
     });
-
     noteCancel.addEventListener('click', function() {
         document.getElementById('awAddNoteForm').style.display = 'none';
         noteText.value = '';
         notePrivate.checked = false;
     });
-
     noteForm.addEventListener('submit', submitNote);
 
     function deleteNote(noteId) {
@@ -1089,9 +1048,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ================================================================
-    // 24. REACTIONS
-    // ================================================================
+    // ===== REACTIONS =====
     function showReactionPicker(noteId, event) {
         currentNoteId = noteId;
         const btn = event.target.closest('.btn-outline');
@@ -1101,7 +1058,6 @@ document.addEventListener('DOMContentLoaded', function() {
         reactionPicker.style.display = 'flex';
         currentReactionPicker = reactionPicker;
     }
-
     document.querySelectorAll('.reaction-option').forEach(btn => {
         btn.addEventListener('click', function() {
             if (!currentNoteId) return;
@@ -1123,7 +1079,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-
     function reactNote(noteId, reactionType) {
         const formData = new FormData();
         formData.append('action', 'toggle_note_reaction');
@@ -1136,7 +1091,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) loadNotes();
         });
     }
-
     document.addEventListener('click', function(e) {
         if (currentReactionPicker && !currentReactionPicker.contains(e.target) && !e.target.closest('.btn-outline') && !e.target.closest('.reaction')) {
             currentReactionPicker.style.display = 'none';
@@ -1145,9 +1099,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ================================================================
-    // 25. CHALLENGE WIDGET
-    // ================================================================
+    // ===== TIME AGO HELPER =====
+    function timeAgo(timestamp) {
+        const time = new Date(timestamp).getTime();
+        const now = Date.now();
+        const diff = Math.floor((now - time) / 1000);
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+        return new Date(timestamp).toLocaleDateString();
+    }
+
+    // ===== CHALLENGE WIDGET =====
     function loadChallenge() {
         if (userId === 0) return;
         fetch('/reader/reader_ajax.php?action=get_monthly_challenge&user_id=' + userId)
@@ -1171,7 +1135,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
     }
-
     window.updateChallenge = function() {
         const pages = prompt('How many pages did you read today?');
         if (pages && parseInt(pages) > 0) {
@@ -1188,12 +1151,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     };
-
     if (userId > 0) loadChallenge();
 
-    // ================================================================
-    // 26. SESSION TRACKING
-    // ================================================================
+    // ===== SESSION TRACKING =====
     if (userId > 0) {
         fetch('/reader/reader_ajax.php', {
             method: 'POST',
@@ -1208,9 +1168,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ================================================================
-    // 27. PDF FALLBACK
-    // ================================================================
+    // ===== PDF FALLBACK =====
     <?php if (!$has_processed && $file_type === 'pdf'): ?>
     const pdfCanvas = document.getElementById('awPdfCanvas');
     const pdfPrev = document.getElementById('awPdfPrev');
@@ -1272,9 +1230,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     <?php endif; ?>
 
-    // ================================================================
-    // 28. EPUB FALLBACK
-    // ================================================================
+    // ===== EPUB FALLBACK =====
     <?php if (!$has_processed && $file_type === 'epub'): ?>
     const epubViewer = document.getElementById('awEpubViewer');
     const epubPrev = document.getElementById('awEpubPrev');
@@ -1290,65 +1246,15 @@ document.addEventListener('DOMContentLoaded', function() {
     epubNext.addEventListener('click', function() { rendition.next(); });
     <?php endif; ?>
 
-    // ================================================================
-    // 29. TOUCH GESTURES
-    // ================================================================
-    let touchStartX = 0;
-    let touchStartY = 0;
-    content.addEventListener('touchstart', function(e) {
-        touchStartX = e.changedTouches[0].screenX;
-        touchStartY = e.changedTouches[0].screenY;
-    }, { passive: true });
-    content.addEventListener('touchend', function(e) {
-        const diffX = touchStartX - e.changedTouches[0].screenX;
-        const diffY = touchStartY - e.changedTouches[0].screenY;
-        if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
-            // Horizontal swipe – used for page flip if enabled
-        }
-    }, { passive: true });
-
-    // ================================================================
-    // 30. PINCH TO ZOOM
-    // ================================================================
-    let lastTouchDist = 0;
-    content.addEventListener('touchmove', function(e) {
-        if (e.touches.length === 2) {
-            const dx = e.touches[0].clientX - e.touches[1].clientX;
-            const dy = e.touches[0].clientY - e.touches[1].clientY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (lastTouchDist > 0) {
-                const delta = dist - lastTouchDist;
-                if (Math.abs(delta) > 10) {
-                    applySize(fontSize + (delta > 0 ? 5 : -5));
-                }
-            }
-            lastTouchDist = dist;
-        }
-    }, { passive: true });
-    content.addEventListener('touchend', function() {
-        lastTouchDist = 0;
-    }, { passive: true });
-
-    // ================================================================
-    // 31. TIME AGO HELPER
-    // ================================================================
-    function timeAgo(timestamp) {
-        const time = new Date(timestamp).getTime();
-        const now = Date.now();
-        const diff = Math.floor((now - time) / 1000);
-        if (diff < 60) return 'just now';
-        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
-        return new Date(timestamp).toLocaleDateString();
-    }
-
-    // ================================================================
-    // 32. INITIAL PROGRESS
-    // ================================================================
+    // ===== INITIAL PROGRESS =====
     setTimeout(() => {
         updateProgress(content.scrollTop);
     }, 200);
+
+    let saveTimer = null;
+    let scrollTimeout = null;
+    let currentNoteId = null;
+    let currentReactionPicker = null;
 });
 </script>
 
@@ -1356,269 +1262,47 @@ document.addEventListener('DOMContentLoaded', function() {
 <!--  STYLES – Fully Branded Reader                                -->
 <!-- ============================================================ -->
 <style>
-/* ===== READER CONTAINER ===== */
-.aw-reader {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
-    background: var(--vanilla);
-    color: var(--text);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-/* ===== HEADER ===== */
-.aw-reader-header {
-    flex-shrink: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--border);
-    z-index: 10;
-    transition: transform 0.3s ease, opacity 0.3s ease;
-}
-.aw-reader-header.hidden {
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-}
-.aw-reader-header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.aw-reader-back {
-    color: var(--rose);
-    font-weight: 500;
-    text-decoration: none;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.aw-reader-title {
-    font-size: 1.1rem;
-    margin: 0;
-    color: var(--text);
-    font-family: 'Playfair Display', serif;
-}
-.aw-reader-header-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.aw-reader-header-right button {
-    background: none;
-    border: none;
-    font-size: 1.1rem;
-    color: var(--text);
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all 0.2s;
-}
-.aw-reader-header-right button:hover {
-    background: rgba(219, 161, 162, 0.1);
-    color: var(--rose);
-}
-
-/* ===== PROGRESS RING ===== */
-.aw-progress-ring {
-    vertical-align: middle;
-}
-.aw-progress-ring-bg {
-    stroke: var(--border);
-}
-.aw-progress-ring-fill {
-    stroke: var(--rose);
-    transition: stroke-dashoffset 0.3s;
-}
-
-/* ===== SETTINGS PANEL ===== */
-.aw-reader-settings {
-    flex-shrink: 0;
-    display: none;
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--border);
-    padding: 12px 16px;
-}
-.aw-reader-settings.open {
-    display: block;
-}
-.aw-settings-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-}
-.aw-setting-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.aw-setting-group label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--text-light);
-    letter-spacing: 0.5px;
-}
-.aw-theme-options, .aw-font-options, .aw-mode-options {
-    display: flex;
-    gap: 4px;
-}
-.aw-theme-btn, .aw-font-btn, .aw-mode-btn {
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: all 0.2s;
-}
-.aw-theme-btn:hover, .aw-font-btn:hover, .aw-mode-btn:hover {
-    border-color: var(--rose);
-}
-.aw-theme-btn.active, .aw-font-btn.active, .aw-mode-btn.active {
-    border-color: var(--rose);
-    background: var(--rose);
-    color: white;
-}
-.color-preview {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    vertical-align: middle;
-    margin-right: 4px;
-    border: 1px solid var(--border);
-}
-.aw-size-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.aw-size-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    color: var(--text);
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.aw-size-btn:hover {
-    border-color: var(--rose);
-    color: var(--rose);
-}
-.aw-size-controls input[type="range"] {
-    width: 80px;
-    accent-color: var(--rose);
-}
-.aw-theme-extra {
-    margin-top: 4px;
-}
-
-/* ===== TOC DRAWER ===== */
-.aw-toc-drawer {
-    position: fixed;
-    top: 0;
-    right: -320px;
-    width: 320px;
-    height: 100vh;
-    background: var(--card-bg);
-    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-    z-index: 20;
-    transition: right 0.3s ease;
-    display: flex;
-    flex-direction: column;
-}
-.aw-toc-drawer.open {
-    right: 0;
-}
-.aw-toc-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.aw-toc-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-}
-.aw-toc-close {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: var(--text);
-    padding: 0 4px;
-}
-.aw-toc-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 20px;
-}
-.aw-toc-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-.aw-toc-list li {
-    padding: 4px 0;
-}
-.aw-toc-list a {
-    color: var(--text);
-    text-decoration: none;
-    display: block;
-    padding: 2px 4px;
-    border-radius: 4px;
-    transition: background 0.2s, color 0.2s;
-}
-.aw-toc-list a:hover {
-    background: rgba(219, 161, 162, 0.1);
-    color: var(--rose);
-}
-.aw-toc-empty {
-    color: var(--text-light);
-    text-align: center;
-    padding: 40px 0;
-}
-
-/* ===== NOTES PANEL ===== */
-.aw-notes-panel {
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    width: 380px;
-    max-height: 60vh;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
-    display: none;
-    flex-direction: column;
-    z-index: 25;
-}
-.aw-notes-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--vanilla);
-    border-radius: 12px 12px 0 0;
-}
+/* (Same as your original CSS – kept intact) */
+.aw-reader { display: flex; flex-direction: column; height: 100vh; background: var(--vanilla); color: var(--text); transition: all 0.3s ease; position: relative; overflow: hidden; }
+.aw-reader-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: rgba(255,255,255,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 10; transition: transform 0.3s ease, opacity 0.3s ease; }
+.aw-reader-header.hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+.aw-reader-header-left { display: flex; align-items: center; gap: 12px; }
+.aw-reader-back { color: var(--rose); font-weight: 500; text-decoration: none; font-size: 0.9rem; display: flex; align-items: center; gap: 4px; }
+.aw-reader-title { font-size: 1.1rem; margin: 0; color: var(--text); font-family: 'Playfair Display', serif; }
+.aw-reader-header-right { display: flex; align-items: center; gap: 6px; }
+.aw-reader-header-right button { background: none; border: none; font-size: 1.1rem; color: var(--text); cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
+.aw-reader-header-right button:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
+.aw-progress-ring { vertical-align: middle; }
+.aw-progress-ring-bg { stroke: var(--border); }
+.aw-progress-ring-fill { stroke: var(--rose); transition: stroke-dashoffset 0.3s; }
+.aw-reader-settings { flex-shrink: 0; display: none; background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 12px 16px; }
+.aw-reader-settings.open { display: block; }
+.aw-settings-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.aw-setting-group { display: flex; flex-direction: column; gap: 4px; }
+.aw-setting-group label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); letter-spacing: 0.5px; }
+.aw-theme-options, .aw-font-options, .aw-mode-options { display: flex; gap: 4px; }
+.aw-theme-btn, .aw-font-btn, .aw-mode-btn { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; }
+.aw-theme-btn:hover, .aw-font-btn:hover, .aw-mode-btn:hover { border-color: var(--rose); }
+.aw-theme-btn.active, .aw-font-btn.active, .aw-mode-btn.active { border-color: var(--rose); background: var(--rose); color: white; }
+.color-preview { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; border: 1px solid var(--border); }
+.aw-size-controls { display: flex; align-items: center; gap: 6px; }
+.aw-size-btn { background: transparent; border: 1px solid var(--border); border-radius: 50%; width: 24px; height: 24px; cursor: pointer; color: var(--text); transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+.aw-size-btn:hover { border-color: var(--rose); color: var(--rose); }
+.aw-size-controls input[type="range"] { width: 80px; accent-color: var(--rose); }
+.aw-theme-extra { margin-top: 4px; }
+.aw-toc-drawer { position: fixed; top: 0; right: -320px; width: 320px; height: 100vh; background: var(--card-bg); box-shadow: -4px 0 20px rgba(0,0,0,0.1); z-index: 20; transition: right 0.3s ease; display: flex; flex-direction: column; }
+.aw-toc-drawer.open { right: 0; }
+.aw-toc-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.aw-toc-header h3 { margin: 0; font-size: 1.1rem; }
+.aw-toc-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text); padding: 0 4px; }
+.aw-toc-body { flex: 1; overflow-y: auto; padding: 12px 20px; }
+.aw-toc-list { list-style: none; padding: 0; margin: 0; }
+.aw-toc-list li { padding: 4px 0; }
+.aw-toc-list a { color: var(--text); text-decoration: none; display: block; padding: 2px 4px; border-radius: 4px; transition: background 0.2s, color 0.2s; }
+.aw-toc-list a:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
+.aw-toc-empty { color: var(--text-light); text-align: center; padding: 40px 0; }
+.aw-notes-panel { position: fixed; bottom: 0; right: 0; width: 380px; max-height: 60vh; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px 12px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); display: none; flex-direction: column; z-index: 25; }
+.aw-notes-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--vanilla); border-radius: 12px 12px 0 0; }
 .aw-notes-title h3 { margin: 0; font-size: 1rem; }
 .aw-notes-title .badge { background: var(--rose); color: white; padding: 0 8px; border-radius: 12px; font-size: 0.75rem; }
 .aw-notes-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
@@ -1640,54 +1324,16 @@ document.addEventListener('DOMContentLoaded', function() {
 #awAddNoteForm textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; resize: vertical; }
 #awAddNoteForm .btn { padding: 4px 12px; font-size: 0.8rem; }
 .aw-notes-actions .btn { padding: 4px 12px; font-size: 0.8rem; }
-
-/* ===== REACTION PICKER ===== */
-.aw-reaction-picker {
-    position: fixed;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    box-shadow: var(--shadow-hover);
-    z-index: 50;
-    display: none;
-    gap: 6px;
-    align-items: center;
-}
-.aw-reaction-picker button {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: all 0.2s;
-}
-.aw-reaction-picker button:hover {
-    background: var(--vanilla);
-    transform: scale(1.15);
-}
-
-/* ===== CHALLENGE WIDGET ===== */
-.aw-challenge-widget {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin: 8px 16px;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
+.aw-reaction-picker { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow-hover); z-index: 50; display: none; gap: 6px; align-items: center; }
+.aw-reaction-picker button { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: all 0.2s; }
+.aw-reaction-picker button:hover { background: var(--vanilla); transform: scale(1.15); }
+.aw-challenge-widget { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 8px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
 .aw-challenge-widget h4 { margin: 0; font-size: 1rem; }
 .aw-challenge-widget p { margin: 0; font-size: 0.9rem; color: var(--text-light); }
 .aw-challenge-progress { position: relative; height: 16px; background: var(--border); border-radius: 8px; overflow: hidden; }
 .aw-challenge-bar { height: 100%; background: var(--rose); transition: width 0.3s; }
 .aw-challenge-percent { position: absolute; top: 0; right: 8px; font-size: 0.7rem; font-weight: 600; color: var(--text); line-height: 16px; }
 .aw-challenge-stats { font-weight: 600; font-size: 0.9rem; color: var(--text); }
-
-/* ===== HIGHLIGHTS ===== */
 .aw-reader-text .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
 .aw-reader-text .highlight-green { background: #a5d6a7; padding: 0 2px; }
 .aw-reader-text .highlight-blue { background: #90caf9; padding: 0 2px; }
@@ -1696,379 +1342,61 @@ document.addEventListener('DOMContentLoaded', function() {
 .aw-reader-text .highlight-green.annotation { border-bottom: 2px solid #a5d6a7; cursor: pointer; }
 .aw-reader-text .highlight-blue.annotation { border-bottom: 2px solid #90caf9; cursor: pointer; }
 .aw-reader-text .highlight-pink.annotation { border-bottom: 2px solid #f48fb1; cursor: pointer; }
-
-/* ===== HIGHLIGHT TOOLTIP ===== */
-.aw-highlight-tooltip {
-    position: fixed;
-    display: none;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    box-shadow: var(--shadow-hover);
-    z-index: 30;
-    gap: 4px;
-    align-items: center;
-}
-.aw-highlight-tooltip.visible {
-    display: flex;
-}
-.aw-highlight-color {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-.aw-highlight-color:hover {
-    transform: scale(1.15);
-}
+.aw-highlight-tooltip { position: fixed; display: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow-hover); z-index: 30; gap: 4px; align-items: center; }
+.aw-highlight-tooltip.visible { display: flex; }
+.aw-highlight-color { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; transition: transform 0.2s; }
+.aw-highlight-color:hover { transform: scale(1.15); }
 .aw-highlight-color[data-color="yellow"] { background: #ffeb3b; }
 .aw-highlight-color[data-color="green"] { background: #a5d6a7; }
 .aw-highlight-color[data-color="blue"] { background: #90caf9; }
 .aw-highlight-color[data-color="pink"] { background: #f48fb1; }
-.aw-highlight-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text);
-    font-size: 0.9rem;
-    padding: 0 4px;
-    transition: color 0.2s;
-}
-.aw-highlight-btn:hover {
-    color: var(--rose);
-}
-
-/* ===== ANNOTATION POPUP ===== */
-.aw-annotation-popup {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 320px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: var(--shadow-hover);
-    z-index: 30;
-    display: none;
-}
-.aw-annotation-popup.visible {
-    display: block;
-}
-.aw-annotation-popup textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    resize: vertical;
-    min-height: 60px;
-    font-size: 0.9rem;
-    background: var(--input-bg);
-    color: var(--text);
-}
-.aw-annotation-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-    justify-content: flex-end;
-}
-.aw-annotation-actions button {
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-size: 0.8rem;
-}
-.aw-annotation-save {
-    background: var(--rose);
-    color: white;
-}
-.aw-annotation-cancel {
-    background: var(--border);
-    color: var(--text);
-}
-
-/* ===== SEARCH BAR ===== */
-.aw-search-bar {
-    position: absolute;
-    top: 56px;
-    right: 16px;
-    width: 320px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px;
-    box-shadow: var(--shadow-hover);
-    z-index: 15;
-    display: none;
-}
-.aw-search-bar.visible {
-    display: block;
-}
-.aw-search-bar input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.9rem;
-    background: var(--input-bg);
-    color: var(--text);
-}
-.aw-search-bar input:focus {
-    outline: none;
-    border-color: var(--rose);
-    box-shadow: 0 0 0 3px rgba(219,161,162,0.15);
-}
-#awSearchResults {
-    margin-top: 8px;
-    max-height: 200px;
-    overflow-y: auto;
-    display: none;
-}
-.aw-search-result {
-    padding: 4px 8px;
-    font-size: 0.85rem;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-}
-.aw-search-result:hover {
-    background: rgba(219,161,162,0.1);
-}
-
-/* ===== SHARE MODAL ===== */
-.aw-share-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 30;
-    display: none;
-    align-items: center;
-    justify-content: center;
-}
-.aw-share-modal.visible {
-    display: flex;
-}
-.aw-share-modal-content {
-    background: var(--card-bg);
-    padding: 24px;
-    border-radius: 12px;
-    max-width: 400px;
-    width: 90%;
-    text-align: center;
-}
-.aw-share-modal-content h3 {
-    margin-top: 0;
-}
-.aw-share-options {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin: 16px 0;
-}
-.aw-share-options button {
-    padding: 8px 16px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--card-bg);
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.9rem;
-}
-.aw-share-options button:hover {
-    border-color: var(--rose);
-    background: rgba(219,161,162,0.1);
-}
-.aw-share-modal-close {
-    background: var(--rose);
-    color: white;
-    border: none;
-    padding: 8px 24px;
-    border-radius: 30px;
-    cursor: pointer;
-}
-
-/* ===== OVERLAY ===== */
-.aw-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.3);
-    z-index: 11;
-    display: none;
-}
-.aw-overlay.active {
-    display: block;
-}
-
-/* ===== FOCUS MODE ===== */
-.aw-reader.focus-mode .aw-reader-header {
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-}
-.aw-reader.focus-mode .aw-reader-settings {
-    display: none !important;
-}
-.aw-reader.focus-mode .aw-search-bar {
-    display: none !important;
-}
-
-/* ===== FALLBACK ===== */
-.aw-reader-fallback {
-    height: 100%;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-}
-.aw-reader-fallback canvas {
-    flex: 1;
-    width: 100%;
-    height: auto;
-    object-fit: contain;
-}
-.aw-pdf-controls, .aw-epub-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    background: var(--card-bg);
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-}
-.aw-pdf-controls button, .aw-epub-controls button {
-    background: var(--rose);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-.aw-pdf-controls button:hover, .aw-epub-controls button:hover {
-    background: var(--rose-dark);
-}
-.aw-pdf-controls input[type="range"] {
-    width: 80px;
-    accent-color: var(--rose);
-}
-.aw-epub-container #awEpubViewer {
-    flex: 1;
-}
-.aw-reader-unsupported {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-light);
-}
-.aw-reader-unsupported i {
-    font-size: 3rem;
-    color: var(--rose);
-    display: block;
-    margin-bottom: 16px;
-}
-
-/* ===== THEMES ===== */
-.aw-reader[data-theme="paper"] {
-    background: var(--vanilla);
-    color: var(--text);
-}
-.aw-reader[data-theme="light"] {
-    background: #ffffff;
-    color: #1a1a1a;
-}
-.aw-reader[data-theme="dark"] {
-    background: #1a1a1a;
-    color: #f0f0f0;
-}
-.aw-reader[data-theme="dark"] .aw-reader-header {
-    background: rgba(26,26,26,0.9);
-}
-.aw-reader[data-theme="sepia"] {
-    background: #f4ecd8;
-    color: #5b4636;
-}
-.aw-reader[data-theme="sepia"] .aw-reader-header {
-    background: rgba(244,236,216,0.9);
-}
-
-/* ===== FONTS ===== */
-.aw-reader[data-font="serif"] .aw-reader-text {
-    font-family: Georgia, 'Times New Roman', serif;
-}
-.aw-reader[data-font="sans"] .aw-reader-text {
-    font-family: 'Inter', -apple-system, sans-serif;
-}
-.aw-reader[data-font="mono"] .aw-reader-text {
-    font-family: 'Courier New', monospace;
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    .aw-reader-header {
-        padding: 6px 12px;
-    }
-    .aw-reader-title {
-        font-size: 0.9rem;
-    }
-    .aw-reader-header-right button {
-        font-size: 0.9rem;
-        padding: 2px 6px;
-    }
-    .aw-reader-content {
-        padding: 16px 12px;
-    }
-    .aw-reader-text .book-title {
-        font-size: 1.6rem;
-    }
-    .aw-reader-text .chapter-heading {
-        font-size: 1.2rem;
-    }
-    .aw-toc-drawer {
-        width: 280px;
-        right: -280px;
-    }
-    .aw-notes-panel {
-        width: 100%;
-        max-height: 50vh;
-        border-radius: 0;
-    }
-    .aw-settings-grid {
-        gap: 8px;
-    }
-    .aw-size-controls input[type="range"] {
-        width: 60px;
-    }
-    .aw-search-bar {
-        width: 260px;
-        right: 8px;
-    }
-}
-
-@media (max-width: 480px) {
-    .aw-reader-header {
-        padding: 4px 8px;
-    }
-    .aw-reader-title {
-        font-size: 0.8rem;
-    }
-    .aw-reader-content {
-        padding: 12px 8px;
-    }
-    .aw-toc-drawer {
-        width: 260px;
-        right: -260px;
-    }
-}
+.aw-highlight-btn { background: none; border: none; cursor: pointer; color: var(--text); font-size: 0.9rem; padding: 0 4px; transition: color 0.2s; }
+.aw-highlight-btn:hover { color: var(--rose); }
+.aw-annotation-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-hover); z-index: 30; display: none; }
+.aw-annotation-popup.visible { display: block; }
+.aw-annotation-popup textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; min-height: 60px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
+.aw-annotation-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+.aw-annotation-actions button { padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; }
+.aw-annotation-save { background: var(--rose); color: white; }
+.aw-annotation-cancel { background: var(--border); color: var(--text); }
+.aw-search-bar { position: absolute; top: 56px; right: 16px; width: 320px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; box-shadow: var(--shadow-hover); z-index: 15; display: none; }
+.aw-search-bar.visible { display: block; }
+.aw-search-bar input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
+.aw-search-bar input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+#awSearchResults { margin-top: 8px; max-height: 200px; overflow-y: auto; display: none; }
+.aw-search-result { padding: 4px 8px; font-size: 0.85rem; border-bottom: 1px solid var(--border); cursor: pointer; }
+.aw-search-result:hover { background: rgba(219,161,162,0.1); }
+.aw-share-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 30; display: none; align-items: center; justify-content: center; }
+.aw-share-modal.visible { display: flex; }
+.aw-share-modal-content { background: var(--card-bg); padding: 24px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; }
+.aw-share-modal-content h3 { margin-top: 0; }
+.aw-share-options { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.aw-share-options button { padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); cursor: pointer; transition: all 0.2s; font-size: 0.9rem; }
+.aw-share-options button:hover { border-color: var(--rose); background: rgba(219,161,162,0.1); }
+.aw-share-modal-close { background: var(--rose); color: white; border: none; padding: 8px 24px; border-radius: 30px; cursor: pointer; }
+.aw-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 11; display: none; }
+.aw-overlay.active { display: block; }
+.aw-reader.focus-mode .aw-reader-header { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+.aw-reader.focus-mode .aw-reader-settings { display: none !important; }
+.aw-reader.focus-mode .aw-search-bar { display: none !important; }
+.aw-reader-fallback { height: 100%; width: 100%; display: flex; flex-direction: column; }
+.aw-reader-fallback canvas { flex: 1; width: 100%; height: auto; object-fit: contain; }
+.aw-pdf-controls, .aw-epub-controls { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 8px 12px; background: var(--card-bg); border-top: 1px solid var(--border); flex-shrink: 0; }
+.aw-pdf-controls button, .aw-epub-controls button { background: var(--rose); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; transition: background 0.2s; }
+.aw-pdf-controls button:hover, .aw-epub-controls button:hover { background: var(--rose-dark); }
+.aw-pdf-controls input[type="range"] { width: 80px; accent-color: var(--rose); }
+.aw-epub-container #awEpubViewer { flex: 1; }
+.aw-reader-unsupported { text-align: center; padding: 40px 20px; color: var(--text-light); }
+.aw-reader-unsupported i { font-size: 3rem; color: var(--rose); display: block; margin-bottom: 16px; }
+.aw-reader[data-theme="paper"] { background: var(--vanilla); color: var(--text); }
+.aw-reader[data-theme="light"] { background: #ffffff; color: #1a1a1a; }
+.aw-reader[data-theme="dark"] { background: #1a1a1a; color: #f0f0f0; }
+.aw-reader[data-theme="sepia"] { background: #f4ecd8; color: #5b4636; }
+.aw-reader[data-font="serif"] .aw-reader-text { font-family: Georgia, 'Times New Roman', serif; }
+.aw-reader[data-font="sans"] .aw-reader-text { font-family: 'Inter', -apple-system, sans-serif; }
+.aw-reader[data-font="mono"] .aw-reader-text { font-family: 'Courier New', monospace; }
+@media (max-width: 768px) { .aw-reader-header { padding: 6px 12px; } .aw-reader-title { font-size: 0.9rem; } .aw-reader-header-right button { font-size: 0.9rem; padding: 2px 6px; } .aw-reader-content { padding: 16px 12px; } .aw-reader-text .book-title { font-size: 1.6rem; } .aw-reader-text .chapter-heading { font-size: 1.2rem; } .aw-toc-drawer { width: 280px; right: -280px; } .aw-notes-panel { width: 100%; max-height: 50vh; border-radius: 0; } .aw-settings-grid { gap: 8px; } .aw-size-controls input[type="range"] { width: 60px; } .aw-search-bar { width: 260px; right: 8px; } }
+@media (max-width: 480px) { .aw-reader-header { padding: 4px 8px; } .aw-reader-title { font-size: 0.8rem; } .aw-reader-content { padding: 12px 8px; } .aw-toc-drawer { width: 260px; right: -260px; } }
 </style>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
