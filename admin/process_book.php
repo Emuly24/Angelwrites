@@ -56,21 +56,9 @@ function detectFileType($file_path) {
     return strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
 }
 
-function fixEncoding($text) {
-    $detected = mb_detect_encoding($text, 'UTF-8, Windows-1252, ISO-8859-1, ASCII', true);
-    if ($detected !== 'UTF-8' && $detected !== 'ASCII') {
-        $text = mb_convert_encoding($text, 'UTF-8', $detected);
-    }
-    $replacements = [
-        'â€œ' => '“', 'â€' => '”', 'â€™' => '’',
-        'â€˜' => '‘', 'â€"’' => '—', 'â€”' => '—',
-        'â€“' => '–', 'â€…' => '…', 'â€¢' => '•',
-        'â€¹' => '‹', 'â€º' => '›', 'â‚¬' => '€',
-        'â„¢' => '™', 'â€¡' => '‡', 'â€°' => '‰',
-        'â€š' => '‚', 'â€ž' => '„'
-    ];
-    return str_replace(array_keys($replacements), array_values($replacements), trim($text));
-}
+// ============================================================
+//  IMPROVED EXTRACTION WITH ENCODING FIX
+// ============================================================
 
 function extractRawText($file_path) {
     if (!file_exists($file_path)) return false;
@@ -83,23 +71,93 @@ function extractRawText($file_path) {
     return false;
 }
 
+function fixEncoding($text) {
+    // 1. If already valid UTF-8 with no corruption, return as-is
+    if (mb_check_encoding($text, 'UTF-8') && !preg_match('/[\x80-\xFF]/', $text)) {
+        return trim($text);
+    }
+
+    // 2. Try converting from Windows-1252 (most common for PDFs)
+    $converted = mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
+    // Check if conversion fixed the common mojibake patterns
+    if (!preg_match('/[â€œâ€™â€“]/', $converted)) {
+        return trim($converted);
+    }
+
+    // 3. Try ISO-8859-1 as fallback
+    $iso = mb_convert_encoding($text, 'UTF-8', 'ISO-8859-1');
+    if (!preg_match('/[â€œâ€™â€“]/', $iso)) {
+        return trim($iso);
+    }
+
+    // 4. Extensive manual mapping for known UTF-8 misinterpretations
+    $map = [
+        // Curly quotes & apostrophes
+        'â€œ' => '“', 'â€' => '”', 'â€™' => '’', 'â€˜' => '‘',
+        // Dashes
+        'â€"' => '—', 'â€”' => '—', 'â€“' => '–',
+        // Punctuation & symbols
+        'â€¦' => '…', 'â€¢' => '•', 'â€¹' => '‹', 'â€º' => '›',
+        'â‚¬' => '€', 'â„¢' => '™', 'â€¡' => '‡', 'â€°' => '‰',
+        'â€š' => '‚', 'â€ž' => '„',
+        // Accented letters (common in PDFs)
+        'Ã¢' => 'â', 'Ã©' => 'é', 'Ã¨' => 'è', 'Ãª' => 'ê',
+        'Ã«' => 'ë', 'Ã¯' => 'ï', 'Ã®' => 'î', 'Ã¬' => 'ì',
+        'Ã¡' => 'á', 'Ã±' => 'ñ', 'Ã§' => 'ç', 'Ã¸' => 'ø',
+        'Ã¦' => 'æ', 'Ã¥' => 'å', 'Ã¤' => 'ä', 'Ã¶' => 'ö',
+        'Ã¼' => 'ü', 'ÃŸ' => 'ß',
+        // Capital accents
+        'Ã‚' => 'Â', 'Ãƒ' => 'Ã', 'Ã…' => 'Å', 'Ã†' => 'Æ',
+        'Ãˆ' => 'È', 'Ã‰' => 'É', 'ÃŠ' => 'Ê', 'Ã‹' => 'Ë',
+        'ÃŒ' => 'Ì', 'ÃŽ' => 'Î', 'Ã‘' => 'Ñ', 'Ã“' => 'Ó',
+        'Ã”' => 'Ô', 'Ã•' => 'Õ', 'Ã–' => 'Ö', 'Ã—' => '×',
+        'Ã˜' => 'Ø', 'Ã™' => 'Ù', 'Ãš' => 'Ú', 'Ã›' => 'Û',
+        'Ãœ' => 'Ü', 'Ãž' => 'Þ',
+        // Single‑byte corruption fixes
+        "\xC2\x82" => "‚", "\xC2\x84" => "„", "\xC2\x85" => "…",
+        "\xC2\x86" => "†", "\xC2\x87" => "‡", "\xC2\x88" => "ˆ",
+        "\xC2\x89" => "‰", "\xC2\x8A" => "Š", "\xC2\x8B" => "‹",
+        "\xC2\x8C" => "Œ", "\xC2\x8E" => "Ž", "\xC2\x91" => "‘",
+        "\xC2\x92" => "’", "\xC2\x93" => "“", "\xC2\x94" => "”",
+        "\xC2\x95" => "•", "\xC2\x96" => "–", "\xC2\x97" => "—",
+        "\xC2\x98" => "˜", "\xC2\x99" => "™", "\xC2\x9A" => "š",
+        "\xC2\x9B" => "›", "\xC2\x9C" => "œ", "\xC2\x9E" => "ž",
+        "\xC2\x9F" => "Ÿ"
+    ];
+    $fixed = str_replace(array_keys($map), array_values($map), $text);
+
+    // 5. Remove any leftover control characters or invalid UTF-8 sequences
+    $fixed = iconv('UTF-8', 'UTF-8//IGNORE', $fixed);
+    $fixed = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $fixed);
+
+    return trim($fixed);
+}
+
 function extractPDF($file_path) {
-    // ===== OPTION 1: Composer autoloader (cleanest) =====
+    // ===== ONLY USE COMPOSER AUTOLOADER – remove manual require_once =====
     if (class_exists('\\Smalot\\PdfParser\\Parser')) {
+        // Set the parser to expect UTF-8 
+        \Smalot\PdfParser\Parser::setEncoding('UTF-8');
+        
         $parser = new \Smalot\PdfParser\Parser();
         try {
             $pdf = $parser->parseFile($file_path);
             $text = $pdf->getText();
+            
+            // Optional: debug raw text before fixEncoding
+            file_put_contents(__DIR__ . '/debug_raw.txt', $text);
+            
             if (empty(trim($text))) {
                 return '⚠️ This PDF appears to be a scan (no extractable text).';
             }
+            // Apply our robust fixEncoding
             return fixEncoding($text);
         } catch (Exception $e) {
-            // Fall through to next method
+            // Fall through to pdftotext
         }
     }
 
-    // ===== OPTION 2: pdftotext (command line) =====
+    // ===== OPTION 2: pdftotext (command line) – good fallback =====
     if (function_exists('exec')) {
         $txt_path = dirname($file_path) . '/' . pathinfo($file_path, PATHINFO_FILENAME) . '.txt';
         $pdftotext_path = defined('PDFTOTEXT_PATH') ? PDFTOTEXT_PATH : 'pdftotext';
@@ -111,76 +169,7 @@ function extractPDF($file_path) {
         }
     }
 
-    // ===== OPTION 3: Manual require_once (based on actual file structure) =====
-    $base_path = LIB_PATH;
-    $parser_path = $base_path . 'Smalot/PdfParser/';
-
-    // Check if the library actually exists at this path
-    if (!file_exists($parser_path . 'Parser.php')) {
-        return '⚠️ PDF parser library not found at expected path. Please install via Composer or verify the library location.';
-    }
-
-    // Register a custom autoloader for the PDF parser
-    spl_autoload_register(function ($class) use ($parser_path) {
-        $class = str_replace('\\', '/', $class);
-        $file = $parser_path . $class . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-        return false;
-    });
-
-    // Force load the core classes if autoloader didn't catch them
-    if (!class_exists('\\Smalot\\PdfParser\\Parser')) {
-        $core_classes = [
-            'Config.php',
-            'PDFObject.php',
-            'Element.php',
-            'Element/ElementArray.php',
-            'Element/ElementBoolean.php',
-            'Element/ElementName.php',
-            'Element/ElementNumeric.php',
-            'Element/ElementNull.php',
-            'Element/ElementString.php',
-            'Element/ElementDate.php',
-            'Element/ElementHexa.php',
-            'Element/ElementMissing.php',
-            'Element/ElementStruct.php',
-            'Element/ElementXRef.php',
-            'Encoding.php',
-            'Font.php',
-            'Header.php',
-            'Page.php',
-            'Pages.php',
-            'XObject/Form.php',
-            'XObject/Image.php',
-            'Parser.php'
-        ];
-        foreach ($core_classes as $file) {
-            $full_path = $parser_path . $file;
-            if (file_exists($full_path)) {
-                require_once $full_path;
-            }
-        }
-    }
-
-    // Attempt parsing
-    if (!class_exists('\\Smalot\\PdfParser\\Parser')) {
-        return '⚠️ PDF parser could not be loaded. Please ensure the library is properly installed.';
-    }
-
-    $parser = new \Smalot\PdfParser\Parser();
-    try {
-        $pdf = $parser->parseFile($file_path);
-        $text = $pdf->getText();
-        if (empty(trim($text))) {
-            return '⚠️ This PDF appears to be a scan (no extractable text).';
-        }
-        return fixEncoding($text);
-    } catch (Exception $e) {
-        return '⚠️ PDF parsing error: ' . $e->getMessage();
-    }
+    return '⚠️ PDF extraction failed. Please ensure "smalot/pdfparser" is installed via Composer.';
 }
 
 function extractDOCX($file_path) {
@@ -1144,6 +1133,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         $action = $_POST['action'];
         header('Content-Type: application/json');
+        // ===== NEW AJAX ENDPOINT =====
+        if ($action === 'get_extracted_text') {
+            $book_id = (int)$_POST['book_id'] ?? 0;
+            $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
+            $stmt->execute([$book_id]);
+            $html = $stmt->fetchColumn();
+            if ($html) {
+                $plain_text = strip_tags($html);
+                echo json_encode(['success' => true, 'text' => $plain_text]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'No extracted text found. Run extraction first.']);
+            }
+            exit;
+        }
 
         if ($action === 'accept') {
             echo json_encode(['success' => true]);
@@ -1623,6 +1626,36 @@ require_once '../includes/header.php';
                 <div id="restore-status" style="display:none;padding:12px;border-radius:8px;margin-top:12px;"></div>
             </div>
         </div>
+        <!-- ===== Extracted Text Tools Card ===== -->
+<div class="card" style="margin-top:20px;">
+    <div class="card-header">
+        <h2>📄 Extracted Text Tools</h2>
+    </div>
+    <div class="card-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-secondary" onclick="viewExtractedText()">
+                <i class="fas fa-eye"></i> View Extracted Text
+            </button>
+            <button class="btn btn-primary" onclick="downloadExtractedText()">
+                <i class="fas fa-download"></i> Download Extracted Text (.txt)
+            </button>
+            <button class="btn btn-outline" onclick="openInLocalApp()">
+                <i class="fas fa-external-link-alt"></i> Open in Local App
+            </button>
+            <button class="btn btn-success" onclick="copyExtractedText()">
+                <i class="fas fa-copy"></i> Copy to Clipboard
+            </button>
+        </div>
+        <div id="extractedTextStatus" style="margin-top:8px;font-size:0.85rem;color:var(--text-light);">
+            💡 <strong>Tips:</strong>
+            <ul style="margin:4px 0 0 16px;padding-left:4px;">
+                <li><strong>Desktop:</strong> Right-click the downloaded file → <strong>"Open with..."</strong> → Choose your app.</li>
+                <li><strong>Mobile:</strong> After downloading, go to your <strong>Downloads</strong> folder → <strong>tap and hold</strong> the file → choose <strong>"Open with..."</strong> or <strong>"Share"</strong>.</li>
+                <li><strong>Copy to Clipboard:</strong> Paste the text anywhere (Notes, Google Keep, Word, etc.).</li>
+            </ul>
+        </div>
+    </div>
+</div>
 
         <!-- Stage 4 -->
         <?php if ($existing): ?>
@@ -1938,6 +1971,140 @@ function resetPageBreaks() {
         }
     });
 }
+// ===== EXTRACTED TEXT TOOLS (AJAX VERSION) =====
+
+// Fetch extracted text from server via AJAX
+function fetchExtractedText(callback) {
+    const formData = new FormData();
+    formData.append('action', 'get_extracted_text');
+    formData.append('book_id', <?php echo $book_id; ?>);
+    
+    fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            callback(data.text);
+        } else {
+            callback(null, data.error || 'No extracted text found. Run extraction first.');
+        }
+    })
+    .catch(error => {
+        callback(null, 'Error fetching text: ' + error.message);
+    });
+}
+
+function viewExtractedText() {
+    fetchExtractedText((text, error) => {
+        if (error) {
+            alert(error);
+            return;
+        }
+        // Use your existing diff modal
+        document.getElementById('diffContent').innerHTML = 
+            '<pre style="white-space:pre-wrap;font-size:0.85rem;background:#f8f9fa;padding:16px;border-radius:8px;max-height:600px;overflow:auto;">' 
+            + escapeHtml(text) + '</pre>';
+        document.getElementById('diffModal').style.display = 'block';
+        document.getElementById('modalTitle').textContent = '📄 Extracted Text';
+        document.querySelector('.modal-footer').innerHTML = 
+            '<button class="btn btn-secondary" onclick="closeDiffModal()">Close</button>';
+    });
+}
+
+function downloadExtractedText() {
+    fetchExtractedText((text, error) => {
+        if (error) {
+            alert(error);
+            return;
+        }
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'extracted_text.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        const statusDiv = document.getElementById('extractedTextStatus');
+        statusDiv.innerHTML = '✅ Downloaded successfully!';
+        setTimeout(() => statusDiv.innerHTML = '', 3000);
+    });
+}
+
+function openInLocalApp() {
+    fetchExtractedText((text, error) => {
+        if (error) {
+            alert(error);
+            return;
+        }
+        // Download the file
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'extracted_text.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Show guidance
+        const statusDiv = document.getElementById('extractedTextStatus');
+        statusDiv.innerHTML = `
+            ✅ File downloaded! <strong>Desktop:</strong> Right-click → "Open with...". 
+            <strong>Mobile:</strong> Go to Downloads → long-press file → "Open with..." or "Share".
+        `;
+        setTimeout(() => statusDiv.innerHTML = '', 8000);
+    });
+}
+
+function copyExtractedText() {
+    fetchExtractedText((text, error) => {
+        if (error) {
+            alert(error);
+            return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                const statusDiv = document.getElementById('extractedTextStatus');
+                statusDiv.innerHTML = '✅ Copied to clipboard! Paste it anywhere.';
+                setTimeout(() => statusDiv.innerHTML = '', 4000);
+            }).catch(() => {
+                fallbackCopyText(text);
+            });
+        } else {
+            fallbackCopyText(text);
+        }
+    });
+}
+
+function fallbackCopyText(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        const statusDiv = document.getElementById('extractedTextStatus');
+        statusDiv.innerHTML = '✅ Copied to clipboard! Paste it anywhere.';
+        setTimeout(() => statusDiv.innerHTML = '', 4000);
+    } catch (e) {
+        alert('Could not copy to clipboard. Please download the file instead.');
+    }
+    document.body.removeChild(textarea);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 // ===== VERSION HISTORY =====
 function loadVersionHistory() {
@@ -2097,6 +2264,11 @@ document.getElementById('diffModal').addEventListener('click', function(e) {
 .diff-line.diff-change.pattern { background: repeating-linear-gradient(45deg, #fff3cd, #fff3cd 10px, #f0e4b0 10px, #f0e4b0 20px); border-left: 4px solid #ffc107; }
 .diff-line.diff-same.pattern { background: #f8f9fa; border-left: 4px solid #6c757d; }
 .page-break-marker { color: #c0392b; font-weight: bold; }
+/* Extracted text tools */
+.admin-process-book .btn {min-height: 40px; display: inline-flex; align-items: center; gap: 6px;}
+.admin-process-book .btn-outline {border: 1px solid var(--border); background: transparent;}
+.admin-process-book .btn-outline:hover {background: var(--vanilla);}
+#extractedTextStatus {padding: 8px 12px; border-radius: 6px; background: #f8f9fa; border-left: 4px solid #28a745; transition: all 0.3s;}
 
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; overflow: auto; }
 .modal-content { background: #fff; margin: 5% auto; max-width: 900px; padding: 24px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
