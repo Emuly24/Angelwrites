@@ -1309,7 +1309,7 @@ if (isset($_POST['extract'])) {
             $stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
             $stmt->execute([$book_id]);
             $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-            
+
             saveVersionHistory($book_id, $html_content, $toc_json, $metadata_json, 'Initial extraction');
             $success = '✅ Content extracted, split into ' . count($pages) . ' pages, and saved successfully.';
             echo json_encode(['success' => true, 'message' => $success]);
@@ -2418,7 +2418,9 @@ function extractAndParse() {
     fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
         method: 'POST',
         body: formData
-    }).then(r => r.json()).then(data => {
+    })
+    .then(response => response.json())
+    .then(data => {
         if (data.success) {
             statusDiv.innerHTML = '✅ Content extracted and parsed successfully!';
             statusDiv.style.background = '#d4edda';
@@ -2429,6 +2431,12 @@ function extractAndParse() {
             statusDiv.style.background = '#f8d7da';
             statusDiv.style.color = '#721c24';
         }
+    })
+    .catch(error => {
+        statusDiv.innerHTML = '❌ Network or JSON error: ' + error.message;
+        statusDiv.style.background = '#f8d7da';
+        statusDiv.style.color = '#721c24';
+        console.error('Fetch error:', error);
     });
 }
 
