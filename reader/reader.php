@@ -121,7 +121,6 @@ function renderToc($toc, $level = 0) {
 
 $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 ?>
-<?php require_once __DIR__ . '/../includes/header.php'; ?>
 
 <!-- ===== READER CONTAINER ===== -->
 <div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>" data-file-path="<?php echo htmlspecialchars($book['file_path']); ?>" data-file-type="<?php echo $file_type; ?>" data-file-exists="<?php echo $file_exists ? '1' : '0'; ?>">
@@ -1398,5 +1397,3 @@ document.addEventListener('DOMContentLoaded', function() {
 @media (max-width: 768px) { .aw-reader-header { padding: 6px 12px; } .aw-reader-title { font-size: 0.9rem; } .aw-reader-header-right button { font-size: 0.9rem; padding: 2px 6px; } .aw-reader-content { padding: 16px 12px; } .aw-reader-text .book-title { font-size: 1.6rem; } .aw-reader-text .chapter-heading { font-size: 1.2rem; } .aw-toc-drawer { width: 280px; right: -280px; } .aw-notes-panel { width: 100%; max-height: 50vh; border-radius: 0; } .aw-settings-grid { gap: 8px; } .aw-size-controls input[type="range"] { width: 60px; } .aw-search-bar { width: 260px; right: 8px; } }
 @media (max-width: 480px) { .aw-reader-header { padding: 4px 8px; } .aw-reader-title { font-size: 0.8rem; } .aw-reader-content { padding: 12px 8px; } .aw-toc-drawer { width: 260px; right: -260px; } }
 </style>
-
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>

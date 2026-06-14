@@ -2653,6 +2653,7 @@ function splitSelectedChapter() {
     });
 }
 
+
 function runHealthCheck() {
     const resultsDiv = document.getElementById('healthCheckResults');
     resultsDiv.innerHTML = '⏳ Scanning...';
