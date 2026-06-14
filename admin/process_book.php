@@ -248,6 +248,60 @@ function detectPageBreaks($text) {
     return $page_breaks;
 }
 
+function splitPagesByNumbers($text) {
+    $lines = explode("\n", $text);
+    $pages = [];
+    $current_page = [];
+    
+    // Keywords that must start a new page
+    $header_keywords = [
+        'ACKNOWLEDGEMENT', 'AUTHOR\'S NOTE', 'ABOUT THE AUTHOR',
+        'Psalm', 'Preface', 'Foreword', 'Introduction', 'DEDICATION',
+        'COPYRIGHT'
+    ];
+
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+
+        // Case 1: Standalone number = definite page break
+        if (preg_match('/^\d+$/', $trimmed)) {
+            if (!empty($current_page)) {
+                $pages[] = implode("\n", $current_page);
+                $current_page = [];
+            }
+            continue;
+        }
+
+        // Case 2: Structural header
+        $is_structural_header = false;
+        foreach ($header_keywords as $keyword) {
+            if (strpos($trimmed, $keyword) === 0) {
+                $is_structural_header = true;
+                break;
+            }
+        }
+
+        if ($is_structural_header) {
+            if (!empty($current_page)) {
+                $pages[] = implode("\n", $current_page);
+                $current_page = [];
+            }
+            $current_page[] = $line;
+            continue;
+        }
+
+        $current_page[] = $line;
+    }
+
+    if (!empty($current_page)) {
+        $pages[] = implode("\n", $current_page);
+    }
+
+    return array_filter($pages, function($p) {
+        return !empty(trim($p));
+    });
+}
+
 function detectTrueParagraphs($lines) {
     $paragraphs = [];
     $buffer = '';
@@ -282,6 +336,28 @@ function detectTrueParagraphs($lines) {
     }
     return $paragraphs;
 }
+
+function generateTOC($pages) {
+    $toc = [];
+    $page_num = 1;
+    $header_keywords = ['ACKNOWLEDGEMENT', 'AUTHOR\'S NOTE', 'ABOUT THE AUTHOR', 'Psalm', 'Preface', 'Foreword', 'Introduction', 'DEDICATION', 'COPYRIGHT', 'Chapter'];
+
+    foreach ($pages as $page_content) {
+        $lines = explode("\n", $page_content);
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            foreach ($header_keywords as $keyword) {
+                if (strpos($trimmed, $keyword) === 0) {
+                    $toc[] = ['title' => $trimmed, 'page' => $page_num];
+                    break;
+                }
+            }
+        }
+        $page_num++;
+    }
+    return $toc;
+}
+
 function parseBookAdvanced($raw_text, $book_title, $book_author) {
     // 1. Fix encoding first
     $raw_text = fixEncoding($raw_text);
@@ -1186,35 +1262,56 @@ function sendEmailWithAttachment($to, $subject, $body, $file_path, $filename) {
 //  POST HANDLERS
 // ============================================================
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['extract'])) {
-        $file_path = '../' . $book['file_path'];
-        if (!file_exists($file_path)) {
-            $error = 'Book file not found.';
-        } else {
-            $raw_text = extractRawText($file_path);
-            if ($raw_text && !str_starts_with($raw_text, '⚠️')) {
-                // NEW: Advanced page-based parser
-                $parsed = parseBookAdvanced($raw_text, $book['title'], $book['author']);
-                $html_content = $parsed['html'];
-                
-                // Optional: Run final cleanup
-                $html_content = finalCleanHTML($html_content);
-                
-                $toc_json = json_encode($parsed['toc']);
-                $metadata = ['keywords' => extractKeywords($raw_text)];
-                $metadata_json = json_encode($metadata);
-                
-                $stmt = $db->prepare("INSERT OR REPLACE INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status) VALUES (?, ?, ?, ?, ?, 1, 'complete')");
-                $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json]);
-                
-                saveVersionHistory($book_id, $html_content, $toc_json, $metadata_json, 'Initial extraction');
-                $success = '✅ Content extracted, parsed, and rendered successfully.';
-            } else {
-                $error = $raw_text ?: 'Failed to extract content from the file.';
+if (isset($_POST['extract'])) {
+    $file_path = '../' . $book['file_path'];
+    if (!file_exists($file_path)) {
+        $error = 'Book file not found.';
+    } else {
+        $raw_text = extractRawText($file_path);
+        if ($raw_text && !str_starts_with($raw_text, '⚠️')) {
+            // 1. Fix the encoding
+            $raw_text = fixEncoding($raw_text);
+            
+            // 2. Split the text into pages
+            $pages = splitPagesByNumbers($raw_text);
+            
+            // 3. Generate the TOC
+            $toc = generateTOC($pages);
+            $toc_json = json_encode($toc);
+            
+            // 4. Build the final HTML for the database
+            $html_content = "<h1 class='book-title'>" . htmlspecialchars($book['title']) . "</h1>\n";
+            $html_content .= "<p class='book-author'>by " . htmlspecialchars($book['author']) . "</p>\n";
+            
+            $page_num = 1;
+            foreach ($pages as $page_content) {
+                $page_html = '<div class="page-content" data-page="' . $page_num . '">';
+                $paragraphs = preg_split('/\n\s*\n/', trim($page_content));
+                foreach ($paragraphs as $para) {
+                    $trimmed = trim($para);
+                    if (empty($trimmed)) continue;
+                    $page_html .= '<p>' . nl2br(htmlspecialchars($trimmed)) . '</p>';
+                }
+                $page_html .= '</div>';
+                $html_content .= $page_html;
+                $html_content .= '<div class="page-break" data-page="' . $page_num . '"></div>';
+                $page_num++;
             }
+            
+            $metadata = ['keywords' => extractKeywords($raw_text)];
+            $metadata_json = json_encode($metadata);
+            
+            // Save to database
+            $stmt = $db->prepare("INSERT OR REPLACE INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status) VALUES (?, ?, ?, ?, ?, 1, 'complete')");
+            $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json]);
+            
+            saveVersionHistory($book_id, $html_content, $toc_json, $metadata_json, 'Initial extraction');
+            $success = '✅ Content extracted, split into ' . count($pages) . ' pages, and saved successfully.';
+        } else {
+            $error = $raw_text ?: 'Failed to extract content from the file.';
         }
     }
+}
 
     if (isset($_POST['upload_cover'])) {
         if (!empty($_FILES['live_cover']['name'])) {

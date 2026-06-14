@@ -41,6 +41,7 @@ $has_processed = !empty($processed) && $processed['is_processed'] == 1;
 // ===== TOC =====
 $toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
 
+
 // ===== USER PROGRESS =====
 $user_progress = null;
 $last_offset = 0;
@@ -105,20 +106,23 @@ $share_page = isset($_GET['page']) ? (int)$_GET['page'] : null;
 $is_share = isset($_GET['share']) && $_GET['share'] == 1;
 
 // ===== TOC RENDER FUNCTION =====
-function renderToc($toc, $level = 0) {
-    $html = '<ul class="aw-toc-list" style="padding-left:' . ($level * 20) . 'px">';
-    foreach ($toc as $index => $item) {
-        $html .= '<li>';
-        $html .= '<a href="#" class="aw-toc-link" data-chapter="' . ($item['index'] ?? $index) . '">' . htmlspecialchars($item['title']) . '</a>';
-        if (!empty($item['children'])) {
-            $html .= renderToc($item['children'], $level + 1);
-        }
-        $html .= '</li>';
-    }
-    $html .= '</ul>';
-    return $html;
+// Load the TOC from the JSON stored in the database
+const toc = <?php echo json_encode($toc); ?>;
+
+function goToChapter(pageNum) {
+    // Your existing goToPage function is 0-based, TOC is 1-based
+    goToPage(pageNum - 1);
 }
 
+function renderTOC() {
+    const tocContainer = document.getElementById('toc-sidebar');
+    tocContainer.innerHTML = '<ul>';
+    toc.forEach(entry => {
+        tocContainer.innerHTML += `<li><a href="#" onclick="goToChapter(${entry.page})">${entry.title}</a></li>`;
+    });
+    tocContainer.innerHTML += '</ul>';
+}
+document.addEventListener('DOMContentLoaded', renderTOC);
 $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 ?>
 <?php require_once __DIR__ . '/../includes/header.php'; ?>
