@@ -4,9 +4,9 @@
 //  Supports: Processed HTML, PDF, EPUB, MOBI, AZW3, AZW4, TXT
 // ============================================================
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(0);
 
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -41,12 +41,12 @@ $has_processed = !empty($processed) && $processed['is_processed'] == 1;
 // ===== TOC =====
 $toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
 
-
 // ===== USER PROGRESS =====
 $user_progress = null;
 $last_offset = 0;
 $last_chapter = 0;
 $progress_percent = 0;
+$streak_days = 0;
 
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
@@ -61,6 +61,12 @@ if (isLoggedIn()) {
         $stmt = $db->prepare("INSERT INTO reading_progress (user_id, book_id, position_offset, position_section, progress_percent) VALUES (?, ?, 0, 0, 0)");
         $stmt->execute([$user_id, $book_id]);
     }
+    
+    // ===== STREAK =====
+    $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $streak = $stmt->fetchColumn();
+    $streak_days = $streak ? (int)$streak : 0;
 }
 
 // ===== GROUP ID (for notes) =====
@@ -105,57 +111,17 @@ $share_chapter = isset($_GET['chapter']) ? (int)$_GET['chapter'] : null;
 $share_page = isset($_GET['page']) ? (int)$_GET['page'] : null;
 $is_share = isset($_GET['share']) && $_GET['share'] == 1;
 
-// ===== TOC RENDER FUNCTION =====
-<?php
-// ===== 1. PHP LOGIC AT THE VERY TOP (BEFORE ANY HTML) =====
+// ============================================================
+//  OUTPUT BUFFER START + HEADER
+// ============================================================
 $pageTitle = 'Reading: ' . htmlspecialchars($book['title']);
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<!-- ===== 2. HTML FOR THE READER ===== -->
-<div id="reader-container">
-    <!-- TOC Sidebar -->
-    <div id="toc-sidebar"></div>
-    <!-- Main Reader Content -->
-    <div id="page-content"></div>
-</div>
-
-<!-- ===== 3. JAVASCRIPT ===== -->
-<script>
-// SAFELY LOAD TOC DATA from PHP
-// Wrapping json_encode() with json_encode ensures it becomes a valid JavaScript object/array.
-const toc = <?php echo json_encode($toc); ?>;
-
-function goToChapter(pageNum) {
-    // Your existing goToPage function (must exist elsewhere) is 0-based, TOC is 1-based
-    if (typeof goToPage === 'function') {
-        goToPage(pageNum - 1);
-    } else {
-        console.error('goToPage function not found.');
-    }
-}
-
-function renderTOC() {
-    const tocContainer = document.getElementById('toc-sidebar');
-    if (!tocContainer) {
-        console.warn('TOC sidebar element not found.');
-        return;
-    }
-    let html = '<ul>';
-    toc.forEach(entry => {
-        html += `<li><a href="#" onclick="goToChapter(${entry.page})">${entry.title}</a></li>`;
-    });
-    html += '</ul>';
-    tocContainer.innerHTML = html;
-}
-
-document.addEventListener('DOMContentLoaded', renderTOC);
-</script>
-
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
-
-<!-- ===== READER CONTAINER ===== -->
-<div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>" data-file-path="<?php echo htmlspecialchars($book['file_path']); ?>" data-file-type="<?php echo $file_type; ?>" data-file-exists="<?php echo $file_exists ? '1' : '0'; ?>">
+<!-- ============================================================ -->
+<!--  READER CONTAINER                                            -->
+<!-- ============================================================ -->
+<div class="aw-reader" id="awReader" data-book-id="<?php echo $book_id; ?>" data-user-id="<?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>" data-last-chapter="<?php echo $last_chapter; ?>" data-last-progress="<?php echo $progress_percent; ?>" data-last-offset="<?php echo $last_offset; ?>" data-file-path="<?php echo htmlspecialchars($book['file_path']); ?>" data-file-type="<?php echo $file_type; ?>" data-file-exists="<?php echo $file_exists ? '1' : '0'; ?>" data-group-id="<?php echo $group_id ? (int)$group_id : 0; ?>">
     
     <!-- ===== HEADER ===== -->
     <header class="aw-reader-header" id="awReaderHeader">
@@ -166,6 +132,13 @@ document.addEventListener('DOMContentLoaded', renderTOC);
             <h1 class="aw-reader-title"><?php echo htmlspecialchars($book['title']); ?></h1>
         </div>
         <div class="aw-reader-header-right">
+            <!-- Streak Badge -->
+            <?php if (isLoggedIn() && $streak_days > 0): ?>
+            <div class="streak-badge" title="Reading streak">
+                <span>🔥</span>
+                <span><?php echo $streak_days; ?> days</span>
+            </div>
+            <?php endif; ?>
             <!-- Progress Ring -->
             <svg class="aw-progress-ring" width="36" height="36" viewBox="0 0 36 36">
                 <circle class="aw-progress-ring-bg" cx="18" cy="18" r="16" stroke="var(--border)" stroke-width="2" fill="none"/>
@@ -252,6 +225,14 @@ document.addEventListener('DOMContentLoaded', renderTOC);
                     <button class="aw-mode-btn" data-mode="flip">Page Flip</button>
                 </div>
             </div>
+            <div class="aw-setting-group">
+                <label>Word Count</label>
+                <div id="awWordCount" style="font-size:0.8rem;color:var(--text-light);">Loading...</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" id="awExportHighlights">📤 Export Highlights</button>
+            <button class="btn btn-sm btn-outline" id="awResumeBtn">↩️ Resume Last Position</button>
         </div>
     </div>
 
@@ -263,7 +244,11 @@ document.addEventListener('DOMContentLoaded', renderTOC);
         </div>
         <div class="aw-toc-body" id="awTocBody">
             <?php if (count($toc) > 0): ?>
-                <?php echo renderToc($toc); ?>
+                <ul class="aw-toc-list">
+                <?php foreach ($toc as $entry): ?>
+                    <li><a href="#" class="aw-toc-link" data-chapter="<?php echo $entry['page']; ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
+                <?php endforeach; ?>
+                </ul>
             <?php else: ?>
                 <p class="aw-toc-empty">No table of contents available.</p>
             <?php endif; ?>
@@ -426,7 +411,7 @@ document.addEventListener('DOMContentLoaded', renderTOC);
 </div>
 
 <!-- ============================================================ -->
-<!--  JAVASCRIPT – Fully Enhanced Reader Logic                      -->
+<!--  JAVASCRIPT – FULLY ENHANCED                                 -->
 <!-- ============================================================ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
@@ -470,6 +455,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchResults = document.getElementById('awSearchResults');
     const reactionPicker = document.getElementById('awReactionPicker');
     const challengeWidget = document.getElementById('awChallengeWidget');
+    const exportBtn = document.getElementById('awExportHighlights');
+    const resumeBtn = document.getElementById('awResumeBtn');
+    const wordCountEl = document.getElementById('awWordCount');
 
     const bookId = parseInt(reader.dataset.bookId);
     const filePath = reader.dataset.filePath;
@@ -480,6 +468,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const lastOffset = parseInt(reader.dataset.lastOffset || 0);
     const lastChapter = parseInt(reader.dataset.lastChapter || 0);
     const progressPercent = parseInt(reader.dataset.lastProgress || 0);
+
+    let saveTimer = null;
+    let scrollTimeout = null;
+    let currentNoteId = null;
+    let currentReactionPicker = null;
+    let readingMode = localStorage.getItem('reading_mode') || 'scroll';
+    let focusMode = false;
+    let flipPages = [];
+    let currentFlipPage = 0;
 
     // ===== FILE EXISTENCE CHECK =====
     if (!fileExists) {
@@ -534,13 +531,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     });
 
-    // ===== RESTORE POSITION =====
-    if (lastOffset > 0 && textContainer) {
-        setTimeout(() => {
+    // ===== RESTORE POSITION (with Resume button) =====
+    function restorePosition() {
+        if (lastOffset > 0 && textContainer) {
             content.scrollTop = lastOffset;
             updateProgress(lastOffset);
-        }, 100);
+        }
     }
+    resumeBtn.addEventListener('click', restorePosition);
+    // Restore on load
+    setTimeout(restorePosition, 100);
 
     // ===== THEME =====
     let currentTheme = localStorage.getItem('reader_theme') || 'light';
@@ -551,6 +551,11 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('reader_theme', theme);
         document.querySelectorAll('.aw-theme-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.aw-theme-btn[data-theme="${theme}"]`)?.classList.add('active');
+    }
+    // Auto-theme based on OS preference (first load)
+    if (!localStorage.getItem('reader_theme')) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(prefersDark ? 'dark' : 'light');
     }
     document.querySelectorAll('.aw-theme-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -649,9 +654,55 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('awIncreaseSpacing').addEventListener('click', () => applySpacing(letterSpacing + 1));
     applySpacing(letterSpacing);
 
-    // ===== READING MODE =====
-    let readingMode = localStorage.getItem('reading_mode') || 'scroll';
-    let focusMode = false;
+    // ===== WORD COUNT & READING TIME =====
+    function updateWordCount() {
+        if (!textContainer) return;
+        const words = textContainer.innerText.split(/\s+/).length;
+        const minutes = Math.ceil(words / 200);
+        const hours = Math.floor(minutes / 60);
+        const remaining = minutes % 60;
+        const readingTime = hours > 0 ? `${hours}h ${remaining}m` : `${minutes}m`;
+        wordCountEl.textContent = `Words: ${words.toLocaleString()} — Reading time: ~${readingTime}`;
+    }
+    setTimeout(updateWordCount, 500);
+    document.addEventListener('DOMContentLoaded', updateWordCount);
+
+    // ===== READING MODE (Scroll vs Flip) =====
+    function initFlipMode() {
+        if (!textContainer) return;
+        const innerHTML = textContainer.innerHTML;
+        flipPages = innerHTML.split(/<div class="page-break"[^>]*><\/div>/);
+        flipPages = flipPages.map(p => p.trim()).filter(p => p.length > 0);
+        currentFlipPage = 0;
+        textContainer.style.display = 'none';
+        const flipContainer = document.createElement('div');
+        flipContainer.id = 'awFlipContainer';
+        flipContainer.style.cssText = 'flex:1;overflow:hidden;padding:20px;display:flex;flex-direction:column;justify-content:center;align-items:center;';
+        textContainer.parentNode.insertBefore(flipContainer, textContainer);
+        showFlipPage(currentFlipPage);
+    }
+
+    function showFlipPage(index) {
+        const container = document.getElementById('awFlipContainer');
+        if (!container) return;
+        if (index < 0 || index >= flipPages.length) return;
+        currentFlipPage = index;
+        container.innerHTML = flipPages[index];
+        const percent = Math.round(((index + 1) / flipPages.length) * 100);
+        const radius = 16;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percent / 100) * circumference;
+        progressRing.setAttribute('stroke-dashoffset', offset);
+        progressText.textContent = percent + '%';
+    }
+
+    function nextFlipPage() {
+        if (currentFlipPage < flipPages.length - 1) showFlipPage(currentFlipPage + 1);
+    }
+    function prevFlipPage() {
+        if (currentFlipPage > 0) showFlipPage(currentFlipPage - 1);
+    }
+
     document.querySelectorAll('.aw-mode-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             readingMode = this.dataset.mode;
@@ -659,10 +710,54 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.setItem('reading_mode', readingMode);
             document.querySelectorAll('.aw-mode-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
+            
+            if (readingMode === 'flip') {
+                initFlipMode();
+                document.addEventListener('keydown', flipKeyHandler);
+            } else {
+                const flipContainer = document.getElementById('awFlipContainer');
+                if (flipContainer) flipContainer.remove();
+                textContainer.style.display = 'block';
+                document.removeEventListener('keydown', flipKeyHandler);
+            }
         });
     });
     reader.setAttribute('data-mode', readingMode);
     document.querySelector(`.aw-mode-btn[data-mode="${readingMode}"]`)?.classList.add('active');
+    if (readingMode === 'flip') initFlipMode();
+
+    function flipKeyHandler(e) {
+        if (e.key === 'ArrowRight') nextFlipPage();
+        if (e.key === 'ArrowLeft') prevFlipPage();
+    }
+
+    // ===== TOUCH GESTURES (Swipe for mobile) =====
+    let touchStartX = 0;
+    let touchStartY = 0;
+    document.addEventListener('touchstart', function(e) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    });
+    document.addEventListener('touchmove', function(e) {
+        if (!touchStartX) return;
+        const diffX = e.touches[0].clientX - touchStartX;
+        const diffY = e.touches[0].clientY - touchStartY;
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 30 && readingMode === 'flip') {
+            e.preventDefault();
+            if (diffX < 0) nextFlipPage();
+            else prevFlipPage();
+            touchStartX = 0;
+        }
+    });
+
+    // ===== BIBLE VERSE POP-UP (Simple implementation) =====
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('bible-ref')) {
+            const ref = e.target.textContent.trim();
+            // You can replace this with your own Bible API or database
+            alert('📖 Bible reference: ' + ref + '\n(Integrate a Bible API to show the verse text.)');
+        }
+    });
 
     // ===== SETTINGS PANEL =====
     settingsToggle.addEventListener('click', function() {
@@ -690,13 +785,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.aw-toc-link').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
-            const chapter = parseInt(this.dataset.chapter);
-            const headings = textContainer.querySelectorAll('.chapter-heading, h2');
-            if (headings[chapter]) {
-                headings[chapter].scrollIntoView({ behavior: 'smooth', block: 'start' });
-                tocDrawer.classList.remove('open');
-                overlay.classList.remove('active');
-            }
+            const page = parseInt(this.dataset.chapter);
+            goToPage(page);
+            tocDrawer.classList.remove('open');
+            overlay.classList.remove('active');
         });
     });
 
@@ -855,6 +947,24 @@ document.addEventListener('DOMContentLoaded', function() {
             highlightTooltip.classList.remove('visible');
             annotationPopup.classList.remove('visible');
         }
+    });
+
+    // ===== EXPORT HIGHLIGHTS =====
+    exportBtn.addEventListener('click', function() {
+        const formData = new FormData();
+        formData.append('action', 'export_highlights');
+        formData.append('book_id', bookId);
+        fetch('/reader/reader_ajax.php', {
+            method: 'POST',
+            body: formData
+        }).then(r => r.blob()).then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'highlights.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
     });
 
     // ===== SEARCH =====
@@ -1199,6 +1309,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // ===== PROGRESS SYNC (visibility change) =====
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && userId > 0) {
+            const formData = new FormData();
+            formData.append('action', 'save_position');
+            formData.append('book_id', bookId);
+            formData.append('offset', content.scrollTop);
+            formData.append('chapter', currentChapter);
+            formData.append('percent', Math.round((content.scrollTop / (content.scrollHeight - content.clientHeight)) * 100));
+            navigator.sendBeacon('/reader/reader_ajax.php', formData);
+        }
+    });
+
     // ===== PDF FALLBACK =====
     <?php if (!$has_processed && $file_type === 'pdf'): ?>
     const pdfCanvas = document.getElementById('awPdfCanvas');
@@ -1282,18 +1405,56 @@ document.addEventListener('DOMContentLoaded', function() {
         updateProgress(content.scrollTop);
     }, 200);
 
-    let saveTimer = null;
-    let scrollTimeout = null;
-    let currentNoteId = null;
-    let currentReactionPicker = null;
+    // ===== GO TO PAGE FUNCTION (Critical missing function) =====
+    function goToPage(pageNum) {
+        if (readingMode === 'scroll') {
+            const headings = textContainer.querySelectorAll('.chapter-heading, h2, h3');
+            let target = null;
+            headings.forEach(h => {
+                // Check if this heading belongs to the target page by data-page attribute
+                const page = h.closest('[data-page]')?.dataset.page;
+                if (page && parseInt(page) === pageNum) {
+                    target = h;
+                }
+            });
+            if (!target) {
+                const paras = textContainer.querySelectorAll(`[data-page="${pageNum}"]`);
+                if (paras.length > 0) target = paras[0];
+            }
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                updateProgress(content.scrollTop);
+            }
+        } else if (readingMode === 'flip') {
+            if (pageNum >= 1 && pageNum <= flipPages.length) {
+                showFlipPage(pageNum - 1);
+            }
+        }
+    }
+
+    // ===== READ THEME / MODE FROM LOCAL STORAGE =====
+    document.querySelector(`.aw-mode-btn[data-mode="${readingMode}"]`)?.classList.add('active');
 });
 </script>
 
 <!-- ============================================================ -->
-<!--  STYLES – Fully Branded Reader                                -->
+<!--  STYLES – FULLY BRANDED                                       -->
 <!-- ============================================================ -->
 <style>
-/* (Same as your original CSS – kept intact) */
+/* ===== BRAND COLORS ===== */
+:root {
+    --rose: #dba1a2;
+    --rose-dark: #c98a8b;
+    --vanilla: #f7f2ec;
+    --border: #e0d8d0;
+    --text: #3a2e2a;
+    --text-light: #7a6e6a;
+    --card-bg: #ffffff;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+    --shadow-hover: 0 4px 20px rgba(0,0,0,0.12);
+    --input-bg: #f9f7f5;
+}
+/* ===== READER BASE ===== */
 .aw-reader { display: flex; flex-direction: column; height: 100vh; background: var(--vanilla); color: var(--text); transition: all 0.3s ease; position: relative; overflow: hidden; }
 .aw-reader-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: rgba(255,255,255,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 10; transition: transform 0.3s ease, opacity 0.3s ease; }
 .aw-reader-header.hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
@@ -1303,6 +1464,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .aw-reader-header-right { display: flex; align-items: center; gap: 6px; }
 .aw-reader-header-right button { background: none; border: none; font-size: 1.1rem; color: var(--text); cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all 0.2s; }
 .aw-reader-header-right button:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
+.streak-badge { background: var(--rose); color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 .aw-progress-ring { vertical-align: middle; }
 .aw-progress-ring-bg { stroke: var(--border); }
 .aw-progress-ring-fill { stroke: var(--rose); transition: stroke-dashoffset 0.3s; }
@@ -1365,6 +1527,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .aw-challenge-bar { height: 100%; background: var(--rose); transition: width 0.3s; }
 .aw-challenge-percent { position: absolute; top: 0; right: 8px; font-size: 0.7rem; font-weight: 600; color: var(--text); line-height: 16px; }
 .aw-challenge-stats { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.aw-reader-text { max-width: 750px; margin: 0 auto; padding: 30px 40px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
 .aw-reader-text .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
 .aw-reader-text .highlight-green { background: #a5d6a7; padding: 0 2px; }
 .aw-reader-text .highlight-blue { background: #90caf9; padding: 0 2px; }
@@ -1429,3 +1592,5 @@ document.addEventListener('DOMContentLoaded', function() {
 @media (max-width: 768px) { .aw-reader-header { padding: 6px 12px; } .aw-reader-title { font-size: 0.9rem; } .aw-reader-header-right button { font-size: 0.9rem; padding: 2px 6px; } .aw-reader-content { padding: 16px 12px; } .aw-reader-text .book-title { font-size: 1.6rem; } .aw-reader-text .chapter-heading { font-size: 1.2rem; } .aw-toc-drawer { width: 280px; right: -280px; } .aw-notes-panel { width: 100%; max-height: 50vh; border-radius: 0; } .aw-settings-grid { gap: 8px; } .aw-size-controls input[type="range"] { width: 60px; } .aw-search-bar { width: 260px; right: 8px; } }
 @media (max-width: 480px) { .aw-reader-header { padding: 4px 8px; } .aw-reader-title { font-size: 0.8rem; } .aw-reader-content { padding: 12px 8px; } .aw-toc-drawer { width: 260px; right: -260px; } }
 </style>
+
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
