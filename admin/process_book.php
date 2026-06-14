@@ -1355,7 +1355,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">';
                 $html .= $is_current ? '<strong>v' . $version['version'] . ' (current)</strong>' : 'v' . $version['version'];
                 $html .= '</td>';
-                $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' . date('Y-m-d H:i:s', strtotime($version['created_at'])) . '</td>';
+                $created_at = $version['created_at'] ?? date('Y-m-d H:i:s');
+$html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' . date('Y-m-d H:i:s', strtotime($created_at)) . '</td>';
                 $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' . htmlspecialchars($version['note'] ?? '—') . '</td>';
                 $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">';
                 $html .= '<button class="btn btn-sm btn-info" onclick="previewVersion(' . $version['version'] . ')">👁️ Preview</button> ';
