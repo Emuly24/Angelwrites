@@ -36,88 +36,7 @@ $stmt->execute([$book_id]);
 $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // ============================================================
-//  DATABASE SETUP – Run these statements once
-// ============================================================
-/*
-CREATE TABLE IF NOT EXISTS book_content_drafts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    content_html TEXT,
-    last_saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(book_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS book_processing_queue (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER NOT NULL UNIQUE,
-    status TEXT DEFAULT 'pending',
-    progress INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS book_permissions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    role TEXT NOT NULL,
-    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(book_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS book_comments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    paragraph_index INTEGER NOT NULL,
-    comment TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    resolved INTEGER DEFAULT 0,
-    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS formatting_presets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    preset_data TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS batch_jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_ids TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    progress INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME
-);
-
-CREATE TABLE IF NOT EXISTS activity_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    action TEXT NOT NULL,
-    details TEXT,
-    ip_address TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS error_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    error_message TEXT NOT NULL,
-    backtrace TEXT,
-    ip_address TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-*/
-
-// ============================================================
-//  CORE FUNCTIONS (Features 1-10)
+//  CORE FUNCTIONS 
 // ============================================================
 
 function detectFileType($file_path) {
@@ -132,34 +51,51 @@ function detectFileType($file_path) {
 }
 
 function fixEncoding($text) {
+    // 1. If already clean UTF-8, return it
     if (mb_check_encoding($text, 'UTF-8') && !preg_match('/[\x80-\xFF]/', $text)) {
         return trim($text);
     }
+    
+    // 2. Try Windows-1252 conversion first (most common for corrupted PDFs)
     $converted = mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
     if (!preg_match('/[â€œâ€™â€“]/', $converted)) {
         return trim($converted);
     }
+    
+    // 3. Try ISO-8859-1 as fallback
     $iso = mb_convert_encoding($text, 'UTF-8', 'ISO-8859-1');
     if (!preg_match('/[â€œâ€™â€“]/', $iso)) {
         return trim($iso);
     }
+    
+    // 4. Try Windows-1250 (Central European) – sometimes used in Scribus
+    $win1250 = mb_convert_encoding($text, 'UTF-8', 'Windows-1250');
+    if (!preg_match('/[â€œâ€™â€“]/', $win1250)) {
+        return trim($win1250);
+    }
+    
+    // 5. Aggressive manual mapping (expanded for Scribus-specific mojibake)
     $map = [
+        // Common Scribus garbage
         'â€œ' => '“', 'â€' => '”', 'â€™' => '’', 'â€˜' => '‘',
         'â€"' => '—', 'â€”' => '—', 'â€“' => '–',
         'â€¦' => '…', 'â€¢' => '•', 'â€¹' => '‹', 'â€º' => '›',
         'â‚¬' => '€', 'â„¢' => '™', 'â€¡' => '‡', 'â€°' => '‰',
         'â€š' => '‚', 'â€ž' => '„',
+        // Latin-1 accents
         'Ã¢' => 'â', 'Ã©' => 'é', 'Ã¨' => 'è', 'Ãª' => 'ê',
         'Ã«' => 'ë', 'Ã¯' => 'ï', 'Ã®' => 'î', 'Ã¬' => 'ì',
         'Ã¡' => 'á', 'Ã±' => 'ñ', 'Ã§' => 'ç', 'Ã¸' => 'ø',
         'Ã¦' => 'æ', 'Ã¥' => 'å', 'Ã¤' => 'ä', 'Ã¶' => 'ö',
         'Ã¼' => 'ü', 'ÃŸ' => 'ß',
+        // Capital accents
         'Ã‚' => 'Â', 'Ãƒ' => 'Ã', 'Ã…' => 'Å', 'Ã†' => 'Æ',
         'Ãˆ' => 'È', 'Ã‰' => 'É', 'ÃŠ' => 'Ê', 'Ã‹' => 'Ë',
         'ÃŒ' => 'Ì', 'ÃŽ' => 'Î', 'Ã‘' => 'Ñ', 'Ã“' => 'Ó',
         'Ã”' => 'Ô', 'Ã•' => 'Õ', 'Ã–' => 'Ö', 'Ã—' => '×',
         'Ã˜' => 'Ø', 'Ã™' => 'Ù', 'Ãš' => 'Ú', 'Ã›' => 'Û',
         'Ãœ' => 'Ü', 'Ãž' => 'Þ',
+        // Raw byte corruption (Identity-H decoding errors)
         "\xC2\x82" => "‚", "\xC2\x84" => "„", "\xC2\x85" => "…",
         "\xC2\x86" => "†", "\xC2\x87" => "‡", "\xC2\x88" => "ˆ",
         "\xC2\x89" => "‰", "\xC2\x8A" => "Š", "\xC2\x8B" => "‹",
@@ -171,11 +107,13 @@ function fixEncoding($text) {
         "\xC2\x9F" => "Ÿ"
     ];
     $fixed = str_replace(array_keys($map), array_values($map), $text);
+    
+    // 6. Final nuclear cleanup
     $fixed = iconv('UTF-8', 'UTF-8//IGNORE', $fixed);
     $fixed = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $fixed);
+    
     return trim($fixed);
 }
-
 function extractRawText($file_path) {
     if (!file_exists($file_path)) return false;
     $type = detectFileType($file_path);
@@ -186,28 +124,60 @@ function extractRawText($file_path) {
 }
 
 function extractPDF($file_path) {
+    // ===== METHOD 1: pdftotext (command line) – Best for Scribus PDFs =====
+    if (function_exists('exec')) {
+        $txt_path = dirname($file_path) . '/' . pathinfo($file_path, PATHINFO_FILENAME) . '.txt';
+        $pdftotext_path = defined('PDFTOTEXT_PATH') ? PDFTOTEXT_PATH : 'pdftotext';
+        // Use -layout to preserve page layout, -enc UTF-8 for clean output
+        exec("$pdftotext_path -layout -enc UTF-8 '$file_path' '$txt_path' 2>&1", $output, $return_var);
+        if ($return_var === 0 && file_exists($txt_path)) {
+            $text = file_get_contents($txt_path);
+            @unlink($txt_path);
+            // Even pdftotext may leave some garbage – run through fixEncoding
+            return fixEncoding($text);
+        }
+    }
+
+    // ===== METHOD 2: smalot/pdfparser (Composer) =====
     if (class_exists('\\Smalot\\PdfParser\\Parser')) {
         $parser = new \Smalot\PdfParser\Parser();
         try {
+            // Set a custom config to bypass encryption warnings
+            $config = new \Smalot\PdfParser\Config();
+            $config->setIgnoreEncryption(true);
+            $parser->setConfig($config);
+            
             $pdf = $parser->parseFile($file_path);
             $text = $pdf->getText();
             if (empty(trim($text))) {
                 return '⚠️ This PDF appears to be a scan (no extractable text).';
             }
             return fixEncoding($text);
-        } catch (Exception $e) {}
-    }
-    if (function_exists('exec')) {
-        $txt_path = dirname($file_path) . '/' . pathinfo($file_path, PATHINFO_FILENAME) . '.txt';
-        $pdftotext_path = defined('PDFTOTEXT_PATH') ? PDFTOTEXT_PATH : 'pdftotext';
-        exec("$pdftotext_path -layout -enc UTF-8 '$file_path' '$txt_path' 2>&1", $output, $return_var);
-        if ($return_var === 0 && file_exists($txt_path)) {
-            $text = file_get_contents($txt_path);
-            @unlink($txt_path);
-            return fixEncoding($text);
+        } catch (Exception $e) {
+            // Fall through to final cleanup
         }
     }
-    return '⚠️ PDF extraction failed. Please ensure "smalot/pdfparser" is installed via Composer.';
+
+    // ===== METHOD 3: Ultimate Fallback – Full binary extraction =====
+    // If pdftotext and smalot both fail, try a raw brute-force extraction
+    $handle = fopen($file_path, 'rb');
+    $content = fread($handle, filesize($file_path));
+    fclose($handle);
+    
+    // Extract text between 'BT' and 'ET' (Begin Text / End Text) operators
+    preg_match_all('/BT(.*?)ET/s', $content, $matches);
+    $raw_text = '';
+    foreach ($matches[1] as $segment) {
+        // Remove binary garbage
+        $segment = preg_replace('/[^\x20-\x7E\x0A\x0D]/', ' ', $segment);
+        $raw_text .= $segment . "\n";
+    }
+    
+    if (!empty(trim($raw_text))) {
+        return fixEncoding($raw_text);
+    }
+    
+    return '⚠️ PDF extraction failed. This PDF appears to be encrypted or uses an unsupported encoding (Identity-H).';
 }
 
 function extractDOCX($file_path) {
@@ -312,75 +282,84 @@ function detectTrueParagraphs($lines) {
     }
     return $paragraphs;
 }
-
-function parseBook($raw_text) {
-    if ($raw_text === false || $raw_text === null) {
-        return ['chapters' => [], 'toc' => [], 'page_breaks' => []];
-    }
+function parseBookAdvanced($raw_text, $book_title, $book_author) {
+    // 1. Fix encoding first
     $raw_text = fixEncoding($raw_text);
-    $page_breaks = detectPageBreaks($raw_text);
-    $lines = explode("\n", $raw_text);
-    $paragraphs = detectTrueParagraphs($lines);
-    $chapters = [];
+    
+    // 2. Split into pages by ==== Page X ====
+    $pages_raw = preg_split('/=====\s*Page\s*(\d+)\s*=====/', $raw_text, -1, PREG_SPLIT_NO_EMPTY);
+    array_shift($pages_raw); // Remove empty before first page
+    
+    $pages_content = [];
     $toc = [];
-    $current_chapter = null;
-    $global_page_num = 1;
+    $reader_page = 1;
     $in_front_matter = true;
-    foreach ($paragraphs as $para) {
-        $trimmed = trim($para);
-        if (empty($trimmed)) continue;
-        if (preg_match('/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)/i', $trimmed, $matches)) {
-            $in_front_matter = false;
-            if ($current_chapter) {
-                $chapters[] = $current_chapter;
+    
+    foreach ($pages_raw as $page_text) {
+        $lines = explode("\n", trim($page_text));
+        $paragraphs = detectTrueParagraphs($lines);
+        
+        // Skip pages with only a single number or no meaningful text
+        $clean_paragraphs = array_filter($paragraphs, function($para) {
+            $trimmed = trim($para);
+            return !preg_match('/^\d+$/', $trimmed) && !empty($trimmed);
+        });
+        
+        if (empty($clean_paragraphs)) {
+            continue; // Skip empty placeholder page
+        }
+        
+        $page_html = '';
+        foreach ($clean_paragraphs as $para) {
+            $page_html .= '<p>' . nl2br(htmlspecialchars(trim($para))) . '</p>';
+        }
+        
+        // Detect TOC entries
+        foreach ($clean_paragraphs as $para) {
+            $trimmed = trim($para);
+            if (preg_match('/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)/i', $trimmed, $matches)) {
+                $in_front_matter = false;
+                $toc[] = ['title' => $trimmed, 'level' => 1, 'page' => $reader_page];
             }
-            $current_chapter = [
-                'heading' => $trimmed,
-                'paragraphs' => [],
-                'page_break' => $global_page_num
-            ];
-            $toc[] = ['title' => $trimmed, 'level' => 1, 'page' => $global_page_num];
-            continue;
-        }
-        if (preg_match('/^(Part|PART)\s+(\d+|[IVXLCDM]+)/i', $trimmed, $matches)) {
-            if ($current_chapter) {
-                $chapters[] = $current_chapter;
-                $current_chapter = null;
+            if (preg_match('/^(Part|PART)\s+(\d+|[IVXLCDM]+)/i', $trimmed, $matches)) {
+                $toc[] = ['title' => $trimmed, 'level' => 0, 'page' => $reader_page];
             }
-            $toc[] = ['title' => $trimmed, 'level' => 0, 'page' => $global_page_num];
-            $current_chapter = [
-                'heading' => $trimmed,
-                'paragraphs' => [],
-                'page_break' => $global_page_num
-            ];
-            continue;
-        }
-        if ($in_front_matter && preg_match('/^(ACKNOWLEDGEMENT|AUTHOR\'S NOTE|ABOUT THE AUTHOR|Psalm|Introduction|Preface|Foreword)/i', $trimmed)) {
-            if ($current_chapter) {
-                $chapters[] = $current_chapter;
+            if ($in_front_matter && preg_match('/^(ACKNOWLEDGEMENT|AUTHOR\'S NOTE|ABOUT THE AUTHOR|Psalm)/i', $trimmed)) {
+                $toc[] = ['title' => $trimmed, 'level' => 1, 'page' => $reader_page];
+                $in_front_matter = false;
             }
-            $current_chapter = [
-                'heading' => $trimmed,
-                'paragraphs' => [],
-                'page_break' => $global_page_num
-            ];
-            $toc[] = ['title' => $trimmed, 'level' => 1, 'page' => $global_page_num];
-            $in_front_matter = false;
-            continue;
         }
-        if (!$current_chapter) {
-            $current_chapter = [
-                'heading' => 'Front Matter',
-                'paragraphs' => [],
-                'page_break' => $global_page_num
-            ];
-        }
-        $current_chapter['paragraphs'][] = $trimmed;
+        
+        $pages_content[] = $page_html;
+        $reader_page++;
     }
-    if ($current_chapter) {
-        $chapters[] = $current_chapter;
+    
+    // Build final HTML
+    $html = "<h1 class='book-title'>" . htmlspecialchars($book_title) . "</h1>\n";
+    $html .= "<p class='book-author'>by " . htmlspecialchars($book_author) . "</p>\n";
+    
+    $reader_page = 1;
+    foreach ($pages_content as $page_html) {
+        $html .= "<div class='page-content' data-page='$reader_page'>$page_html</div>\n";
+        $html .= "<div class='page-break' data-page='$reader_page'></div>\n";
+        $reader_page++;
     }
-    return ['chapters' => $chapters, 'toc' => $toc, 'page_breaks' => $page_breaks];
+    
+    return [
+        'html' => $html,
+        'toc' => $toc,
+        'total_pages' => $reader_page - 1
+    ];
+}
+
+function finalCleanHTML($html) {
+    // Remove multiple consecutive page breaks
+    $html = preg_replace('/<div class="page-break"[^>]*><\/div>\s*<div class="page-break"[^>]*><\/div>/', '', $html);
+    // Remove empty paragraphs
+    $html = preg_replace('/<p[^>]*><\/p>/', '', $html);
+    // Trim excessive whitespace
+    $html = preg_replace('/\n\s*\n/', "\n", $html);
+    return $html;
 }
 
 function renderBookFromParsed($parsed, $book) {
@@ -1215,13 +1194,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $raw_text = extractRawText($file_path);
             if ($raw_text && !str_starts_with($raw_text, '⚠️')) {
-                $parsed = parseBook($raw_text);
-                $html_content = renderBook($parsed, $book);
+                // NEW: Advanced page-based parser
+                $parsed = parseBookAdvanced($raw_text, $book['title'], $book['author']);
+                $html_content = $parsed['html'];
+                
+                // Optional: Run final cleanup
+                $html_content = finalCleanHTML($html_content);
+                
                 $toc_json = json_encode($parsed['toc']);
-                $metadata = ['keywords' => extractKeywords($raw_text), 'page_breaks' => $parsed['page_breaks']];
+                $metadata = ['keywords' => extractKeywords($raw_text)];
                 $metadata_json = json_encode($metadata);
+                
                 $stmt = $db->prepare("INSERT OR REPLACE INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status) VALUES (?, ?, ?, ?, ?, 1, 'complete')");
                 $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json]);
+                
                 saveVersionHistory($book_id, $html_content, $toc_json, $metadata_json, 'Initial extraction');
                 $success = '✅ Content extracted, parsed, and rendered successfully.';
             } else {
@@ -2312,7 +2298,7 @@ tinymce.init({
     selector: '#editor',
     height: 500,
     menubar: true,
-    plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+    plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount code',
     toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
     content_style: 'body { font-family: Inter, sans-serif; font-size: 18px; line-height: 2; } .page-break { display: block; width: 100%; border-top: 2px dashed #c0392b; margin: 20px 0; text-align: center; color: #c0392b; font-size: 0.8rem; } .page-break::before { content: "⏎ Page Break"; }',
     forced_root_block: 'p'
