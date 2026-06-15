@@ -258,7 +258,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 
 /* ===== FLIP MODE ===== */
 #flip-container {
-    width: 90%; max-width: 1000px;
+    width: 90%; max-width: 900px;
     height: 85%; max-height: 900px;
     display: none; justify-content: center; align-items: center;
     border: 1px solid var(--border);
