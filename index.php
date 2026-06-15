@@ -173,12 +173,11 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             </div>
         </div>
         <div class="hero-image">
-            <div class="hero-placeholder" style="background: var(--rose-light); border-color: var(--rose);">
-                <i class="fas fa-heart" style="color: var(--rose);"></i>
-                <span style="color: var(--text); font-weight: 600;">Your Story Lives Here</span>
-            </div>
+           <a href="<?php echo SITE_URL; ?>/index.php" class="hero" aria-label="AngelWrites Hero Image">
+                    <img src="<?php echo SITE_URL; ?>/assets/images/Angel_hero.png" alt="AngelWrites Hero Image" class="hero-img">
+                </a>
             <div style="text-align: center; margin-top: 12px; max-width: 250px; margin-left: auto; margin-right: auto;">
-                <p style="font-size: 0.85rem; color: var(--text-light); line-height: 1.5; font-style: italic;">
+                <p style="font-size: 1.125rem; color: var(--text-light); line-height: 1.5; font-style: italic;">
                     "You don't have to be fixed before you walk in. Just come as you are."
                 </p>
             </div>

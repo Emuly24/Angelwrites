@@ -1,5 +1,5 @@
 <?php
-ini_set('display_errors', 1); // <- Fixed typo here
+ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
@@ -62,7 +62,7 @@ if (isLoggedIn()) {
         $stmt = $db->prepare("INSERT INTO reading_progress (user_id, book_id, position_offset, position_section, progress_percent) VALUES (?, ?, 0, 0, 0)");
         $stmt->execute([$user_id, $book_id]);
     }
-    
+
     $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $streak = $stmt->fetchColumn();
@@ -100,603 +100,515 @@ $file_path = __DIR__ . '/../' . $book['file_path'];
 $file_exists = file_exists($file_path);
 
 $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter : 1;
+$cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_URL . '/' . $book['cover_path'] : '';
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><?php echo htmlspecialchars($book['title']); ?></title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<style>
-    /* ===== RESET ===== */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; width: 100%; overflow: hidden; }
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        /* ======================================================= */
+        /*  RESET & BRAND VARIABLES                                 */
+        /* ======================================================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; overflow: hidden; }
 
-/* ===== ANGELWRITES BRAND VARIABLES ===== */
-:root {
-    --rose: #DBA1A2;
-    --rose-dark: #c08a8b;
-    --rose-light: #e8c0c0;
-    --vanilla: #EFD8D6;
-    --fantasy: #F7F3ED;
-    --white: #ffffff;
-    --dark: #2c1e1e;
-    --text: #3d2e2e;
-    --text-light: #6b5a5a;
-    --bg: #F7F3ED;
-    --card-bg: #ffffff;
-    --border: #e5d5d5;
-    --shadow: 0 4px 16px rgba(44, 30, 30, 0.08);
-    --shadow-hover: 0 8px 30px rgba(44, 30, 30, 0.15);
-    --input-bg: #ffffff;
-    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+        :root {
+            --rose: #DBA1A2;
+            --rose-dark: #c08a8b;
+            --rose-light: #e8c0c0;
+            --vanilla: #EFD8D6;
+            --fantasy: #F7F3ED;
+            --white: #ffffff;
+            --dark: #2c1e1e;
+            --text: #3d2e2e;
+            --text-light: #6b5a5a;
+            --bg: #F7F3ED;
+            --card-bg: #ffffff;
+            --border: #e5d5d5;
+            --shadow: 0 4px 16px rgba(44, 30, 30, 0.08);
+            --shadow-hover: 0 8px 30px rgba(44, 30, 30, 0.15);
+            --input-bg: #ffffff;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-/* ===== DARK THEME ===== */
-[data-theme="dark"] {
-    --rose: #dba1a2;
-    --rose-dark: #c08a8b;
-    --rose-light: #e8c0c0;
-    --vanilla: #3d2e2e;
-    --fantasy: #2c1e1e;
-    --white: #1a1212;
-    --dark: #f0e8e8;
-    --text: #e8dddd;
-    --text-light: #b8a8a8;
-    --bg: #1a1212;
-    --card-bg: #2c1e1e;
-    --border: #4a3a3a;
-    --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.6);
-    --input-bg: #2c1e1e;
-}
-/* Apply themes to the correct container */
-#reader-app[data-theme="dark"] {
-    background: var(--bg);
-    color: var(--text);
-}
-#reader-app[data-theme="dark"] .page-content,
-#reader-app[data-theme="dark"] .reader-page {
-    background: var(--card-bg);
-    color: var(--text);
-    border-color: var(--border);
-}
-#reader-app[data-theme="dark"] #toolbar {
-    background: var(--card-bg);
-    border-color: var(--border);
-}
-#reader-app[data-theme="dark"] #toolbar button {
-    color: var(--text-light);
-}
-#reader-app[data-theme="dark"] #toolbar button:hover {
-    color: var(--rose);
-}
+        [data-theme="dark"] {
+            --rose: #dba1a2;
+            --rose-dark: #c08a8b;
+            --rose-light: #e8c0c0;
+            --vanilla: #3d2e2e;
+            --fantasy: #2c1e1e;
+            --white: #1a1212;
+            --dark: #f0e8e8;
+            --text: #e8dddd;
+            --text-light: #b8a8a8;
+            --bg: #1a1212;
+            --card-bg: #2c1e1e;
+            --border: #4a3a3a;
+            --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.6);
+            --input-bg: #2c1e1e;
+        }
 
-/* ===== READER APP ===== */
-#reader-app {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    display: flex; flex-direction: column;
-    background: var(--bg);
-    z-index: 10000;
-    font-family: 'Inter', sans-serif;
-    color: var(--text);
-    transition: background var(--transition), color var(--transition);
-}
+        /* ======================================================= */
+        /*  READER APP                                              */
+        /* ======================================================= */
+        #reader-app {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            background: var(--bg);
+            z-index: 10000;
+            font-family: 'Inter', sans-serif;
+            color: var(--text);
+            transition: background var(--transition), color var(--transition);
+        }
 
-/* ===== TOOLBAR ===== */
-#toolbar {
-    flex-shrink: 0; height: 56px; min-height: 56px;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0 16px;
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--border);
-    z-index: 20;
-    box-shadow: var(--shadow);
-}
-.toolbar-left { display: flex; align-items: center; gap: 12px; }
-.toolbar-left .title {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-weight: 700;
-    font-size: 1.1rem;
-    max-width: 240px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    color: var(--dark);
-}
-.toolbar-left button { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-light); transition: color var(--transition); }
-.toolbar-left button:hover { color: var(--rose); }
-.toolbar-center { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-light); }
-.toolbar-center .progress-ring { position: relative; width: 32px; height: 32px; }
-.toolbar-center .progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.toolbar-center .progress-ring .bg { stroke: var(--border); stroke-width: 2; fill: none; }
-.toolbar-center .progress-ring .fill { stroke: var(--rose); stroke-width: 2; fill: none; transition: stroke-dashoffset var(--transition); }
-.toolbar-center .progress-ring .percent { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.65rem; font-weight: 600; color: var(--text-light); }
-.toolbar-right { display: flex; align-items: center; gap: 4px; }
-.toolbar-right button { background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-light); padding: 6px 8px; border-radius: 6px; transition: all var(--transition); }
-.toolbar-right button:hover { background: rgba(219, 161, 162, 0.1); color: var(--rose); transform: scale(1.05); }
-.streak-badge { background: var(--rose); color: var(--white); padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        /* ======================================================= */
+        /*  TOOLBAR                                                 */
+        /* ======================================================= */
+        #toolbar {
+            flex-shrink: 0; height: 56px; min-height: 56px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 16px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            z-index: 20;
+            box-shadow: var(--shadow);
+        }
+        .toolbar-left { display: flex; align-items: center; gap: 12px; }
+        .toolbar-left .title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            max-width: 240px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: var(--dark);
+        }
+        .toolbar-left button {
+            background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-light);
+            transition: color var(--transition);
+        }
+        .toolbar-left button:hover { color: var(--rose); }
+        .toolbar-center { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-light); }
+        .toolbar-center .progress-ring { position: relative; width: 32px; height: 32px; }
+        .toolbar-center .progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .toolbar-center .progress-ring .bg { stroke: var(--border); stroke-width: 2; fill: none; }
+        .toolbar-center .progress-ring .fill { stroke: var(--rose); stroke-width: 2; fill: none; transition: stroke-dashoffset var(--transition); }
+        .toolbar-center .progress-ring .percent { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.65rem; font-weight: 600; color: var(--text-light); }
+        .toolbar-right { display: flex; align-items: center; gap: 4px; }
+        .toolbar-right button {
+            background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-light);
+            padding: 6px 8px; border-radius: 6px; transition: all var(--transition);
+        }
+        .toolbar-right button:hover {
+            background: rgba(219, 161, 162, 0.1); color: var(--rose); transform: scale(1.05);
+        }
+        .streak-badge { background: var(--rose); color: var(--white); padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
 
-/* ===== CONTENT AREA ===== */
-#page-viewport {
-    flex: 1; position: relative; overflow: hidden;
-    background: var(--bg);
-    display: flex; justify-content: center; align-items: center;
-}
+        /* ======================================================= */
+        /*  PAGE VIEWPORT                                           */
+        /* ======================================================= */
+        #page-viewport {
+            flex: 1; position: relative; overflow: hidden;
+            background: var(--bg);
+            display: flex; justify-content: center; align-items: center;
+        }
 
-/* ===== SCROLL MODE ===== */
-#scroll-container {
-    height: 100%; width: 100%;
-    overflow-y: auto;
-    padding: 20px 20px 120px 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;      
-    justify-content: flex-start;
-}
-#scroll-container .page-content {
-    width: 100%; max-width: 1000px;
-    margin: 0 auto 40px auto;
-    padding: 30px 40px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    box-shadow: var(--shadow);
-    font-family: 'Inter', sans-serif;
-    font-size: 1.05rem;
-    line-height: 1.8;
-    color: var(--text);
-}
-#scroll-container .page-content h1,
-#scroll-container .page-content h2,
-#scroll-container .page-content h3 {
-    font-family: 'Playfair Display', Georgia, serif;
-    color: var(--dark);
-}
-#scroll-container .page-break { display: none; }
+        #scroll-container {
+            height: 100%; width: 100%;
+            overflow-y: auto;
+            padding: 20px 20px 120px 20px;
+            display: flex; flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        #scroll-container .page-content {
+            width: 100%; max-width: 1000px;
+            margin: 0 auto 40px auto;
+            padding: 30px 40px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            font-family: 'Inter', sans-serif;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: var(--text);
+        }
+        #scroll-container .page-content h1,
+        #scroll-container .page-content h2,
+        #scroll-container .page-content h3 {
+            font-family: 'Playfair Display', Georgia, serif;
+            color: var(--dark);
+        }
+        #scroll-container .page-break { display: none; }
 
-/* ===== FLIP MODE ===== */
-#flip-container {
-    width: 90%; max-width: 900px;
-    height: 85%; max-height: 900px;
-    display: none; justify-content: center; align-items: center;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    background: var(--card-bg);
-    box-shadow: var(--shadow-hover);
-    overflow: hidden; position: relative;
-}
-#flip-container .reader-page {
-    width: 100%; height: 100%;
-    padding: 40px;
-    overflow-y: auto;
-    font-family: 'Inter', sans-serif;
-    font-size: 1.05rem;
-    line-height: 1.8;
-    color: var(--text);
-}
-#flip-container .reader-page h1,
-#flip-container .reader-page h2,
-#flip-container .reader-page h3 {
-    font-family: 'Playfair Display', Georgia, serif;
-    color: var(--dark);
-}
+        #flip-container {
+            width: 90%; max-width: 900px;
+            height: 85%; max-height: 900px;
+            display: none; justify-content: center; align-items: center;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--card-bg);
+            box-shadow: var(--shadow-hover);
+            overflow: hidden; position: relative;
+        }
+        #flip-container .reader-page {
+            width: 100%; height: 100%;
+            padding: 40px;
+            overflow-y: auto;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: var(--text);
+        }
+        #flip-container .reader-page h1,
+        #flip-container .reader-page h2,
+        #flip-container .reader-page h3 {
+            font-family: 'Playfair Display', Georgia, serif;
+            color: var(--dark);
+        }
 
-/* ===== HIGHLIGHTS ===== */
-./* ===== UNHIDE AND POSITION ALL TOOLS ===== */
-#highlight-tooltip,
-#reaction-picker,
-#annotation-popup,
-#search-bar {
-    display: none !important;
-    position: fixed !important;
-    z-index: 100 !important;
-}
+        .cover-image {
+            width: 100%; max-width: 750px;
+            margin: 0 auto 40px auto;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .cover-image img {
+            width: 100%; height: auto; display: block;
+        }
 
-#highlight-tooltip.visible,
-#reaction-picker[style*="display: flex"],
-#annotation-popup.visible,
-#search-bar.visible {
-    display: flex !important;
-}
+        /* ======================================================= */
+        /*  HIGHLIGHTS                                               */
+        /* ======================================================= */
+        .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
+        .highlight-green { background: #a5d6a7; padding: 0 2px; }
+        .highlight-blue { background: #90caf9; padding: 0 2px; }
+        .highlight-pink { background: #f48fb1; padding: 0 2px; }
+        .highlight-yellow.annotation { border-bottom: 2px solid #ffeb3b; cursor: pointer; }
 
-/* ===== HIGHLIGHT TOOLTIP - Bottom left ===== */
-#highlight-tooltip.visible {
-    bottom: 80px !important;
-    left: 20px !important;
-    top: auto !important;
-    right: auto !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 8px 12px !important;
-    box-shadow: var(--shadow-hover) !important;
-    gap: 6px !important;
-}
+        /* ======================================================= */
+        /*  NAVIGATION BUTTONS                                      */
+        /* ======================================================= */
+        .aw-nav-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 50%;
+            width: 40px; height: 40px; cursor: pointer; font-size: 1rem;
+            display: flex; align-items: center; justify-content: center;
+            transition: all var(--transition); z-index: 10; color: var(--text); box-shadow: var(--shadow);
+        }
+        .aw-nav-btn:hover { border-color: var(--rose); color: var(--rose); box-shadow: var(--shadow-hover); }
+        .aw-nav-btn.prev { left: 16px; }
+        .aw-nav-btn.next { right: 16px; }
 
-/* ===== REACTION PICKER - Bottom left ===== */
-#reaction-picker {
-    bottom: 80px !important;
-    left: 20px !important;
-    top: auto !important;
-    right: auto !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 8px 12px !important;
-    box-shadow: var(--shadow-hover) !important;
-    gap: 6px !important;
-}
+        /* ======================================================= */
+        /*  FLOATING TOOLS (Highlight, Reaction, Annotation, etc)  */
+        /* ======================================================= */
+        #highlight-tooltip,
+        #reaction-picker,
+        #annotation-popup,
+        #search-bar,
+        #share-modal,
+        #overlay,
+        #notes-panel,
+        #toc-drawer,
+        #settings-panel {
+            position: fixed !important;
+            z-index: 9999 !important;
+        }
 
-/* ===== ANNOTATION POPUP - Bottom left, above tooltip ===== */
-#annotation-popup.visible {
-    bottom: 140px !important;
-    left: 20px !important;
-    top: auto !important;
-    right: auto !important;
-    width: 300px !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 16px !important;
-    box-shadow: var(--shadow-hover) !important;
-}
+        /* Highlight Tooltip */
+        #highlight-tooltip {
+            display: none;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px 12px;
+            box-shadow: var(--shadow-hover);
+            min-width: 260px;
+            pointer-events: auto;
+        }
+        #highlight-tooltip.visible { display: block; }
+        #highlight-tooltip .highlight-color {
+            width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border);
+            cursor: pointer; transition: all 0.2s;
+        }
+        #highlight-tooltip .highlight-color:hover { transform: scale(1.15); border-color: var(--rose); }
+        #highlight-tooltip .tooltip-action {
+            background: transparent; border: 1px solid var(--border); border-radius: 6px;
+            padding: 4px 8px; cursor: pointer; color: var(--text);
+            transition: all 0.2s; font-size: 0.9rem;
+        }
+        #highlight-tooltip .tooltip-action:hover { border-color: var(--rose); color: var(--rose); background: rgba(219, 161, 162, 0.05); }
 
-/* ===== SEARCH BAR - Centered bottom ===== */
-#search-bar.visible {
-    bottom: 20px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 90% !important;
-    max-width: 400px !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 12px !important;
-    box-shadow: var(--shadow-hover) !important;
-}
+        /* Reaction Picker */
+        #reaction-picker {
+            display: none;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px 12px;
+            box-shadow: var(--shadow-hover);
+            gap: 6px;
+            pointer-events: auto;
+        }
+        #reaction-picker[style*="flex"] { display: flex !important; }
+        #reaction-picker button {
+            background: none; border: none; font-size: 1.4rem; cursor: pointer; padding: 4px;
+            transition: transform var(--transition);
+        }
+        #reaction-picker button:hover { transform: scale(1.2); }
 
-/* ===== SHARE MODAL - Centered overlay ===== */
-#share-modal {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    z-index: 1000 !important;
-    display: none !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background: rgba(44, 30, 30, 0.6) !important;
-}
-#share-modal.visible {
-    display: flex !important;
-}
+        /* Annotation Popup */
+        #annotation-popup {
+            display: none;
+            width: 300px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: var(--shadow-hover);
+            pointer-events: auto;
+        }
+        #annotation-popup.visible { display: block; }
+        #annotation-popup textarea {
+            width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px;
+            resize: vertical; min-height: 60px; font-size: 0.9rem;
+            background: var(--input-bg); color: var(--text); font-family: 'Inter', sans-serif;
+        }
+        #annotation-popup textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+        .annotation-actions {
+            display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;
+        }
+        .annotation-actions button {
+            padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer;
+            font-size: 0.8rem; transition: background var(--transition);
+        }
+        .annotation-save { background: var(--rose); color: var(--white); }
+        .annotation-save:hover { background: var(--rose-dark); }
+        .annotation-cancel { background: var(--border); color: var(--text); }
+        .annotation-cancel:hover { background: var(--text-light); color: var(--white); }
 
-/* ===== OVERLAY - Full screen ===== */
-#overlay {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    z-index: 999 !important;
-    display: none !important;
-    background: rgba(44, 30, 30, 0.3) !important;
-}
-#overlay.active {
-    display: block !important;
-}
+        /* Search Bar */
+        #search-bar {
+            display: none;
+            width: 280px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: var(--shadow-hover);
+            pointer-events: auto;
+        }
+        #search-bar.visible { display: block; }
+        #search-bar input {
+            width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+            font-size: 0.9rem; background: var(--input-bg); color: var(--text); font-family: 'Inter', sans-serif;
+        }
+        #search-bar input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+        #search-bar button {
+            background: none; border: none; cursor: pointer; color: var(--text-light); font-size: 0.9rem;
+            transition: color var(--transition);
+        }
+        #search-bar button:hover { color: var(--rose); }
+        #searchResults {
+            margin-top: 8px; max-height: 200px; overflow-y: auto; font-size: 0.85rem;
+        }
+        .search-result {
+            padding: 6px 8px; border-bottom: 1px solid var(--border); cursor: pointer;
+            transition: background var(--transition);
+        }
+        .search-result:hover { background: rgba(219, 161, 162, 0.1); }
+        .search-result strong { color: var(--rose); }
 
-/* ===== NOTES PANEL - Bottom right ===== */
-#notes-panel {
-    position: fixed !important;
-    bottom: 0 !important;
-    right: 0 !important;
-    width: 380px !important;
-    max-height: 60vh !important;
-    z-index: 999 !important;
-    display: none !important;
-    flex-direction: column !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px 12px 0 0 !important;
-    box-shadow: 0 -4px 20px rgba(44, 30, 30, 0.1) !important;
-}
-#notes-panel.open {
-    display: flex !important;
-}
+        /* ======================================================= */
+        /*  SETTINGS PANEL                                          */
+        /* ======================================================= */
+        #settings-panel {
+            bottom: 0; left: 0; right: 0;
+            background: var(--card-bg); border-top: 1px solid var(--border);
+            padding: 16px 20px;
+            transform: translateY(100%); transition: transform 0.25s ease;
+            max-height: 50vh; overflow-y: auto;
+            pointer-events: auto;
+        }
+        #settings-panel.open { transform: translateY(0); }
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+        .settings-group label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); }
+        .settings-group .btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+        .settings-group .btn-group button {
+            padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+            background: transparent; cursor: pointer; font-size: 0.75rem; transition: var(--transition);
+        }
+        .settings-group .btn-group button.active { border-color: var(--rose); background: var(--rose); color: var(--white); }
+        .settings-group .btn-group button:hover { border-color: var(--rose); }
+        .slider-group { display: flex; align-items: center; gap: 6px; }
+        .slider-group input[type="range"] { width: 80px; accent-color: var(--rose); }
 
-/* ===== TOC DRAWER - Right side ===== */
-#toc-drawer {
-    position: fixed !important;
-    top: 0 !important;
-    right: -320px !important;
-    width: 320px !important;
-    height: 100vh !important;
-    z-index: 999 !important;
-    background: var(--card-bg) !important;
-    box-shadow: -4px 0 20px rgba(44, 30, 30, 0.1) !important;
-    transition: right 0.25s ease !important;
-    display: flex !important;
-    flex-direction: column !important;
-}
-#toc-drawer.open {
-    right: 0 !important;
-}
+        /* ======================================================= */
+        /*  TOC DRAWER                                              */
+        /* ======================================================= */
+        #toc-drawer {
+            top: 0; right: -320px; width: 320px; height: 100vh;
+            background: var(--card-bg); box-shadow: -4px 0 20px rgba(44, 30, 30, 0.1);
+            transition: right 0.25s ease; display: flex; flex-direction: column;
+            pointer-events: auto;
+        }
+        #toc-drawer.open { right: 0; }
+        .toc-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--vanilla); }
+        .toc-header h3 { margin: 0; font-size: 1.1rem; font-family: 'Playfair Display', Georgia, serif; color: var(--dark); }
+        .toc-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text); }
+        .toc-body { flex: 1; overflow-y: auto; padding: 12px 20px; }
+        .toc-list { list-style: none; padding: 0; margin: 0; }
+        .toc-list li { padding: 4px 0; }
+        .toc-list a {
+            color: var(--text); text-decoration: none; display: block; padding: 6px 8px; border-radius: 6px;
+            transition: all var(--transition);
+        }
+        .toc-list a:hover { background: rgba(219, 161, 162, 0.1); color: var(--rose); }
+        .toc-empty { text-align: center; color: var(--text-light); padding: 40px 0; }
 
-/* ===== SETTINGS PANEL - Bottom slide-up ===== */
-#settings-panel {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 999 !important;
-    background: var(--card-bg) !important;
-    border-top: 1px solid var(--border) !important;
-    padding: 16px 20px !important;
-    transform: translateY(100%) !important;
-    transition: transform 0.25s ease !important;
-    max-height: 50vh !important;
-    overflow-y: auto !important;
-}
-#settings-panel.open {
-    transform: translateY(0) !important;
-}
-/* ===== FOCUS MODE ===== */
-.focus-mode #toolbar { transform: translateY(-100%); opacity: 0; pointer-events: none; transition: all var(--transition); }
+        /* ======================================================= */
+        /*  NOTES PANEL                                             */
+        /* ======================================================= */
+        #notes-panel {
+            bottom: 0; right: 0; width: 380px; max-height: 60vh;
+            background: var(--card-bg); border: 1px solid var(--border);
+            border-radius: 12px 12px 0 0; box-shadow: 0 -4px 20px rgba(44, 30, 30, 0.1);
+            display: none; flex-direction: column; pointer-events: auto;
+        }
+        #notes-panel.open { display: flex; }
+        .notes-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--vanilla); border-radius: 12px 12px 0 0; }
+        .notes-header h3 { margin: 0; font-size: 1rem; font-family: 'Playfair Display', Georgia, serif; }
+        .notes-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+        .note-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        .note-card.private { border-left: 4px solid var(--text-light); }
+        .note-author { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .note-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: var(--rose); color: var(--white); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85rem; }
+        .note-author-info { flex: 1; }
+        .note-author-info strong { color: var(--dark); }
+        .note-author-info small { color: var(--text-light); }
+        .note-text { margin: 0 0 8px; font-size: 0.95rem; color: var(--text); }
+        .note-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+        .note-reactions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+        .reaction { background: var(--vanilla); padding: 0 8px; border-radius: 12px; font-size: 0.8rem; cursor: pointer; transition: all var(--transition); }
+        .reaction:hover { background: rgba(219, 161, 162, 0.2); }
+        .badge-private { background: var(--text-light); color: var(--white); padding: 0 6px; border-radius: 4px; font-size: 0.7rem; }
+        .empty-notes { color: var(--text-light); text-align: center; padding: 24px 12px; }
+        #noteForm { display: none; padding: 12px 16px; border-top: 1px solid var(--border); }
+        #noteForm textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; font-size: 0.9rem; background: var(--input-bg); color: var(--text); font-family: 'Inter', sans-serif; }
+        #noteForm textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+        #noteForm label { color: var(--text); font-size: 0.9rem; }
+        #noteForm button { padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .note-submit { background: var(--rose); color: var(--white); }
+        .note-submit:hover { background: var(--rose-dark); }
+        .note-cancel { background: var(--border); color: var(--text); }
+        .note-cancel:hover { background: var(--text-light); color: var(--white); }
 
-/* ===== NAVIGATION BUTTONS ===== */
-.aw-nav-btn {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    background: var(--card-bg); border: 1px solid var(--border); border-radius: 50%;
-    width: 40px; height: 40px; cursor: pointer; font-size: 1rem;
-    display: flex; align-items: center; justify-content: center;
-    transition: all var(--transition); z-index: 10; color: var(--text); box-shadow: var(--shadow);
-}
-.aw-nav-btn:hover { border-color: var(--rose); color: var(--rose); box-shadow: var(--shadow-hover); }
-.aw-nav-btn.prev { left: 16px; }
-.aw-nav-btn.next { right: 16px; }
+        /* ======================================================= */
+        /*  SHARE MODAL                                             */
+        /* ======================================================= */
+        #share-modal {
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(44, 30, 30, 0.6);
+            display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+        }
+        #share-modal.visible { display: flex; }
+        .share-content {
+            background: var(--card-bg); padding: 24px 32px; border-radius: 16px;
+            max-width: 400px; width: 90%; text-align: center; box-shadow: var(--shadow-hover);
+        }
+        .share-content h3 { font-family: 'Playfair Display', Georgia, serif; color: var(--dark); margin-top: 0; }
+        .share-options { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+        .share-options button {
+            padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px;
+            background: var(--card-bg); cursor: pointer; transition: all var(--transition);
+            font-size: 0.9rem; color: var(--text); width: 100%; text-align: left;
+        }
+        .share-options button:hover { border-color: var(--rose); background: rgba(219, 161, 162, 0.05); }
+        .share-options button i { margin-right: 8px; color: var(--rose); }
+        .share-close { background: var(--rose); color: var(--white); border: none; padding: 8px 24px; border-radius: 30px; cursor: pointer; transition: background var(--transition); width: 100%; margin-top: 12px; font-weight: 600; }
+        .share-close:hover { background: var(--rose-dark); }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    #toolbar { height: 48px; padding: 0 8px; }
-    .toolbar-left .title { font-size: 0.9rem; max-width: 160px; }
-    #scroll-container, #flip-container { padding: 12px 8px; }
-    #scroll-container .page-content, #flip-container .reader-page { padding: 20px; }
-    #toc-drawer { width: 280px; right: -280px; }
-    #notes-panel { width: 100%; max-height: 50vh; border-radius: 0; }
-    .settings-grid { grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 480px) {
-    .toolbar-left .title { font-size: 0.8rem; max-width: 120px; }
-    #scroll-container .page-content, #flip-container .reader-page { padding: 16px; }
-}
+        /* ======================================================= */
+        /*  OVERLAY                                                 */
+        /* ======================================================= */
+        #overlay {
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(44, 30, 30, 0.3);
+            display: none;
+        }
+        #overlay.active { display: block; }
 
-/* ===== FLOATING TOOLS CONTAINER (Bottom Left) ===== */
-.floating-tools {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: flex-start;
-    pointer-events: none;
-}
-.floating-tools > * { pointer-events: auto; }
+        /* ======================================================= */
+        /*  CHALLENGE WIDGET                                        */
+        /* ======================================================= */
+        #challenge-widget {
+            display: none;
+            margin: 8px 16px; padding: 12px 16px;
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+        #challenge-widget h4 { margin: 0 0 4px; font-size: 1rem; }
+        .challenge-progress { position: relative; height: 12px; background: var(--border); border-radius: 6px; overflow: hidden; }
+        .challenge-progress .bar { height: 100%; background: var(--rose); transition: width 0.3s; }
 
-/* ===== INDIVIDUAL TOOL WRAPPERS ===== */
-#highlight-tooltip,
-#reaction-picker,
-#annotation-popup,
-#search-bar {
-    position: fixed !important;
-    bottom: auto !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-}
+        /* ======================================================= */
+        /*  READING STATUS DROPDOWN                                 */
+        /* ======================================================= */
+        #readingStatus {
+            appearance: none; -webkit-appearance: none; -moz-appearance: none;
+            background-color: var(--card-bg); border: 1px solid var(--border); border-radius: 30px;
+            padding: 6px 36px 6px 16px; font-size: 0.85rem; font-weight: 500; color: var(--text);
+            cursor: pointer; transition: all var(--transition);
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
+        }
+        #readingStatus:hover { border-color: var(--rose); }
+        #readingStatus:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
+        #readingStatus option { background: var(--card-bg); color: var(--text); }
 
-/* Highlight Tooltip – Bottom Left */
-#highlight-tooltip.visible {
-    position: fixed !important;
-    top: auto !important;
-    bottom: 80px !important;
-    left: 20px !important;
-    transform: none !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 8px 12px !important;
-    box-shadow: var(--shadow-hover) !important;
-    display: flex !important;
-    gap: 6px !important;
-    z-index: 100 !important;
-}
-#highlight-tooltip .highlight-color {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    cursor: pointer;
-    transition: all var(--transition);
-}
-#highlight-tooltip .highlight-color:hover {
-    transform: scale(1.15);
-    border-color: var(--rose);
-}
-#highlight-tooltip .highlight-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text);
-    font-size: 1rem;
-    padding: 2px 6px;
-    transition: color var(--transition);
-}
-#highlight-tooltip .highlight-btn:hover { color: var(--rose); }
+        /* ======================================================= */
+        /*  FOCUS MODE                                              */
+        /* ======================================================= */
+        .focus-mode #toolbar { transform: translateY(-100%); opacity: 0; pointer-events: none; transition: all var(--transition); }
+        .focus-mode #settings-panel.open { display: none !important; }
 
-/* Reaction Picker – Bottom Left */
-#reaction-picker {
-    position: fixed !important;
-    top: auto !important;
-    bottom: 80px !important;
-    left: 20px !important;
-    transform: none !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 8px 12px !important;
-    box-shadow: var(--shadow-hover) !important;
-    display: none !important;
-    gap: 6px !important;
-    z-index: 100 !important;
-}
-#reaction-picker[style*="display: flex"] { display: flex !important; }
-#reaction-picker button {
-    background: none;
-    border: none;
-    font-size: 1.4rem;
-    cursor: pointer;
-    padding: 4px;
-    transition: transform var(--transition);
-}
-#reaction-picker button:hover { transform: scale(1.2); }
-
-/* Annotation Popup – Bottom Left */
-#annotation-popup.visible {
-    position: fixed !important;
-    top: auto !important;
-    bottom: 140px !important;
-    left: 20px !important;
-    transform: none !important;
-    width: 300px !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 16px !important;
-    box-shadow: var(--shadow-hover) !important;
-    z-index: 100 !important;
-}
-#annotation-popup textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    resize: vertical;
-    min-height: 60px;
-    font-size: 0.9rem;
-    background: var(--input-bg);
-    color: var(--text);
-}
-#annotation-popup textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-.annotation-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-    justify-content: flex-end;
-}
-.annotation-actions button {
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-size: 0.8rem;
-    transition: all var(--transition);
-}
-.annotation-actions .annotation-save { background: var(--rose); color: var(--white); }
-.annotation-actions .annotation-save:hover { background: var(--rose-dark); }
-.annotation-actions .annotation-cancel { background: var(--border); color: var(--text); }
-.annotation-actions .annotation-cancel:hover { background: var(--text-light); color: var(--white); }
-
-/* Search Bar – Centered Bottom */
-#search-bar.visible {
-    position: fixed !important;
-    bottom: 20px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 80% !important;
-    max-width: 200px !important;
-    background: var(--card-bg) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 12px !important;
-    box-shadow: var(--shadow-hover) !important;
-    z-index: 100 !important;
-}
-#search-bar input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.9rem;
-    background: var(--input-bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-}
-#search-bar input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-#search-bar button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-light);
-    font-size: 0.9rem;
-    transition: color var(--transition);
-}
-#search-bar button:hover { color: var(--rose); }
-#searchResults {
-    margin-top: 8px;
-    max-height: 200px;
-    overflow-y: auto;
-    font-size: 0.85rem;
-}
-.search-result {
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background var(--transition);
-}
-.search-result:hover { background: rgba(219, 161, 162, 0.1); }
-.search-result strong { color: var(--rose); }
-
-/* ===== READING STATUS DROPDOWN ===== */
-#readingStatus {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-color: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 30px;
-    padding: 6px 36px 6px 16px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text);
-    cursor: pointer;
-    transition: all var(--transition);
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 16px;
-}
-#readingStatus:hover { border-color: var(--rose); }
-#readingStatus:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-#readingStatus option { background: var(--card-bg); color: var(--text); }
-</style>    
+        /* ======================================================= */
+        /*  RESPONSIVE                                              */
+        /* ======================================================= */
+        @media (max-width: 768px) {
+            #toolbar { height: 48px; padding: 0 8px; }
+            .toolbar-left .title { font-size: 0.9rem; max-width: 160px; }
+            #scroll-container, #flip-container { padding: 12px 8px; }
+            #scroll-container .page-content, #flip-container .reader-page { padding: 20px; }
+            #toc-drawer { width: 280px; right: -280px; }
+            #notes-panel { width: 100%; max-height: 50vh; border-radius: 0; }
+            .settings-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 480px) {
+            .toolbar-left .title { font-size: 0.8rem; max-width: 120px; }
+            #scroll-container .page-content, #flip-container .reader-page { padding: 16px; }
+        }
+    </style>
 </head>
 <body>
 
 <div id="reader-app">
     <div id="toolbar">
         <div class="toolbar-left">
-            <button id="backBtn" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#555;"><i class="fas fa-arrow-left"></i></button>
+            <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
             <?php if (isLoggedIn() && $streak_days > 0): ?>
             <span class="streak-badge">🔥 <?php echo $streak_days; ?>d</span>
             <?php endif; ?>
-            <select id="readingStatus" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;background:#ffffff;color:var(--text);">
+            <select id="readingStatus">
                 <option value="not_started" <?php echo $reading_status == 'not_started' ? 'selected' : ''; ?>>📌 Not Started</option>
                 <option value="currently_reading" <?php echo $reading_status == 'currently_reading' ? 'selected' : ''; ?>>📖 Currently Reading</option>
                 <option value="finished" <?php echo $reading_status == 'finished' ? 'selected' : ''; ?>>✅ Finished</option>
@@ -715,6 +627,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
             <span id="pageNum">1</span> / <span id="totalPages"><?php echo $total_pages; ?></span>
         </div>
         <div class="toolbar-right">
+            <button id="searchBtn"><i class="fas fa-search"></i></button>
             <button id="bookmarkBtn"><i class="far fa-bookmark"></i></button>
             <button id="tocBtn"><i class="fas fa-list-ul"></i></button>
             <button id="settingsBtn"><i class="fas fa-cog"></i></button>
@@ -725,6 +638,11 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 
     <div id="page-viewport">
         <div id="scroll-container">
+            <?php if (!empty($cover_path)): ?>
+            <div class="cover-image">
+                <img src="<?php echo $cover_path; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
+            </div>
+            <?php endif; ?>
             <?php foreach ($pages as $page_html) { echo $page_html; } ?>
         </div>
         <div id="flip-container">
@@ -769,15 +687,6 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
                     <span id="lineHeightLabel">1.8</span>
                 </div>
             </div>
-            <div class="settings-group">
-                <label>Letter Spacing</label>
-                <div class="slider-group">
-                    <button onclick="adjustLetterSpacing(-1)">-</button>
-                    <input type="range" id="letterSpacingSlider" min="-2" max="4" value="0" step="1">
-                    <button onclick="adjustLetterSpacing(1)">+</button>
-                    <span id="letterSpacingLabel">0</span>
-                </div>
-            </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
             <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="resumePosition()">↩️ Resume</button>
@@ -792,10 +701,14 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
             <button class="toc-close" id="tocClose">&times;</button>
         </div>
         <div class="toc-body" id="tocBody">
-            <?php if (count($toc) > 0): ?>
+            <?php if (is_array($toc) && count($toc) > 0): ?>
                 <ul class="toc-list">
                 <?php foreach ($toc as $entry): ?>
-                    <li><a href="#" class="toc-link" data-chapter="<?php echo $entry['page']; ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
+                    <?php
+                        $page = isset($entry['page']) ? (int)$entry['page'] : 1;
+                        $title = isset($entry['title']) ? htmlspecialchars($entry['title']) : 'Untitled Chapter';
+                    ?>
+                    <li><a href="#" class="toc-link" data-chapter="<?php echo $page; ?>"><?php echo $title; ?></a></li>
                 <?php endforeach; ?>
                 </ul>
             <?php else: ?>
@@ -808,8 +721,8 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         <div class="notes-header">
             <h3>📝 Group Notes</h3>
             <div>
-                <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" id="addNoteBtn">+ Add</button>
-                <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" id="notesClose">&times;</button>
+                <button class="note-submit" id="addNoteBtn">+ Add</button>
+                <button class="note-cancel" id="notesClose">&times;</button>
             </div>
         </div>
         <div class="notes-body" id="notesBody">
@@ -817,8 +730,8 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
             <div id="noteForm">
                 <textarea id="noteText" rows="2" placeholder="Write a note..."></textarea>
                 <div style="margin:6px 0;"><label><input type="checkbox" id="notePrivate"> Private</label></div>
-                <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:var(--rose);color:white;cursor:pointer;" onclick="submitNote()">Post</button>
-                <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="toggleNoteForm()">Cancel</button>
+                <button class="note-submit" onclick="submitNote()">Post</button>
+                <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
             </div>
         </div>
     </div>
@@ -831,13 +744,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         <button data-reaction="📖">📖</button>
     </div>
 
-    <div id="highlight-tooltip">
-        <button class="highlight-color" data-color="yellow"></button>
-        <button class="highlight-color" data-color="green"></button>
-        <button class="highlight-color" data-color="blue"></button>
-        <button class="highlight-color" data-color="pink"></button>
-        <button class="highlight-btn" id="highlightAnnotate"><i class="fas fa-pen"></i></button>
-    </div>
+    <div id="highlight-tooltip"></div>
 
     <div id="annotation-popup">
         <textarea id="annotationText" rows="3" placeholder="Add a note…"></textarea>
@@ -849,7 +756,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 
     <div id="search-bar">
         <input type="text" id="searchInput" placeholder="Search in this book…">
-        <button onclick="closeSearch()" style="background:none;border:none;cursor:pointer;font-size:0.9rem;float:right;">✕</button>
+        <button onclick="closeSearch()"><i class="fas fa-times"></i></button>
         <div id="searchResults"></div>
     </div>
 
@@ -906,7 +813,6 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     const readingStatus = document.getElementById('readingStatus');
     const resetProgressBtn = document.getElementById('resetProgressBtn');
     const exportHighlightsBtn = document.getElementById('exportHighlightsBtn');
-    const highlightTooltip = document.getElementById('highlight-tooltip');
     const annotationPopup = document.getElementById('annotation-popup');
     const annotationText = document.getElementById('annotationText');
     const annotationSave = document.getElementById('annotationSave');
@@ -919,6 +825,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     const backBtn = document.getElementById('backBtn');
     const prevFlipBtn = document.getElementById('prevFlipBtn');
     const nextFlipBtn = document.getElementById('nextFlipBtn');
+    const searchBtn = document.getElementById('searchBtn');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
     let readingMode = localStorage.getItem('reader_mode') || 'scroll';
@@ -929,13 +836,13 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     let selectedText = '';
     let selectedRange = null;
 
-    // Flip mode specific state
     let flipCurrentChunkIndex = 0;
     let flipChunks = [];
 
     totalPagesEl.textContent = totalPages;
 
-    if (localStorage.getItem('reader_mode') === 'flip') {
+    const savedMode = localStorage.getItem('reader_mode');
+    if (savedMode === 'flip') {
         readingMode = 'flip';
         document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active');
         document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active');
@@ -948,6 +855,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     if (userId > 0) startSession();
     if (userId > 0) loadChallenge();
 
+    // ===== READING STATUS =====
     readingStatus.addEventListener('change', function() {
         if (userId === 0) { alert('Please log in to set reading status.'); return; }
         var data = new FormData();
@@ -961,6 +869,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>';
     });
 
+    // ===== MODE SWITCHING =====
     function switchMode(mode) {
         readingMode = mode;
         localStorage.setItem('reader_mode', mode);
@@ -969,27 +878,23 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
             flipContainer.style.display = 'flex';
             prepareFlipChunks(currentPage);
             renderFlipChunk(0);
-            prevFlipBtn.style.display = 'flex';
-            nextFlipBtn.style.display = 'flex';
         } else {
             scrollContainer.style.display = 'block';
             flipContainer.style.display = 'none';
-            prevFlipBtn.style.display = 'none';
-            nextFlipBtn.style.display = 'none';
             var target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         updateUI(currentPage);
     }
 
+    // ===== FLIP MODE LOGIC =====
     function prepareFlipChunks(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
         var html = pages[pageNum - 1];
-        // Split the content of the page into smaller chunks
         var paragraphs = html.split('</p>');
         var chunks = [];
         var currentChunk = '';
-        var chunkSize = 6; // Number of paragraphs per chunk
+        var chunkSize = 6;
         var count = 0;
         for (var i = 0; i < paragraphs.length; i++) {
             var para = paragraphs[i].trim();
@@ -1012,7 +917,6 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     function renderFlipChunk(index) {
         if (index < 0) index = 0;
         if (index >= flipChunks.length) {
-            // Move to the next page
             if (currentPage < totalPages) {
                 currentPage++;
                 prepareFlipChunks(currentPage);
@@ -1025,7 +929,6 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
         flipCurrentChunkIndex = index;
         var html = flipChunks[index];
-        // Apply highlights if logged in
         if (userId > 0) {
             var saved = getHighlightsForPage(currentPage);
             saved.forEach(function(h) {
@@ -1037,18 +940,9 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
             <button class="aw-nav-btn next" id="nextFlipBtn"><i class="fas fa-chevron-right"></i></button>
             <div class="reader-page">${html}</div>
         `;
-        // Re-attach event listeners to the newly created buttons
         document.getElementById('prevFlipBtn').addEventListener('click', prevFlipPage);
         document.getElementById('nextFlipBtn').addEventListener('click', nextFlipPage);
         updateUI(currentPage);
-        // Calculate progress based on chunks
-        var totalChunks = 0;
-        for (var i = currentPage - 1; i < totalPages; i++) {
-            var tempHtml = pages[i];
-            var tempParas = tempHtml.split('</p>');
-            totalChunks += Math.ceil((tempParas.length - 1) / 6);
-        }
-        // For simplicity, updateUI already handles the page percentage.
     }
 
     function nextFlipPage() {
@@ -1082,20 +976,15 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
     }
 
+    // ===== NAVIGATION =====
     function nextPage() {
-        if (readingMode === 'flip') {
-            nextFlipPage();
-        } else if (currentPage < totalPages) {
-            goToPage(currentPage + 1);
-        }
+        if (readingMode === 'flip') { nextFlipPage(); }
+        else if (currentPage < totalPages) { goToPage(currentPage + 1); }
     }
 
     function prevPage() {
-        if (readingMode === 'flip') {
-            prevFlipPage();
-        } else if (currentPage > 1) {
-            goToPage(currentPage - 1);
-        }
+        if (readingMode === 'flip') { prevFlipPage(); }
+        else if (currentPage > 1) { goToPage(currentPage - 1); }
     }
 
     function goToPage(pageNum) {
@@ -1152,6 +1041,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         return result;
     }
 
+    // ===== BOOKMARKS =====
     function loadBookmarkStatus() {
         if (userId === 0) return;
         var xhr = new XMLHttpRequest();
@@ -1206,6 +1096,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
     });
 
+    // ===== SETTINGS: MODE =====
     document.querySelectorAll('#modeGroup button').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var mode = this.dataset.mode;
@@ -1215,21 +1106,29 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         });
     });
 
+    // ===== SETTINGS: THEME =====
+    function applyTheme(theme) {
+        var app = document.getElementById('reader-app');
+        app.classList.remove('theme-paper', 'theme-light', 'theme-dark', 'theme-sepia');
+        app.classList.add('theme-' + theme);
+        localStorage.setItem('reader_theme', theme);
+    }
+
     document.querySelectorAll('#themeGroup button').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var theme = this.dataset.theme;
-            document.getElementById('reader-app').className = 'theme-' + theme;
             document.querySelectorAll('#themeGroup button').forEach(function(b) { b.classList.remove('active'); });
             this.classList.add('active');
-            localStorage.setItem('reader_theme', theme);
+            applyTheme(theme);
         });
     });
 
     var savedTheme = localStorage.getItem('reader_theme') || 'light';
-    document.getElementById('reader-app').className = 'theme-' + savedTheme;
+    applyTheme(savedTheme);
     var themeBtn = document.querySelector('#themeGroup [data-theme="' + savedTheme + '"]');
     if (themeBtn) themeBtn.classList.add('active');
 
+    // ===== SETTINGS: FONT SIZE =====
     document.getElementById('fontSizeSlider').addEventListener('input', function() {
         var val = parseInt(this.value);
         document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.fontSize = val + '%'; });
@@ -1250,6 +1149,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.fontSize = savedSize + '%'; });
     document.getElementById('fontSizeLabel').textContent = savedSize + '%';
 
+    // ===== SETTINGS: LINE HEIGHT =====
     document.getElementById('lineHeightSlider').addEventListener('input', function() {
         var val = parseInt(this.value);
         document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (val / 100).toFixed(1); });
@@ -1270,26 +1170,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (savedLine / 100).toFixed(1); });
     document.getElementById('lineHeightLabel').textContent = (savedLine / 100).toFixed(1);
 
-    document.getElementById('letterSpacingSlider').addEventListener('input', function() {
-        var val = parseInt(this.value);
-        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.letterSpacing = val + 'px'; });
-        document.getElementById('letterSpacingLabel').textContent = val;
-        localStorage.setItem('reader_letter_spacing', val);
-    });
-
-    window.adjustLetterSpacing = function(amount) {
-        var slider = document.getElementById('letterSpacingSlider');
-        var val = parseInt(slider.value) + amount;
-        val = Math.min(4, Math.max(-2, val));
-        slider.value = val;
-        slider.dispatchEvent(new Event('input'));
-    };
-
-    var savedSpacing = localStorage.getItem('reader_letter_spacing') || 0;
-    document.getElementById('letterSpacingSlider').value = savedSpacing;
-    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.letterSpacing = savedSpacing + 'px'; });
-    document.getElementById('letterSpacingLabel').textContent = savedSpacing;
-
+    // ===== TOUCH / CLICK EVENTS =====
     document.getElementById('page-viewport').addEventListener('click', function(e) {
         if (e.target.closest('button') || e.target.closest('a')) return;
         if (readingMode === 'flip') {
@@ -1317,20 +1198,20 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
     document.addEventListener('keydown', function(e) {
         if (e.key === 'ArrowRight') nextPage();
         else if (e.key === 'ArrowLeft') prevPage();
-        else if (e.key === 'Escape') {
-            window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>';
-        }
+        else if (e.key === 'Escape') closeAll();
         else if (e.ctrlKey && e.key === 'f') {
             e.preventDefault();
             toggleSearch();
         }
     });
 
+    // ===== SETTINGS PANEL TOGGLE =====
     document.getElementById('settingsBtn').addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active', settingsPanel.classList.contains('open'));
     });
 
+    // ===== TOC TOGGLE =====
     document.getElementById('tocBtn').addEventListener('click', function() {
         tocDrawer.classList.toggle('open');
         overlay.classList.toggle('active', tocDrawer.classList.contains('open'));
@@ -1353,6 +1234,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         });
     });
 
+    // ===== NOTES PANEL =====
     document.getElementById('notesBtn').addEventListener('click', function() {
         if (groupId === 0) { alert('You are not in a reading group for this book.'); return; }
         notesPanel.classList.toggle('open');
@@ -1364,49 +1246,6 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         notesPanel.classList.remove('open');
         overlay.classList.remove('active');
     });
-
-    function loadNotes() {
-        if (groupId === 0) return;
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', '/reader/reader_ajax.php?action=get_notes&group_id=' + groupId + '&book_id=' + bookId + '&chapter=' + currentPage, true);
-        xhr.onload = function() {
-            try {
-                var data = JSON.parse(this.responseText);
-                if (data.success) {
-                    var html = '';
-                    if (data.notes.length === 0) {
-                        html = '<p class="empty-notes">No notes for this chapter.</p>';
-                    } else {
-                        data.notes.forEach(function(n) {
-                            var reactionsHtml = '';
-                            if (n.reactions && n.reactions.length > 0) {
-                                n.reactions.forEach(function(r) {
-                                    reactionsHtml += '<span class="reaction" onclick="reactNote(' + n.id + ', \'' + r.reaction_type + '\')">' + r.reaction_type + ' ' + r.count + '</span>';
-                                });
-                            }
-                            var canReact = !n.is_private || n.user_id == userId;
-                            var isMyNote = n.user_id == userId;
-                            html += '<div class="note-card' + (n.is_private ? ' private' : '') + '">';
-                            html += '<div class="note-author">';
-                            html += '<div class="note-avatar-placeholder">' + (n.display_name || n.username).charAt(0).toUpperCase() + '</div>';
-                            html += '<div class="note-author-info"><strong>' + (n.display_name || n.username) + '</strong> <small>' + timeAgo(n.created_at) + '</small>';
-                            if (n.is_private) html += ' <span class="badge-private">🔒 Private</span>';
-                            html += '</div></div>';
-                            html += '<p class="note-text">' + n.text + '</p>';
-                            html += '<div class="note-footer">';
-                            html += '<div class="note-reactions">' + reactionsHtml;
-                            if (canReact) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="showReactionPicker(' + n.id + ', event)">➕</button>';
-                            html += '</div>';
-                            if (isMyNote) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="deleteNote(' + n.id + ')">🗑️</button>';
-                            html += '</div></div>';
-                        });
-                    }
-                    notesList.innerHTML = html;
-                }
-            } catch(e) {}
-        };
-        xhr.send();
-    }
 
     window.toggleNoteForm = function() {
         noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none';
@@ -1477,6 +1316,49 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         reactionPicker.style.display = 'flex';
     };
 
+    function loadNotes() {
+        if (groupId === 0) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/reader/reader_ajax.php?action=get_notes&group_id=' + groupId + '&book_id=' + bookId + '&chapter=' + currentPage, true);
+        xhr.onload = function() {
+            try {
+                var data = JSON.parse(this.responseText);
+                if (data.success) {
+                    var html = '';
+                    if (data.notes.length === 0) {
+                        html = '<p class="empty-notes">No notes for this chapter.</p>';
+                    } else {
+                        data.notes.forEach(function(n) {
+                            var reactionsHtml = '';
+                            if (n.reactions && n.reactions.length > 0) {
+                                n.reactions.forEach(function(r) {
+                                    reactionsHtml += '<span class="reaction" onclick="reactNote(' + n.id + ', \'' + r.reaction_type + '\')">' + r.reaction_type + ' ' + r.count + '</span>';
+                                });
+                            }
+                            var canReact = !n.is_private || n.user_id == userId;
+                            var isMyNote = n.user_id == userId;
+                            html += '<div class="note-card' + (n.is_private ? ' private' : '') + '">';
+                            html += '<div class="note-author">';
+                            html += '<div class="note-avatar-placeholder">' + (n.display_name || n.username).charAt(0).toUpperCase() + '</div>';
+                            html += '<div class="note-author-info"><strong>' + (n.display_name || n.username) + '</strong> <small>' + timeAgo(n.created_at) + '</small>';
+                            if (n.is_private) html += ' <span class="badge-private">🔒 Private</span>';
+                            html += '</div></div>';
+                            html += '<p class="note-text">' + n.text + '</p>';
+                            html += '<div class="note-footer">';
+                            html += '<div class="note-reactions">' + reactionsHtml;
+                            if (canReact) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="showReactionPicker(' + n.id + ', event)">➕</button>';
+                            html += '</div>';
+                            if (isMyNote) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="deleteNote(' + n.id + ')">🗑️</button>';
+                            html += '</div></div>';
+                        });
+                    }
+                    notesList.innerHTML = html;
+                }
+            } catch(e) {}
+        };
+        xhr.send();
+    }
+
     reactionPicker.querySelectorAll('button').forEach(function(btn) {
         btn.addEventListener('click', function() {
             if (!currentNoteId) return;
@@ -1503,6 +1385,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
     });
 
+    // ===== FOCUS MODE =====
     focusBtn.addEventListener('click', function() {
         focusMode = !focusMode;
         document.getElementById('reader-app').classList.toggle('focus-mode', focusMode);
@@ -1513,64 +1396,11 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
     });
 
-    window.closeAll = function() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.classList.remove('open');
-        overlay.classList.remove('active');
-    };
-
-    overlay.addEventListener('click', closeAll);
-
-    window.resumePosition = function() {
-        if (lastPage >= 1 && lastPage <= totalPages) {
-            goToPage(lastPage);
-            if (readingMode === 'scroll') {
-                setTimeout(function() {
-                    var target = document.querySelector('.page-content[data-page="' + lastPage + '"]');
-                    if (target) target.scrollIntoView({ block: 'start' });
-                }, 100);
-            }
-        }
-    };
-
-    resetProgressBtn.addEventListener('click', function() {
-        if (userId === 0) return;
-        if (confirm('Reset reading progress for this book?')) {
-            var data = new FormData();
-            data.append('action', 'reset_progress');
-            data.append('book_id', bookId);
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/reader/reader_ajax.php', true);
-            xhr.send(data);
-            goToPage(1);
-            alert('✅ Progress reset.');
-        }
-    });
-
-    exportHighlightsBtn.addEventListener('click', function() {
-        if (userId === 0) return;
-        var data = new FormData();
-        data.append('action', 'export_highlights');
-        data.append('book_id', bookId);
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/reader/reader_ajax.php', true);
-        xhr.responseType = 'blob';
-        xhr.onload = function() {
-            var url = URL.createObjectURL(this.response);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'highlights.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-        };
-        xhr.send(data);
-    });
-
-    window.toggleSearch = function() {
+    // ===== SEARCH =====
+    searchBtn.addEventListener('click', function() {
         searchBar.classList.toggle('visible');
         if (searchBar.classList.contains('visible')) searchInput.focus();
-    };
+    });
 
     window.closeSearch = function() {
         searchBar.classList.remove('visible');
@@ -1620,6 +1450,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
     });
 
+    // ===== SHARE =====
     function share(platform) {
         var url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentPage;
         var text = '📖 I\'m reading on AngelWrites!';
@@ -1644,6 +1475,7 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 
     document.getElementById('share-modal').querySelector('.share-close').addEventListener('click', closeShare);
 
+    // ===== CHALLENGE WIDGET =====
     function loadChallenge() {
         if (userId === 0) return;
         var xhr = new XMLHttpRequest();
@@ -1675,16 +1507,65 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
     };
 
-    function timeAgo(timestamp) {
-        var diff = Date.now() - new Date(timestamp).getTime();
-        var secs = Math.floor(diff / 1000);
-        if (secs < 60) return 'just now';
-        if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
-        if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
-        if (secs < 604800) return Math.floor(secs / 86400) + 'd ago';
-        return new Date(timestamp).toLocaleDateString();
-    }
+    // ===== CLOSE ALL =====
+    window.closeAll = function() {
+        settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open');
+        notesPanel.classList.remove('open');
+        overlay.classList.remove('active');
+    };
 
+    overlay.addEventListener('click', closeAll);
+
+    // ===== RESUME POSITION =====
+    window.resumePosition = function() {
+        if (lastPage >= 1 && lastPage <= totalPages) {
+            goToPage(lastPage);
+            if (readingMode === 'scroll') {
+                setTimeout(function() {
+                    var target = document.querySelector('.page-content[data-page="' + lastPage + '"]');
+                    if (target) target.scrollIntoView({ block: 'start' });
+                }, 100);
+            }
+        }
+    };
+
+    // ===== RESET PROGRESS =====
+    resetProgressBtn.addEventListener('click', function() {
+        if (userId === 0) return;
+        if (confirm('Reset reading progress for this book?')) {
+            var data = new FormData();
+            data.append('action', 'reset_progress');
+            data.append('book_id', bookId);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            xhr.send(data);
+            goToPage(1);
+            alert('✅ Progress reset.');
+        }
+    });
+
+    // ===== EXPORT HIGHLIGHTS =====
+    exportHighlightsBtn.addEventListener('click', function() {
+        if (userId === 0) return;
+        var data = new FormData();
+        data.append('action', 'export_highlights');
+        data.append('book_id', bookId);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/reader/reader_ajax.php', true);
+        xhr.responseType = 'blob';
+        xhr.onload = function() {
+            var url = URL.createObjectURL(this.response);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'highlights.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+        xhr.send(data);
+    });
+
+    // ===== SESSION TRACKING =====
     function startSession() {
         var data = new FormData();
         data.append('action', 'start_session');
@@ -1701,73 +1582,229 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
         }
     });
 
-    function getSelectedText() { return window.getSelection().toString().trim(); }
-    function getSelectionRange() { var sel = window.getSelection(); return sel.rangeCount > 0 ? sel.getRangeAt(0) : null; }
-    function showHighlightTooltip() {
-        selectedText = getSelectedText();
-        selectedRange = getSelectionRange();
-        if (!selectedText || !selectedRange) { highlightTooltip.classList.remove('visible'); return; }
-        var rect = selectedRange.getBoundingClientRect();
-        highlightTooltip.style.top = (rect.top - 50) + 'px';
-        highlightTooltip.style.left = (rect.left + rect.width / 2 - 60) + 'px';
-        highlightTooltip.classList.add('visible');
+    // ===== TIME AGO HELPER =====
+    function timeAgo(timestamp) {
+        var diff = Date.now() - new Date(timestamp).getTime();
+        var secs = Math.floor(diff / 1000);
+        if (secs < 60) return 'just now';
+        if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+        if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+        if (secs < 604800) return Math.floor(secs / 86400) + 'd ago';
+        return new Date(timestamp).toLocaleDateString();
     }
-    document.addEventListener('mouseup', showHighlightTooltip);
-    document.addEventListener('touchend', function() { setTimeout(showHighlightTooltip, 300); });
 
-    document.querySelectorAll('.highlight-color').forEach(function(btn) {
+    // ================================================================
+    //  SELECTION TOOLTIP (New unified implementation)
+    // ================================================================
+    function getSelectedText() {
+        const sel = window.getSelection();
+        return sel.toString().trim();
+    }
+
+    function getSelectionRange() {
+        const sel = window.getSelection();
+        return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    }
+
+    function showSelectionTooltip() {
+        const text = getSelectedText();
+        const range = getSelectionRange();
+        const tooltip = document.getElementById('highlight-tooltip');
+
+        if (!text || !range || text.length < 1) {
+            tooltip.classList.remove('visible');
+            return;
+        }
+
+        const rect = range.getBoundingClientRect();
+        const tooltipWidth = 320;
+        const leftPos = rect.left + rect.width / 2 - tooltipWidth / 2;
+        const topPos = rect.top - 50;
+
+        tooltip.style.left = Math.max(10, leftPos) + 'px';
+        tooltip.style.top = Math.max(10, topPos) + 'px';
+        tooltip.classList.add('visible');
+
+        tooltip.dataset.text = text;
+        tooltip.dataset.rangeStart = range.startOffset;
+        tooltip.dataset.rangeEnd = range.endOffset;
+        tooltip.dataset.node = range.commonAncestorContainer.parentElement;
+    }
+
+    document.addEventListener('click', function(e) {
+        const tooltip = document.getElementById('highlight-tooltip');
+        if (tooltip && !tooltip.contains(e.target)) {
+            tooltip.classList.remove('visible');
+        }
+    });
+
+    function initSelectionTooltip() {
+        const tooltip = document.getElementById('highlight-tooltip');
+        if (!tooltip) return;
+
+        tooltip.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:4px;width:100%;">
+                <div style="display:flex;gap:4px;justify-content:center;padding:2px 0;">
+                    <button class="highlight-color" data-color="yellow" title="Highlight Yellow"></button>
+                    <button class="highlight-color" data-color="green" title="Highlight Green"></button>
+                    <button class="highlight-color" data-color="blue" title="Highlight Blue"></button>
+                    <button class="highlight-color" data-color="pink" title="Highlight Pink"></button>
+                </div>
+                <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding:2px 0;">
+                    <button class="tooltip-action" data-action="copy" title="Copy">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    <button class="tooltip-action" data-action="note" title="Add Note">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="tooltip-action" data-action="share" title="Share">
+                        <i class="fas fa-share-alt"></i>
+                    </button>
+                    <button class="tooltip-action" data-action="question" title="Ask Group">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                    <button class="tooltip-action" data-action="react" title="React">
+                        <i class="fas fa-smile"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        tooltip.querySelectorAll('.highlight-color').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const color = this.dataset.color;
+                const text = tooltip.dataset.text;
+                const range = getSelectionRange();
+                if (!range) return;
+
+                const span = document.createElement('span');
+                span.className = 'highlight-' + color;
+                span.textContent = text;
+                range.deleteContents();
+                range.insertNode(span);
+                tooltip.classList.remove('visible');
+
+                if (userId > 0) {
+                    const data = new FormData();
+                    data.append('action', 'add_highlight');
+                    data.append('book_id', bookId);
+                    data.append('chapter', currentPage);
+                    data.append('text', text);
+                    data.append('color', color);
+                    fetch('/reader/reader_ajax.php', { method: 'POST', body: data });
+                }
+            });
+        });
+
+        tooltip.querySelectorAll('.tooltip-action').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const action = this.dataset.action;
+                const text = tooltip.dataset.text;
+                const range = getSelectionRange();
+
+                switch(action) {
+                    case 'copy':
+                        navigator.clipboard.writeText(text).then(() => {
+                            alert('✅ Copied to clipboard!');
+                        }).catch(() => {
+                            const ta = document.createElement('textarea');
+                            ta.value = text;
+                            document.body.appendChild(ta);
+                            ta.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(ta);
+                            alert('✅ Copied!');
+                        });
+                        break;
+
+                    case 'note':
+                        annotationPopup.classList.add('visible');
+                        annotationText.value = '"' + text + '"\n\n';
+                        annotationText.focus();
+                        break;
+
+                    case 'share':
+                        document.getElementById('share-modal').classList.add('visible');
+                        document.getElementById('overlay').classList.add('active');
+                        break;
+
+                    case 'question':
+                        if (groupId === 0) {
+                            alert('You need to be in a reading group to ask questions.');
+                            return;
+                        }
+                        const question = prompt('Ask a question about this text:\n\n"' + text + '"');
+                        if (question && question.trim().length > 0) {
+                            const data = new FormData();
+                            data.append('action', 'ask_question');
+                            data.append('book_id', bookId);
+                            data.append('chapter', currentPage);
+                            data.append('text', text);
+                            data.append('question', question);
+                            fetch('/reader/reader_ajax.php', { method: 'POST', body: data })
+                                .then(() => { alert('✅ Question sent to group!'); });
+                        }
+                        break;
+
+                    case 'react':
+                        const picker = document.getElementById('reaction-picker');
+                        if (picker) {
+                            const rect = this.getBoundingClientRect();
+                            picker.style.top = (rect.bottom + 8) + 'px';
+                            picker.style.left = (rect.left) + 'px';
+                            picker.style.display = 'flex';
+                            picker.dataset.text = text;
+                        }
+                        break;
+                }
+                tooltip.classList.remove('visible');
+            });
+        });
+    }
+
+    document.addEventListener('mouseup', function(e) {
+        setTimeout(showSelectionTooltip, 50);
+    });
+
+    document.addEventListener('touchend', function(e) {
+        setTimeout(showSelectionTooltip, 100);
+    });
+
+    reactionPicker.querySelectorAll('button').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            var color = this.dataset.color;
-            if (selectedText && selectedRange) {
-                var data = new FormData();
-                data.append('action', 'add_highlight');
+            const reaction = this.dataset.reaction;
+            const picker = document.getElementById('reaction-picker');
+            const text = picker.dataset.text;
+            picker.style.display = 'none';
+
+            if (userId > 0) {
+                const data = new FormData();
+                data.append('action', 'add_reaction');
                 data.append('book_id', bookId);
                 data.append('chapter', currentPage);
-                data.append('text', selectedText);
-                data.append('color', color);
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', '/reader/reader_ajax.php', true);
-                xhr.onload = function() {
-                    var span = document.createElement('span');
-                    span.className = 'highlight-' + color;
-                    span.textContent = selectedText;
-                    selectedRange.deleteContents();
-                    selectedRange.insertNode(span);
-                    highlightTooltip.classList.remove('visible');
-                };
-                xhr.send(data);
+                data.append('text', text);
+                data.append('reaction', reaction);
+                fetch('/reader/reader_ajax.php', { method: 'POST', body: data })
+                    .then(() => { alert('✅ Reaction added!'); });
             }
         });
     });
 
-    document.getElementById('highlightAnnotate').addEventListener('click', function() {
-        if (selectedText && selectedRange) {
-            annotationPopup.classList.add('visible');
-            annotationText.value = '';
-            annotationText.focus();
-            highlightTooltip.classList.remove('visible');
-        }
-    });
-
     annotationSave.addEventListener('click', function() {
         var note = annotationText.value.trim();
-        if (note && selectedText && selectedRange) {
+        if (note && getSelectedText()) {
             var data = new FormData();
             data.append('action', 'add_highlight');
             data.append('book_id', bookId);
             data.append('chapter', currentPage);
-            data.append('text', selectedText);
+            data.append('text', getSelectedText());
             data.append('color', 'yellow');
             data.append('note', note);
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/reader/reader_ajax.php', true);
             xhr.onload = function() {
-                var span = document.createElement('span');
-                span.className = 'highlight-yellow.annotation';
-                span.textContent = selectedText;
-                selectedRange.deleteContents();
-                selectedRange.insertNode(span);
                 annotationPopup.classList.remove('visible');
+                alert('✅ Annotation saved!');
             };
             xhr.send(data);
         }
@@ -1779,10 +1816,11 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 
     document.addEventListener('click', function(e) {
         if (!e.target.closest('#highlight-tooltip') && !e.target.closest('#annotation-popup')) {
-            highlightTooltip.classList.remove('visible');
             annotationPopup.classList.remove('visible');
         }
     });
+
+    initSelectionTooltip();
 
     window.goToPage = goToPage;
 
