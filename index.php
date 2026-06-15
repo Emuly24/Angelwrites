@@ -173,9 +173,9 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             </div>
         </div>
         <div class="hero-image">
-            <div class="hero-placeholder" style="background: var(--rose-light); border-color: var(--rose);">
-                <i class="fas fa-heart" style="color: var(--rose);"></i>
-                <span style="color: var(--text); font-weight: 600;">Your Story Lives Here</span>
+            <div class="hero-image-container">
+                <!-- REPLACE THIS PATH WITH YOUR ACTUAL IMAGE PATH -->
+                <img src="<?php echo SITE_URL; ?>/assets/images/hero-logo.png" alt="AngelWrites - Your Story Lives Here">
             </div>
             <div style="text-align: center; margin-top: 12px; max-width: 250px; margin-left: auto; margin-right: auto;">
                 <p style="font-size: 0.85rem; color: var(--text-light); line-height: 1.5; font-style: italic;">
@@ -674,9 +674,26 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .hero-search .search-form { display: flex; gap: 8px; }
 .hero-search .search-form input { flex: 1; padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .hero-search .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+
+/* ===== HERO IMAGE (NEW) ===== */
 .hero-image { display: flex; justify-content: center; align-items: center; flex-direction: column; }
-.hero-placeholder { width: 350px; height: 350px; border-radius: 50%; background: var(--rose-light); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 4rem; color: var(--rose); border: 4px solid var(--rose); box-shadow: var(--shadow-hover); }
-.hero-placeholder span { font-size: 1rem; color: var(--text); margin-top: 8px; font-weight: 500; }
+.hero-image-container {
+    width: 350px;
+    height: 350px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: var(--shadow-hover);
+    border: 4px solid var(--rose);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--rose-light);
+}
+.hero-image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
 
 /* ===== ABOUT SECTION ===== */
 .about-section { padding: 60px 0; }
@@ -691,7 +708,6 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .about-feature p { font-size: 0.85rem; color: var(--text-light); margin: 0; }
 .about-cta { margin-top: 20px; }
 .about-small { margin-top: 10px; font-size: 0.9rem; color: var(--text-light); }
-
 
 /* ===== STATS SECTION ===== */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 24px; text-align: center; }
@@ -755,7 +771,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     .hero-buttons { justify-content: center; }
     .hero-search { margin: 0 auto; }
     .hero-search .search-form { flex-direction: column; }
-    .hero-placeholder { width: 180px; height: 180px; font-size: 3rem; }
+    .hero-image-container { width: 200px; height: 200px; }
     .about-grid { grid-template-columns: 1fr; text-align: center; }
     .about-features-grid { grid-template-columns: 1fr; }
     .about-image { order: -1; }
