@@ -388,34 +388,38 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         .toolbar-left .title { font-size: 0.8rem; max-width: 120px; }
         #scroll-container .page-content, #flip-container .reader-page { padding: 16px; }
     }
-    /* ===== FLOATING TOOLS CONTAINER (Bottom Left) ===== */
+/* ===== FLOATING TOOLS CONTAINER (Bottom Left) ===== */
 .floating-tools {
     position: fixed;
     bottom: 20px;
     left: 20px;
-    z-index: 50;
+    z-index: 100; /* Higher than toolbar (z-index: 20) */
     display: flex;
     flex-direction: column;
     gap: 8px;
     align-items: flex-start;
+    pointer-events: none; /* Let clicks pass through the container */
+}
+.floating-tools > * {
+    pointer-events: auto; /* Let clicks work on the actual tools */
 }
 
-/* ===== INDIVIDUAL TOOL WRAPPERS ===== */
+/* ===== INDIVIDUAL TOOL WRAPPERS (All absolute within #reader-app) ===== */
 #highlight-tooltip,
 #reaction-picker,
 #annotation-popup,
 #search-bar {
-    /* Reset positioning */
+    /* Remove conflicting !important positions */
     position: fixed !important;
     bottom: auto !important;
     left: auto !important;
-    top: auto !important;
     right: auto !important;
+    top: auto !important;
 }
 
-/* Reposition highlight tooltip */
+/* Highlight Tooltip – Bottom Left */
 #highlight-tooltip.visible {
-    position: absolute !important;
+    position: fixed !important;
     top: auto !important;
     bottom: 80px !important;
     left: 20px !important;
@@ -426,13 +430,14 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     padding: 8px 12px !important;
     box-shadow: var(--shadow-hover) !important;
     display: flex !important;
-    gap: 6px;
-    z-index: 55;
+    gap: 6px !important;
+    z-index: 100 !important;
 }
 
-/* Reposition reaction picker */
+/* Reaction Picker – Bottom Left */
 #reaction-picker {
-    position: absolute !important;
+    position: fixed !important;
+    top: auto !important;
     bottom: 80px !important;
     left: 20px !important;
     transform: none !important;
@@ -442,16 +447,17 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     padding: 8px 12px !important;
     box-shadow: var(--shadow-hover) !important;
     display: none !important;
-    gap: 6px;
-    z-index: 55;
+    gap: 6px !important;
+    z-index: 100 !important;
 }
 #reaction-picker[style*="display: flex"] {
     display: flex !important;
 }
 
-/* Reposition annotation popup */
+/* Annotation Popup – Bottom Left */
 #annotation-popup.visible {
-    position: absolute !important;
+    position: fixed !important;
+    top: auto !important;
     bottom: 140px !important;
     left: 20px !important;
     transform: none !important;
@@ -461,12 +467,12 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     border-radius: 12px !important;
     padding: 16px !important;
     box-shadow: var(--shadow-hover) !important;
-    z-index: 55;
+    z-index: 100 !important;
 }
 
-/* Reposition search bar */
+/* Search Bar – Centered Bottom (Not left) */
 #search-bar.visible {
-    position: absolute !important;
+    position: fixed !important;
     bottom: 20px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
@@ -477,7 +483,7 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     border-radius: 12px !important;
     padding: 12px !important;
     box-shadow: var(--shadow-hover) !important;
-    z-index: 55;
+    z-index: 100 !important;
 }
 
 /* Style buttons inside tools */
@@ -564,6 +570,37 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 .annotation-actions .annotation-cancel:hover {
     background: var(--text-light);
     color: var(--white);
+}
+#readingStatus {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 6px 36px 6px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    transition: all var(--transition);
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+}
+#readingStatus:hover {
+    border-color: var(--rose);
+}
+#readingStatus:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+/* Style the dropdown options */
+#readingStatus option {
+    background: var(--card-bg);
+    color: var(--text);
 }
 
 /* ===== SEARCH RESULT STYLING ===== */
