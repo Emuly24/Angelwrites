@@ -196,25 +196,40 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 
 /* ===== SCROLL MODE CONTAINER ===== */
 #scroll-container {
-    height: 100%;
+    flex: 1;
     width: 100%;
-    overflow-y: auto;
-    padding: 20px 20px 120px 20px;
-    background: var(--bg); /* Keeps the pink/rose background */
+    min-width: 100%;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-start;
 }
+
 #scroll-container .page-content {
     width: 100%;
     max-width: 750px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 30px 40px;
     margin: 0 auto 40px auto;
-    box-shadow: var(--shadow);
-    color: var(--text);
+    flex-shrink: 0;
+}
+
+#highlight-tooltip, 
+#reaction-picker, 
+#annotation-popup, 
+#search-bar {
+    position: fixed !important;
+    bottom: 80px !important;
+    left: 20px !important;
+    top: auto !important;
+    right: auto !important;
+    z-index: 100 !important;
+    pointer-events: auto;
+}
+
+#search-bar.visible {
+    bottom: 20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
 }
 
 /* ===== FLIP MODE CONTAINER ===== */
@@ -265,22 +280,6 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 }
 .settings-group .btn-group button:hover {
     border-color: var(--rose);
-}
-
-/* ===== HIGHLIGHT TOOLTIP ===== */
-#highlight-tooltip {
-    background: var(--white);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-hover);
-}
-#highlight-tooltip .highlight-color {
-    border: 1px solid var(--border);
-}
-#highlight-tooltip .highlight-color:hover {
-    border-color: var(--rose);
-}
-#highlight-tooltip .highlight-btn:hover {
-    color: var(--rose);
 }
 
 /* ===== RESPONSIVE ===== */
