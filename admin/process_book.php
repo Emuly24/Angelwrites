@@ -65,14 +65,17 @@ function fixEncoding($text) {
         return trim($text);
     }
     $converted = mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
+    if ($converted === false) $converted = ''; // PREVENT WARNINGS
     if (!preg_match('/[â€œâ€™â€“]/', $converted)) {
         return trim($converted);
     }
     $iso = mb_convert_encoding($text, 'UTF-8', 'ISO-8859-1');
+    if ($iso === false) $iso = ''; // PREVENT WARNINGS
     if (!preg_match('/[â€œâ€™â€“]/', $iso)) {
         return trim($iso);
     }
     $win1250 = mb_convert_encoding($text, 'UTF-8', 'Windows-1250');
+    if ($win1250 === false) $win1250 = '';
     if (!preg_match('/[â€œâ€™â€“]/', $win1250)) {
         return trim($win1250);
     }
@@ -515,6 +518,7 @@ function deleteVersion($book_id, $version) {
 // --- EXTRACT ---
 if (isset($_POST['extract'])) {
     header('Content-Type: application/json');
+    ob_clean(); // <-- CLEAR OUTPUT BUFFER TO PREVENT JSON ERROR
     $file_path = '../' . $book['file_path'];
     if (!file_exists($file_path)) {
         echo json_encode(['success' => false, 'error' => 'Book file not found.']);
@@ -610,6 +614,7 @@ if (isset($_POST['upload_cover'])) {
 // --- QUEUE BOOK ---
 if (isset($_POST['queue_book'])) {
     header('Content-Type: application/json');
+    ob_clean(); // <-- CLEAR OUTPUT BUFFER
     addToQueue($book_id);
     echo json_encode(['success' => true, 'message' => '✅ Book added to processing queue.']);
     exit;
@@ -618,6 +623,7 @@ if (isset($_POST['queue_book'])) {
 // --- SAVE CONTENT ---
 if (isset($_POST['save_content'])) {
     header('Content-Type: application/json');
+    ob_clean(); // <-- CLEAR OUTPUT BUFFER
     $content_html = trim($_POST['content_html']);
     if (!empty($content_html)) {
         $stmt = $db->prepare("UPDATE book_content SET content_html = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
@@ -636,6 +642,7 @@ if (isset($_POST['save_content'])) {
 // --- RESET PAGE BREAKS ---
 if (isset($_POST['reset_page_breaks'])) {
     header('Content-Type: application/json');
+    ob_clean(); // <-- CLEAR OUTPUT BUFFER
     $file_path = '../' . $book['file_path'];
     if (!file_exists($file_path)) {
         echo json_encode(['success' => false, 'error' => 'Book file not found. Cannot reset page breaks.']);
@@ -666,6 +673,7 @@ if (isset($_POST['reset_page_breaks'])) {
 // ============================================================
 if (isset($_POST['action'])) {
     header('Content-Type: application/json');
+    ob_clean(); // <-- CLEAR OUTPUT BUFFER
     $action = $_POST['action'];
 
     if ($action === 'get_extracted_text') {
