@@ -109,9 +109,10 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; width: 100%; overflow: hidden; }
+        html, body { height: 100%; width: 100%; overflow: hidden; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; background: #f5f2ed; }
         
         #reader-app {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -137,7 +138,7 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
             z-index: 20;
         }
         .toolbar-left { display: flex; align-items: center; gap: 12px; }
-        .toolbar-left .title { font-weight: 600; font-size: 1.1rem; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .toolbar-left .title { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.1rem; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .toolbar-center { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #777; }
         .toolbar-center .progress-ring { position: relative; width: 32px; height: 32px; }
         .toolbar-center .progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -151,11 +152,12 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
         #page-viewport {
             flex: 1; position: relative; overflow: hidden;
-            background: #ffffff;
+            background: #fdfdfd;
+            display: flex; justify-content: center; align-items: center;
         }
 
         #scroll-container {
-            height: 100%; overflow-y: auto;
+            height: 100%; width: 100%; overflow-y: auto;
             padding: 20px 20px 120px 20px;
             display: flex; flex-direction: column; align-items: center;
         }
@@ -168,24 +170,31 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
             border-radius: 12px;
             box-shadow: var(--shadow);
             line-height: 1.8;
+            font-size: 1.1rem;
         }
         #scroll-container .page-break { display: none; }
 
         #flip-container {
-            height: 100%; width: 100%;
+            width: 90%; max-width: 750px;
+            height: 85%; max-height: 800px;
             display: none; justify-content: center; align-items: center;
-            padding: 20px;
-        }
-        #flip-container .page-content {
-            width: 100%; max-width: 750px;
-            max-height: 90%; height: auto;
-            padding: 30px 40px;
-            overflow-y: auto;
-            background: #ffffff;
             border: 1px solid var(--border);
             border-radius: 12px;
+            background: #ffffff;
             box-shadow: var(--shadow-hover);
+            overflow: hidden;
+            position: relative;
+        }
+        #flip-container .reader-page {
+            width: 100%; height: 100%;
+            padding: 40px;
+            overflow-y: auto;
             line-height: 1.8;
+            font-size: 1.1rem;
+            color: #3a2e2a;
+        }
+        #flip-container .reader-page h1, #flip-container .reader-page h2, #flip-container .reader-page h3 {
+            font-family: 'Playfair Display', serif;
         }
 
         .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
@@ -194,14 +203,14 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         .highlight-pink { background: #f48fb1; padding: 0 2px; }
         .highlight-yellow.annotation { border-bottom: 2px solid #ffeb3b; cursor: pointer; }
 
-        .theme-paper #reader-app, .theme-paper .page-content { background: #f7f2ec; color: #3a2e2a; }
-        .theme-paper .page-content { border-color: #d8d0c8; }
-        .theme-dark #reader-app, .theme-dark .page-content { background: #1a1a1a; color: #e0e0e0; }
-        .theme-dark .page-content { border-color: #444; }
+        .theme-paper #reader-app, .theme-paper .page-content, .theme-paper #flip-container { background: #f7f2ec; color: #3a2e2a; }
+        .theme-paper #flip-container { border-color: #d8d0c8; }
+        .theme-dark #reader-app, .theme-dark .page-content, .theme-dark #flip-container { background: #1a1a1a; color: #e0e0e0; }
+        .theme-dark #flip-container { border-color: #444; }
         .theme-dark #toolbar { background: #2a2a2a; border-color: #444; }
         .theme-dark #toolbar button { color: #ccc; }
-        .theme-sepia #reader-app, .theme-sepia .page-content { background: #f4ecd8; color: #5b4636; }
-        .theme-sepia .page-content { border-color: #d4c8b0; }
+        .theme-sepia #reader-app, .theme-sepia .page-content, .theme-sepia #flip-container { background: #f4ecd8; color: #5b4636; }
+        .theme-sepia #flip-container { border-color: #d4c8b0; }
 
         #settings-panel {
             position: fixed; bottom: 0; left: 0; right: 0;
@@ -227,12 +236,12 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         }
         #toc-drawer.open { right: 0; }
         .toc-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .toc-header h3 { margin: 0; font-size: 1.1rem; }
+        .toc-header h3 { margin: 0; font-size: 1.1rem; font-family: 'Playfair Display', serif; }
         .toc-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; }
         .toc-body { flex: 1; overflow-y: auto; padding: 12px 20px; }
         .toc-list { list-style: none; padding: 0; margin: 0; }
         .toc-list li { padding: 4px 0; }
-        .toc-list a { color: var(--text); text-decoration: none; display: block; padding: 6px 8px; border-radius: 4px; transition: all 0.2s; }
+        .toc-list a { font-family: 'Playfair Display', serif; color: var(--text); text-decoration: none; display: block; padding: 6px 8px; border-radius: 4px; transition: all 0.2s; }
         .toc-list a:hover { background: rgba(219,161,162,0.1); color: var(--rose); }
         .toc-empty { text-align: center; color: var(--text-light); padding: 40px 0; }
 
@@ -321,17 +330,38 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
         .focus-mode #toolbar { transform: translateY(-100%); opacity: 0; pointer-events: none; transition: all 0.3s; }
 
+        .aw-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.8);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+        .aw-nav-btn:hover { background: white; border-color: var(--rose); color: var(--rose); }
+        .aw-nav-btn.prev { left: 16px; }
+        .aw-nav-btn.next { right: 16px; }
+
         @media (max-width: 768px) {
             #toolbar { height: 48px; padding: 0 8px; }
             .toolbar-left .title { font-size: 0.9rem; max-width: 160px; }
             #scroll-container, #flip-container { padding: 12px 8px; }
-            #scroll-container .page-content, #flip-container .page-content { padding: 16px; }
+            #scroll-container .page-content, #flip-container .reader-page { padding: 16px; }
             #toc-drawer { width: 280px; right: -280px; }
             #notes-panel { width: 100%; max-height: 50vh; border-radius: 0; }
         }
         @media (max-width: 480px) {
             .toolbar-left .title { font-size: 0.8rem; max-width: 120px; }
-            #scroll-container .page-content, #flip-container .page-content { padding: 12px; }
+            #scroll-container .page-content, #flip-container .reader-page { padding: 12px; }
         }
     </style>
 </head>
@@ -340,9 +370,7 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 <div id="reader-app">
     <div id="toolbar">
         <div class="toolbar-left">
-            <button onclick="window.location.href='<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#555;">
-                <i class="fas fa-arrow-left"></i>
-            </button>
+            <button id="backBtn" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#555;"><i class="fas fa-arrow-left"></i></button>
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
             <?php if (isLoggedIn() && $streak_days > 0): ?>
             <span class="streak-badge">🔥 <?php echo $streak_days; ?>d</span>
@@ -378,7 +406,10 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         <div id="scroll-container">
             <?php foreach ($pages as $page_html) { echo $page_html; } ?>
         </div>
-        <div id="flip-container"></div>
+        <div id="flip-container">
+            <button class="aw-nav-btn prev" id="prevFlipBtn"><i class="fas fa-chevron-left"></i></button>
+            <button class="aw-nav-btn next" id="nextFlipBtn"><i class="fas fa-chevron-right"></i></button>
+        </div>
     </div>
 
     <div id="settings-panel">
@@ -564,6 +595,9 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     const searchResults = document.getElementById('searchResults');
     const reactionPicker = document.getElementById('reaction-picker');
     const challengeWidget = document.getElementById('challenge-widget');
+    const backBtn = document.getElementById('backBtn');
+    const prevFlipBtn = document.getElementById('prevFlipBtn');
+    const nextFlipBtn = document.getElementById('nextFlipBtn');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
     let readingMode = localStorage.getItem('reader_mode') || 'scroll';
@@ -573,6 +607,10 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     let currentNoteId = null;
     let selectedText = '';
     let selectedRange = null;
+
+    // Flip mode specific state
+    let flipCurrentChunkIndex = 0;
+    let flipChunks = [];
 
     totalPagesEl.textContent = totalPages;
 
@@ -598,48 +636,144 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         navigator.sendBeacon('/reader/reader_ajax.php', data);
     });
 
+    backBtn.addEventListener('click', function() {
+        window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>';
+    });
+
     function switchMode(mode) {
         readingMode = mode;
         localStorage.setItem('reader_mode', mode);
         if (mode === 'flip') {
             scrollContainer.style.display = 'none';
             flipContainer.style.display = 'flex';
-            renderFlipPage(currentPage);
+            prepareFlipChunks(currentPage);
+            renderFlipChunk(0);
+            prevFlipBtn.style.display = 'flex';
+            nextFlipBtn.style.display = 'flex';
         } else {
             scrollContainer.style.display = 'block';
             flipContainer.style.display = 'none';
+            prevFlipBtn.style.display = 'none';
+            nextFlipBtn.style.display = 'none';
             var target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         updateUI(currentPage);
     }
 
-    function renderFlipPage(page) {
-        if (page < 1) page = 1;
-        if (page > totalPages) page = totalPages;
-        currentPage = page;
-        var html = pages[page - 1];
+    function prepareFlipChunks(pageNum) {
+        if (pageNum < 1 || pageNum > totalPages) return;
+        var html = pages[pageNum - 1];
+        // Split the content of the page into smaller chunks
+        var paragraphs = html.split('</p>');
+        var chunks = [];
+        var currentChunk = '';
+        var chunkSize = 6; // Number of paragraphs per chunk
+        var count = 0;
+        for (var i = 0; i < paragraphs.length; i++) {
+            var para = paragraphs[i].trim();
+            if (para.length === 0) continue;
+            currentChunk += para + '</p>';
+            count++;
+            if (count >= chunkSize) {
+                chunks.push(currentChunk);
+                currentChunk = '';
+                count = 0;
+            }
+        }
+        if (currentChunk.length > 0) {
+            chunks.push(currentChunk);
+        }
+        flipChunks = chunks;
+        flipCurrentChunkIndex = 0;
+    }
+
+    function renderFlipChunk(index) {
+        if (index < 0) index = 0;
+        if (index >= flipChunks.length) {
+            // Move to the next page
+            if (currentPage < totalPages) {
+                currentPage++;
+                prepareFlipChunks(currentPage);
+                renderFlipChunk(0);
+                updateUI(currentPage);
+                savePosition();
+                loadNotes();
+            }
+            return;
+        }
+        flipCurrentChunkIndex = index;
+        var html = flipChunks[index];
+        // Apply highlights if logged in
         if (userId > 0) {
-            var saved = getHighlightsForPage(page);
+            var saved = getHighlightsForPage(currentPage);
             saved.forEach(function(h) {
                 html = html.replaceAll(h.text, '<span class="highlight-' + h.color + '">' + h.text + '</span>');
             });
         }
-        flipContainer.innerHTML = html;
-        updateUI(page);
+        flipContainer.innerHTML = `
+            <button class="aw-nav-btn prev" id="prevFlipBtn"><i class="fas fa-chevron-left"></i></button>
+            <button class="aw-nav-btn next" id="nextFlipBtn"><i class="fas fa-chevron-right"></i></button>
+            <div class="reader-page">${html}</div>
+        `;
+        // Re-attach event listeners to the newly created buttons
+        document.getElementById('prevFlipBtn').addEventListener('click', prevFlipPage);
+        document.getElementById('nextFlipBtn').addEventListener('click', nextFlipPage);
+        updateUI(currentPage);
+        // Calculate progress based on chunks
+        var totalChunks = 0;
+        for (var i = currentPage - 1; i < totalPages; i++) {
+            var tempHtml = pages[i];
+            var tempParas = tempHtml.split('</p>');
+            totalChunks += Math.ceil((tempParas.length - 1) / 6);
+        }
+        // For simplicity, updateUI already handles the page percentage.
+    }
+
+    function nextFlipPage() {
+        if (flipCurrentChunkIndex < flipChunks.length - 1) {
+            renderFlipChunk(flipCurrentChunkIndex + 1);
+        } else {
+            if (currentPage < totalPages) {
+                currentPage++;
+                prepareFlipChunks(currentPage);
+                renderFlipChunk(0);
+                updateUI(currentPage);
+                savePosition();
+                loadNotes();
+            }
+        }
+    }
+
+    function prevFlipPage() {
+        if (flipCurrentChunkIndex > 0) {
+            renderFlipChunk(flipCurrentChunkIndex - 1);
+        } else {
+            if (currentPage > 1) {
+                currentPage--;
+                prepareFlipChunks(currentPage);
+                var lastChunkIndex = flipChunks.length - 1;
+                renderFlipChunk(lastChunkIndex);
+                updateUI(currentPage);
+                savePosition();
+                loadNotes();
+            }
+        }
     }
 
     function nextPage() {
-        if (currentPage < totalPages) {
-            if (readingMode === 'flip') renderFlipPage(currentPage + 1);
-            else goToPage(currentPage + 1);
+        if (readingMode === 'flip') {
+            nextFlipPage();
+        } else if (currentPage < totalPages) {
+            goToPage(currentPage + 1);
         }
     }
 
     function prevPage() {
-        if (currentPage > 1) {
-            if (readingMode === 'flip') renderFlipPage(currentPage - 1);
-            else goToPage(currentPage - 1);
+        if (readingMode === 'flip') {
+            prevFlipPage();
+        } else if (currentPage > 1) {
+            goToPage(currentPage - 1);
         }
     }
 
@@ -647,7 +781,8 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         if (pageNum < 1 || pageNum > totalPages) return;
         currentPage = pageNum;
         if (readingMode === 'flip') {
-            renderFlipPage(pageNum);
+            prepareFlipChunks(pageNum);
+            renderFlipChunk(0);
         } else {
             var target = document.querySelector('.page-content[data-page="' + pageNum + '"]');
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -776,7 +911,7 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
     document.getElementById('fontSizeSlider').addEventListener('input', function() {
         var val = parseInt(this.value);
-        document.querySelectorAll('.page-content').forEach(function(el) { el.style.fontSize = val + '%'; });
+        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.fontSize = val + '%'; });
         document.getElementById('fontSizeLabel').textContent = val + '%';
         localStorage.setItem('reader_font_size', val);
     });
@@ -791,12 +926,12 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
     var savedSize = localStorage.getItem('reader_font_size') || 100;
     document.getElementById('fontSizeSlider').value = savedSize;
-    document.querySelectorAll('.page-content').forEach(function(el) { el.style.fontSize = savedSize + '%'; });
+    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.fontSize = savedSize + '%'; });
     document.getElementById('fontSizeLabel').textContent = savedSize + '%';
 
     document.getElementById('lineHeightSlider').addEventListener('input', function() {
         var val = parseInt(this.value);
-        document.querySelectorAll('.page-content').forEach(function(el) { el.style.lineHeight = (val / 100).toFixed(1); });
+        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (val / 100).toFixed(1); });
         document.getElementById('lineHeightLabel').textContent = (val / 100).toFixed(1);
         localStorage.setItem('reader_line_height', val);
     });
@@ -811,12 +946,12 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
     var savedLine = localStorage.getItem('reader_line_height') || 180;
     document.getElementById('lineHeightSlider').value = savedLine;
-    document.querySelectorAll('.page-content').forEach(function(el) { el.style.lineHeight = (savedLine / 100).toFixed(1); });
+    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (savedLine / 100).toFixed(1); });
     document.getElementById('lineHeightLabel').textContent = (savedLine / 100).toFixed(1);
 
     document.getElementById('letterSpacingSlider').addEventListener('input', function() {
         var val = parseInt(this.value);
-        document.querySelectorAll('.page-content').forEach(function(el) { el.style.letterSpacing = val + 'px'; });
+        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.letterSpacing = val + 'px'; });
         document.getElementById('letterSpacingLabel').textContent = val;
         localStorage.setItem('reader_letter_spacing', val);
     });
@@ -831,7 +966,7 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
     var savedSpacing = localStorage.getItem('reader_letter_spacing') || 0;
     document.getElementById('letterSpacingSlider').value = savedSpacing;
-    document.querySelectorAll('.page-content').forEach(function(el) { el.style.letterSpacing = savedSpacing + 'px'; });
+    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.letterSpacing = savedSpacing + 'px'; });
     document.getElementById('letterSpacingLabel').textContent = savedSpacing;
 
     document.getElementById('page-viewport').addEventListener('click', function(e) {
@@ -861,7 +996,9 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     document.addEventListener('keydown', function(e) {
         if (e.key === 'ArrowRight') nextPage();
         else if (e.key === 'ArrowLeft') prevPage();
-        else if (e.key === 'Escape') closeAll();
+        else if (e.key === 'Escape') {
+            window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>';
+        }
         else if (e.ctrlKey && e.key === 'f') {
             e.preventDefault();
             toggleSearch();
