@@ -476,8 +476,8 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     bottom: 20px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 90% !important;
-    max-width: 400px !important;
+    width: 80% !important;
+    max-width: 200px !important;
     background: var(--card-bg) !important;
     border: 1px solid var(--border) !important;
     border-radius: 12px !important;
