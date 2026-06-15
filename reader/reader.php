@@ -112,7 +112,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <style>
         /* ======================================================= */
-        /*  RESET & BRAND VARIABLES                                 */
+        /*  RESET & BRAND VARIABLES (MATCHING PROCESS_BOOK)        */
         /* ======================================================= */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { height: 100%; width: 100%; overflow: hidden; }
@@ -171,131 +171,78 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         /*  TOOLBAR                                                 */
         /* ======================================================= */
         #toolbar {
-            flex-shrink: 0; height: 56px; min-height: 56px;
+            flex-shrink: 0; height: 60px; min-height: 60px;
             display: flex; justify-content: space-between; align-items: center;
-            padding: 0 16px;
+            padding: 0 20px;
             background: var(--card-bg);
             border-bottom: 1px solid var(--border);
             z-index: 20;
             box-shadow: var(--shadow);
         }
-        .toolbar-left { display: flex; align-items: center; gap: 12px; }
+        .toolbar-left { display: flex; align-items: center; gap: 16px; }
         .toolbar-left .title {
             font-family: 'Playfair Display', Georgia, serif;
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             max-width: 240px;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             color: var(--dark);
         }
         .toolbar-left button {
             background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-light);
-            transition: color var(--transition);
+            transition: color var(--transition); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
         }
-        .toolbar-left button:hover { color: var(--rose); }
-        .toolbar-center { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-light); }
-        .toolbar-center .progress-ring { position: relative; width: 32px; height: 32px; }
+        .toolbar-left button:hover { color: var(--rose); background: rgba(219, 161, 162, 0.1); }
+        .toolbar-center { display: flex; align-items: center; gap: 12px; font-size: 0.95rem; color: var(--text-light); }
+        .toolbar-center .progress-ring { position: relative; width: 36px; height: 36px; }
         .toolbar-center .progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
         .toolbar-center .progress-ring .bg { stroke: var(--border); stroke-width: 2; fill: none; }
         .toolbar-center .progress-ring .fill { stroke: var(--rose); stroke-width: 2; fill: none; transition: stroke-dashoffset var(--transition); }
-        .toolbar-center .progress-ring .percent { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.65rem; font-weight: 600; color: var(--text-light); }
-        .toolbar-right { display: flex; align-items: center; gap: 4px; }
+        .toolbar-center .progress-ring .percent { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.7rem; font-weight: 600; color: var(--text-light); }
+        .toolbar-right { display: flex; align-items: center; gap: 8px; }
         .toolbar-right button {
             background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-light);
-            padding: 6px 8px; border-radius: 6px; transition: all var(--transition);
+            padding: 6px 10px; border-radius: 6px; transition: all var(--transition); display: flex; align-items: center; justify-content: center;
         }
-        .toolbar-right button:hover {
-            background: rgba(219, 161, 162, 0.1); color: var(--rose); transform: scale(1.05);
-        }
-        .streak-badge { background: var(--rose); color: var(--white); padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .toolbar-right button:hover { background: rgba(219, 161, 162, 0.1); color: var(--rose); transform: scale(1.05); }
+        .streak-badge { background: var(--rose); color: var(--white); padding: 2px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 
-        /* ===== LEFT SIDEBAR ===== */
+        /* ===== SIDEBAR ===== */
         #sidebar {
-            position: fixed;
-            top: 56px; /* Below the toolbar */
-            left: 0;
-            width: 48px;
-            height: calc(100% - 56px);
-            background: var(--card-bg);
-            border-right: 1px solid var(--border);
-            z-index: 15;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 8px 0;
-            gap: 4px;
-            overflow-y: auto;
+            position: fixed; top: 60px; left: 0; width: 48px; height: calc(100% - 60px);
+            background: var(--card-bg); border-right: 1px solid var(--border); z-index: 15;
+            display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; overflow-y: auto;
             transition: transform 0.25s ease;
         }
         #sidebar.closed { transform: translateX(-100%); }
         #sidebar.open { transform: translateX(0); }
-        /* Adjust the page viewport to sit beside the sidebar */
-        #page-viewport {
-            margin-left: 48px;
-        }
-        /* When focus mode is active, hide the sidebar */
-        .focus-mode #sidebar {
-            transform: translateX(-100%);
-        }
-        /* Sidebar buttons */
+        #page-viewport { margin-left: 48px; flex: 1; position: relative; overflow: hidden; background: var(--bg); display: flex; justify-content: center; align-items: center; }
+        .focus-mode #sidebar { transform: translateX(-100%); }
+
         .sidebar-btn {
-            width: 32px;
-            height: 32px;
-            border: none;
-            background: transparent;
-            color: var(--text-light);
-            font-size: 1rem;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
+            width: 36px; height: 36px; border: none; background: transparent; color: var(--text-light);
+            font-size: 1rem; cursor: pointer; border-radius: 8px; transition: all var(--transition);
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
-        .sidebar-btn:hover {
-            background: rgba(219, 161, 162, 0.1);
-            color: var(--rose);
-            transform: scale(1.05);
-        }
-        .sidebar-btn.active {
-            color: var(--rose);
-            background: rgba(219, 161, 162, 0.15);
-        }
-        .sidebar-separator {
-            width: 24px;
-            border: none;
-            border-top: 1px solid var(--border);
-            margin: 4px 0;
-        }
-        /* Responsive – hide sidebar on small screens */
+        .sidebar-btn:hover { background: rgba(219, 161, 162, 0.1); color: var(--rose); transform: scale(1.05); }
+        .sidebar-btn.active { color: var(--rose); background: rgba(219, 161, 162, 0.15); }
+        .sidebar-separator { width: 28px; border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
         @media (max-width: 768px) {
-            #sidebar {
-                display: none;
-            }
-            #page-viewport {
-                margin-left: 0;
-            }
-        }
-        /* ======================================================= */
-        /*  PAGE VIEWPORT                                           */
-        /* ======================================================= */
-        #page-viewport {
-            flex: 1; position: relative; overflow: hidden;
-            background: var(--bg);
-            display: flex; justify-content: center; align-items: center;
+            #sidebar { display: none; }
+            #page-viewport { margin-left: 0; }
         }
 
+        /* ======================================================= */
+        /*  PAGE VIEWPORT (SCROLL)                                  */
+        /* ======================================================= */
         #scroll-container {
-            height: 100%; width: 100%;
-            overflow-y: auto;
+            height: 100%; width: 100%; overflow-y: auto;
             padding: 20px 20px 120px 20px;
-            display: flex; flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
+            display: flex; flex-direction: column; align-items: center;
         }
         #scroll-container .page-content {
-            width: 100%; max-width: 1000px;
+            width: 100%; max-width: 900px;
             margin: 0 auto 40px auto;
             padding: 30px 40px;
             background: var(--card-bg);
@@ -315,24 +262,18 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         #scroll-container .page-break { display: none; }
 
+        /* ===== FLIP CONTAINER ===== */
         #flip-container {
-            width: 90%; max-width: 900px;
-            height: 85%; max-height: 900px;
+            width: 90%; max-width: 900px; height: 85%; max-height: 900px;
             display: none; justify-content: center; align-items: center;
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            background: var(--card-bg);
-            box-shadow: var(--shadow-hover);
+            border: 1px solid var(--border); border-radius: 16px;
+            background: var(--card-bg); box-shadow: var(--shadow-hover);
             overflow: hidden; position: relative;
         }
         #flip-container .reader-page {
-            width: 100%; height: 100%;
-            padding: 40px;
-            overflow-y: auto;
-            font-family: 'Inter', sans-serif;
-            font-size: 1.05rem;
-            line-height: 1.8;
-            color: var(--text);
+            width: 100%; height: 100%; padding: 40px;
+            overflow-y: auto; font-family: 'Inter', sans-serif;
+            font-size: 1.05rem; line-height: 1.8; color: var(--text);
         }
         #flip-container .reader-page h1,
         #flip-container .reader-page h2,
@@ -341,33 +282,37 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             color: var(--dark);
         }
 
+        /* ===== COVER IMAGE ===== */
         .cover-image {
             width: 100%; max-width: 750px;
             margin: 0 auto 40px auto;
             border-radius: 16px;
             box-shadow: var(--shadow);
             overflow: hidden;
+            background: var(--card-bg);
+            padding: 20px;
+            display: flex; justify-content: center; align-items: center;
         }
         .cover-image img {
-            width: 100%; height: auto; display: block;
+            width: 100%; height: auto; display: block; object-fit: contain; max-height: 80vh;
+            border-radius: 8px;
         }
 
         /* ======================================================= */
-        /*  HIGHLIGHTS                                               */
+        /*  HIGHLIGHTS & ANNOTATIONS                                */
         /* ======================================================= */
-        .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
-        .highlight-green { background: #a5d6a7; padding: 0 2px; }
-        .highlight-blue { background: #90caf9; padding: 0 2px; }
-        .highlight-pink { background: #f48fb1; padding: 0 2px; }
-        .highlight-yellow.annotation { border-bottom: 2px solid #ffeb3b; cursor: pointer; }
+        .highlight-yellow { background: #ffeb3b; padding: 0 2px; border-radius: 2px; }
+        .highlight-green { background: #a5d6a7; padding: 0 2px; border-radius: 2px; }
+        .highlight-blue { background: #90caf9; padding: 0 2px; border-radius: 2px; }
+        .highlight-pink { background: #f48fb1; padding: 0 2px; border-radius: 2px; }
 
         /* ======================================================= */
-        /*  NAVIGATION BUTTONS                                      */
+        /*  NAVIGATION BUTTONS (FLIP MODE)                          */
         /* ======================================================= */
         .aw-nav-btn {
             position: absolute; top: 50%; transform: translateY(-50%);
             background: var(--card-bg); border: 1px solid var(--border); border-radius: 50%;
-            width: 40px; height: 40px; cursor: pointer; font-size: 1rem;
+            width: 44px; height: 44px; cursor: pointer; font-size: 1rem;
             display: flex; align-items: center; justify-content: center;
             transition: all var(--transition); z-index: 10; color: var(--text); box-shadow: var(--shadow);
         }
@@ -376,7 +321,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .aw-nav-btn.next { right: 16px; }
 
         /* ======================================================= */
-        /*  FLOATING TOOLS (Highlight, Reaction, Annotation, etc)  */
+        /*  FLOATING TOOLS (Highlight, Reaction, etc)              */
         /* ======================================================= */
         #highlight-tooltip,
         #reaction-picker,
@@ -387,19 +332,17 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         #notes-panel,
         #toc-drawer,
         #settings-panel {
-            position: fixed !important;
-            z-index: 9999 !important;
+            position: fixed !important; z-index: 9999 !important;
         }
 
-        /* Highlight Tooltip */
         #highlight-tooltip {
             display: none;
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 8px 12px;
+            padding: 12px 16px;
             box-shadow: var(--shadow-hover);
-            min-width: 260px;
+            min-width: 280px;
             pointer-events: auto;
         }
         #highlight-tooltip.visible { display: block; }
@@ -410,12 +353,10 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         #highlight-tooltip .highlight-color:hover { transform: scale(1.15); border-color: var(--rose); }
         #highlight-tooltip .tooltip-action {
             background: transparent; border: 1px solid var(--border); border-radius: 6px;
-            padding: 4px 8px; cursor: pointer; color: var(--text);
-            transition: all 0.2s; font-size: 0.9rem;
+            padding: 4px 8px; cursor: pointer; color: var(--text); transition: all 0.2s; font-size: 0.9rem; display: flex; align-items: center; gap: 4px;
         }
         #highlight-tooltip .tooltip-action:hover { border-color: var(--rose); color: var(--rose); background: rgba(219, 161, 162, 0.05); }
 
-        /* Reaction Picker - Bottom Right */
         #reaction-picker {
             display: none;
             background: var(--card-bg);
@@ -431,15 +372,14 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         #reaction-picker[style*="flex"] { display: flex !important; }
         #reaction-picker button {
-            background: none; border: none; font-size: 1.4rem; cursor: pointer; padding: 4px;
+            background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 4px;
             transition: transform var(--transition);
         }
         #reaction-picker button:hover { transform: scale(1.2); }
 
-        /* Annotation Popup - Bottom Right */
         #annotation-popup {
             display: none;
-            width: 300px;
+            width: 320px;
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 12px;
@@ -457,11 +397,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             background: var(--input-bg); color: var(--text); font-family: 'Inter', sans-serif;
         }
         #annotation-popup textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-        .annotation-actions {
-            display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;
-        }
+        .annotation-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
         .annotation-actions button {
-            padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer;
+            padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
             font-size: 0.8rem; transition: background var(--transition);
         }
         .annotation-save { background: var(--rose); color: var(--white); }
@@ -469,16 +407,20 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .annotation-cancel { background: var(--border); color: var(--text); }
         .annotation-cancel:hover { background: var(--text-light); color: var(--white); }
 
-        /* Search Bar */
+        /* ======================================================= */
+        /*  SEARCH BAR                                              */
+        /* ======================================================= */
         #search-bar {
             display: none;
-            width: 280px;
+            width: 300px;
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 12px;
             box-shadow: var(--shadow-hover);
             pointer-events: auto;
+            top: 70px !important;
+            left: 50px !important;
         }
         #search-bar.visible { display: block; }
         #search-bar input {
@@ -486,18 +428,11 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             font-size: 0.9rem; background: var(--input-bg); color: var(--text); font-family: 'Inter', sans-serif;
         }
         #search-bar input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-        #search-bar button {
-            background: none; border: none; cursor: pointer; color: var(--text-light); font-size: 0.9rem;
-            transition: color var(--transition);
-        }
-        #search-bar button:hover { color: var(--rose); }
-        #searchResults {
-            margin-top: 8px; max-height: 200px; overflow-y: auto; font-size: 0.85rem;
-        }
-        .search-result {
-            padding: 6px 8px; border-bottom: 1px solid var(--border); cursor: pointer;
-            transition: background var(--transition);
-        }
+        #search-bar .search-header { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        #search-bar .search-header button { background: none; border: none; cursor: pointer; color: var(--text-light); font-size: 0.9rem; transition: color var(--transition); }
+        #search-bar .search-header button:hover { color: var(--rose); }
+        #searchResults { margin-top: 8px; max-height: 200px; overflow-y: auto; font-size: 0.85rem; }
+        .search-result { padding: 6px 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background var(--transition); }
         .search-result:hover { background: rgba(219, 161, 162, 0.1); }
         .search-result strong { color: var(--rose); }
 
@@ -514,7 +449,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         #settings-panel.open { transform: translateY(0); }
         .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-        .settings-group label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); }
+        .settings-group label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); display: block; margin-bottom: 4px; }
         .settings-group .btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
         .settings-group .btn-group button {
             padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
@@ -529,18 +464,23 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         /*  TOC DRAWER                                              */
         /* ======================================================= */
         #toc-drawer {
-            top: 0; right: -320px; width: 320px; height: 100vh;
+            top: 0; right: -340px; width: 340px; height: 100vh;
             background: var(--card-bg); box-shadow: -4px 0 20px rgba(44, 30, 30, 0.1);
             transition: right 0.25s ease; display: flex; flex-direction: column;
             pointer-events: auto;
         }
         #toc-drawer.open { right: 0; }
-        .toc-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--vanilla); }
+        .toc-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--vanilla);
+        }
         .toc-header h3 { margin: 0; font-size: 1.1rem; font-family: 'Playfair Display', Georgia, serif; color: var(--dark); }
-        .toc-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text); }
+        .toc-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text); width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: background var(--transition); }
+        .toc-close:hover { background: rgba(219, 161, 162, 0.1); }
         .toc-body { flex: 1; overflow-y: auto; padding: 12px 20px; }
         .toc-list { list-style: none; padding: 0; margin: 0; }
-        .toc-list li { padding: 4px 0; }
+        .toc-list li { padding: 2px 0; }
         .toc-list a {
             color: var(--text); text-decoration: none; display: block; padding: 6px 8px; border-radius: 6px;
             transition: all var(--transition);
@@ -552,16 +492,23 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         /*  NOTES PANEL                                             */
         /* ======================================================= */
         #notes-panel {
-            bottom: 0; right: 0; width: 380px; max-height: 60vh;
+            bottom: 0; right: 0; width: 400px; max-height: 60vh;
             background: var(--card-bg); border: 1px solid var(--border);
             border-radius: 12px 12px 0 0; box-shadow: 0 -4px 20px rgba(44, 30, 30, 0.1);
             display: none; flex-direction: column; pointer-events: auto;
         }
         #notes-panel.open { display: flex; }
-        .notes-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--vanilla); border-radius: 12px 12px 0 0; }
+        .notes-header {
+            padding: 12px 16px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--vanilla); border-radius: 12px 12px 0 0;
+        }
         .notes-header h3 { margin: 0; font-size: 1rem; font-family: 'Playfair Display', Georgia, serif; }
         .notes-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
-        .note-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        .note-card {
+            border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px;
+            background: var(--card-bg);
+        }
         .note-card.private { border-left: 4px solid var(--text-light); }
         .note-author { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
         .note-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: var(--rose); color: var(--white); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85rem; }
@@ -615,8 +562,8 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         /* ======================================================= */
         #overlay {
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(44, 30, 30, 0.3);
-            display: none;
+            background: rgba(44, 30, 30, 0.4);
+            display: none; z-index: 9998 !important;
         }
         #overlay.active { display: block; }
 
@@ -675,6 +622,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 <body>
 
 <div id="reader-app">
+    <!-- TOOLBAR -->
     <div id="toolbar">
         <div class="toolbar-left">
             <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
@@ -692,9 +640,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         </div>
         <div class="toolbar-center">
             <div class="progress-ring">
-                <svg viewBox="0 0 32 32">
-                    <circle class="bg" cx="16" cy="16" r="14"/>
-                    <circle class="fill" id="progressFill" cx="16" cy="16" r="14" stroke-dasharray="87.96" stroke-dashoffset="87.96"/>
+                <svg viewBox="0 0 36 36">
+                    <circle class="bg" cx="18" cy="18" r="16"/>
+                    <circle class="fill" id="progressFill" cx="18" cy="18" r="16" stroke-dasharray="100.53" stroke-dashoffset="100.53"/>
                 </svg>
                 <span class="percent" id="progressPercent">0%</span>
             </div>
@@ -705,21 +653,23 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         </div>
     </div>
 
+    <!-- SIDEBAR -->
     <div id="sidebar">
-        <button class="sidebar-btn" title="Search" onclick="toggleSearch()"><i class="fas fa-search"></i></button>
-        <button class="sidebar-btn" title="Bookmark" onclick="document.getElementById('bookmarkBtn').click()"><i class="far fa-bookmark"></i></button>
-        <button class="sidebar-btn" title="Table of Contents" onclick="document.getElementById('tocBtn').click()"><i class="fas fa-list-ul"></i></button>
-        <button class="sidebar-btn" title="Group Notes" onclick="document.getElementById('notesBtn').click()"><i class="fas fa-sticky-note"></i></button>
-        <button class="sidebar-btn" title="Settings" onclick="document.getElementById('settingsBtn').click()"><i class="fas fa-cog"></i></button>
-        <button class="sidebar-btn" title="Focus Mode" onclick="document.getElementById('focusBtn').click()"><i class="fas fa-expand"></i></button>
+        <button class="sidebar-btn" id="searchBtn" title="Search"><i class="fas fa-search"></i></button>
+        <button class="sidebar-btn" id="bookmarkBtn" title="Bookmark"><i class="far fa-bookmark"></i></button>
+        <button class="sidebar-btn" id="tocBtn" title="Table of Contents"><i class="fas fa-list-ul"></i></button>
+        <button class="sidebar-btn" id="notesBtn" title="Group Notes"><i class="fas fa-sticky-note"></i></button>
+        <button class="sidebar-btn" id="settingsBtn" title="Settings"><i class="fas fa-cog"></i></button>
+        <button class="sidebar-btn" id="focusBtn" title="Focus Mode"><i class="fas fa-expand"></i></button>
         <hr class="sidebar-separator">
-        <button class="sidebar-btn" title="Export Highlights" onclick="document.getElementById('exportHighlightsBtn').click()"><i class="fas fa-file-export"></i></button>
-        <button class="sidebar-btn" title="Reset Progress" onclick="document.getElementById('resetProgressBtn').click()"><i class="fas fa-undo-alt"></i></button>
-        <button class="sidebar-btn" title="Resume Position" onclick="resumePosition()"><i class="fas fa-bookmark"></i></button>
-        <button class="sidebar-btn" title="Challenge" onclick="document.getElementById('challengeWidget').style.display='block'"><i class="fas fa-trophy"></i></button>
-        <button class="sidebar-btn" title="Share" onclick="document.getElementById('share-modal').classList.add('visible');document.getElementById('overlay').classList.add('active')"><i class="fas fa-share-alt"></i></button>
+        <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights"><i class="fas fa-file-export"></i></button>
+        <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress"><i class="fas fa-undo-alt"></i></button>
+        <button class="sidebar-btn" id="resumeBtn" title="Resume Position"><i class="fas fa-bookmark"></i></button>
+        <button class="sidebar-btn" id="challengeBtn" title="Challenge"><i class="fas fa-trophy"></i></button>
+        <button class="sidebar-btn" id="shareBtn" title="Share"><i class="fas fa-share-alt"></i></button>
     </div>
 
+    <!-- PAGE VIEWPORT -->
     <div id="page-viewport">
         <div id="scroll-container">
             <?php if (!empty($cover_path)): ?>
@@ -735,6 +685,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         </div>
     </div>
 
+    <!-- SETTINGS PANEL -->
     <div id="settings-panel">
         <div class="settings-grid">
             <div class="settings-group">
@@ -779,6 +730,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         </div>
     </div>
 
+    <!-- TOC DRAWER -->
     <div id="toc-drawer">
         <div class="toc-header">
             <h3>Table of Contents</h3>
@@ -801,6 +753,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         </div>
     </div>
 
+    <!-- NOTES PANEL -->
     <div id="notes-panel">
         <div class="notes-header">
             <h3>📝 Group Notes</h3>
@@ -820,6 +773,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         </div>
     </div>
 
+    <!-- FLOATING TOOLS -->
     <div id="reaction-picker">
         <button data-reaction="👍">👍</button>
         <button data-reaction="❤️">❤️</button>
@@ -839,8 +793,10 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     </div>
 
     <div id="search-bar">
-        <input type="text" id="searchInput" placeholder="Search in this book…">
-        <button onclick="closeSearch()"><i class="fas fa-times"></i></button>
+        <div class="search-header">
+            <input type="text" id="searchInput" placeholder="Search in this book…">
+            <button onclick="closeSearch()"><i class="fas fa-times"></i></button>
+        </div>
         <div id="searchResults"></div>
     </div>
 
@@ -859,6 +815,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     <div id="challenge-widget"></div>
 
+    <!-- OVERLAY -->
     <div id="overlay" onclick="closeAll()"></div>
 </div>
 
@@ -880,7 +837,6 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     const totalPagesEl = document.getElementById('totalPages');
     const progressFill = document.getElementById('progressFill');
     const progressPercent = document.getElementById('progressPercent');
-    const bookmarkBtn = document.getElementById('bookmarkBtn');
     const settingsPanel = document.getElementById('settings-panel');
     const tocDrawer = document.getElementById('toc-drawer');
     const tocClose = document.getElementById('tocClose');
@@ -895,8 +851,6 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     const overlay = document.getElementById('overlay');
     const focusBtn = document.getElementById('focusBtn');
     const readingStatus = document.getElementById('readingStatus');
-    const resetProgressBtn = document.getElementById('resetProgressBtn');
-    const exportHighlightsBtn = document.getElementById('exportHighlightsBtn');
     const annotationPopup = document.getElementById('annotation-popup');
     const annotationText = document.getElementById('annotationText');
     const annotationSave = document.getElementById('annotationSave');
@@ -909,9 +863,18 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     const backBtn = document.getElementById('backBtn');
     const prevFlipBtn = document.getElementById('prevFlipBtn');
     const nextFlipBtn = document.getElementById('nextFlipBtn');
-    const searchBtn = document.getElementById('searchBtn');
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
+    const searchBtn = document.getElementById('searchBtn');
+    const bookmarkBtn = document.getElementById('bookmarkBtn');
+    const tocBtn = document.getElementById('tocBtn');
+    const notesBtn = document.getElementById('notesBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const resetProgressBtn = document.getElementById('resetProgressBtn');
+    const exportHighlightsBtn = document.getElementById('exportHighlightsBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const challengeBtn = document.getElementById('challengeBtn');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
     let readingMode = localStorage.getItem('reader_mode') || 'scroll';
@@ -924,11 +887,6 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     let flipCurrentChunkIndex = 0;
     let flipChunks = [];
-
-    // ===== SIDEBAR TOGGLE =====
-    sidebarToggle.addEventListener('click', function() {
-        sidebar.classList.toggle('closed');
-    });
 
     totalPagesEl.textContent = totalPages;
 
@@ -945,6 +903,11 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     loadBookmarkStatus();
     if (userId > 0) startSession();
     if (userId > 0) loadChallenge();
+
+    // ===== SIDEBAR TOGGLE =====
+    sidebarToggle.addEventListener('click', function() {
+        sidebar.classList.toggle('closed');
+    });
 
     // ===== READING STATUS =====
     readingStatus.addEventListener('change', function() {
@@ -1096,7 +1059,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     function updateUI(page) {
         pageNumEl.textContent = page;
         var percent = Math.round((page / totalPages) * 100);
-        var circumference = 2 * Math.PI * 14;
+        var circumference = 2 * Math.PI * 16;
         var offset = circumference - (percent / 100) * circumference;
         progressFill.setAttribute('stroke-dashoffset', offset);
         progressPercent.textContent = percent + '%';
@@ -1299,13 +1262,13 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     });
 
     // ===== SETTINGS PANEL TOGGLE =====
-    document.getElementById('settingsBtn').addEventListener('click', function() {
+    settingsBtn.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active', settingsPanel.classList.contains('open'));
     });
 
     // ===== TOC TOGGLE =====
-    document.getElementById('tocBtn').addEventListener('click', function() {
+    tocBtn.addEventListener('click', function() {
         tocDrawer.classList.toggle('open');
         overlay.classList.toggle('active', tocDrawer.classList.contains('open'));
     });
@@ -1328,7 +1291,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     });
 
     // ===== NOTES PANEL =====
-    document.getElementById('notesBtn').addEventListener('click', function() {
+    notesBtn.addEventListener('click', function() {
         if (groupId === 0) { alert('You are not in a reading group for this book.'); return; }
         notesPanel.classList.toggle('open');
         overlay.classList.toggle('active', notesPanel.classList.contains('open'));
@@ -1489,26 +1452,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
     });
 
-    // ===== CLOSE ALL (includes exiting focus mode) =====
-    window.closeAll = function() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.classList.remove('open');
-        overlay.classList.remove('active');
-        // Exit focus mode if active
-        if (focusMode) {
-            focusMode = false;
-            document.getElementById('reader-app').classList.remove('focus-mode');
-            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
-        }
-    };
-
-    overlay.addEventListener('click', closeAll);
-
     // ===== SEARCH =====
     searchBtn.addEventListener('click', function() {
-        searchBar.classList.toggle('visible');
-        if (searchBar.classList.contains('visible')) searchInput.focus();
+        toggleSearch();
     });
 
     window.toggleSearch = function() {
@@ -1565,6 +1511,11 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     });
 
     // ===== SHARE =====
+    shareBtn.addEventListener('click', function() {
+        document.getElementById('share-modal').classList.add('visible');
+        document.getElementById('overlay').classList.add('active');
+    });
+
     function share(platform) {
         var url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentPage;
         var text = '📖 I\'m reading on AngelWrites!';
@@ -1590,6 +1541,10 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     document.getElementById('share-modal').querySelector('.share-close').addEventListener('click', closeShare);
 
     // ===== CHALLENGE WIDGET =====
+    challengeBtn.addEventListener('click', function() {
+        loadChallenge();
+    });
+
     function loadChallenge() {
         if (userId === 0) return;
         var xhr = new XMLHttpRequest();
@@ -1622,6 +1577,10 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     };
 
     // ===== RESUME POSITION =====
+    resumeBtn.addEventListener('click', function() {
+        resumePosition();
+    });
+
     window.resumePosition = function() {
         if (lastPage >= 1 && lastPage <= totalPages) {
             goToPage(lastPage);
@@ -1927,6 +1886,23 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     initSelectionTooltip();
 
     window.goToPage = goToPage;
+
+    // ===== CLOSE ALL (Optimized Overlay Handling) =====
+    window.closeAll = function() {
+        settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open');
+        notesPanel.classList.remove('open');
+        searchBar.classList.remove('visible');
+        document.getElementById('share-modal').classList.remove('visible');
+        overlay.classList.remove('active');
+        if (focusMode) {
+            focusMode = false;
+            document.getElementById('reader-app').classList.remove('focus-mode');
+            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
+        }
+    };
+
+    overlay.addEventListener('click', closeAll);
 
 })();
 </script>
