@@ -111,220 +111,185 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epubjs/0.3.93/epub.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
-    <style>
-/* ===== READER CONTAINER ===== */
-.aw-reader {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
-    background: var(--vanilla);
-    color: var(--text);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
+    /* ===== FULL SCREEN RESET ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; width: 100%; overflow: hidden; }
+
+/* ===== ANGELWRITES BRAND COLORS ===== */
+:root {
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #EFD8D6; /* Matches vanilla */
+    --card-bg: #ffffff;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44, 30, 30, 0.08);
+    --shadow-hover: 0 8px 30px rgba(44, 30, 30, 0.15);
+    --input-bg: #ffffff;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ===== HEADER ===== */
-.aw-reader-header {
-    flex-shrink: 0;
+/* ===== READER APP CONTAINER ===== */
+#reader-app {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg); /* The pink/rose color from your screenshot */
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    z-index: 10000;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 16px;
+    flex-direction: column;
+}
+
+/* ===== TOOLBAR (Clean, minimal) ===== */
+#toolbar {
+    height: 56px;
+    min-height: 56px;
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
-    z-index: 10;
-    transition: transform 0.3s ease, opacity 0.3s ease;
-}
-.aw-reader-header.hidden {
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-}
-.aw-reader-header-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.aw-reader-back {
-    color: var(--rose);
-    font-weight: 500;
-    text-decoration: none;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.aw-reader-title {
-    font-size: 1.1rem;
-    margin: 0;
-    color: var(--text);
-    font-family: 'Playfair Display', serif;
-}
-.aw-reader-header-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.aw-reader-header-right button {
-    background: none;
-    border: none;
-    font-size: 1.1rem;
-    color: var(--text);
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all 0.2s;
-}
-.aw-reader-header-right button:hover {
-    background: rgba(219, 161, 162, 0.1);
-    color: var(--rose);
-}
-
-/* ===== PROGRESS RING ===== */
-.aw-progress-ring {
-    vertical-align: middle;
-}
-.aw-progress-ring-bg {
-    stroke: var(--border);
-}
-.aw-progress-ring-fill {
-    stroke: var(--rose);
-    transition: stroke-dashoffset 0.3s;
-}
-
-/* ===== SETTINGS PANEL ===== */
-.aw-reader-settings {
-    flex-shrink: 0;
-    display: none;
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--border);
-    padding: 12px 16px;
-}
-.aw-reader-settings.open {
-    display: block;
-}
-.aw-settings-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-}
-.aw-setting-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.aw-setting-group label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--text-light);
-    letter-spacing: 0.5px;
-}
-.aw-theme-options, .aw-font-options, .aw-mode-options {
-    display: flex;
-    gap: 4px;
-}
-.aw-theme-btn, .aw-font-btn, .aw-mode-btn {
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: all 0.2s;
-}
-.aw-theme-btn:hover, .aw-font-btn:hover, .aw-mode-btn:hover {
-    border-color: var(--rose);
-}
-.aw-theme-btn.active, .aw-font-btn.active, .aw-mode-btn.active {
-    border-color: var(--rose);
-    background: var(--rose);
-    color: white;
-}
-.color-preview {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    vertical-align: middle;
-    margin-right: 4px;
-    border: 1px solid var(--border);
-}
-.aw-size-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.aw-size-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    color: var(--text);
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.aw-size-btn:hover {
-    border-color: var(--rose);
-    color: var(--rose);
-}
-.aw-size-controls input[type="range"] {
-    width: 80px;
-    accent-color: var(--rose);
-}
-.aw-theme-extra {
-    margin-top: 4px;
-}
-
-/* ===== TOC DRAWER ===== */
-.aw-toc-drawer {
-    position: fixed;
-    top: 0;
-    right: -320px;
-    width: 320px;
-    height: 100vh;
-    background: var(--card-bg);
-    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-    z-index: 20;
-    transition: right 0.3s ease;
-    display: flex;
-    flex-direction: column;
-}
-.aw-toc-drawer.open {
-    right: 0;
-}
-.aw-toc-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 0 16px;
+    z-index: 10;
+    flex-shrink: 0;
 }
-.aw-toc-header h3 {
-    margin: 0;
+.toolbar-left .title {
+    font-weight: 600;
     font-size: 1.1rem;
+    color: var(--dark);
+    font-family: 'Playfair Display', Georgia, serif;
 }
-.aw-toc-close {
+.toolbar-right button {
     background: none;
     border: none;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
+    color: var(--text-light);
     cursor: pointer;
-    color: var(--text);
-    padding: 0 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
 }
-.aw-toc-body {
+.toolbar-right button:hover {
+    color: var(--rose);
+    background: rgba(219, 161, 162, 0.1);
+}
+
+/* ===== CONTENT AREA (Pink background from screenshot) ===== */
+#page-viewport {
     flex: 1;
-    overflow-y: auto;
-    padding: 12px 20px;
+    background: var(--bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
 }
+
+/* ===== SCROLL MODE CONTAINER ===== */
+#scroll-container {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+    padding: 20px 20px 120px 20px;
+    background: var(--bg); /* Keeps the pink/rose background */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+#scroll-container .page-content {
+    width: 100%;
+    max-width: 750px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 30px 40px;
+    margin: 0 auto 40px auto;
+    box-shadow: var(--shadow);
+    color: var(--text);
+}
+
+/* ===== FLIP MODE CONTAINER ===== */
+#flip-container {
+    display: none;
+    width: 90%;
+    max-width: 750px;
+    height: 85%;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-hover);
+    overflow: hidden;
+}
+#flip-container .reader-page {
+    padding: 40px;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--text);
+}
+
+/* ===== TOC DRAWER ===== */
+#toc-drawer {
+    background: var(--white);
+    border-left: 1px solid var(--border);
+}
+.toc-header {
+    background: var(--vanilla);
+    border-bottom: 1px solid var(--border);
+}
+.toc-list a {
+    color: var(--text);
+}
+.toc-list a:hover {
+    color: var(--rose);
+    background: rgba(219, 161, 162, 0.1);
+}
+
+/* ===== SETTINGS PANEL ===== */
+#settings-panel {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+}
+.settings-group .btn-group button.active {
+    background: var(--rose);
+    border-color: var(--rose);
+    color: white;
+}
+.settings-group .btn-group button:hover {
+    border-color: var(--rose);
+}
+
+/* ===== HIGHLIGHT TOOLTIP ===== */
+#highlight-tooltip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-hover);
+}
+#highlight-tooltip .highlight-color {
+    border: 1px solid var(--border);
+}
+#highlight-tooltip .highlight-color:hover {
+    border-color: var(--rose);
+}
+#highlight-tooltip .highlight-btn:hover {
+    color: var(--rose);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    #toolbar { height: 48px; padding: 0 8px; }
+    .toolbar-left .title { font-size: 0.9rem; max-width: 160px; }
+    #scroll-container .page-content { padding: 20px; }
+}
+/* ===== TOC LIST ===== */
 .aw-toc-list {
     list-style: none;
     padding: 0;
@@ -337,137 +302,145 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     color: var(--text);
     text-decoration: none;
     display: block;
-    padding: 2px 4px;
-    border-radius: 4px;
-    transition: background 0.2s, color 0.2s;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
 }
 .aw-toc-list a:hover {
     background: rgba(219, 161, 162, 0.1);
     color: var(--rose);
 }
-.aw-toc-empty {
-    color: var(--text-light);
-    text-align: center;
-    padding: 40px 0;
-}
 
-/* ===== NOTES PANEL ===== */
+/* ===== GROUP NOTES ===== */
 .aw-notes-panel {
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    width: 380px;
-    max-height: 60vh;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 12px 12px 0 0;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
-    display: none;
-    flex-direction: column;
-    z-index: 25;
+    box-shadow: 0 -4px 20px rgba(44, 30, 30, 0.1);
 }
 .aw-notes-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     background: var(--vanilla);
+    border-bottom: 1px solid var(--border);
     border-radius: 12px 12px 0 0;
 }
-.aw-notes-title h3 { margin: 0; font-size: 1rem; }
-.aw-notes-title .badge { background: var(--rose); color: white; padding: 0 8px; border-radius: 12px; font-size: 0.75rem; }
-.aw-notes-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
-.note-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-.note-card.private { border-left: 4px solid #6c757d; }
-.note-author { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.note-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-.note-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: var(--rose); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85rem; }
-.note-author-info { flex: 1; }
-.note-author-info small { color: var(--text-light); }
-.note-text { margin: 0 0 8px; font-size: 0.95rem; }
-.note-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-.note-reactions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.reaction { background: var(--vanilla); padding: 0 8px; border-radius: 12px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
-.reaction:hover { background: rgba(219,161,162,0.2); }
-.badge-private { background: #6c757d; color: white; padding: 0 6px; border-radius: 4px; font-size: 0.7rem; }
-.empty-notes { color: var(--text-light); text-align: center; padding: 24px 12px; }
-#awAddNoteForm { padding: 12px 16px; border-top: 1px solid var(--border); }
-#awAddNoteForm textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; resize: vertical; }
-#awAddNoteForm .btn { padding: 4px 12px; font-size: 0.8rem; }
-.aw-notes-actions .btn { padding: 4px 12px; font-size: 0.8rem; }
-
-/* ===== REACTION PICKER ===== */
-.aw-reaction-picker {
-    position: fixed;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    box-shadow: var(--shadow-hover);
-    z-index: 50;
-    display: none;
-    gap: 6px;
-    align-items: center;
+.aw-notes-header h3 {
+    color: var(--dark);
+    font-family: 'Playfair Display', Georgia, serif;
 }
-.aw-reaction-picker button {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
+.aw-notes-header .badge {
+    background: var(--rose);
+    color: var(--white);
+}
+.aw-notes-header button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 12px;
     cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--text);
     transition: all 0.2s;
 }
-.aw-reaction-picker button:hover {
-    background: var(--vanilla);
-    transform: scale(1.15);
+.aw-notes-header button:hover {
+    border-color: var(--rose);
+    color: var(--rose);
 }
-
-/* ===== CHALLENGE WIDGET ===== */
-.aw-challenge-widget {
-    background: var(--card-bg);
+.note-card {
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 12px 16px;
-    margin: 8px 16px;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
 }
-.aw-challenge-widget h4 { margin: 0; font-size: 1rem; }
-.aw-challenge-widget p { margin: 0; font-size: 0.9rem; color: var(--text-light); }
-.aw-challenge-progress { position: relative; height: 16px; background: var(--border); border-radius: 8px; overflow: hidden; }
-.aw-challenge-bar { height: 100%; background: var(--rose); transition: width 0.3s; }
-.aw-challenge-percent { position: absolute; top: 0; right: 8px; font-size: 0.7rem; font-weight: 600; color: var(--text); line-height: 16px; }
-.aw-challenge-stats { font-weight: 600; font-size: 0.9rem; color: var(--text); }
-
-/* ===== HIGHLIGHTS ===== */
-.aw-reader-text .highlight-yellow { background: #ffeb3b; padding: 0 2px; }
-.aw-reader-text .highlight-green { background: #a5d6a7; padding: 0 2px; }
-.aw-reader-text .highlight-blue { background: #90caf9; padding: 0 2px; }
-.aw-reader-text .highlight-pink { background: #f48fb1; padding: 0 2px; }
-.aw-reader-text .highlight-yellow.annotation { border-bottom: 2px solid #ffeb3b; cursor: pointer; }
-.aw-reader-text .highlight-green.annotation { border-bottom: 2px solid #a5d6a7; cursor: pointer; }
-.aw-reader-text .highlight-blue.annotation { border-bottom: 2px solid #90caf9; cursor: pointer; }
-.aw-reader-text .highlight-pink.annotation { border-bottom: 2px solid #f48fb1; cursor: pointer; }
+.note-card.private {
+    border-left: 4px solid #6c757d;
+}
+.note-author-info strong {
+    color: var(--dark);
+}
+.note-author-info small {
+    color: var(--text-light);
+}
+.note-text {
+    color: var(--text);
+}
+.note-footer {
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+    margin-top: 8px;
+}
+.note-reactions .reaction {
+    background: var(--vanilla);
+    padding: 0 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.note-reactions .reaction:hover {
+    background: rgba(219, 161, 162, 0.2);
+}
+.note-footer button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text);
+    transition: all 0.2s;
+}
+.note-footer button:hover {
+    border-color: var(--rose);
+    color: var(--rose);
+}
+#noteForm textarea {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    resize: vertical;
+    width: 100%;
+}
+#noteForm textarea:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+#noteForm label {
+    color: var(--text);
+    font-size: 0.9rem;
+}
+#noteForm .btn {
+    background: var(--rose);
+    color: var(--white);
+    border: none;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.2s;
+}
+#noteForm .btn:hover {
+    background: var(--rose-dark);
+}
+#noteForm .btn-secondary {
+    background: var(--border);
+    color: var(--text);
+}
+#noteForm .btn-secondary:hover {
+    background: var(--text-light);
+    color: var(--white);
+}
 
 /* ===== HIGHLIGHT TOOLTIP ===== */
 .aw-highlight-tooltip {
-    position: fixed;
-    display: none;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 6px 10px;
     box-shadow: var(--shadow-hover);
-    z-index: 30;
-    gap: 4px;
-    align-items: center;
-}
-.aw-highlight-tooltip.visible {
-    display: flex;
+    padding: 6px 10px;
 }
 .aw-highlight-color {
     width: 20px;
@@ -499,21 +472,11 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
 /* ===== ANNOTATION POPUP ===== */
 .aw-annotation-popup {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 320px;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 20px;
     box-shadow: var(--shadow-hover);
-    z-index: 30;
-    display: none;
-}
-.aw-annotation-popup.visible {
-    display: block;
+    padding: 20px;
 }
 .aw-annotation-popup textarea {
     width: 100%;
@@ -525,12 +488,12 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     font-size: 0.9rem;
     background: var(--input-bg);
     color: var(--text);
+    font-family: 'Inter', sans-serif;
 }
-.aw-annotation-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-    justify-content: flex-end;
+.aw-annotation-popup textarea:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
 }
 .aw-annotation-actions button {
     padding: 4px 12px;
@@ -538,32 +501,31 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     border: none;
     cursor: pointer;
     font-size: 0.8rem;
+    transition: background 0.2s;
 }
 .aw-annotation-save {
     background: var(--rose);
-    color: white;
+    color: var(--white);
+}
+.aw-annotation-save:hover {
+    background: var(--rose-dark);
 }
 .aw-annotation-cancel {
     background: var(--border);
     color: var(--text);
 }
+.aw-annotation-cancel:hover {
+    background: var(--text-light);
+    color: var(--white);
+}
 
 /* ===== SEARCH BAR ===== */
 .aw-search-bar {
-    position: absolute;
-    top: 56px;
-    right: 16px;
-    width: 320px;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 12px;
     box-shadow: var(--shadow-hover);
-    z-index: 15;
-    display: none;
-}
-.aw-search-bar.visible {
-    display: block;
+    padding: 12px;
 }
 .aw-search-bar input {
     width: 100%;
@@ -573,259 +535,96 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
     font-size: 0.9rem;
     background: var(--input-bg);
     color: var(--text);
+    font-family: 'Inter', sans-serif;
 }
 .aw-search-bar input:focus {
     outline: none;
     border-color: var(--rose);
-    box-shadow: 0 0 0 3px rgba(219,161,162,0.15);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+.aw-search-bar button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    transition: color 0.2s;
+}
+.aw-search-bar button:hover {
+    color: var(--rose);
 }
 #awSearchResults {
     margin-top: 8px;
     max-height: 200px;
     overflow-y: auto;
-    display: none;
 }
 .aw-search-result {
     padding: 4px 8px;
-    font-size: 0.85rem;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.85rem;
 }
 .aw-search-result:hover {
-    background: rgba(219,161,162,0.1);
+    background: rgba(219, 161, 162, 0.1);
+}
+.aw-search-result strong {
+    color: var(--rose);
 }
 
 /* ===== SHARE MODAL ===== */
 .aw-share-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 30;
-    display: none;
-    align-items: center;
-    justify-content: center;
-}
-.aw-share-modal.visible {
-    display: flex;
+    background: rgba(44, 30, 30, 0.5);
+    backdrop-filter: blur(4px);
 }
 .aw-share-modal-content {
     background: var(--card-bg);
+    border-radius: 16px;
     padding: 24px;
-    border-radius: 12px;
     max-width: 400px;
-    width: 90%;
-    text-align: center;
+    box-shadow: var(--shadow-hover);
 }
 .aw-share-modal-content h3 {
+    color: var(--dark);
+    font-family: 'Playfair Display', Georgia, serif;
     margin-top: 0;
 }
-.aw-share-options {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin: 16px 0;
-}
 .aw-share-options button {
-    padding: 8px 16px;
+    background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    background: var(--card-bg);
+    padding: 8px 16px;
     cursor: pointer;
-    transition: all 0.2s;
     font-size: 0.9rem;
+    color: var(--text);
+    transition: all 0.2s;
+    width: 100%;
+    text-align: left;
 }
 .aw-share-options button:hover {
     border-color: var(--rose);
-    background: rgba(219,161,162,0.1);
+    background: rgba(219, 161, 162, 0.05);
+}
+.aw-share-options button i {
+    margin-right: 8px;
+    color: var(--rose);
 }
 .aw-share-modal-close {
     background: var(--rose);
-    color: white;
+    color: var(--white);
     border: none;
     padding: 8px 24px;
     border-radius: 30px;
     cursor: pointer;
-}
-
-/* ===== OVERLAY ===== */
-.aw-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.3);
-    z-index: 11;
-    display: none;
-}
-.aw-overlay.active {
-    display: block;
-}
-
-/* ===== FOCUS MODE ===== */
-.aw-reader.focus-mode .aw-reader-header {
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-}
-.aw-reader.focus-mode .aw-reader-settings {
-    display: none !important;
-}
-.aw-reader.focus-mode .aw-search-bar {
-    display: none !important;
-}
-
-/* ===== FALLBACK ===== */
-.aw-reader-fallback {
-    height: 100%;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-}
-.aw-reader-fallback canvas {
-    flex: 1;
-    width: 100%;
-    height: auto;
-    object-fit: contain;
-}
-.aw-pdf-controls, .aw-epub-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    background: var(--card-bg);
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-}
-.aw-pdf-controls button, .aw-epub-controls button {
-    background: var(--rose);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
     transition: background 0.2s;
+    width: 100%;
+    margin-top: 12px;
+    font-weight: 600;
 }
-.aw-pdf-controls button:hover, .aw-epub-controls button:hover {
+.aw-share-modal-close:hover {
     background: var(--rose-dark);
 }
-.aw-pdf-controls input[type="range"] {
-    width: 80px;
-    accent-color: var(--rose);
-}
-.aw-epub-container #awEpubViewer {
-    flex: 1;
-}
-.aw-reader-unsupported {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-light);
-}
-.aw-reader-unsupported i {
-    font-size: 3rem;
-    color: var(--rose);
-    display: block;
-    margin-bottom: 16px;
-}
-
-/* ===== THEMES ===== */
-.aw-reader[data-theme="paper"] {
-    background: var(--vanilla);
-    color: var(--text);
-}
-.aw-reader[data-theme="light"] {
-    background: #ffffff;
-    color: #1a1a1a;
-}
-.aw-reader[data-theme="dark"] {
-    background: #1a1a1a;
-    color: #f0f0f0;
-}
-.aw-reader[data-theme="dark"] .aw-reader-header {
-    background: rgba(26,26,26,0.9);
-}
-.aw-reader[data-theme="sepia"] {
-    background: #f4ecd8;
-    color: #5b4636;
-}
-.aw-reader[data-theme="sepia"] .aw-reader-header {
-    background: rgba(244,236,216,0.9);
-}
-
-/* ===== FONTS ===== */
-.aw-reader[data-font="serif"] .aw-reader-text {
-    font-family: Georgia, 'Times New Roman', serif;
-}
-.aw-reader[data-font="sans"] .aw-reader-text {
-    font-family: 'Inter', -apple-system, sans-serif;
-}
-.aw-reader[data-font="mono"] .aw-reader-text {
-    font-family: 'Courier New', monospace;
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    .aw-reader-header {
-        padding: 6px 12px;
-    }
-    .aw-reader-title {
-        font-size: 0.9rem;
-    }
-    .aw-reader-header-right button {
-        font-size: 0.9rem;
-        padding: 2px 6px;
-    }
-    .aw-reader-content {
-        padding: 16px 12px;
-    }
-    .aw-reader-text .book-title {
-        font-size: 1.6rem;
-    }
-    .aw-reader-text .chapter-heading {
-        font-size: 1.2rem;
-    }
-    .aw-toc-drawer {
-        width: 280px;
-        right: -280px;
-    }
-    .aw-notes-panel {
-        width: 100%;
-        max-height: 50vh;
-        border-radius: 0;
-    }
-    .aw-settings-grid {
-        gap: 8px;
-    }
-    .aw-size-controls input[type="range"] {
-        width: 60px;
-    }
-    .aw-search-bar {
-        width: 260px;
-        right: 8px;
-    }
-}
-
-@media (max-width: 480px) {
-    .aw-reader-header {
-        padding: 4px 8px;
-    }
-    .aw-reader-title {
-        font-size: 0.8rem;
-    }
-    .aw-reader-content {
-        padding: 12px 8px;
-    }
-    .aw-toc-drawer {
-        width: 260px;
-        right: -260px;
-    }
-}
-</style>
+</style>    
 </head>
 <body>
 
