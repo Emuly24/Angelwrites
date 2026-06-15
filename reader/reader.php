@@ -153,6 +153,27 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.6);
         --input-bg: #2c1e1e;
     }
+    /* Apply themes to the correct container */
+        #reader-app[data-theme="dark"] {
+            background: var(--bg);
+            color: var(--text);
+        }
+        #reader-app[data-theme="dark"] .page-content,
+        #reader-app[data-theme="dark"] .reader-page {
+            background: var(--card-bg);
+            color: var(--text);
+            border-color: var(--border);
+        }
+        #reader-app[data-theme="dark"] #toolbar {
+            background: var(--card-bg);
+            border-color: var(--border);
+        }
+        #reader-app[data-theme="dark"] #toolbar button {
+            color: var(--text-light);
+        }
+        #reader-app[data-theme="dark"] #toolbar button:hover {
+            color: var(--rose);
+        }
 
     /* ===== READER APP ===== */
     #reader-app {
@@ -206,13 +227,17 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
     /* ===== SCROLL MODE ===== */
     #scroll-container {
-        height: 100%; width: 100%; overflow-y: auto;
+        height: 100%; width: 100%;
+        overflow-y: auto;
         padding: 20px 20px 120px 20px;
-        display: flex; flex-direction: column; align-items: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;      
+        justify-content: flex-start;
     }
     #scroll-container .page-content {
-        width: 100%; max-width: 750px;
-        margin-bottom: 40px;
+        width: 100%; max-width: 1000px;
+        margin: 0 auto 40px auto;
         padding: 30px 40px;
         background: var(--card-bg);
         border: 1px solid var(--border);
@@ -233,8 +258,8 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
 
     /* ===== FLIP MODE ===== */
     #flip-container {
-        width: 90%; max-width: 750px;
-        height: 85%; max-height: 800px;
+        width: 90%; max-width: 1000px;
+        height: 85%; max-height: 900px;
         display: none; justify-content: center; align-items: center;
         border: 1px solid var(--border);
         border-radius: 16px;
@@ -363,6 +388,204 @@ $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter 
         .toolbar-left .title { font-size: 0.8rem; max-width: 120px; }
         #scroll-container .page-content, #flip-container .reader-page { padding: 16px; }
     }
+    /* ===== FLOATING TOOLS CONTAINER (Bottom Left) ===== */
+.floating-tools {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+/* ===== INDIVIDUAL TOOL WRAPPERS ===== */
+#highlight-tooltip,
+#reaction-picker,
+#annotation-popup,
+#search-bar {
+    /* Reset positioning */
+    position: fixed !important;
+    bottom: auto !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+}
+
+/* Reposition highlight tooltip */
+#highlight-tooltip.visible {
+    position: absolute !important;
+    top: auto !important;
+    bottom: 80px !important;
+    left: 20px !important;
+    transform: none !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 8px 12px !important;
+    box-shadow: var(--shadow-hover) !important;
+    display: flex !important;
+    gap: 6px;
+    z-index: 55;
+}
+
+/* Reposition reaction picker */
+#reaction-picker {
+    position: absolute !important;
+    bottom: 80px !important;
+    left: 20px !important;
+    transform: none !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 8px 12px !important;
+    box-shadow: var(--shadow-hover) !important;
+    display: none !important;
+    gap: 6px;
+    z-index: 55;
+}
+#reaction-picker[style*="display: flex"] {
+    display: flex !important;
+}
+
+/* Reposition annotation popup */
+#annotation-popup.visible {
+    position: absolute !important;
+    bottom: 140px !important;
+    left: 20px !important;
+    transform: none !important;
+    width: 300px !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    box-shadow: var(--shadow-hover) !important;
+    z-index: 55;
+}
+
+/* Reposition search bar */
+#search-bar.visible {
+    position: absolute !important;
+    bottom: 20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 90% !important;
+    max-width: 400px !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+    box-shadow: var(--shadow-hover) !important;
+    z-index: 55;
+}
+
+/* Style buttons inside tools */
+#highlight-tooltip .highlight-color {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+#highlight-tooltip .highlight-color:hover {
+    transform: scale(1.15);
+    border-color: var(--rose);
+}
+
+#highlight-tooltip .highlight-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 1rem;
+    padding: 2px 6px;
+    transition: color var(--transition);
+}
+#highlight-tooltip .highlight-btn:hover {
+    color: var(--rose);
+}
+
+#reaction-picker button {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 4px;
+    transition: transform var(--transition);
+}
+#reaction-picker button:hover {
+    transform: scale(1.2);
+}
+
+#annotation-popup textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    resize: vertical;
+    min-height: 60px;
+    font-size: 0.9rem;
+    background: var(--input-bg);
+    color: var(--text);
+}
+#annotation-popup textarea:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+
+.annotation-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    justify-content: flex-end;
+}
+.annotation-actions button {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all var(--transition);
+}
+.annotation-actions .annotation-save {
+    background: var(--rose);
+    color: var(--white);
+}
+.annotation-actions .annotation-save:hover {
+    background: var(--rose-dark);
+}
+.annotation-actions .annotation-cancel {
+    background: var(--border);
+    color: var(--text);
+}
+.annotation-actions .annotation-cancel:hover {
+    background: var(--text-light);
+    color: var(--white);
+}
+
+/* ===== SEARCH RESULT STYLING ===== */
+#searchResults {
+    margin-top: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+}
+.search-result {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background var(--transition);
+}
+.search-result:hover {
+    background: rgba(219, 161, 162, 0.1);
+}
+.search-result strong {
+    color: var(--rose);
+}
+
 </style>
 </head>
 <body>
