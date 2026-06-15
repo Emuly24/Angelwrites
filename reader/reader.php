@@ -209,6 +209,74 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         .streak-badge { background: var(--rose); color: var(--white); padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
 
+        /* ===== LEFT SIDEBAR ===== */
+        #sidebar {
+            position: fixed;
+            top: 56px; /* Below the toolbar */
+            left: 0;
+            width: 48px;
+            height: calc(100% - 56px);
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            z-index: 15;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 0;
+            gap: 4px;
+            overflow-y: auto;
+            transition: transform 0.25s ease;
+        }
+        #sidebar.closed { transform: translateX(-100%); }
+        #sidebar.open { transform: translateX(0); }
+        /* Adjust the page viewport to sit beside the sidebar */
+        #page-viewport {
+            margin-left: 48px;
+        }
+        /* When focus mode is active, hide the sidebar */
+        .focus-mode #sidebar {
+            transform: translateX(-100%);
+        }
+        /* Sidebar buttons */
+        .sidebar-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: var(--text-light);
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .sidebar-btn:hover {
+            background: rgba(219, 161, 162, 0.1);
+            color: var(--rose);
+            transform: scale(1.05);
+        }
+        .sidebar-btn.active {
+            color: var(--rose);
+            background: rgba(219, 161, 162, 0.15);
+        }
+        .sidebar-separator {
+            width: 24px;
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 4px 0;
+        }
+        /* Responsive – hide sidebar on small screens */
+        @media (max-width: 768px) {
+            #sidebar {
+                display: none;
+            }
+            #page-viewport {
+                margin-left: 0;
+            }
+        }
         /* ======================================================= */
         /*  PAGE VIEWPORT                                           */
         /* ======================================================= */
@@ -347,7 +415,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         #highlight-tooltip .tooltip-action:hover { border-color: var(--rose); color: var(--rose); background: rgba(219, 161, 162, 0.05); }
 
-        /* Reaction Picker */
+        /* Reaction Picker - Bottom Right */
         #reaction-picker {
             display: none;
             background: var(--card-bg);
@@ -357,6 +425,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             box-shadow: var(--shadow-hover);
             gap: 6px;
             pointer-events: auto;
+            bottom: 80px !important;
+            right: 20px !important;
+            left: auto !important;
         }
         #reaction-picker[style*="flex"] { display: flex !important; }
         #reaction-picker button {
@@ -365,7 +436,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         #reaction-picker button:hover { transform: scale(1.2); }
 
-        /* Annotation Popup */
+        /* Annotation Popup - Bottom Right */
         #annotation-popup {
             display: none;
             width: 300px;
@@ -375,6 +446,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             padding: 16px;
             box-shadow: var(--shadow-hover);
             pointer-events: auto;
+            bottom: 140px !important;
+            right: 20px !important;
+            left: auto !important;
         }
         #annotation-popup.visible { display: block; }
         #annotation-popup textarea {
@@ -627,13 +701,23 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             <span id="pageNum">1</span> / <span id="totalPages"><?php echo $total_pages; ?></span>
         </div>
         <div class="toolbar-right">
-            <button id="searchBtn"><i class="fas fa-search"></i></button>
-            <button id="bookmarkBtn"><i class="far fa-bookmark"></i></button>
-            <button id="tocBtn"><i class="fas fa-list-ul"></i></button>
-            <button id="settingsBtn"><i class="fas fa-cog"></i></button>
-            <button id="notesBtn"><i class="fas fa-sticky-note"></i></button>
-            <button id="focusBtn"><i class="fas fa-expand"></i></button>
+            <button id="sidebarToggle"><i class="fas fa-bars"></i></button>
         </div>
+    </div>
+
+    <div id="sidebar">
+        <button class="sidebar-btn" title="Search" onclick="toggleSearch()"><i class="fas fa-search"></i></button>
+        <button class="sidebar-btn" title="Bookmark" onclick="document.getElementById('bookmarkBtn').click()"><i class="far fa-bookmark"></i></button>
+        <button class="sidebar-btn" title="Table of Contents" onclick="document.getElementById('tocBtn').click()"><i class="fas fa-list-ul"></i></button>
+        <button class="sidebar-btn" title="Group Notes" onclick="document.getElementById('notesBtn').click()"><i class="fas fa-sticky-note"></i></button>
+        <button class="sidebar-btn" title="Settings" onclick="document.getElementById('settingsBtn').click()"><i class="fas fa-cog"></i></button>
+        <button class="sidebar-btn" title="Focus Mode" onclick="document.getElementById('focusBtn').click()"><i class="fas fa-expand"></i></button>
+        <hr class="sidebar-separator">
+        <button class="sidebar-btn" title="Export Highlights" onclick="document.getElementById('exportHighlightsBtn').click()"><i class="fas fa-file-export"></i></button>
+        <button class="sidebar-btn" title="Reset Progress" onclick="document.getElementById('resetProgressBtn').click()"><i class="fas fa-undo-alt"></i></button>
+        <button class="sidebar-btn" title="Resume Position" onclick="resumePosition()"><i class="fas fa-bookmark"></i></button>
+        <button class="sidebar-btn" title="Challenge" onclick="document.getElementById('challengeWidget').style.display='block'"><i class="fas fa-trophy"></i></button>
+        <button class="sidebar-btn" title="Share" onclick="document.getElementById('share-modal').classList.add('visible');document.getElementById('overlay').classList.add('active')"><i class="fas fa-share-alt"></i></button>
     </div>
 
     <div id="page-viewport">
@@ -826,6 +910,8 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     const prevFlipBtn = document.getElementById('prevFlipBtn');
     const nextFlipBtn = document.getElementById('nextFlipBtn');
     const searchBtn = document.getElementById('searchBtn');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('sidebar');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
     let readingMode = localStorage.getItem('reader_mode') || 'scroll';
@@ -838,6 +924,11 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     let flipCurrentChunkIndex = 0;
     let flipChunks = [];
+
+    // ===== SIDEBAR TOGGLE =====
+    sidebarToggle.addEventListener('click', function() {
+        sidebar.classList.toggle('closed');
+    });
 
     totalPagesEl.textContent = totalPages;
 
@@ -1198,7 +1289,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     document.addEventListener('keydown', function(e) {
         if (e.key === 'ArrowRight') nextPage();
         else if (e.key === 'ArrowLeft') prevPage();
-        else if (e.key === 'Escape') closeAll();
+        else if (e.key === 'Escape') {
+            closeAll();
+        }
         else if (e.ctrlKey && e.key === 'f') {
             e.preventDefault();
             toggleSearch();
@@ -1396,11 +1489,32 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
     });
 
+    // ===== CLOSE ALL (includes exiting focus mode) =====
+    window.closeAll = function() {
+        settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open');
+        notesPanel.classList.remove('open');
+        overlay.classList.remove('active');
+        // Exit focus mode if active
+        if (focusMode) {
+            focusMode = false;
+            document.getElementById('reader-app').classList.remove('focus-mode');
+            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
+        }
+    };
+
+    overlay.addEventListener('click', closeAll);
+
     // ===== SEARCH =====
     searchBtn.addEventListener('click', function() {
         searchBar.classList.toggle('visible');
         if (searchBar.classList.contains('visible')) searchInput.focus();
     });
+
+    window.toggleSearch = function() {
+        searchBar.classList.toggle('visible');
+        if (searchBar.classList.contains('visible')) searchInput.focus();
+    };
 
     window.closeSearch = function() {
         searchBar.classList.remove('visible');
@@ -1506,16 +1620,6 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             xhr.send(data);
         }
     };
-
-    // ===== CLOSE ALL =====
-    window.closeAll = function() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.classList.remove('open');
-        overlay.classList.remove('active');
-    };
-
-    overlay.addEventListener('click', closeAll);
 
     // ===== RESUME POSITION =====
     window.resumePosition = function() {
