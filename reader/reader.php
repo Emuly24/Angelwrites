@@ -285,19 +285,19 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         /* ===== RESPONSIVE ===== */
         @media (max-width:768px) { .flip-3d-page { padding:20px; } }
 
-        /* ===== COVER IMAGE ===== */
+        /* ===== COVER IMAGE (FIXED) ===== */
         .cover-image {
-            width: 100%; max-width: 750px;
+            width: 100%; max-width: 900px;
             margin: 0 auto 40px auto;
             border-radius: 16px;
             box-shadow: var(--shadow);
             overflow: hidden;
             background: var(--card-bg);
-            padding: 20px;
+            padding: 0;
             display: flex; justify-content: center; align-items: center;
         }
         .cover-image img {
-            width: 100%; height: auto; display: block; object-fit: contain; max-height: 80vh;
+            width: 100%; height: auto; display: block; object-fit: cover;
             border-radius: 8px;
         }
 
@@ -1358,132 +1358,153 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     // ===== 3D FLIP MODE IMPLEMENTATION =====
 
-const flip3dContainer = document.getElementById('flip3dContainer');
-const flipBook = document.getElementById('flipBook');
-const flipLeftPage = document.getElementById('flipLeftPage');
-const flipRightPage = document.getElementById('flipRightPage');
-const flipPrevBtn = document.getElementById('flipPrevBtn');
-const flipNextBtn = document.getElementById('flipNextBtn');
+    const flip3dContainer = document.getElementById('flip3dContainer');
+    const flipBook = document.getElementById('flipBook');
+    const flipLeftPage = document.getElementById('flipLeftPage');
+    const flipRightPage = document.getElementById('flipRightPage');
+    const flipPrevBtn = document.getElementById('flipPrevBtn');
+    const flipNextBtn = document.getElementById('flipNextBtn');
 
-let flipCurrentPage = currentPage;
-let flipIsAnimating = false;
-let flipDirection = 1; // 1 = forward, -1 = backward
+    let flipCurrentPage = currentPage;
+    let flipIsAnimating = false;
+    let flipDirection = 1; // 1 = forward, -1 = backward
 
-function loadFlipPages(pageNum) {
-    if (pageNum < 1 || pageNum > totalPages) return;
-    
-    // Load two pages side by side
-    const leftContent = pages[pageNum - 1] || '';
-    const rightContent = pages[pageNum] || '';
-    
-    flipLeftPage.innerHTML = leftContent;
-    flipRightPage.innerHTML = rightContent;
-    
-    // Reset book rotation
-    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
-    flipBook.style.transform = 'rotateY(0deg)';
-    
-    flipCurrentPage = pageNum;
-    updateUI(pageNum);
-    savePosition();
-}
-
-function flipToNext() {
-    if (flipIsAnimating) return;
-    if (flipCurrentPage >= totalPages) return;
-    
-    flipIsAnimating = true;
-    flipDirection = 1;
-    
-    // Load the next page into the right page slot
-    const nextContent = pages[flipCurrentPage + 1] || '';
-    flipRightPage.innerHTML = nextContent;
-    
-    // Animate: right page flips to the left
-    flipBook.classList.add('page-right-flipped');
-    
-    setTimeout(() => {
-        flipCurrentPage += 2;
-        if (flipCurrentPage > totalPages) flipCurrentPage = totalPages;
-        loadFlipPages(flipCurrentPage);
-        flipIsAnimating = false;
-        updateUI(flipCurrentPage);
+    function loadFlipPages(pageNum) {
+        if (pageNum < 1 || pageNum > totalPages) return;
+        
+        // Load two pages side by side
+        const leftContent = pages[pageNum - 1] || '';
+        const rightContent = pages[pageNum] || '';
+        
+        flipLeftPage.innerHTML = leftContent;
+        flipRightPage.innerHTML = rightContent;
+        
+        // Reset book rotation
+        flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
+        flipBook.style.transform = 'rotateY(0deg)';
+        
+        flipCurrentPage = pageNum;
+        updateUI(pageNum);
         savePosition();
-    }, 800);
-}
-
-function flipToPrev() {
-    if (flipIsAnimating) return;
-    if (flipCurrentPage <= 1) return;
-    
-    flipIsAnimating = true;
-    flipDirection = -1;
-    
-    // Load the previous page into the left page slot
-    const prevContent = pages[flipCurrentPage - 2] || '';
-    flipLeftPage.innerHTML = prevContent;
-    
-    // Animate: left page flips to the right
-    flipBook.classList.add('page-left-flipped');
-    
-    setTimeout(() => {
-        flipCurrentPage -= 2;
-        if (flipCurrentPage < 1) flipCurrentPage = 1;
-        loadFlipPages(flipCurrentPage);
-        flipIsAnimating = false;
-        updateUI(flipCurrentPage);
-        savePosition();
-    }, 800);
-}
-
-// Override the existing switchMode() to use the 3D flip
-const originalSwitchMode = window.switchMode || function(){};
-window.switchMode = function(mode) {
-    if (mode === 'flip') {
-        document.getElementById('scroll-container').style.display = 'none';
-        flip3dContainer.style.display = 'block';
-        loadFlipPages(currentPage);
-    } else {
-        flip3dContainer.style.display = 'none';
-        document.getElementById('scroll-container').style.display = 'block';
-        // Restore scroll view
-        const target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-};
 
-// Click handlers for navigation
-flipNextBtn.addEventListener('click', flipToNext);
-flipPrevBtn.addEventListener('click', flipToPrev);
-
-// Click on the right half of the book -> next page
-flip3dContainer.addEventListener('click', function(e) {
-    if (e.target.closest('button')) return;
-    const rect = this.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x > rect.width / 2) {
-        flipToNext();
-    } else {
-        flipToPrev();
+    function flipToNext() {
+        if (flipIsAnimating) return;
+        if (flipCurrentPage >= totalPages) return;
+        
+        flipIsAnimating = true;
+        flipDirection = 1;
+        
+        // Load the next page into the right page slot
+        const nextContent = pages[flipCurrentPage + 1] || '';
+        flipRightPage.innerHTML = nextContent;
+        
+        // Animate: right page flips to the left
+        flipBook.classList.add('page-right-flipped');
+        
+        setTimeout(() => {
+            flipCurrentPage += 2;
+            if (flipCurrentPage > totalPages) flipCurrentPage = totalPages;
+            loadFlipPages(flipCurrentPage);
+            flipIsAnimating = false;
+            updateUI(flipCurrentPage);
+            savePosition();
+        }, 800);
     }
-});
 
-// Keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-    if (flip3dContainer.style.display !== 'block') return;
-    if (e.key === 'ArrowRight') flipToNext();
-    else if (e.key === 'ArrowLeft') flipToPrev();
-});
+    function flipToPrev() {
+        if (flipIsAnimating) return;
+        if (flipCurrentPage <= 1) return;
+        
+        flipIsAnimating = true;
+        flipDirection = -1;
+        
+        // Load the previous page into the left page slot
+        const prevContent = pages[flipCurrentPage - 2] || '';
+        flipLeftPage.innerHTML = prevContent;
+        
+        // Animate: left page flips to the right
+        flipBook.classList.add('page-left-flipped');
+        
+        setTimeout(() => {
+            flipCurrentPage -= 2;
+            if (flipCurrentPage < 1) flipCurrentPage = 1;
+            loadFlipPages(flipCurrentPage);
+            flipIsAnimating = false;
+            updateUI(flipCurrentPage);
+            savePosition();
+        }, 800);
+    }
 
-// Make sure the mode toggle works
-document.querySelectorAll('#modeGroup button').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        const mode = this.dataset.mode;
-        document.querySelectorAll('#modeGroup button').forEach(function(b) { b.classList.remove('active'); });
-        this.classList.add('active');
-        window.switchMode(mode);
+    // Override the existing switchMode() to use the 3D flip
+    const originalSwitchMode = window.switchMode || function(){};
+    window.switchMode = function(mode) {
+        if (mode === 'flip') {
+            document.getElementById('scroll-container').style.display = 'none';
+            flip3dContainer.style.display = 'block';
+            loadFlipPages(currentPage);
+        } else {
+            flip3dContainer.style.display = 'none';
+            document.getElementById('scroll-container').style.display = 'block';
+            // Restore scroll view
+            const target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    // Click handlers for navigation
+    flipNextBtn.addEventListener('click', flipToNext);
+    flipPrevBtn.addEventListener('click', flipToPrev);
+
+    // Click on the right half of the book -> next page
+    flip3dContainer.addEventListener('click', function(e) {
+        if (e.target.closest('button')) return;
+        const rect = this.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        if (x > rect.width / 2) {
+            flipToNext();
+        } else {
+            flipToPrev();
+        }
     });
-});
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (flip3dContainer.style.display !== 'block') return;
+        if (e.key === 'ArrowRight') flipToNext();
+        else if (e.key === 'ArrowLeft') flipToPrev();
+    });
+
+    // Make sure the mode toggle works
+    document.querySelectorAll('#modeGroup button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const mode = this.dataset.mode;
+            document.querySelectorAll('#modeGroup button').forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            window.switchMode(mode);
+        });
+    });
+
+    // ===== SETTINGS: FONT TYPE =====
+    const fontTypeSelect = document.getElementById('fontTypeSelect');
+    const savedFont = localStorage.getItem('reader_font_family') || 'Inter, sans-serif';
+    if (savedFont) {
+        fontTypeSelect.value = savedFont;
+        applyFontType(savedFont);
+    }
+
+    fontTypeSelect.addEventListener('change', function() {
+        const font = this.value;
+        applyFontType(font);
+        localStorage.setItem('reader_font_family', font);
+    });
+
+    function applyFontType(font) {
+        // Apply to all content areas
+        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) {
+            el.style.fontFamily = font;
+        });
+    }
 
     // ===== TOUCH / CLICK EVENTS =====
     document.getElementById('page-viewport').addEventListener('click', function(e) {
@@ -1527,26 +1548,6 @@ document.querySelectorAll('#modeGroup button').forEach(function(btn) {
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active', settingsPanel.classList.contains('open'));
     });
-    // ===== SETTINGS: FONT TYPE =====
-const fontTypeSelect = document.getElementById('fontTypeSelect');
-const savedFont = localStorage.getItem('reader_font_family') || 'Inter, sans-serif';
-if (savedFont) {
-    fontTypeSelect.value = savedFont;
-    applyFontType(savedFont);
-}
-
-fontTypeSelect.addEventListener('change', function() {
-    const font = this.value;
-    applyFontType(font);
-    localStorage.setItem('reader_font_family', font);
-});
-
-function applyFontType(font) {
-    // Apply to all content areas
-    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) {
-        el.style.fontFamily = font;
-    });
-}
 
     // ===== TOC TOGGLE =====
     tocBtn.addEventListener('click', function() {
@@ -2185,10 +2186,8 @@ function applyFontType(font) {
 
     overlay.addEventListener('click', closeAll);
 
-/ ============================================================
     // ============================================================
     //   NEW FEATURES: COMMENTS, PROOFREADING, PRAYER REQUESTS
-    // ============================================================
     // ============================================================
 
     // ===== 1. COMMENTS =====
