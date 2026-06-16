@@ -170,10 +170,8 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             <div class="hero-image-container">
                 <img src="<?php echo SITE_URL; ?>/assets/images/hero-logo.png" alt="AngelWrites - Your Story Lives Here">
             </div>
-            <div>
-                <p style="font-size: 1.15rem; color: var(--text); line-height: 1.6; font-weight: 500; text-align: center; max-width: 320px; margin: 16px auto 0;">
-                    "You don't have to be fixed before you walk in. Just come as you are."
-                </p>
+            <div class="hero-quote">
+                "You don't have to be fixed before you walk in. Just come as you are."
             </div>
         </div>
     </div>
@@ -597,20 +595,58 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .hero-search .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .hero-image-container { width: 420px; height: 420px; display: flex; justify-content: center; align-items: center; }
 .hero-image-container img { width: 100%; height: 100%; object-fit: contain; }
-.hero-image-container + div p { font-size: 1.15rem; color: var(--text); line-height: 1.6; font-weight: 500; text-align: center; max-width: 320px; margin: 16px auto 0; }
 
-/* ===== ABOUT ===== */
+/* ===== SPECIAL QUOTE STYLING ===== */
+.hero-quote {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.2rem;
+    color: var(--rose-dark);
+    font-style: italic;
+    text-align: center;
+    max-width: 450px;
+    margin: 20px auto 0;
+    padding: 16px 24px;
+    background: rgba(219, 161, 162, 0.1);
+    border-radius: 50px;
+    border: 1px solid rgba(219, 161, 162, 0.3);
+    line-height: 1.6;
+}
+
+/* ===== ABOUT (CENTERED & BEAUTIFIED) ===== */
 .about-section { padding: 60px 0; }
-.about-grid { display: grid; grid-template-columns: 1fr 0.8fr; gap: 40px; align-items: center; }
+.about-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+    align-items: center;
+    justify-items: center;
+}
+.about-text {
+    max-width: 800px;
+    text-align: center;
+}
 .about-text h2 { font-size: 2.4rem; margin-bottom: 8px; }
 .about-lead { font-size: 1.2rem; color: var(--text-light); margin-bottom: 16px; font-weight: 500; font-style: italic; }
-.about-features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-.about-feature { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; transition: all 0.2s; }
+.about-features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px auto;
+    text-align: left;
+}
+.about-feature {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s;
+    text-align: center;
+}
 .about-feature:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 .about-feature i { font-size: 1.2rem; color: var(--rose); margin-bottom: 4px; display: block; }
 .about-feature h4 { font-size: 0.95rem; margin-bottom: 2px; }
 .about-feature p { font-size: 0.85rem; color: var(--text-light); margin: 0; }
-.about-cta { margin-top: 20px; }
+.about-cta { margin-top: 20px; text-align: center; }
 .about-small { margin-top: 10px; font-size: 0.9rem; color: var(--text-light); }
 
 /* ===== STATS ===== */
@@ -743,7 +779,6 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     .hero-search { margin: 0 auto; }
     .hero-search .search-form { flex-direction: column; }
     .hero-image-container { width: 280px; height: 280px; }
-    .about-grid { grid-template-columns: 1fr; text-align: center; }
     .about-features-grid { grid-template-columns: 1fr; }
     .sticky-cta .container { flex-direction: column; text-align: center; }
     .testimonial-card { width: 240px; height: 180px; }
