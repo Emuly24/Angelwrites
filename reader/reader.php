@@ -161,7 +161,7 @@ html,body{height:100%;width:100%;overflow:hidden}
 .page-content-inner p:last-child{margin-bottom:0}
 
 /* ===== 3D FLIP MODE ===== */
-#flip-container{display:none;width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg)}
+#flip-container{background: var(--bg); display:none;width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg)}
 .flip-book{position:relative;width:95%;max-width:900px;height:92%;max-height:900px;transform-style:preserve-3d;transition:transform 0.9s cubic-bezier(0.645,0.045,0.355,1)}
 .flip-page{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-hover);border:1px solid var(--border)}
 .flip-page-front{z-index:2;transform:rotateY(0deg);transform-origin:left center}
@@ -640,6 +640,7 @@ html,body{height:100%;width:100%;overflow:hidden}
     const bookId = <?php echo $book_id; ?>;
     const userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
     const groupId = <?php echo $group_id ? (int)$group_id : 0; ?>;
+    const cover_path = <?php echo json_encode($cover_path); ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
 
@@ -773,159 +774,296 @@ html,body{height:100%;width:100%;overflow:hidden}
         updateUI(currentPage);
     }
 
-    // ===== FLIP MODE LOGIC =====
-    function prepareFlipChunks(pageNum) {
-        if (pageNum < 1 || pageNum > totalPages) return;
-        var html = pages[pageNum - 1];
-        var paragraphs = html.split('</p>');
-        var chunks = [];
-        var currentChunk = '';
-        var chunkSize = 6;
-        var count = 0;
-        for (var i = 0; i < paragraphs.length; i++) {
-            var para = paragraphs[i].trim();
-            if (para.length === 0) continue;
-            currentChunk += para + '</p>';
-            count++;
-            if (count >= chunkSize) {
-                chunks.push(currentChunk);
-                currentChunk = '';
-                count = 0;
-            }
-        }
-        if (currentChunk.length > 0) {
-            chunks.push(currentChunk);
-        }
-        flipChunks = chunks;
-        flipCurrentChunkIndex = 0;
+   // ===== FLIP MODE LOGIC (REPLACEMENT) =====
+
+const flipBook = document.getElementById('flipBook');
+const flipLeftPage = document.getElementById('flipLeftPage');
+const flipRightPage = document.getElementById('flipRightPage');
+const cover_path = <?php echo json_encode($cover_path); ?>;
+
+let flipIsAnimating = false;
+let flipDirection = 1; // 1 = forward, -1 = backward
+let flipCurrentPage = currentPage;
+
+// ===== LOAD TWO PAGES SIDE BY SIDE =====
+function loadFlipPages(pageNum) {
+    if (pageNum < 1 || pageNum > totalPages) return;
+
+    // Function to wrap content in the beautiful container
+    function wrapInContainer(html) {
+        return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`;
     }
 
-    function renderFlipChunk(index) {
-        if (index < 0) index = 0;
-        if (index >= flipChunks.length) {
-            if (currentPage < totalPages) {
-                currentPage++;
-                prepareFlipChunks(currentPage);
-                renderFlipChunk(0);
-                updateUI(currentPage);
-                savePosition();
-                loadNotes();
-            }
-            return;
+    // Generate the Cover Image HTML (already has the wrapper inside it)
+    function getCoverHTML() {
+        if (cover_path && cover_path.length > 0) {
+            return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
         }
-        flipCurrentChunkIndex = index;
-        var html = flipChunks[index];
-        if (userId > 0) {
-            var saved = getHighlightsForPage(currentPage);
-            saved.forEach(function(h) {
-                html = html.replaceAll(h.text, '<span class="highlight-' + h.color + '">' + h.text + '</span>');
+        return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
+    }
+
+    // Determine content for left and right pages
+    let leftContent, rightContent;
+
+    if (pageNum === 1) {
+        // Page 1 = Cover Image (Left) + First Content Page (Right)
+        leftContent = getCoverHTML();
+        rightContent = wrapInContainer(pages[0] || '');
+    } else {
+        // Standard behavior: Two pages side by side, wrapped in containers
+        leftContent = wrapInContainer(pages[pageNum - 1] || '');
+        rightContent = wrapInContainer(pages[pageNum] || '');
+    }
+
+    // Split both pages into chunks if they are too long
+    const leftChunks = splitContent(leftContent, 1800);
+    const rightChunks = splitContent(rightContent, 1800);
+
+    // Store chunks
+    flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
+    flipBook.dataset.rightChunks = JSON.stringify(rightChunks);
+    flipBook.dataset.leftIndex = 0;
+    flipBook.dataset.rightIndex = 0;
+    flipBook.dataset.pageNum = pageNum;
+
+    // Render the first chunk of the left page (front)
+    renderChunk(leftChunks[0] || '', 'left');
+    renderChunk(rightChunks[0] || '', 'right');
+
+    // Reset book rotation
+    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
+    flipBook.style.transform = 'rotateY(0deg)';
+
+    flipCurrentPage = pageNum;
+    updateUI(pageNum);
+    savePosition();
+}
+
+function splitContent(html, charLimit) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    const text = tempDiv.textContent || tempDiv.innerText || '';
+    const words = text.split(/\s+/);
+    const chunks = [];
+    let currentChunk = '';
+    
+    for (let i = 0; i < words.length; i++) {
+        if ((currentChunk.length + words[i].length + 1) > charLimit) {
+            const chunkHTML = getHTMLForText(tempDiv, currentChunk);
+            if (chunkHTML) chunks.push(chunkHTML);
+            currentChunk = words[i];
+        } else {
+            if (currentChunk.length > 0) currentChunk += ' ';
+            currentChunk += words[i];
+        }
+    }
+    if (currentChunk.length > 0) {
+        const chunkHTML = getHTMLForText(tempDiv, currentChunk);
+        if (chunkHTML) chunks.push(chunkHTML);
+    }
+    return chunks.length > 0 ? chunks : [html];
+}
+
+function getHTMLForText(sourceDiv, text) {
+    const paragraphs = sourceDiv.querySelectorAll('p');
+    for (let i = 0; i < paragraphs.length; i++) {
+        if (paragraphs[i].textContent.includes(text)) {
+            return paragraphs[i].outerHTML;
+        }
+    }
+    return text;
+}
+
+function renderChunk(html, side) {
+    const target = side === 'left' ? document.getElementById('flipLeftPage').querySelector('.flip-page-content') : document.getElementById('flipRightPage').querySelector('.flip-page-content');
+    target.innerHTML = html;
+}
+
+// ===== FLIP TO NEXT =====
+function flipToNext() {
+    if (flipIsAnimating) return;
+    const pageNum = parseInt(flipBook.dataset.pageNum);
+    if (pageNum >= totalPages) return;
+    
+    flipIsAnimating = true;
+    flipDirection = 1;
+    
+    // Load the next page's first chunk into the right slot
+    const rightChunks = JSON.parse(flipBook.dataset.rightChunks || '[]');
+    const nextRightContent = pages[pageNum + 1] || '';
+    const nextRightChunks = splitContent(nextRightContent, 1800);
+    renderChunk(nextRightChunks[0] || '', 'right');
+    
+    // Animate: right page flips to the left (curl effect)
+    flipBook.classList.add('page-right-flipped');
+    
+    setTimeout(() => {
+        // After animation, replace left with right content and advance page
+        const rightContent = pages[pageNum] || '';
+        const leftChunks = splitContent(rightContent, 1800);
+        const nextRightContent = pages[pageNum + 1] || '';
+        const nextRightChunks = splitContent(nextRightContent, 1800);
+        
+        flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
+        flipBook.dataset.rightChunks = JSON.stringify(nextRightChunks);
+        flipBook.dataset.leftIndex = 0;
+        flipBook.dataset.rightIndex = 0;
+        flipBook.dataset.pageNum = pageNum + 1;
+        
+        renderChunk(leftChunks[0] || '', 'left');
+        renderChunk(nextRightChunks[0] || '', 'right');
+        
+        flipBook.classList.remove('page-right-flipped');
+        flipBook.style.transform = 'rotateY(0deg)';
+        
+        flipCurrentPage = pageNum + 1;
+        updateUI(flipCurrentPage);
+        savePosition();
+        flipIsAnimating = false;
+    }, 800);
+}
+
+// ===== FLIP TO PREV =====
+function flipToPrev() {
+    if (flipIsAnimating) return;
+    const pageNum = parseInt(flipBook.dataset.pageNum);
+    if (pageNum <= 1) return;
+    
+    flipIsAnimating = true;
+    flipDirection = -1;
+    
+    // Load the previous page's last chunk into the left slot
+    const prevContent = pages[pageNum - 2] || '';
+    const prevChunks = splitContent(prevContent, 1800);
+    const lastPrevChunk = prevChunks[prevChunks.length - 1] || '';
+    renderChunk(lastPrevChunk, 'left');
+    
+    // Animate: left page flips to the right (curl effect)
+    flipBook.classList.add('page-left-flipped');
+    
+    setTimeout(() => {
+        // After animation, set up the new page
+        const prevContent = pages[pageNum - 2] || '';
+        const currentContent = pages[pageNum - 1] || '';
+        const prevChunks = splitContent(prevContent, 1800);
+        const currentChunks = splitContent(currentContent, 1800);
+        
+        flipBook.dataset.leftChunks = JSON.stringify(prevChunks);
+        flipBook.dataset.rightChunks = JSON.stringify(currentChunks);
+        flipBook.dataset.leftIndex = 0;
+        flipBook.dataset.rightIndex = 0;
+        flipBook.dataset.pageNum = pageNum - 1;
+        
+        renderChunk(prevChunks[0] || '', 'left');
+        renderChunk(currentChunks[0] || '', 'right');
+        
+        flipBook.classList.remove('page-left-flipped');
+        flipBook.style.transform = 'rotateY(0deg)';
+        
+        flipCurrentPage = pageNum - 1;
+        updateUI(flipCurrentPage);
+        savePosition();
+        flipIsAnimating = false;
+    }, 800);
+}
+
+// ===== CLICK HANDLERS =====
+flipContainer.addEventListener('click', function(e) {
+    if (e.target.closest('button')) return;
+    const rect = this.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x > rect.width / 2) {
+        flipToNext();
+    } else {
+        flipToPrev();
+    }
+});
+
+// ===== KEYBOARD SHORTCUTS =====
+document.addEventListener('keydown', function(e) {
+    if (flipContainer.style.display !== 'block') return;
+    if (e.key === 'ArrowRight') flipToNext();
+    else if (e.key === 'ArrowLeft') flipToPrev();
+});
+
+// ===== NAVIGATION (UPDATED) =====
+function nextPage() {
+    if (readingMode === 'flip') { flipToNext(); }
+    else if (currentPage < totalPages) { goToPage(currentPage + 1); }
+}
+
+function prevPage() {
+    if (readingMode === 'flip') { flipToPrev(); }
+    else if (currentPage > 1) { goToPage(currentPage - 1); }
+}
+
+function goToPage(pageNum) {
+    if (pageNum < 1 || pageNum > totalPages) return;
+    currentPage = pageNum;
+    if (readingMode === 'flip') {
+        loadFlipPages(pageNum);
+    } else {
+        var target = document.querySelector('.page-content[data-page="' + pageNum + '"]');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        updateUI(pageNum);
+    }
+    savePosition();
+    loadNotes();
+}
+
+function updateUI(page) {
+    pageNumEl.textContent = page;
+    var percent = Math.round((page / totalPages) * 100);
+    var circumference = 2 * Math.PI * 16;
+    var offset = circumference - (percent / 100) * circumference;
+    progressFill.setAttribute('stroke-dashoffset', offset);
+    progressPercent.textContent = percent + '%';
+}
+
+function savePosition() {
+    if (userId === 0) return;
+    var data = new FormData();
+    data.append('action', 'save_position');
+    data.append('book_id', bookId);
+    data.append('chapter', currentPage);
+    data.append('percent', Math.round((currentPage / totalPages) * 100));
+    navigator.sendBeacon('/reader/reader_ajax.php', data);
+}
+
+function getHighlightsForPage(page) {
+    var result = [];
+    if (userId === 0) return result;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/reader/reader_ajax.php', false);
+    var fd = new FormData();
+    fd.append('action', 'list_highlights');
+    fd.append('book_id', bookId);
+    xhr.send(fd);
+    try {
+        var data = JSON.parse(xhr.responseText);
+        if (data.success) {
+            data.highlights.forEach(function(h) {
+                if (h.chapter_index == page) result.push(h);
             });
         }
-        flipContainer.innerHTML = `
-            <button class="aw-nav-btn prev" id="prevFlipBtn"><i class="fas fa-chevron-left"></i></button>
-            <button class="aw-nav-btn next" id="nextFlipBtn"><i class="fas fa-chevron-right"></i></button>
-            <div class="reader-page">${html}</div>
-        `;
-        document.getElementById('prevFlipBtn').addEventListener('click', prevFlipPage);
-        document.getElementById('nextFlipBtn').addEventListener('click', nextFlipPage);
-        updateUI(currentPage);
-    }
+    } catch(e) {}
+    return result;
+}
 
-    function nextFlipPage() {
-        if (flipCurrentChunkIndex < flipChunks.length - 1) {
-            renderFlipChunk(flipCurrentChunkIndex + 1);
-        } else {
-            if (currentPage < totalPages) {
-                currentPage++;
-                prepareFlipChunks(currentPage);
-                renderFlipChunk(0);
-                updateUI(currentPage);
-                savePosition();
-                loadNotes();
-            }
-        }
+// ===== SWITCH MODE (UPDATED) =====
+window.switchMode = function(mode) {
+    if (mode === 'flip') {
+        document.getElementById('scroll-container').style.display = 'none';
+        flipContainer.style.display = 'flex';
+        // Initialize the flip book with the correct cover image
+        loadFlipPages(currentPage);
+    } else {
+        flipContainer.style.display = 'none';
+        document.getElementById('scroll-container').style.display = 'block';
+        const target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-
-    function prevFlipPage() {
-        if (flipCurrentChunkIndex > 0) {
-            renderFlipChunk(flipCurrentChunkIndex - 1);
-        } else {
-            if (currentPage > 1) {
-                currentPage--;
-                prepareFlipChunks(currentPage);
-                var lastChunkIndex = flipChunks.length - 1;
-                renderFlipChunk(lastChunkIndex);
-                updateUI(currentPage);
-                savePosition();
-                loadNotes();
-            }
-        }
-    }
-
-    // ===== NAVIGATION =====
-    function nextPage() {
-        if (readingMode === 'flip') { nextFlipPage(); }
-        else if (currentPage < totalPages) { goToPage(currentPage + 1); }
-    }
-
-    function prevPage() {
-        if (readingMode === 'flip') { prevFlipPage(); }
-        else if (currentPage > 1) { goToPage(currentPage - 1); }
-    }
-
-    function goToPage(pageNum) {
-        if (pageNum < 1 || pageNum > totalPages) return;
-        currentPage = pageNum;
-        if (readingMode === 'flip') {
-            prepareFlipChunks(pageNum);
-            renderFlipChunk(0);
-        } else {
-            var target = document.querySelector('.page-content[data-page="' + pageNum + '"]');
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            updateUI(pageNum);
-        }
-        savePosition();
-        loadNotes();
-    }
-
-    function updateUI(page) {
-        pageNumEl.textContent = page;
-        var percent = Math.round((page / totalPages) * 100);
-        var circumference = 2 * Math.PI * 16;
-        var offset = circumference - (percent / 100) * circumference;
-        progressFill.setAttribute('stroke-dashoffset', offset);
-        progressPercent.textContent = percent + '%';
-    }
-
-    function savePosition() {
-        if (userId === 0) return;
-        var data = new FormData();
-        data.append('action', 'save_position');
-        data.append('book_id', bookId);
-        data.append('chapter', currentPage);
-        data.append('percent', Math.round((currentPage / totalPages) * 100));
-        navigator.sendBeacon('/reader/reader_ajax.php', data);
-    }
-
-    function getHighlightsForPage(page) {
-        var result = [];
-        if (userId === 0) return result;
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/reader/reader_ajax.php', false);
-        var fd = new FormData();
-        fd.append('action', 'list_highlights');
-        fd.append('book_id', bookId);
-        xhr.send(fd);
-        try {
-            var data = JSON.parse(xhr.responseText);
-            if (data.success) {
-                data.highlights.forEach(function(h) {
-                    if (h.chapter_index == page) result.push(h);
-                });
-            }
-        } catch(e) {}
-        return result;
-    }
+};
 
     // ===== BOOKMARKS =====
     function loadBookmarkStatus() {
