@@ -559,163 +559,161 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     // ===== FLIP MODE – CHUNKED CONTENT + NO INNER WRAPPER =====
 
     function loadFlipPages(pageNum) {
-        if (pageNum < 1 || pageNum > totalPages) return;
+    if (pageNum < 1 || pageNum > totalPages) return;
 
-        // Helper: Format a page's HTML with headings (Chapter, Acknowledgements, etc.)
-        function formatPageHTML(rawHtml) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = rawHtml;
-            const paragraphs = tempDiv.querySelectorAll('p');
-            let result = '';
-            paragraphs.forEach(p => {
-                const text = p.textContent.trim();
-                if (!text) return;
+    function formatPageHTML(rawHtml) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = rawHtml;
+        const paragraphs = tempDiv.querySelectorAll('p');
+        let result = '';
+        paragraphs.forEach(p => {
+            const text = p.textContent.trim();
+            if (!text) return;
 
-                if (/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)/i.test(text)) {
-                    result += `<h2 class="chapter-heading">${escapeHtml(text)}</h2>`;
-                }
-                else if (text.startsWith('ACKNOWLEDGEMENT')) {
-                    const rest = text.substring('ACKNOWLEDGEMENT'.length).trim();
-                    result += `<h3>Acknowledgements</h3><p>${escapeHtml(rest)}</p>`;
-                }
-                else if (text.startsWith("AUTHOR'S NOTE")) {
-                    const rest = text.substring("AUTHOR'S NOTE".length).trim();
-                    result += `<h3>Author's Note</h3><p>${escapeHtml(rest)}</p>`;
-                }
-                else if (text.startsWith('ABOUT THE AUTHOR')) {
-                    const rest = text.substring('ABOUT THE AUTHOR'.length).trim();
-                    result += `<h3>About the Author</h3><p>${escapeHtml(rest)}</p>`;
-                }
-                else if (/^Psalm\s+(\d+)/i.test(text)) {
-                    result += `<h3>${escapeHtml(text)}</h3>`;
-                }
-                else if (/^To\s+[A-Za-z]/.test(text)) {
-                    result += `<p class="dedication">${escapeHtml(text)}</p>`;
-                }
-                else {
-                    result += `<p>${escapeHtml(text)}</p>`;
-                }
-            });
-            return result;
-        }
-
-        function getCoverHTML() {
-            if (cover_path && cover_path.length > 0) {
-                return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
+            if (/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)/i.test(text)) {
+                result += `<h2 class="chapter-heading">${escapeHtml(text)}</h2>`;
             }
-            return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
-        }
-
-        function escapeHtml(text) {
-            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-        }
-
-        // Split the formatted HTML into blocks of exactly 13 items
-        function splitIntoChunks(html, blockCount) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
-            const blocks = Array.from(tempDiv.children);
-            const chunks = [];
-            for (let i = 0; i < blocks.length; i += blockCount) {
-                const chunkBlocks = blocks.slice(i, i + blockCount);
-                let chunkHtml = '';
-                chunkBlocks.forEach(block => {
-                    chunkHtml += block.outerHTML;
-                });
-                chunks.push(chunkHtml);
+            else if (text.startsWith('ACKNOWLEDGEMENT')) {
+                const rest = text.substring('ACKNOWLEDGEMENT'.length).trim();
+                result += `<h3>Acknowledgements</h3><p>${escapeHtml(rest)}</p>`;
             }
-            if (chunks.length === 0) {
-                chunks.push(html);
+            else if (text.startsWith("AUTHOR'S NOTE")) {
+                const rest = text.substring("AUTHOR'S NOTE".length).trim();
+                result += `<h3>Author's Note</h3><p>${escapeHtml(rest)}</p>`;
             }
-            return chunks;
-        }
-
-        let contentToChunk;
-        if (pageNum === 1) {
-            // Cover image: No inner wrapper, just the image
-            contentToChunk = getCoverHTML();
-        } else {
-            // Format the page content to preserve headings
-            contentToChunk = formatPageHTML(pages[pageNum - 1] || '');
-        }
-
-        // Split into chunks of 13 blocks (paragraphs / headings)
-        const chunks = splitIntoChunks(contentToChunk, 13);
-
-        // Store chunks and current index
-        flipBook.dataset.chunks = JSON.stringify(chunks);
-        flipBook.dataset.currentChunk = 0;
-        flipBook.dataset.pageNum = pageNum;
-
-        // Render the first chunk
-        renderChunk(chunks[0] || '');
+            else if (text.startsWith('ABOUT THE AUTHOR')) {
+                const rest = text.substring('ABOUT THE AUTHOR'.length).trim();
+                result += `<h3>About the Author</h3><p>${escapeHtml(rest)}</p>`;
+            }
+            else if (/^Psalm\s+(\d+)/i.test(text)) {
+                result += `<h3>${escapeHtml(text)}</h3>`;
+            }
+            else if (/^To\s+[A-Za-z]/.test(text)) {
+                result += `<p class="dedication">${escapeHtml(text)}</p>`;
+            }
+            else {
+                result += `<p>${escapeHtml(text)}</p>`;
+            }
+        });
+        return result;
     }
 
-    function renderChunk(html) {
-        // Update the left page content (front)
-        flipLeftContent.innerHTML = html;
-        // Clear the right page (back)
-        flipRightContent.innerHTML = '';
-
-        // Reset book rotation
-        flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
-        flipBook.style.transform = 'rotateY(0deg)';
+    function getCoverHTML() {
+        if (cover_path && cover_path.length > 0) {
+            // No inner wrapper – just the image
+            return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
+        }
+        return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
     }
 
-   function flipToNext() {
+    function escapeHtml(text) {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    // ===== NEW: Smart splitting that respects chapters =====
+    function splitIntoChunks(html, blockCount) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const children = Array.from(tempDiv.children);
+        const chunks = [];
+        let currentChunk = [];
+
+        children.forEach(child => {
+            const isHeader = /^H[2-3]$/i.test(child.tagName);
+
+            // If it's a header (Chapter, Acknowledgement, etc.) AND the current chunk is not empty,
+            // start a new chunk. This ensures every section starts on a fresh page.
+            if (isHeader && currentChunk.length > 0) {
+                chunks.push(currentChunk.map(el => el.outerHTML).join(''));
+                currentChunk = [];
+            }
+
+            currentChunk.push(child);
+
+            // If the chunk has reached blockCount paragraphs, finalize it.
+            if (currentChunk.length >= blockCount) {
+                chunks.push(currentChunk.map(el => el.outerHTML).join(''));
+                currentChunk = [];
+            }
+        });
+
+        // Push the last chunk if it has content
+        if (currentChunk.length > 0) {
+            chunks.push(currentChunk.map(el => el.outerHTML).join(''));
+        }
+
+        return chunks.length > 0 ? chunks : [html];
+    }
+
+    let contentToChunk;
+    if (pageNum === 1) {
+        // Cover image: No extra wrappers
+        contentToChunk = getCoverHTML();
+    } else {
+        contentToChunk = formatPageHTML(pages[pageNum - 1] || '');
+    }
+
+    // Split into chunks of 10 logical blocks (paragraphs / headings)
+    const chunks = splitIntoChunks(contentToChunk, 10);
+
+    flipBook.dataset.chunks = JSON.stringify(chunks);
+    flipBook.dataset.currentChunk = 0;
+    flipBook.dataset.pageNum = pageNum;
+
+    renderChunk(chunks[0] || '');
+}
+
+function renderChunk(html) {
+    flipLeftContent.innerHTML = html;
+    flipRightContent.innerHTML = '';
+    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
+    flipBook.style.transform = 'rotateY(0deg)';
+}
+
+function flipToNext() {
+    const chunks = JSON.parse(flipBook.dataset.chunks || '[]');
+    const currentChunk = parseInt(flipBook.dataset.currentChunk);
+    const pageNum = parseInt(flipBook.dataset.pageNum);
+
+    if (currentChunk < chunks.length - 1) {
+        flipBook.classList.add('page-right-flipped');
+        setTimeout(() => {
+            renderChunk(chunks[currentChunk + 1]);
+            flipBook.dataset.currentChunk = currentChunk + 1;
+            updateUI(pageNum);
+        }, 800);
+    } else if (pageNum < totalPages) {
+        flipBook.classList.add('page-right-flipped');
+        setTimeout(() => {
+            loadFlipPages(pageNum + 1);
+            updateUI(pageNum + 1);
+            savePosition();
+        }, 800);
+    }
+}
+
+function flipToPrev() {
+    const currentChunk = parseInt(flipBook.dataset.currentChunk);
+    const pageNum = parseInt(flipBook.dataset.pageNum);
+
+    if (currentChunk > 0) {
         const chunks = JSON.parse(flipBook.dataset.chunks || '[]');
-        const currentChunk = parseInt(flipBook.dataset.currentChunk);
-        const pageNum = parseInt(flipBook.dataset.pageNum);
-
-        if (currentChunk < chunks.length - 1) {
-            // Move to the next chunk within the same page
-            flipBook.classList.add('page-right-flipped');
-            setTimeout(() => {
-                renderChunk(chunks[currentChunk + 1]);
-                flipBook.dataset.currentChunk = currentChunk + 1;
-                updateUI(pageNum);
-            }, 800);
-        } else {
-            // Move to the next actual page
-            if (pageNum < totalPages) {
-                flipBook.classList.add('page-right-flipped');
-                setTimeout(() => {
-                    loadFlipPages(pageNum + 1);
-                    updateUI(pageNum + 1);
-                    savePosition();
-                }, 800);
-            }
-        }
+        flipBook.classList.add('page-left-flipped');
+        setTimeout(() => {
+            renderChunk(chunks[currentChunk - 1]);
+            flipBook.dataset.currentChunk = currentChunk - 1;
+            updateUI(pageNum);
+        }, 800);
+    } else if (pageNum > 1) {
+        flipBook.classList.add('page-left-flipped');
+        setTimeout(() => {
+            loadFlipPages(pageNum - 1);
+            updateUI(pageNum - 1);
+            savePosition();
+        }, 800);
     }
-
-
-    function flipToPrev() {
-        const currentChunk = parseInt(flipBook.dataset.currentChunk);
-        const pageNum = parseInt(flipBook.dataset.pageNum);
-
-        if (currentChunk > 0) {
-            // Move to the previous chunk within the same page
-            const chunks = JSON.parse(flipBook.dataset.chunks || '[]');
-            flipBook.classList.add('page-left-flipped');
-            setTimeout(() => {
-                renderChunk(chunks[currentChunk - 1]);
-                flipBook.dataset.currentChunk = currentChunk - 1;
-                updateUI(pageNum);
-            }, 800);
-        } else {
-            // Move to the previous actual page
-            if (pageNum > 1) {
-                flipBook.classList.add('page-left-flipped');
-                setTimeout(() => {
-                    loadFlipPages(pageNum - 1);
-                    updateUI(pageNum - 1);
-                    savePosition();
-                }, 800);
-            }
-        }
-    }
-
+}
 
     // ===== NAVIGATION FUNCTIONS =====
     function goToPage(pageNum) {
@@ -934,20 +932,19 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     // ===== KEYBOARD NAVIGATION (Updated) =====
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            nextPage();
-        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            prevPage();
-        } else if (e.key === 'Escape') {
-            closeAll();
-        } else if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            toggleSearch();
-        }
-    });
-
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        nextPage();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        prevPage();
+    } else if (e.key === 'Escape') {
+        closeAll();
+    } else if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        toggleSearch();
+    }
+});
 
     settingsBtn.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
