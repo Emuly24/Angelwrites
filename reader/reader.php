@@ -565,10 +565,46 @@ html, body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
-    <div id="toc-drawer"><div class="toc-header"><h3>Table of Contents</h3><button class="toc-close" id="tocClose">&times;</button></div><div class="toc-body" id="tocBody"><?php if (is_array($toc) && count($toc) > 0): ?><ul class="toc-list"><?php foreach ($toc as $entry): ?><li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li><?php endforeach; ?></ul><?php else: ?><p class="toc-empty">No table of contents available.</p><?php endif; ?></div></div>
+   <div id="toc-drawer" style="display: none;">
+    <div class="toc-header">
+        <h3>Table of Contents</h3>
+        <button class="toc-close" id="tocClose">&times;</button>
+    </div>
+    <div class="toc-body" id="tocBody">
+        <?php if (is_array($toc) && count($toc) > 0): ?>
+        <ul class="toc-list">
+            <?php foreach ($toc as $entry): ?>
+            <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
+            <?php endforeach; ?>
+        </ul>
+        <?php else: ?>
+        <p class="toc-empty">No table of contents available.</p>
+        <?php endif; ?>
+    </div>
+</div>
 
-    <div id="notes-panel"><div class="notes-header"><h3>📝 Group Notes</h3><div><button class="note-submit" id="addNoteBtn">+ Add</button><button class="note-cancel" id="notesClose">&times;</button></div></div><div class="notes-body" id="notesBody"><div id="notesList"><p class="empty-notes">No notes for this chapter.</p></div><div id="noteForm"><textarea id="noteText" rows="2" placeholder="Write a note..."></textarea><div><label><input type="checkbox" id="notePrivate"> Private</label></div><button class="note-submit" onclick="submitNote()">Post</button><button class="note-cancel" onclick="toggleNoteForm()">Cancel</button></div></div></div>
-
+    <div id="notes-panel" style="display: none;">
+    <div class="notes-header">
+        <h3>📝 Group Notes</h3>
+        <div>
+            <button class="note-submit" id="addNoteBtn">+ Add</button>
+            <button class="note-cancel" id="notesClose">&times;</button>
+        </div>
+    </div>
+    <div class="notes-body" id="notesBody">
+        <div id="notesList">
+            <p class="empty-notes">No notes for this chapter.</p>
+        </div>
+        <div id="noteForm">
+            <textarea id="noteText" rows="2" placeholder="Write a note..."></textarea>
+            <div>
+                <label><input type="checkbox" id="notePrivate"> Private</label>
+            </div>
+            <button class="note-submit" onclick="submitNote()">Post</button>
+            <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
+        </div>
+    </div>
+</div>
    <div id="share-modal" class="modal" style="display: none;">
     <div class="modal-content">
         <span class="modal-close" onclick="closeShare()">&times;</span>
@@ -599,6 +635,30 @@ html, body { height:100%; width:100%; overflow:hidden; }
     const lastPage = <?php echo $last_page; ?>;
     const cover_path = <?php echo json_encode($cover_path); ?>;
     const chapterMap = <?php echo json_encode($chapterMap); ?>;
+    // --- FIX: Build chapter map from TOC if PHP detection failed ---
+if (Object.keys(chapterMap).length === 0 && toc && toc.length > 0) {
+    let chapterIndex = 0;
+    // Process each TOC entry
+    for (let i = 0; i < toc.length; i++) {
+        chapterIndex++;
+        const startPage = toc[i].page || 1;
+        // Determine the end page: either one less than the next chapter's start page, or totalPages
+        const endPage = (i < toc.length - 1) ? (toc[i + 1].page - 1) : totalPages;
+        chapterMap[chapterIndex] = [];
+        for (let p = startPage; p <= endPage; p++) {
+            chapterMap[chapterIndex].push(p);
+        }
+        chapterTitles[chapterIndex] = toc[i].title;
+    }
+    // Also map individual pages to chapters for pageToChapter
+    Object.keys(chapterMap).forEach(ch => {
+        const pages = chapterMap[ch];
+        pages.forEach(p => {
+            pageToChapter[p] = parseInt(ch);
+        });
+    });
+    console.log('✅ Chapter map rebuilt from TOC:', chapterMap);
+}
     const pageToChapter = <?php echo json_encode($pageToChapter); ?>;
     const chapterTitles = <?php echo json_encode($chapterTitles); ?>;
     const readingSpeedWPM = <?php echo $reading_speed_wpm; ?>;
@@ -1130,9 +1190,21 @@ html, body { height:100%; width:100%; overflow:hidden; }
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active',settingsPanel.classList.contains('open'));
     });
-    tocBtn.addEventListener('click',function() {
-        tocDrawer.classList.toggle('open');
-        overlay.classList.toggle('active',tocDrawer.classList.contains('open'));
+    tocBtn.addEventListener('click', function() {
+    const drawer = document.getElementById('toc-drawer');
+    if (drawer.style.display === 'none' || drawer.style.display === '') {
+        drawer.style.display = 'block';
+        overlay.classList.add('active');
+    } else {
+        drawer.style.display = 'none';
+        overlay.classList.remove('active');
+    }
+});
+    commentsBtn.addEventListener('click',function() {
+        if (userId === 0) { alert('Please log in to view comments.'); return; }
+        loadComments();
+        commentsModal.style.display = 'block';
+        overlay.classList.add('active');
     });
     tocClose.addEventListener('click',function() {
         tocDrawer.classList.remove('open');
@@ -1196,14 +1268,19 @@ html, body { height:100%; width:100%; overflow:hidden; }
         return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     }
     function showSelectionTooltip(e) {
-        e.stopPropagation();
-        const text = getSelectedText();
-        const range = getSelectionRange();
-        const tooltip = document.getElementById('highlight-tooltip');
-        if (!text || !range || text.length < 1) {
-            tooltip.classList.remove('visible');
-            return;
-        }
+    e.stopPropagation();
+    const text = getSelectedText();
+    const range = getSelectionRange();
+    const tooltip = document.getElementById('highlight-tooltip');
+    
+    if (!text || !range || text.length < 1) {
+        tooltip.classList.remove('visible');
+        // Hide notes panel if selection is cleared
+        document.getElementById('notes-panel').style.display = 'none';
+        overlay.classList.remove('active');
+        return;
+    }
+    
         const rect = range.getBoundingClientRect();
         const tooltipWidth = 320;
         const leftPos = rect.left + rect.width/2 - tooltipWidth/2;
@@ -1219,6 +1296,16 @@ html, body { height:100%; width:100%; overflow:hidden; }
             tooltip.classList.remove('visible');
         }
     });
+    document.addEventListener('click', function(e) {
+    const tooltip = document.getElementById('highlight-tooltip');
+    const notesPanel = document.getElementById('notes-panel');
+    
+    if (tooltip && !tooltip.contains(e.target) && notesPanel && !notesPanel.contains(e.target)) {
+        tooltip.classList.remove('visible');
+        notesPanel.style.display = 'none';
+        overlay.classList.remove('active');
+    }
+});
     document.addEventListener('mouseup',function(e) {
         if (getSelectedText().length > 0) {
             setTimeout(function() { showSelectionTooltip(e); }, 50);
@@ -1272,25 +1359,34 @@ html, body { height:100%; width:100%; overflow:hidden; }
             });
         });
         tooltip.querySelectorAll('.tooltip-action').forEach(function(btn) {
-            btn.addEventListener('click',function() {
-                const action = this.dataset.action;
-                const text = tooltip.dataset.text;
-                switch(action) {
-                    case 'copy': navigator.clipboard.writeText(text).then(()=>{alert('✅ Copied!');}).catch(()=>{document.execCommand('copy');}); break;
-                    case 'note': document.getElementById('annotation-popup').classList.add('visible'); document.getElementById('annotationText').value = '"'+text+'"\n\n'; document.getElementById('annotationText').focus(); break;
-                    case 'share': document.getElementById('share-modal').classList.add('visible'); overlay.classList.add('active'); break;
-                    case 'question': if (groupId===0) { alert('You need to be in a reading group.'); return; } 
-                        const question = prompt('Ask a question about this text:\n\n"'+text+'"');
-                        if (question) { /* send question */ }
-                        break;
-                    case 'react': const picker = document.getElementById('reaction-picker'); if (picker) { picker.style.display = 'flex'; picker.dataset.text = text; } break;
+    btn.addEventListener('click', function() {
+        const action = this.dataset.action;
+        const text = tooltip.dataset.text;
+        switch(action) {
+            case 'copy': /* ... */ break;
+            case 'note': 
+                // Ensure notes panel is open and pre-filled
+                if (groupId > 0) {
+                    const panel = document.getElementById('notes-panel');
+                    panel.style.display = 'flex';
+                    overlay.classList.add('active');
+                    loadNotes();
+                    const noteTextarea = document.getElementById('noteText');
+                    if (noteTextarea) {
+                        noteTextarea.value = '"' + text + '"\n\n';
+                        noteTextarea.focus();
+                    }
+                } else {
+                    alert('You need to be in a reading group to add notes.');
                 }
-                tooltip.classList.remove('visible');
-            });
-        });
-    }
-    initSelectionTooltip();
-
+                break;
+            case 'share': /* ... */ break;
+            case 'question': /* ... */ break;
+            case 'react': /* ... */ break;
+        }
+        tooltip.classList.remove('visible');
+    });
+});
     // ===== RESUME =====
     resumeBtn.addEventListener('click',function() { resumePosition(); });
     window.resumePosition = function() {
@@ -1370,6 +1466,39 @@ html, body { height:100%; width:100%; overflow:hidden; }
         }
         closeShare();
     };
+
+    tocClose.addEventListener('click', function() {
+    document.getElementById('toc-drawer').style.display = 'none';
+    overlay.classList.remove('active');
+});
+
+// Notes Panel Toggle
+notesBtn.addEventListener('click', function() {
+    if (groupId === 0) { 
+        alert('You are not in a reading group for this book.'); 
+        return; 
+    }
+    const panel = document.getElementById('notes-panel');
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'flex'; // use flex to match its CSS layout
+        overlay.classList.add('active');
+        loadNotes();
+    } else {
+        panel.style.display = 'none';
+        overlay.classList.remove('active');
+    }
+});
+
+// Close Notes when the X is clicked
+notesClose.addEventListener('click', function() {
+    document.getElementById('notes-panel').style.display = 'none';
+    overlay.classList.remove('active');
+});
+
+// Clicking the overlay should close any open panel/modal
+overlay.addEventListener('click', function() {
+    closeAll();
+});
     // Function to close the share modal
 window.closeShare = function() {
     document.getElementById('share-modal').style.display = 'none';
@@ -1389,11 +1518,11 @@ shareBtn.addEventListener('click', function() {
 });
     // ===== CLOSE ALL =====
     window.closeAll = function() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.classList.remove('open');
-        document.getElementById('share-modal').classList.remove('visible');
-        overlay.classList.remove('active');
+    document.getElementById('settings-panel').classList.remove('open');
+    document.getElementById('toc-drawer').style.display = 'none';
+    document.getElementById('notes-panel').style.display = 'none';
+    document.getElementById('share-modal').style.display = 'none';
+    document.getElementById('overlay').classList.remove('active');
         if (focusMode) {
             focusMode = false;
             document.getElementById('reader-app').classList.remove('focus-mode');
@@ -1403,7 +1532,7 @@ shareBtn.addEventListener('click', function() {
         if (errorModal.style.display === 'block') { errorModal.style.display = 'none'; }
         if (prayerModal.style.display === 'block') { prayerModal.style.display = 'none'; }
     };
-    overlay.addEventListener('click',closeAll);
+    document.getElementById('overlay').addEventListener('click',closeAll);
 
     // ===== BACK BUTTON =====
     backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
