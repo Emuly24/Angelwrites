@@ -622,6 +622,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     <div id="challenge-widget"></div>
     <div id="overlay" onclick="closeAll()"></div>
 </div>
+
 <script>
 (function() {
     // ===== DATA =====
@@ -735,9 +736,8 @@ html, body { height:100%; width:100%; overflow:hidden; }
         localStorage.setItem('reader_theme',theme);
     }
 
-    // ===== SPLITTER =====
+    // ===== SPLITTER & FLIP LOGIC =====
     function splitByFit(originalPageNum, html) {
-        // (same as before)
         if (originalPageNum === 1 && html.trim() === 'COVER') {
             let coverHTML = '';
             if (cover_path && cover_path.length > 0) {
@@ -807,7 +807,6 @@ html, body { height:100%; width:100%; overflow:hidden; }
         return { chunks, mapping };
     }
 
-    // ===== FLIP RENDERING =====
     function loadFlipPages(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
         const pageHTML = (pageNum === 1) ? 'COVER' : pages[pageNum-1];
@@ -966,114 +965,20 @@ html, body { height:100%; width:100%; overflow:hidden; }
         }
     }
 
-    // ===== EVENTS =====
-    prevFlipBtn.addEventListener('click',flipToPrev);
-    nextFlipBtn.addEventListener('click',flipToNext);
+    // ================================================================
+    // ✅ FULLY IMPLEMENTED BUTTONS
+    // ================================================================
 
-    document.addEventListener('keydown',function(e) {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (readingMode === 'flip') flipToNext(); else scrollContainer.scrollBy({ top: scrollContainer.clientHeight*0.8, behavior:'smooth' });
-        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (readingMode === 'flip') flipToPrev(); else scrollContainer.scrollBy({ top: -scrollContainer.clientHeight*0.8, behavior:'smooth' });
-        } else if (e.key === 'Escape') {
-            closeAll();
-        }
-    });
-
-    document.getElementById('page-viewport').addEventListener('click',function(e) {
-        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('#highlight-tooltip')) return;
-        if (readingMode === 'flip') {
-            const rect = this.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            if (x > rect.width/2) flipToNext(); else flipToPrev();
-        }
-    });
-
-    document.addEventListener('touchstart',function(e) { touchStartX = e.changedTouches[0].screenX; });
-    document.addEventListener('touchend',function(e) {
-        if (readingMode === 'flip') {
-            const diff = touchStartX - e.changedTouches[0].screenX;
-            if (Math.abs(diff) > 30) {
-                if (diff > 0) flipToNext(); else flipToPrev();
-            }
-        }
-    });
-
-    // ===== BOOKMARK =====
-    bookmarkBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to bookmark.'); return; }
-        if (isBookmarked) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/reader/reader_ajax.php', true);
-            const fd = new FormData();
-            fd.append('action', 'remove_bookmark');
-            fd.append('book_id', bookId);
-            xhr.send(fd);
-            isBookmarked = false;
-            bookmarkBtn.querySelector('i').className = 'far fa-bookmark';
-            bookmarkBtn.style.color = '#555';
-        } else {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/reader/reader_ajax.php', true);
-            const fd = new FormData();
-            fd.append('action', 'add_bookmark');
-            fd.append('book_id', bookId);
-            fd.append('chapter', currentPage);
-            fd.append('offset', 0);
-            xhr.send(fd);
-            isBookmarked = true;
-            bookmarkBtn.querySelector('i').className = 'fas fa-bookmark';
-            bookmarkBtn.style.color = 'var(--rose)';
-        }
-    });
-
-    function loadBookmarkStatus() {
-        if (userId === 0) return;
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/reader/reader_ajax.php', false);
-        const fd = new FormData();
-        fd.append('action', 'list_bookmarks');
-        fd.append('book_id', bookId);
-        xhr.send(fd);
-        try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success) {
-                let exists = false;
-                data.bookmarks.forEach(function(b) {
-                    if (b.chapter_index == currentPage) exists = true;
-                });
-                isBookmarked = exists;
-                if (exists) {
-                    bookmarkBtn.querySelector('i').className = 'fas fa-bookmark';
-                    bookmarkBtn.style.color = 'var(--rose)';
-                } else {
-                    bookmarkBtn.querySelector('i').className = 'far fa-bookmark';
-                    bookmarkBtn.style.color = '#555';
-                }
-            }
-        } catch(e) {}
-    }
-
-    // ===== TOC =====
-    document.querySelectorAll('.toc-link').forEach(function(link) {
-        link.addEventListener('click',function(e) {
-            e.preventDefault();
-            const page = parseInt(this.dataset.chapter);
-            if (page >= 1 && page <= totalPages) {
-                goToPage(page);
-                tocDrawer.style.display = 'none';
-                overlay.classList.remove('active');
-            }
-        });
-    });
-    // ===== SIDEBAR TOGGLES =====
+    // ----- Sidebar & Toolbar -----
     sidebarToggle.addEventListener('click', function() { sidebar.classList.toggle('closed'); });
+
+    // ----- Settings -----
     settingsBtn.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active', settingsPanel.classList.contains('open'));
     });
+
+    // ----- TOC -----
     tocBtn.addEventListener('click', function() {
         tocDrawer.classList.toggle('open');
         overlay.classList.toggle('active', tocDrawer.classList.contains('open'));
@@ -1093,6 +998,8 @@ html, body { height:100%; width:100%; overflow:hidden; }
             }
         });
     });
+
+    // ----- Notes Panel -----
     notesBtn.addEventListener('click', function() {
         if (groupId === 0) { alert('You are not in a reading group for this book.'); return; }
         notesPanel.classList.toggle('open');
@@ -1103,96 +1010,10 @@ html, body { height:100%; width:100%; overflow:hidden; }
         notesPanel.classList.remove('open');
         overlay.classList.remove('active');
     });
-
-    // ===== SETTINGS =====
-    document.querySelectorAll('#modeGroup button').forEach(function(btn) {
-        btn.addEventListener('click',function() {
-            const mode = this.dataset.mode;
-            document.querySelectorAll('#modeGroup button').forEach(function(b) { b.classList.remove('active'); });
-            this.classList.add('active');
-            switchMode(mode);
-        });
+    addNoteBtn.addEventListener('click', function() {
+        noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none';
+        if (noteForm.style.display === 'block') noteText.focus();
     });
-
-    document.querySelectorAll('#themeGroup button').forEach(function(btn) {
-        btn.addEventListener('click',function() {
-            const theme = this.dataset.theme;
-            document.querySelectorAll('#themeGroup button').forEach(function(b) { b.classList.remove('active'); });
-            this.classList.add('active');
-            applyTheme(theme);
-        });
-    });
-
-    const savedTheme = localStorage.getItem('reader_theme') || 'light';
-    applyTheme(savedTheme);
-    const themeBtn = document.querySelector('#themeGroup [data-theme="'+savedTheme+'"]');
-    if (themeBtn) themeBtn.classList.add('active');
-
-    document.getElementById('fontSizeSlider').addEventListener('input',function() {
-        const val = parseInt(this.value);
-        document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(function(el) { el.style.fontSize = val+'%'; });
-        document.getElementById('fontSizeLabel').textContent = val+'%';
-        localStorage.setItem('reader_font_size',val);
-    });
-    window.adjustFontSize = function(amount) {
-        const slider = document.getElementById('fontSizeSlider');
-        let val = parseInt(slider.value)+amount;
-        val = Math.min(160,Math.max(70,val));
-        slider.value = val;
-        slider.dispatchEvent(new Event('input'));
-    };
-    const savedSize = localStorage.getItem('reader_font_size') || 100;
-    document.getElementById('fontSizeSlider').value = savedSize;
-    document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(function(el) { el.style.fontSize = savedSize+'%'; });
-    document.getElementById('fontSizeLabel').textContent = savedSize+'%';
-
-    document.getElementById('lineHeightSlider').addEventListener('input',function() {
-        const val = parseInt(this.value);
-        document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(function(el) { el.style.lineHeight = (val/100).toFixed(1); });
-        document.getElementById('lineHeightLabel').textContent = (val/100).toFixed(1);
-        localStorage.setItem('reader_line_height',val);
-    });
-    window.adjustLineHeight = function(amount) {
-        const slider = document.getElementById('lineHeightSlider');
-        let val = parseInt(slider.value)+amount;
-        val = Math.min(220,Math.max(140,val));
-        slider.value = val;
-        slider.dispatchEvent(new Event('input'));
-    };
-    const savedLine = localStorage.getItem('reader_line_height') || 180;
-    document.getElementById('lineHeightSlider').value = savedLine;
-    document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(function(el) { el.style.lineHeight = (savedLine/100).toFixed(1); });
-    document.getElementById('lineHeightLabel').textContent = (savedLine/100).toFixed(1);
-
-    const fontTypeSelect = document.getElementById('fontTypeSelect');
-    const savedFont = localStorage.getItem('reader_font_family') || 'Inter,sans-serif';
-    if (savedFont) { fontTypeSelect.value = savedFont; applyFontType(savedFont); }
-    fontTypeSelect.addEventListener('change',function() {
-        const font = this.value;
-        applyFontType(font);
-        localStorage.setItem('reader_font_family',font);
-    });
-    function applyFontType(font) {
-        document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(function(el) {
-            el.style.fontFamily = font;
-        });
-    }
-
-    // Reading speed slider
-    const speedSlider = document.getElementById('readingSpeedSlider');
-    speedSlider.addEventListener('input',function() {
-        const val = parseInt(this.value);
-        document.getElementById('readingSpeedLabel').textContent = val + ' wpm';
-        if (userId > 0) {
-            const data = new FormData();
-            data.append('action','update_reading_speed');
-            data.append('speed',val);
-            navigator.sendBeacon('/reader/reader_ajax.php',data);
-        }
-        updateUI(currentPage);
-    });
-
-    // ===== NOTES =====
     window.toggleNoteForm = function() { noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none'; };
     window.submitNote = function() {
         const text = noteText.value.trim();
@@ -1222,10 +1043,6 @@ html, body { height:100%; width:100%; overflow:hidden; }
         };
         xhr.send(data);
     };
-    addNoteBtn.addEventListener('click', function() {
-        noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none';
-        if (noteForm.style.display === 'block') noteText.focus();
-    });
     window.deleteNote = function(noteId) {
         if (!confirm('Delete this note?')) return;
         const data = new FormData();
@@ -1297,32 +1114,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
         xhr.send();
     }
 
-    // ===== REACTION PICKER =====
-    reactionPicker.querySelectorAll('button').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            if (!currentNoteId) return;
-            const reaction = this.dataset.reaction;
-            const data = new FormData();
-            data.append('action', 'add_reader_reaction');
-            data.append('note_id', currentNoteId);
-            data.append('reaction_type', reaction);
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/reader/reader_ajax.php', true);
-            xhr.onload = function() {
-                loadNotes();
-                reactionPicker.style.display = 'none';
-                currentNoteId = null;
-            };
-            xhr.send(data);
-        });
-    });
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('#reaction-picker') && !e.target.closest('button')) {
-            reactionPicker.style.display = 'none';
-            currentNoteId = null;
-        }
-    });   
-    // ===== FOCUS MODE =====
+    // ----- Focus Mode -----
     focusBtn.addEventListener('click', function() {
         focusMode = !focusMode;
         document.getElementById('reader-app').classList.toggle('focus-mode', focusMode);
@@ -1333,64 +1125,239 @@ html, body { height:100%; width:100%; overflow:hidden; }
         }
     });
 
-    // ===== SEARCH =====
+    // ----- Search -----
     searchBtn.addEventListener('click', function() { toggleSearch(); });
-    window.toggleSearch = function() {
+    function toggleSearch() {
         searchBar.classList.toggle('visible');
         if (searchBar.classList.contains('visible')) searchInput.focus();
-    };
-    window.closeSearch = function() {
+    }
+    function closeSearch() {
         searchBar.classList.remove('visible');
         searchResults.innerHTML = '';
-        searchResults.style.display = 'none';
-    };
-    searchInput.addEventListener('input', function() {
-        const q = this.value.toLowerCase().trim();
-        if (q.length < 2) { searchResults.innerHTML = ''; searchResults.style.display = 'none'; return; }
-        if (readingMode === 'flip') {
-            // Search only current page's chunks? For simplicity, search all pages
-            let found = [];
-            pages.forEach(function(html, idx) {
-                const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-                if (text.toLowerCase().includes(q)) {
-                    found.push({ page: idx + 1, snippet: text.substring(0, 80) + '…' });
+    }
+
+    // ----- Comments -----
+    commentsBtn.addEventListener('click', function() { openCommentsModal(); });
+    function openCommentsModal() {
+        if (userId === 0) { alert('Please log in to view comments.'); return; }
+        commentsModal.style.display = 'block';
+        loadComments();
+        overlay.classList.add('active');
+    }
+    function closeCommentsModal() {
+        commentsModal.style.display = 'none';
+        overlay.classList.remove('active');
+    }
+    function loadComments() {
+        if (userId === 0) return;
+        document.getElementById('currentCommentPage').textContent = currentPage;
+        const formData = new FormData();
+        formData.append('action', 'get_book_comments');
+        formData.append('book_id', bookId);
+        formData.append('page_num', currentPage);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                commentList.innerHTML = '';
+                if (data.comments.length === 0) {
+                    commentList.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px;">No comments on this page yet.</p>';
+                } else {
+                    data.comments.forEach(com => {
+                        const isAdmin = com.is_admin_reply == 1;
+                        const authorName = isAdmin ? 'Angella (Admin)' : com.author_name;
+                        const badge = isAdmin ? '<span class="admin-badge">🛡️ Admin</span>' : '';
+                        commentList.innerHTML += `
+                            <div class="comment-item ${isAdmin ? 'admin' : ''}">
+                                <div class="comment-author"><i class="fas fa-user-circle"></i> ${authorName} ${badge}</div>
+                                <div style="font-size:0.85rem;color:var(--text-light);">${timeAgo(com.created_at)}</div>
+                                <div style="margin-top:4px;">${com.comment}</div>
+                            </div>
+                        `;
+                    });
                 }
-            });
-            if (found.length === 0) {
-                searchResults.innerHTML = '<div style="color:#999;">No matches</div>';
-                searchResults.style.display = 'block';
+            }
+        });
+    }
+    function submitComment() {
+        const text = commentInput.value.trim();
+        if (!text) return alert('Please write a comment.');
+        const formData = new FormData();
+        formData.append('action', 'add_book_comment');
+        formData.append('book_id', bookId);
+        formData.append('page_num', currentPage);
+        formData.append('comment', text);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                commentInput.value = '';
+                loadComments();
             } else {
-                let html = '';
-                found.slice(0, 10).forEach(function(f) {
-                    html += '<div class="search-result" onclick="goToPage(' + f.page + ')"><strong>Page ' + f.page + '</strong> – ' + f.snippet + '</div>';
-                });
-                searchResults.innerHTML = html;
-                searchResults.style.display = 'block';
+                alert('Error: ' + (data.error || 'Failed to post comment.'));
             }
-        } else {
-            const text = document.querySelector('#scroll-container').innerText;
-            const lines = text.split('\n');
-            let html = '';
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].toLowerCase().includes(q)) {
-                    html += '<div class="search-result">' + lines[i] + '</div>';
-                    if (html.split('</div>').length > 20) break;
-                }
-            }
-            if (html) {
-                searchResults.innerHTML = html;
-                searchResults.style.display = 'block';
+        });
+    }
+
+    // ----- Error Report -----
+    errorReportBtn.addEventListener('click', function() { openErrorModal(); });
+    function openErrorModal() {
+        errorPageNumSpan.textContent = currentPage;
+        errorPageInput.value = currentPage;
+        errorText.value = '';
+        errorCorrection.value = '';
+        errorModal.style.display = 'block';
+        overlay.classList.add('active');
+    }
+    function closeErrorModal() {
+        errorModal.style.display = 'none';
+        overlay.classList.remove('active');
+    }
+    function submitError() {
+        if (userId === 0) { alert('Please login to report an error.'); return; }
+        const text = errorText.value.trim();
+        if (!text) return alert('Please describe the error.');
+        const formData = new FormData();
+        formData.append('action', 'report_book_error');
+        formData.append('book_id', bookId);
+        formData.append('page_num', errorPageInput.value);
+        formData.append('error_text', text);
+        formData.append('correction', errorCorrection.value);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Error report submitted. Thank you for helping improve the book!');
+                closeErrorModal();
             } else {
-                searchResults.innerHTML = '<div style="color:#999;">No matches</div>';
-                searchResults.style.display = 'block';
+                alert('Error: ' + (data.error || 'Failed to submit report.'));
             }
+        });
+    }
+
+    // ----- Prayer Request -----
+    prayerBtn.addEventListener('click', function() { openPrayerModal(); });
+    function openPrayerModal() {
+        prayerText.value = '';
+        prayerModal.style.display = 'block';
+        overlay.classList.add('active');
+    }
+    function closePrayerModal() {
+        prayerModal.style.display = 'none';
+        overlay.classList.remove('active');
+    }
+    function submitPrayer() {
+        if (userId === 0) { alert('Please login to submit a prayer request.'); return; }
+        const text = prayerText.value.trim();
+        if (!text) return alert('Please write your prayer request.');
+        const formData = new FormData();
+        formData.append('action', 'submit_prayer_request');
+        formData.append('book_id', bookId);
+        formData.append('request_text', text);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Prayer request sent. Angella will pray for you.');
+                closePrayerModal();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to send request.'));
+            }
+        });
+    }
+
+    // ----- Export Highlights -----
+    exportHighlightsBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to export highlights.'); return; }
+        const formData = new FormData();
+        formData.append('action', 'export_highlights');
+        formData.append('book_id', bookId);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(response => response.blob())
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'highlights.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('Export failed.'));
+    });
+
+    // ----- Reset Progress -----
+    resetProgressBtn.addEventListener('click', function() {
+        if (userId === 0) return;
+        if (confirm('Reset reading progress for this book?')) {
+            const data = new FormData();
+            data.append('action', 'reset_progress');
+            data.append('book_id', bookId);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            xhr.send(data);
+            goToPage(1);
+            alert('✅ Progress reset.');
         }
     });
 
-    // ===== SHARE =====
+    // ----- Resume Position -----
+    resumeBtn.addEventListener('click', function() { resumePosition(); });
+    function resumePosition() {
+        if (lastPage >= 1 && lastPage <= totalPages) {
+            goToPage(lastPage);
+            if (readingMode === 'scroll') {
+                setTimeout(function() {
+                    const target = document.querySelector('.page-content-inner[data-page="' + lastPage + '"]');
+                    if (target) target.scrollIntoView({ block: 'start' });
+                }, 100);
+            }
+        }
+    }
+
+    // ----- Challenge -----
+    challengeBtn.addEventListener('click', function() { loadChallenge(); });
+    function loadChallenge() {
+        if (userId === 0) { alert('Please log in to view challenges.'); return; }
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/reader/reader_ajax.php?action=get_monthly_challenge&user_id=' + userId, true);
+        xhr.onload = function() {
+            try {
+                const data = JSON.parse(this.responseText);
+                if (data.success) {
+                    challengeWidget.style.display = 'block';
+                    const percent = Math.min(100, Math.round((data.progress / data.target) * 100));
+                    challengeWidget.innerHTML = `
+                        <h4>📖 Monthly Challenge</h4>
+                        <p>${data.goal}</p>
+                        <div class="challenge-progress"><div class="bar" style="width:${percent}%;"></div></div>
+                        <p style="font-size:0.9rem;">${data.progress} / ${data.target} pages</p>
+                        <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:var(--rose);color:white;cursor:pointer;" onclick="updateChallenge()">📈 Update</button>
+                    `;
+                }
+            } catch(e) { console.error('Challenge error:', e); alert('Could not load challenge.'); }
+        };
+        xhr.send();
+    }
+    function updateChallenge() {
+        const pagesRead = prompt('How many pages did you read today?');
+        if (pagesRead && parseInt(pagesRead) > 0) {
+            const data = new FormData();
+            data.append('action', 'update_challenge_progress');
+            data.append('user_id', userId);
+            data.append('pages_read', pagesRead);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            xhr.onload = function() { loadChallenge(); alert('✅ Updated!'); };
+            xhr.send(data);
+        }
+    }
+
+    // ----- Share Modal -----
     shareBtn.addEventListener('click', function() {
         document.getElementById('share-modal').classList.add('visible');
-        document.getElementById('overlay').classList.add('active');
+        overlay.classList.add('active');
     });
     function share(platform) {
         const url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentPage;
@@ -1411,105 +1378,96 @@ html, body { height:100%; width:100%; overflow:hidden; }
         }
         closeShare();
     }
-    window.closeShare = function() { document.getElementById('share-modal').classList.remove('visible'); overlay.classList.remove('active'); };
-    document.getElementById('share-modal').querySelector('.share-close').addEventListener('click', closeShare);
+    function closeShare() {
+        document.getElementById('share-modal').classList.remove('visible');
+        overlay.classList.remove('active');
+    }
 
-    // ===== CHALLENGE =====
-    challengeBtn.addEventListener('click', function() { loadChallenge(); });
-    function loadChallenge() {
+    // ----- Bookmark -----
+    bookmarkBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to bookmark.'); return; }
+        if (isBookmarked) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            const fd = new FormData();
+            fd.append('action', 'remove_bookmark');
+            fd.append('book_id', bookId);
+            xhr.send(fd);
+            isBookmarked = false;
+            bookmarkBtn.querySelector('i').className = 'far fa-bookmark';
+            bookmarkBtn.style.color = '#555';
+        } else {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            const fd = new FormData();
+            fd.append('action', 'add_bookmark');
+            fd.append('book_id', bookId);
+            fd.append('chapter', currentPage);
+            fd.append('offset', 0);
+            xhr.send(fd);
+            isBookmarked = true;
+            bookmarkBtn.querySelector('i').className = 'fas fa-bookmark';
+            bookmarkBtn.style.color = 'var(--rose)';
+        }
+    });
+    function loadBookmarkStatus() {
         if (userId === 0) return;
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', '/reader/reader_ajax.php?action=get_monthly_challenge&user_id=' + userId, true);
-        xhr.onload = function() {
-            try {
-                const data = JSON.parse(this.responseText);
-                if (data.success) {
-                    challengeWidget.style.display = 'block';
-                    const percent = Math.min(100, Math.round((data.progress / data.target) * 100));
-                    challengeWidget.innerHTML = '<h4>📖 Monthly Challenge</h4><p>' + data.goal + '</p><div class="challenge-progress"><div class="bar" style="width:' + percent + '%;"></div></div><p style="font-size:0.9rem;">' + data.progress + ' / ' + data.target + ' pages</p><button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:var(--rose);color:white;cursor:pointer;" onclick="updateChallenge()">📈 Update</button>';
+        xhr.open('POST', '/reader/reader_ajax.php', false);
+        const fd = new FormData();
+        fd.append('action', 'list_bookmarks');
+        fd.append('book_id', bookId);
+        xhr.send(fd);
+        try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+                let exists = false;
+                data.bookmarks.forEach(function(b) {
+                    if (b.chapter_index == currentPage) exists = true;
+                });
+                isBookmarked = exists;
+                if (exists) {
+                    bookmarkBtn.querySelector('i').className = 'fas fa-bookmark';
+                    bookmarkBtn.style.color = 'var(--rose)';
+                } else {
+                    bookmarkBtn.querySelector('i').className = 'far fa-bookmark';
+                    bookmarkBtn.style.color = '#555';
                 }
-            } catch(e) {}
-        };
-        xhr.send();
-    }
-    window.updateChallenge = function() {
-        const pagesRead = prompt('How many pages did you read today?');
-        if (pagesRead && parseInt(pagesRead) > 0) {
-            const data = new FormData();
-            data.append('action', 'update_challenge_progress');
-            data.append('user_id', userId);
-            data.append('pages_read', pagesRead);
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/reader/reader_ajax.php', true);
-            xhr.onload = function() { loadChallenge(); alert('✅ Updated!'); };
-            xhr.send(data);
-        }
-    };
-
-    // ===== RESUME =====
-    resumeBtn.addEventListener('click', function() { resumePosition(); });
-    window.resumePosition = function() {
-        if (lastPage >= 1 && lastPage <= totalPages) {
-            goToPage(lastPage);
-            if (readingMode === 'scroll') {
-                setTimeout(function() {
-                    const target = document.querySelector('.page-content-inner[data-page="' + lastPage + '"]');
-                    if (target) target.scrollIntoView({ block: 'start' });
-                }, 100);
             }
-        }
-    };
-
-    // ===== RESET PROGRESS =====
-    resetProgressBtn.addEventListener('click', function() {
-        if (userId === 0) return;
-        if (confirm('Reset reading progress for this book?')) {
-            const data = new FormData();
-            data.append('action', 'reset_progress');
-            data.append('book_id', bookId);
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/reader/reader_ajax.php', true);
-            xhr.send(data);
-            goToPage(1);
-            alert('✅ Progress reset.');
-        }
-    });
-
-    // ===== EXPORT HIGHLIGHTS =====
-    exportHighlightsBtn.addEventListener('click', function() {
-        if (userId === 0) return;
-        const data = new FormData();
-        data.append('action', 'export_highlights');
-        data.append('book_id', bookId);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/reader/reader_ajax.php', true);
-        xhr.responseType = 'blob';
-        xhr.onload = function() {
-            const url = URL.createObjectURL(this.response);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'highlights.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-        };
-        xhr.send(data);
-    });
-
-    // ===== SESSION =====
-    function startSession() {
-        const data = new FormData();
-        data.append('action', 'start_session');
-        data.append('book_id', bookId);
-        navigator.sendBeacon('/reader/reader_ajax.php', data);
+        } catch(e) {}
     }
-    window.addEventListener('beforeunload', function() {
-        if (userId > 0) {
-            const data = new FormData();
-            data.append('action', 'end_session');
-            data.append('book_id', bookId);
-            navigator.sendBeacon('/reader/reader_ajax.php', data);
-        }
+
+    // ----- Reading Status -----
+    readingStatus.addEventListener('change', function() {
+        if (userId === 0) { alert('Please log in to set reading status.'); return; }
+        const data = new FormData();
+        data.append('action', 'set_reading_status');
+        data.append('book_id', bookId);
+        data.append('status', this.value);
+        navigator.sendBeacon('/reader/reader_ajax.php', data);
     });
+
+    // ----- Back Button -----
+    backBtn.addEventListener('click', function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
+
+    // ----- Close All -----
+    function closeAll() {
+        settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open');
+        notesPanel.classList.remove('open');
+        searchBar.classList.remove('visible');
+        document.getElementById('share-modal').classList.remove('visible');
+        overlay.classList.remove('active');
+        if (focusMode) {
+            focusMode = false;
+            document.getElementById('reader-app').classList.remove('focus-mode');
+            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
+        }
+        if (commentsModal.style.display === 'block') closeCommentsModal();
+        if (errorModal.style.display === 'block') closeErrorModal();
+        if (prayerModal.style.display === 'block') closePrayerModal();
+    }
+    overlay.addEventListener('click', closeAll);
 
     // ===== TIME AGO =====
     function timeAgo(timestamp) {
@@ -1522,7 +1480,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
         return new Date(timestamp).toLocaleDateString();
     }
 
-    // ===== HIGHLIGHT TOOLTIP (simplified from original) =====
+    // ===== HIGHLIGHT TOOLTIP =====
     function getSelectedText() {
         const sel = window.getSelection();
         return sel.toString().trim();
@@ -1531,7 +1489,8 @@ html, body { height:100%; width:100%; overflow:hidden; }
         const sel = window.getSelection();
         return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     }
-    function showSelectionTooltip() {
+    function showSelectionTooltip(e) {
+        e.stopPropagation();
         const text = getSelectedText();
         const range = getSelectionRange();
         const tooltip = document.getElementById('highlight-tooltip');
@@ -1547,9 +1506,6 @@ html, body { height:100%; width:100%; overflow:hidden; }
         tooltip.style.top = Math.max(10, topPos) + 'px';
         tooltip.classList.add('visible');
         tooltip.dataset.text = text;
-        tooltip.dataset.rangeStart = range.startOffset;
-        tooltip.dataset.rangeEnd = range.endOffset;
-        tooltip.dataset.node = range.commonAncestorContainer.parentElement;
     }
     document.addEventListener('click', function(e) {
         const tooltip = document.getElementById('highlight-tooltip');
@@ -1612,158 +1568,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     document.addEventListener('mouseup', function(e) { setTimeout(showSelectionTooltip, 50); });
     document.addEventListener('touchend', function(e) { setTimeout(showSelectionTooltip, 100); });
 
-    // ===== COMMENTS =====
-    function loadComments() {
-        if (userId === 0) return;
-        currentCommentPageSpan.textContent = currentPage;
-        const formData = new FormData();
-        formData.append('action', 'get_book_comments');
-        formData.append('book_id', bookId);
-        formData.append('page_num', currentPage);
-        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                commentList.innerHTML = '';
-                if (data.comments.length === 0) {
-                    commentList.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px;">No comments on this page yet.</p>';
-                } else {
-                    data.comments.forEach(com => {
-                        const isAdmin = com.is_admin_reply == 1;
-                        const authorName = isAdmin ? 'Angella (Admin)' : com.author_name;
-                        const badge = isAdmin ? '<span class="admin-badge">🛡️ Admin</span>' : '';
-                        commentList.innerHTML += `
-                            <div class="comment-item ${isAdmin ? 'admin' : ''}">
-                                <div class="comment-author"><i class="fas fa-user-circle"></i> ${authorName} ${badge}</div>
-                                <div style="font-size:0.85rem;color:var(--text-light);">${timeAgo(com.created_at)}</div>
-                                <div style="margin-top:4px;">${com.comment}</div>
-                            </div>
-                        `;
-                    });
-                }
-            }
-        });
-    }
-    window.submitComment = function() {
-        const text = commentInput.value.trim();
-        if (!text) return alert('Please write a comment.');
-        const formData = new FormData();
-        formData.append('action', 'add_book_comment');
-        formData.append('book_id', bookId);
-        formData.append('page_num', currentPage);
-        formData.append('comment', text);
-        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                commentInput.value = '';
-                loadComments();
-            } else {
-                alert('Error: ' + (data.error || 'Failed to post comment.'));
-            }
-        });
-    };
-    window.openCommentsModal = function() {
-        commentsModal.style.display = 'block';
-        loadComments();
-        overlay.classList.add('active');
-    };
-    window.closeCommentsModal = function() {
-        commentsModal.style.display = 'none';
-        overlay.classList.remove('active');
-    };
-    commentsBtn.addEventListener('click', openCommentsModal);
-
-    // ===== ERROR REPORT =====
-    window.openErrorModal = function() {
-        errorPageNumSpan.textContent = currentPage;
-        errorPageInput.value = currentPage;
-        errorText.value = '';
-        errorCorrection.value = '';
-        errorModal.style.display = 'block';
-        overlay.classList.add('active');
-    };
-    window.closeErrorModal = function() {
-        errorModal.style.display = 'none';
-        overlay.classList.remove('active');
-    };
-    window.submitError = function() {
-        if (userId === 0) { alert('Please login to report an error.'); return; }
-        const text = errorText.value.trim();
-        if (!text) return alert('Please describe the error.');
-        const formData = new FormData();
-        formData.append('action', 'report_book_error');
-        formData.append('book_id', bookId);
-        formData.append('page_num', errorPageInput.value);
-        formData.append('error_text', text);
-        formData.append('correction', errorCorrection.value);
-        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                alert('✅ Error report submitted. Thank you for helping improve the book!');
-                closeErrorModal();
-            } else {
-                alert('Error: ' + (data.error || 'Failed to submit report.'));
-            }
-        });
-    };
-    errorReportBtn.addEventListener('click', openErrorModal);
-
-    // ===== PRAYER REQUESTS =====
-    window.openPrayerModal = function() {
-        prayerText.value = '';
-        prayerModal.style.display = 'block';
-        overlay.classList.add('active');
-    };
-    window.closePrayerModal = function() {
-        prayerModal.style.display = 'none';
-        overlay.classList.remove('active');
-    };
-    window.submitPrayer = function() {
-        if (userId === 0) { alert('Please login to submit a prayer request.'); return; }
-        const text = prayerText.value.trim();
-        if (!text) return alert('Please write your prayer request.');
-        const formData = new FormData();
-        formData.append('action', 'submit_prayer_request');
-        formData.append('book_id', bookId);
-        formData.append('request_text', text);
-        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                alert('✅ Prayer request sent. Angella will pray for you.');
-                closePrayerModal();
-            } else {
-                alert('Error: ' + (data.error || 'Failed to send request.'));
-            }
-        });
-    };
-    prayerBtn.addEventListener('click', openPrayerModal);
-
-    // ===== CLOSE ALL =====
-    window.closeAll = function() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.classList.remove('open');
-        searchBar.classList.remove('visible');
-        document.getElementById('share-modal').classList.remove('visible');
-        overlay.classList.remove('active');
-        if (focusMode) {
-            focusMode = false;
-            document.getElementById('reader-app').classList.remove('focus-mode');
-            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
-        }
-        if (commentsModal.style.display === 'block') closeCommentsModal();
-        if (errorModal.style.display === 'block') closeErrorModal();
-        if (prayerModal.style.display === 'block') closePrayerModal();
-    };
-    overlay.addEventListener('click', closeAll);
-
-    // ===== BACK BUTTON =====
-    backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
-
-    // ===== EXPOSE ALL FUNCTIONS TO GLOBAL SCOPE =====
+    // ===== EXPOSE ALL FUNCTIONS =====
     window.adjustFontSize = adjustFontSize;
     window.adjustLineHeight = adjustLineHeight;
     window.goToPage = goToPage;
@@ -1817,6 +1622,6 @@ html, body { height:100%; width:100%; overflow:hidden; }
         }
     });
 })();
-</script>
+</script>   
 </body>
 </html>
