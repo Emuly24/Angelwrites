@@ -218,7 +218,7 @@ $pageTitle = htmlspecialchars($book['title']);
 
                     <div class="action-buttons">
                         <?php if ($has_processed): ?>
-                            <a href="<?php echo SITE_URL; ?>/reader/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
+                            <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
                         <?php else: ?>

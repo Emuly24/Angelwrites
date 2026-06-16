@@ -736,7 +736,7 @@
     });
 
     function share(platform) {
-        var url = window.location.origin + '/reader/reader/reader.php?id=' + bookId + '&chapter=' + currentPage;
+        var url = window.location.origin + '/reader/reader.phpid=' + bookId + '&chapter=' + currentPage;
         var text = '📖 I\'m reading on AngelWrites!';
         switch(platform) {
             case 'facebook': window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank'); break;

@@ -126,7 +126,7 @@ $pageTitle = 'Books';
                                     <?php endif; ?>
                                 </div>
                                 <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
+                                    <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book['id']; ?>" class="btn btn-primary">
                                         <i class="fas fa-book-open"></i> Read
                                     </a>
                                     <?php if (isLoggedIn()): ?>

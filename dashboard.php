@@ -290,7 +290,7 @@ $pageTitle = 'My Dashboard';
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                                         <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                         <div class="book-actions">
-                                            <a href="<?php echo SITE_URL; ?>/reader/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Continue</a>
+                                            <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Continue</a>
                                             <form method="POST" action="<?php echo SITE_URL; ?>/library.php" style="display:inline;">
                                                 <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
                                                 <input type="hidden" name="status" value="finished">
@@ -334,7 +334,7 @@ $pageTitle = 'My Dashboard';
                                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                                         <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                         <div class="book-actions">
-                                            <a href="<?php echo SITE_URL; ?>/reader/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">Re-read</a>
+                                            <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">Re-read</a>
                                             <a href="<?php echo SITE_URL; ?>/book_review.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary">Review</a>
                                         </div>
                                     </div>
