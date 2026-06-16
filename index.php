@@ -373,7 +373,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                                     <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                 <?php endif; ?>
                             </div>
-                            <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">
+                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">
                                 <i class="fas fa-book-open"></i> Read
                             </a>
                         </div>

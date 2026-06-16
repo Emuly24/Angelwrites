@@ -1360,7 +1360,7 @@ require_once '../includes/header.php';
                 <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Books
                 </a>
-                <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book_id; ?>" class="btn btn-secondary" target="_blank">
+                <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-secondary" target="_blank">
                     <i class="fas fa-eye"></i> Preview Reader
                 </a>
             </div>
@@ -1403,7 +1403,7 @@ require_once '../includes/header.php';
                 <textarea id="editor" name="content_html" style="width:100%;height:500px;"><?php echo htmlspecialchars($existing['content_html'] ?? ''); ?></textarea>
                 <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
                     <button class="btn btn-primary" onclick="saveContent()">💾 Save Changes</button>
-                    <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book_id; ?>" class="btn btn-secondary" target="_blank">
+                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-secondary" target="_blank">
                         <i class="fas fa-eye"></i> Preview Reader
                     </a>
                     <button class="btn btn-outline" onclick="compareWithOriginal()">
@@ -1456,7 +1456,7 @@ require_once '../includes/header.php';
                         <textarea id="editor" name="content_html" style="width:100%;height:500px;"><?php echo htmlspecialchars($existing['content_html'] ?? ''); ?></textarea>
                         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
                             <button class="btn btn-primary" onclick="saveContent()">💾 Save Changes</button>
-                            <a href="<?php echo SITE_URL; ?>/reader/reader.phpid=<?php echo $book_id; ?>" class="btn btn-secondary" target="_blank">
+                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-secondary" target="_blank">
                                 <i class="fas fa-eye"></i> Preview Reader
                             </a>
                         </div>
