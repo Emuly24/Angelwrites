@@ -644,9 +644,7 @@ html,body{height:100%;width:100%;overflow:hidden}
     const lastPage = <?php echo $last_page; ?>;
 
     const scrollContainer = document.getElementById('scroll-container');
-    const flipBook = document.getElementById('flipBook');
-    const flipLeftContent = document.getElementById('flipLeftContent');
-    const flipRightContent = document.getElementById('flipRightContent');
+    const flipContainer = document.getElementById('flip-container'); // This now correctly targets the 3D container
     const pageNumEl = document.getElementById('pageNum');
     const totalPagesEl = document.getElementById('totalPages');
     const progressFill = document.getElementById('progressFill');
@@ -715,6 +713,9 @@ html,body{height:100%;width:100%;overflow:hidden}
     let selectedText = '';
     let selectedRange = null;
 
+    let flipCurrentChunkIndex = 0;
+    let flipChunks = [];
+
     totalPagesEl.textContent = totalPages;
 
     const savedMode = localStorage.getItem('reader_mode');
@@ -756,231 +757,119 @@ html,body{height:100%;width:100%;overflow:hidden}
         localStorage.setItem('reader_mode', mode);
         if (mode === 'flip') {
             scrollContainer.style.display = 'none';
-            flipContainer.style.display = 'flex';
-            loadFlipPages(currentPage);
+            if (flipContainer) {
+                flipContainer.style.display = 'flex';
+            }
+            prepareFlipChunks(currentPage);
+            renderFlipChunk(0);
         } else {
-            flipContainer.style.display = 'none';
+            if (flipContainer) {
+                flipContainer.style.display = 'none';
+            }
             scrollContainer.style.display = 'block';
-            var target = document.querySelector('.page-content-wrapper[data-page="' + currentPage + '"]');
+            var target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         updateUI(currentPage);
     }
-// ===== FLIP MODE IMPLEMENTATION =====
 
-const flipBook = document.getElementById('flipBook');
-const flipLeftContent = document.getElementById('flipLeftContent');
-const flipRightContent = document.getElementById('flipRightContent');
-const flipPrevBtn = document.getElementById('flipPrevBtn');
-const flipNextBtn = document.getElementById('flipNextBtn');
+    // ===== FLIP MODE LOGIC =====
+    function prepareFlipChunks(pageNum) {
+        if (pageNum < 1 || pageNum > totalPages) return;
+        var html = pages[pageNum - 1];
+        var paragraphs = html.split('</p>');
+        var chunks = [];
+        var currentChunk = '';
+        var chunkSize = 6;
+        var count = 0;
+        for (var i = 0; i < paragraphs.length; i++) {
+            var para = paragraphs[i].trim();
+            if (para.length === 0) continue;
+            currentChunk += para + '</p>';
+            count++;
+            if (count >= chunkSize) {
+                chunks.push(currentChunk);
+                currentChunk = '';
+                count = 0;
+            }
+        }
+        if (currentChunk.length > 0) {
+            chunks.push(currentChunk);
+        }
+        flipChunks = chunks;
+        flipCurrentChunkIndex = 0;
+    }
 
-let flipIsAnimating = false;
-let flipDirection = 1; // 1 = forward, -1 = backward
-let flipCurrentPage = currentPage;
+    function renderFlipChunk(index) {
+        if (index < 0) index = 0;
+        if (index >= flipChunks.length) {
+            if (currentPage < totalPages) {
+                currentPage++;
+                prepareFlipChunks(currentPage);
+                renderFlipChunk(0);
+                updateUI(currentPage);
+                savePosition();
+                loadNotes();
+            }
+            return;
+        }
+        flipCurrentChunkIndex = index;
+        var html = flipChunks[index];
+        if (userId > 0) {
+            var saved = getHighlightsForPage(currentPage);
+            saved.forEach(function(h) {
+                html = html.replaceAll(h.text, '<span class="highlight-' + h.color + '">' + h.text + '</span>');
+            });
+        }
+        flipContainer.innerHTML = `
+            <button class="aw-nav-btn prev" id="prevFlipBtn"><i class="fas fa-chevron-left"></i></button>
+            <button class="aw-nav-btn next" id="nextFlipBtn"><i class="fas fa-chevron-right"></i></button>
+            <div class="reader-page">${html}</div>
+        `;
+        document.getElementById('prevFlipBtn').addEventListener('click', prevFlipPage);
+        document.getElementById('nextFlipBtn').addEventListener('click', nextFlipPage);
+        updateUI(currentPage);
+    }
 
-// ===== LOAD TWO PAGES SIDE BY SIDE =====
-function loadFlipPages(pageNum) {
-    if (pageNum < 1 || pageNum > totalPages) return;
-    
-    // Get content for left page (current page) and right page (next page)
-    const leftContent = pages[pageNum - 1] || '';
-    const rightContent = pages[pageNum] || '';
-    
-    // Split both pages into chunks if they are too long
-    const leftChunks = splitContent(leftContent, 1800);
-    const rightChunks = splitContent(rightContent, 1800);
-    
-    // Store chunks
-    flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
-    flipBook.dataset.rightChunks = JSON.stringify(rightChunks);
-    flipBook.dataset.leftIndex = 0;
-    flipBook.dataset.rightIndex = 0;
-    flipBook.dataset.pageNum = pageNum;
-    
-    // Render the first chunk of the left page (front)
-    renderChunk(leftChunks[0] || '', 'left');
-    renderChunk(rightChunks[0] || '', 'right');
-    
-    // Reset book rotation
-    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
-    flipBook.style.transform = 'rotateY(0deg)';
-    
-    flipCurrentPage = pageNum;
-    updateUI(pageNum);
-    savePosition();
-}
-
-function splitContent(html, charLimit) {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    const text = tempDiv.textContent || tempDiv.innerText || '';
-    const words = text.split(/\s+/);
-    const chunks = [];
-    let currentChunk = '';
-    
-    for (let i = 0; i < words.length; i++) {
-        if ((currentChunk.length + words[i].length + 1) > charLimit) {
-            const chunkHTML = getHTMLForText(tempDiv, currentChunk);
-            if (chunkHTML) chunks.push(chunkHTML);
-            currentChunk = words[i];
+    function nextFlipPage() {
+        if (flipCurrentChunkIndex < flipChunks.length - 1) {
+            renderFlipChunk(flipCurrentChunkIndex + 1);
         } else {
-            if (currentChunk.length > 0) currentChunk += ' ';
-            currentChunk += words[i];
+            if (currentPage < totalPages) {
+                currentPage++;
+                prepareFlipChunks(currentPage);
+                renderFlipChunk(0);
+                updateUI(currentPage);
+                savePosition();
+                loadNotes();
+            }
         }
     }
-    if (currentChunk.length > 0) {
-        const chunkHTML = getHTMLForText(tempDiv, currentChunk);
-        if (chunkHTML) chunks.push(chunkHTML);
-    }
-    return chunks.length > 0 ? chunks : [html];
-}
 
-function getHTMLForText(sourceDiv, text) {
-    const paragraphs = sourceDiv.querySelectorAll('p');
-    for (let i = 0; i < paragraphs.length; i++) {
-        if (paragraphs[i].textContent.includes(text)) {
-            return paragraphs[i].outerHTML;
+    function prevFlipPage() {
+        if (flipCurrentChunkIndex > 0) {
+            renderFlipChunk(flipCurrentChunkIndex - 1);
+        } else {
+            if (currentPage > 1) {
+                currentPage--;
+                prepareFlipChunks(currentPage);
+                var lastChunkIndex = flipChunks.length - 1;
+                renderFlipChunk(lastChunkIndex);
+                updateUI(currentPage);
+                savePosition();
+                loadNotes();
+            }
         }
     }
-    return text;
-}
 
-function renderChunk(html, side) {
-    const target = side === 'left' ? flipLeftContent : flipRightContent;
-    target.innerHTML = html;
-}
-
-// ===== FLIP TO NEXT =====
-function flipToNext() {
-    if (flipIsAnimating) return;
-    const pageNum = parseInt(flipBook.dataset.pageNum);
-    if (pageNum >= totalPages) return;
-    
-    flipIsAnimating = true;
-    flipDirection = 1;
-    
-    // Load the next page's first chunk into the right slot
-    const rightChunks = JSON.parse(flipBook.dataset.rightChunks || '[]');
-    const nextRightContent = pages[pageNum + 1] || '';
-    const nextRightChunks = splitContent(nextRightContent, 1800);
-    renderChunk(nextRightChunks[0] || '', 'right');
-    
-    // Animate: right page flips to the left (curl effect)
-    flipBook.classList.add('page-right-flipped');
-    
-    setTimeout(() => {
-        // After animation, replace left with right content and advance page
-        const rightContent = pages[pageNum] || '';
-        const leftChunks = splitContent(rightContent, 1800);
-        const nextRightContent = pages[pageNum + 1] || '';
-        const nextRightChunks = splitContent(nextRightContent, 1800);
-        
-        flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
-        flipBook.dataset.rightChunks = JSON.stringify(nextRightChunks);
-        flipBook.dataset.leftIndex = 0;
-        flipBook.dataset.rightIndex = 0;
-        flipBook.dataset.pageNum = pageNum + 1;
-        
-        renderChunk(leftChunks[0] || '', 'left');
-        renderChunk(nextRightChunks[0] || '', 'right');
-        
-        flipBook.classList.remove('page-right-flipped');
-        flipBook.style.transform = 'rotateY(0deg)';
-        
-        flipCurrentPage = pageNum + 1;
-        updateUI(flipCurrentPage);
-        savePosition();
-        flipIsAnimating = false;
-    }, 800);
-}
-
-// ===== FLIP TO PREV =====
-function flipToPrev() {
-    if (flipIsAnimating) return;
-    const pageNum = parseInt(flipBook.dataset.pageNum);
-    if (pageNum <= 1) return;
-    
-    flipIsAnimating = true;
-    flipDirection = -1;
-    
-    // Load the previous page's last chunk into the left slot
-    const prevContent = pages[pageNum - 2] || '';
-    const prevChunks = splitContent(prevContent, 1800);
-    const lastPrevChunk = prevChunks[prevChunks.length - 1] || '';
-    renderChunk(lastPrevChunk, 'left');
-    
-    // Animate: left page flips to the right (curl effect)
-    flipBook.classList.add('page-left-flipped');
-    
-    setTimeout(() => {
-        // After animation, set up the new page
-        const prevContent = pages[pageNum - 2] || '';
-        const currentContent = pages[pageNum - 1] || '';
-        const prevChunks = splitContent(prevContent, 1800);
-        const currentChunks = splitContent(currentContent, 1800);
-        
-        flipBook.dataset.leftChunks = JSON.stringify(prevChunks);
-        flipBook.dataset.rightChunks = JSON.stringify(currentChunks);
-        flipBook.dataset.leftIndex = 0;
-        flipBook.dataset.rightIndex = 0;
-        flipBook.dataset.pageNum = pageNum - 1;
-        
-        renderChunk(prevChunks[0] || '', 'left');
-        renderChunk(currentChunks[0] || '', 'right');
-        
-        flipBook.classList.remove('page-left-flipped');
-        flipBook.style.transform = 'rotateY(0deg)';
-        
-        flipCurrentPage = pageNum - 1;
-        updateUI(flipCurrentPage);
-        savePosition();
-        flipIsAnimating = false;
-    }, 800);
-}
-
-// ===== CLICK HANDLERS =====
-flipNextBtn.addEventListener('click', flipToNext);
-flipPrevBtn.addEventListener('click', flipToPrev);
-
-flipContainer.addEventListener('click', function(e) {
-    if (e.target.closest('button')) return;
-    const rect = this.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x > rect.width / 2) {
-        flipToNext();
-    } else {
-        flipToPrev();
-    }
-});
-
-// ===== KEYBOARD SHORTCUTS =====
-document.addEventListener('keydown', function(e) {
-    if (flipContainer.style.display !== 'block') return;
-    if (e.key === 'ArrowRight') flipToNext();
-    else if (e.key === 'ArrowLeft') flipToPrev();
-});
-
-// ===== MODE SWITCH =====
-window.switchMode = function(mode) {
-    if (mode === 'flip') {
-        document.getElementById('scroll-container').style.display = 'none';
-        flipContainer.style.display = 'flex';
-        loadFlipPages(currentPage);
-    } else {
-        flipContainer.style.display = 'none';
-        document.getElementById('scroll-container').style.display = 'block';
-        const target = document.querySelector('.page-content-wrapper[data-page="' + currentPage + '"]');
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-};
     // ===== NAVIGATION =====
     function nextPage() {
-        if (readingMode === 'flip') { flipToNext(); }
+        if (readingMode === 'flip') { nextFlipPage(); }
         else if (currentPage < totalPages) { goToPage(currentPage + 1); }
     }
 
     function prevPage() {
-        if (readingMode === 'flip') { flipToPrev(); }
+        if (readingMode === 'flip') { prevFlipPage(); }
         else if (currentPage > 1) { goToPage(currentPage - 1); }
     }
 
@@ -988,9 +877,10 @@ window.switchMode = function(mode) {
         if (pageNum < 1 || pageNum > totalPages) return;
         currentPage = pageNum;
         if (readingMode === 'flip') {
-            loadFlipPages(pageNum);
+            prepareFlipChunks(pageNum);
+            renderFlipChunk(0);
         } else {
-            var target = document.querySelector('.page-content-wrapper[data-page="' + pageNum + '"]');
+            var target = document.querySelector('.page-content[data-page="' + pageNum + '"]');
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             updateUI(pageNum);
         }
@@ -1166,7 +1056,6 @@ window.switchMode = function(mode) {
     document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (savedLine / 100).toFixed(1); });
     document.getElementById('lineHeightLabel').textContent = (savedLine / 100).toFixed(1);
 
-
     // ===== SETTINGS: FONT TYPE =====
     const fontTypeSelect = document.getElementById('fontTypeSelect');
     const savedFont = localStorage.getItem('reader_font_family') || 'Inter, sans-serif';
@@ -1182,7 +1071,6 @@ window.switchMode = function(mode) {
     });
 
     function applyFontType(font) {
-        // Apply to all content areas
         document.querySelectorAll('.page-content, .reader-page').forEach(function(el) {
             el.style.fontFamily = font;
         });
@@ -1550,7 +1438,7 @@ window.switchMode = function(mode) {
             goToPage(lastPage);
             if (readingMode === 'scroll') {
                 setTimeout(function() {
-                    var target = document.querySelector('.page-content-wrapper[data-page="' + lastPage + '"]');
+                    var target = document.querySelector('.page-content[data-page="' + lastPage + '"]');
                     if (target) target.scrollIntoView({ block: 'start' });
                 }, 100);
             }
@@ -1851,7 +1739,7 @@ window.switchMode = function(mode) {
 
     window.goToPage = goToPage;
 
-    /// ===== CLOSE ALL (Optimized Overlay Handling) =====
+    // ===== CLOSE ALL (Optimized Overlay Handling) =====
     window.closeAll = function() {
         settingsPanel.classList.remove('open');
         tocDrawer.classList.remove('open');
@@ -2020,5 +1908,3 @@ window.switchMode = function(mode) {
 
 })();
 </script>
-</body>
-</html>
