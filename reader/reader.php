@@ -158,7 +158,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .flip-page{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden;border-radius:20px;box-shadow:var(--shadow-hover);border:1px solid var(--rose);background:linear-gradient(145deg,var(--rose-light),var(--vanilla));padding:10px;overflow:hidden}
         .flip-page-front{z-index:2;transform:rotateY(0deg);transform-origin:left center}
         .flip-page-back{transform:rotateY(180deg);transform-origin:right center}
-        .flip-page-inner{width:100%;height:100%;padding:30px 40px;background:var(--card-bg);border-radius:12px;box-shadow:inset 0 0 20px rgba(0,0,0,0.03);overflow-y:auto;font-size:1.05rem;line-height:1.8;color:var(--text);font-family:'Inter',sans-serif}
+        .flip-page-inner{width:100%;height:100%;padding:30px 40px;background:var(--card-bg);border-radius:12px;box-shadow:inset 0 0 20px rgba(0,0,0,0.03);font-size:1.05rem;line-height:1.8;color:var(--text);font-family:'Inter',sans-serif}
         .flip-page-inner h1,.flip-page-inner h2,.flip-page-inner h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
         .flip-page-inner p{margin-bottom:16px}
         .flip-page-inner p:last-child{margin-bottom:0}
@@ -561,6 +561,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     function loadFlipPages(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
 
+        // Helper: Format a page's HTML with headings (Chapter, Acknowledgements, etc.)
         function formatPageHTML(rawHtml) {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = rawHtml;
@@ -605,16 +606,42 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
         }
 
-        let contentToSplit;
-        if (pageNum === 1) {
-            contentToSplit = getCoverHTML();
-        } else {
-            // Format the page content but do NOT wrap it in .page-content-wrapper
-            contentToSplit = formatPageHTML(pages[pageNum - 1] || '');
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
         }
 
-        // Split the content into smaller chunks (approx. 1500 characters)
-        const chunks = splitContent(contentToSplit, 1500);
+        // Split the formatted HTML into blocks of exactly 13 items
+        function splitIntoChunks(html, blockCount) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            const blocks = Array.from(tempDiv.children);
+            const chunks = [];
+            for (let i = 0; i < blocks.length; i += blockCount) {
+                const chunkBlocks = blocks.slice(i, i + blockCount);
+                let chunkHtml = '';
+                chunkBlocks.forEach(block => {
+                    chunkHtml += block.outerHTML;
+                });
+                chunks.push(chunkHtml);
+            }
+            if (chunks.length === 0) {
+                chunks.push(html);
+            }
+            return chunks;
+        }
+
+        let contentToChunk;
+        if (pageNum === 1) {
+            // Cover image: No inner wrapper, just the image
+            contentToChunk = getCoverHTML();
+        } else {
+            // Format the page content to preserve headings
+            contentToChunk = formatPageHTML(pages[pageNum - 1] || '');
+        }
+
+        // Split into chunks of 13 blocks (paragraphs / headings)
+        const chunks = splitIntoChunks(contentToChunk, 13);
 
         // Store chunks and current index
         flipBook.dataset.chunks = JSON.stringify(chunks);
@@ -623,60 +650,6 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
         // Render the first chunk
         renderChunk(chunks[0] || '');
-    }
-
-    function splitContent(html, charLimit) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        const text = tempDiv.textContent || tempDiv.innerText || '';
-        const words = text.split(/\s+/);
-        const chunks = [];
-        let currentChunk = '';
-        let currentChunkHTML = '';
-
-        // Helper to extract valid HTML for a given text chunk
-        function getHTMLForText(sourceDiv, textChunk) {
-            // Simple approach: rebuild from paragraphs
-            const paragraphs = sourceDiv.querySelectorAll('p, h2, h3');
-            let result = '';
-            let charCount = 0;
-            for (let p of paragraphs) {
-                const pText = p.textContent.trim();
-                if (pText.length === 0) continue;
-                if (charCount + pText.length > charLimit && charCount > 0) break;
-                result += p.outerHTML;
-                charCount += pText.length;
-            }
-            if (result.length === 0) {
-                // Fallback: return the first paragraph
-                const firstP = sourceDiv.querySelector('p');
-                return firstP ? firstP.outerHTML : textChunk;
-            }
-            return result;
-        }
-
-        // Iterate through words to build chunks
-        for (let i = 0; i < words.length; i++) {
-            if ((currentChunk.length + words[i].length + 1) > charLimit) {
-                // Wrap the chunk in a way that preserves HTML structure
-                const chunkHTML = getHTMLForText(tempDiv, currentChunk);
-                if (chunkHTML) chunks.push(chunkHTML);
-                currentChunk = words[i];
-            } else {
-                if (currentChunk.length > 0) currentChunk += ' ';
-                currentChunk += words[i];
-            }
-        }
-        if (currentChunk.length > 0) {
-            const chunkHTML = getHTMLForText(tempDiv, currentChunk);
-            if (chunkHTML) chunks.push(chunkHTML);
-        }
-
-        // If no chunks were created, return the original HTML
-        if (chunks.length === 0) {
-            return [html];
-        }
-        return chunks;
     }
 
     function renderChunk(html) {
@@ -690,7 +663,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         flipBook.style.transform = 'rotateY(0deg)';
     }
 
-    function flipToNext() {
+   function flipToNext() {
         const chunks = JSON.parse(flipBook.dataset.chunks || '[]');
         const currentChunk = parseInt(flipBook.dataset.currentChunk);
         const pageNum = parseInt(flipBook.dataset.pageNum);
@@ -715,6 +688,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             }
         }
     }
+
 
     function flipToPrev() {
         const currentChunk = parseInt(flipBook.dataset.currentChunk);
@@ -741,6 +715,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             }
         }
     }
+
 
     // ===== NAVIGATION FUNCTIONS =====
     function goToPage(pageNum) {
@@ -957,12 +932,22 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
     });
 
+    // ===== KEYBOARD NAVIGATION (Updated) =====
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'ArrowRight') nextPage();
-        else if (e.key === 'ArrowLeft') prevPage();
-        else if (e.key === 'Escape') { closeAll(); }
-        else if (e.ctrlKey && e.key === 'f') { e.preventDefault(); toggleSearch(); }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            nextPage();
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            prevPage();
+        } else if (e.key === 'Escape') {
+            closeAll();
+        } else if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            toggleSearch();
+        }
     });
+
 
     settingsBtn.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
