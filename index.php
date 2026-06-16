@@ -29,22 +29,19 @@ $stmt->execute();
 $testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH LIVE STATS =====
-// Users count
 $stmt = $db->prepare("SELECT COUNT(*) FROM users");
 $stmt->execute();
 $total_users = $stmt->fetchColumn();
 
-// Books downloaded count (placeholder - you'd need a downloads table)
 $stmt = $db->prepare("SELECT COUNT(*) FROM books WHERE is_free = 1");
 $stmt->execute();
 $free_books = $stmt->fetchColumn();
 
-// Prayers count (placeholder - you'd need a prayer_requests table)
 $stmt = $db->prepare("SELECT COUNT(*) FROM prayer_requests");
 $stmt->execute();
 $total_prayers = $stmt->fetchColumn();
 
-// ===== PERSONALIZED RECOMMENDATIONS (if logged in) =====
+// ===== PERSONALIZED RECOMMENDATIONS =====
 $recommended_books = [];
 if ($isLoggedIn) {
     $stmt = $db->prepare("
@@ -58,10 +55,9 @@ if ($isLoggedIn) {
     $recommended_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// ===== HERO GREETING =====
 $greeting = $isLoggedIn ? "Welcome back, " . htmlspecialchars($_SESSION['name'] ?? 'Friend') . "!" : "Welcome Home.";
 
-// ===== NEWSLETTER SUBSCRIPTION =====
+// ===== NEWSLETTER =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['newsletter_email'])) {
     $email = trim($_POST['newsletter_email']);
     $name = isset($_POST['newsletter_name']) ? trim($_POST['newsletter_name']) : '';
@@ -105,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['newsletter_email'])) 
     }
 }
 
-// ===== HANDLE TESTIMONIAL SUBMISSION =====
+// ===== TESTIMONIAL SUBMISSION =====
 if ($isLoggedIn && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_testimonial'])) {
     $testimony = trim($_POST['testimony']);
     $is_public = isset($_POST['is_public']) ? 1 : 0;
@@ -122,7 +118,6 @@ if ($isLoggedIn && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit
         $stmt->execute([$userId, $testimony, $is_public]);
         $testimonial_success = 'Thank you for sharing! Your story will be reviewed and featured soon.';
         
-        // Notify admin
         $admin_email = 'angelwrites@zohomail.com';
         $subject = 'New Testimonial Submission';
         $body = "A new testimonial has been submitted.\n\nUser: " . $_SESSION['name'] . "\nPublic: " . ($is_public ? 'Yes' : 'No') . "\n\n$testimony";
@@ -134,7 +129,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 ?>
 <?php require_once 'includes/header.php'; ?>
 
-<!-- ===== NEW HERO SECTION – With Warmth, Safety & "Your Story Lives Here" ===== -->
+<!-- ===== HERO SECTION ===== -->
 <section class="hero" style="background: linear-gradient(135deg, #DBA1A2 0%, #EFD8D6 50%, #F7F3ED 100%);">
     <div class="container hero-content">
         <div class="hero-text">
@@ -164,7 +159,6 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                     <a href="#about" class="btn btn-secondary">See What's Here for You</a>
                 <?php endif; ?>
             </div>
-            <!-- Search Bar (visible to all) -->
             <div class="hero-search">
                 <form action="<?php echo SITE_URL; ?>/search_results.php" method="GET" class="search-form">
                     <input type="text" name="q" placeholder="Search books, poems, reflections..." required>
@@ -174,11 +168,10 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
         </div>
         <div class="hero-image">
             <div class="hero-image-container">
-                <!-- REPLACE THIS PATH WITH YOUR ACTUAL IMAGE PATH -->
                 <img src="<?php echo SITE_URL; ?>/assets/images/hero-logo.png" alt="AngelWrites - Your Story Lives Here">
             </div>
-            <div style="text-align: center; margin-top: 12px; max-width: 250px; margin-left: auto; margin-right: auto;">
-                <p style="font-size: 0.85rem; color: var(--text-light); line-height: 1.5; font-style: italic;">
+            <div>
+                <p style="font-size: 1.15rem; color: var(--text); line-height: 1.6; font-weight: 500; text-align: center; max-width: 320px; margin: 16px auto 0;">
                     "You don't have to be fixed before you walk in. Just come as you are."
                 </p>
             </div>
@@ -186,63 +179,24 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     </div>
 </section>
 
-<!-- ===== ABOUT SECTION – User-Centered, Warm, Welcoming ===== -->
+<!-- ===== ABOUT SECTION ===== -->
 <section class="about-section section-padding" id="about">
     <div class="container">
         <div class="about-grid">
             <div class="about-text">
                 <h2>Welcome to <span class="rose-text">AngelWrites</span></h2>
                 <p class="about-lead">You're here because something inside you is crying out for hope. You've been carrying pain, confusion, or loneliness — and you're looking for a place where you can just be real. You've found it.</p>
-                
                 <p>AngelWrites is not about one person. It's about <strong>you</strong> and every human like you who needs to know that God hasn't given up on you. This is a <strong>community</strong> where you can heal, grow, and discover that your story matters.</p>
-                
                 <p>Here, you will find:</p>
-                
                 <div class="about-features-grid">
-                    <div class="about-feature">
-                        <i class="fas fa-book-reader"></i>
-                        <h4>Books &amp; Poems</h4>
-                        <p>Read words that speak to your soul — written by someone who has walked through the fire and come out holding God's hand.</p>
-                    </div>
-                    <div class="about-feature">
-                        <i class="fas fa-pen-fancy"></i>
-                        <h4>Reflections &amp; Blog</h4>
-                        <p>Daily thoughts, honest stories, and insights to pull you out of the pit and point you to hope.</p>
-                    </div>
-                    <div class="about-feature">
-                        <i class="fas fa-hands-praying"></i>
-                        <h4>Prayer Support</h4>
-                        <p>You don't have to pray alone. Ask the community — and Angella — to stand with you in prayer.</p>
-                    </div>
-                    <div class="about-feature">
-                        <i class="fas fa-comments"></i>
-                        <h4>1-on-1 Chats</h4>
-                        <p>Book a free, confidential session with Angella. Your story is safe here.</p>
-                    </div>
-                    <div class="about-feature">
-                        <i class="fas fa-users"></i>
-                        <h4>Reading Groups</h4>
-                        <p>Join or create a circle where you can discuss, question, and grow — together.</p>
-                    </div>
-                    <div class="about-feature">
-                        <i class="fas fa-bible"></i>
-                        <h4>Bible Reader</h4>
-                        <p>All common translations, with highlights, notes, parallel mode, and your own reading progress — built just for you.</p>
-                    </div>
-                    <div class="about-feature">
-                        <i class="fas fa-comment-dots"></i>
-                        <h4>Community Q&amp;A</h4>
-                        <p>Ask questions. Answer questions. See that you are not alone in what you're going through.</p>
-                    </div>
-                    <div class="about-feature">
-                        <i class="fas fa-download"></i>
-                        <h4>Free Downloads</h4>
-                        <p>Free books and resources to help you on your journey. If you can't pay, you still belong here.</p>
-                    </div>
+                    <div class="about-feature"><i class="fas fa-book-reader"></i><h4>Books &amp; Poems</h4><p>Read words that speak to your soul.</p></div>
+                    <div class="about-feature"><i class="fas fa-pen-fancy"></i><h4>Reflections &amp; Blog</h4><p>Daily thoughts, honest stories, and insights.</p></div>
+                    <div class="about-feature"><i class="fas fa-hands-praying"></i><h4>Prayer Support</h4><p>You don't have to pray alone.</p></div>
+                    <div class="about-feature"><i class="fas fa-comments"></i><h4>1-on-1 Chats</h4><p>Book a free, confidential session with Angella.</p></div>
+                    <div class="about-feature"><i class="fas fa-users"></i><h4>Reading Groups</h4><p>Join or create a circle where you can grow together.</p></div>
+                    <div class="about-feature"><i class="fas fa-bible"></i><h4>Bible Reader</h4><p>All common translations with highlights and notes.</p></div>
                 </div>
-                
-                <p>This community was built by <strong>Angella Bottoman</strong> — a Christian writer, speaker, and mentor who believes that every broken vessel holds a beautiful story. But she doesn't see herself as the star. She sees herself as the one who opens the door, holds the light, and walks alongside you. The real story? It's yours. And this is the place where you can start writing it.</p>
-                
+                <p>This community was built by <strong>Angella Bottoman</strong> — a Christian writer who believes every broken vessel holds a beautiful story.</p>
                 <div class="about-cta">
                     <?php if (!$isLoggedIn): ?>
                         <a href="<?php echo SITE_URL; ?>/register.php" class="btn btn-primary">Join the Community — It's Free</a>
@@ -256,7 +210,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     </div>
 </section>
 
-<!-- ===== LIVE STATS COUNTER ===== -->
+<!-- ===== STATS ===== -->
 <section class="stats-section section-padding" style="background-color: var(--vanilla);">
     <div class="container">
         <div class="stats-grid">
@@ -280,31 +234,26 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     </div>
 </section>
 
-<!-- ===== TESTIMONIALS CAROUSEL ===== -->
+<!-- ===== TESTIMONIALS ===== -->
 <section class="testimonials-section section-padding">
     <div class="container">
         <div class="section-header">
             <h2>Real Stories. <span class="rose-text">Real Hope.</span></h2>
             <p>Hear from members whose lives have been touched by AngelWrites.</p>
         </div>
-
         <?php if ($isLoggedIn): ?>
-        <!-- ===== SHARED TESTIMONIAL PROMPT ===== -->
         <div class="testimonial-prompt">
             <p><i class="fas fa-heart" style="color: var(--rose);"></i> Share your AngelWrites story – your testimony could be the hope someone needs today.</p>
             <button class="btn btn-primary btn-sm" id="testimonialPromptBtn">Share Your Story</button>
         </div>
         <?php endif; ?>
-
         <div class="testimonial-carousel-container">
             <div class="testimonial-carousel" id="testimonialCarousel">
                 <?php if (count($testimonials) > 0): ?>
                     <?php foreach ($testimonials as $index => $testimonial): ?>
                         <?php 
-                        // Generate a random color for each card
                         $colors = ['#DBA1A2', '#F7B7A3', '#A8D5BA', '#F3D8C7', '#C4A5C9', '#E8C9A0', '#A3C6D4', '#F0D4D4'];
                         $color = $colors[$index % count($colors)];
-                        // Get user name
                         $stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
                         $stmt->execute([$testimonial['user_id']]);
                         $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -313,9 +262,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                         <div class="testimonial-card" style="--card-color: <?php echo $color; ?>;">
                             <div class="card-inner">
                                 <div class="card-front">
-                                    <div class="testimonial-avatar">
-                                        <i class="fas fa-user-circle"></i>
-                                    </div>
+                                    <div class="testimonial-avatar"><i class="fas fa-user-circle"></i></div>
                                     <p class="testimonial-quote">"<?php echo htmlspecialchars($testimonial['testimony']); ?>"</p>
                                     <span class="testimonial-author">– <?php echo htmlspecialchars($name); ?></span>
                                 </div>
@@ -327,26 +274,20 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <div class="placeholder-testimonial">
-                        <p>No testimonials yet. Be the first to share your story.</p>
-                    </div>
+                    <div class="placeholder-testimonial"><p>No testimonials yet. Be the first to share your story.</p></div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </section>
 
-<!-- ===== TESTIMONIAL SUBMISSION MODAL ===== -->
+<!-- ===== TESTIMONIAL MODAL ===== -->
 <div id="testimonialModal" class="modal" style="display:none;">
     <div class="modal-content">
         <h3>Share Your AngelWrites Story</h3>
         <p>Your testimony could be the hope someone needs today.</p>
-        <?php if (isset($testimonial_error)): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($testimonial_error); ?></div>
-        <?php endif; ?>
-        <?php if (isset($testimonial_success)): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($testimonial_success); ?></div>
-        <?php endif; ?>
+        <?php if (isset($testimonial_error)): ?><div class="alert alert-error"><?php echo htmlspecialchars($testimonial_error); ?></div><?php endif; ?>
+        <?php if (isset($testimonial_success)): ?><div class="alert alert-success"><?php echo htmlspecialchars($testimonial_success); ?></div><?php endif; ?>
         <form method="POST" action="<?php echo SITE_URL; ?>/index.php#testimonials">
             <input type="hidden" name="submit_testimonial" value="1">
             <div class="form-group">
@@ -368,7 +309,6 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 
 <!-- ===== CONTENT GATING ===== -->
 <?php if (!$isLoggedIn): ?>
-    <!-- Guest view: lock overlay + signup prompt -->
     <div class="content-gate">
         <div class="container">
             <div class="gate-message">
@@ -382,8 +322,6 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             </div>
         </div>
     </div>
-
-    <!-- ===== STICKY CTA FOR GUESTS ===== -->
     <div class="sticky-cta" id="stickyCta">
         <div class="container">
             <p><strong>Join AngelWrites Free</strong> – No credit card required. Start your healing journey.</p>
@@ -394,11 +332,9 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             <button class="sticky-cta-close" onclick="document.getElementById('stickyCta').style.display='none'">×</button>
         </div>
     </div>
-
 <?php else: ?>
-    <!-- ===== LOGGED-IN CONTENT ===== -->
 
-    <!-- ===== PERSONALIZED RECOMMENDATIONS ===== -->
+    <!-- ===== RECOMMENDED ===== -->
     <?php if (!empty($recommended_books)): ?>
     <section class="recommended-section section-padding" style="background-color: var(--vanilla);">
         <div class="container">
@@ -415,11 +351,8 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                         <?php else: ?>
                             <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                         <?php endif; ?>
-                        <?php if ($book['is_free']): ?>
-                            <span class="badge free">Free</span>
-                        <?php elseif ($book['is_sale']): ?>
-                            <span class="badge sale">Sale</span>
-                        <?php endif; ?>
+                        <?php if ($book['is_free']): ?><span class="badge free">Free</span><?php endif; ?>
+                        <?php if ($book['is_sale']): ?><span class="badge sale">Sale</span><?php endif; ?>
                     </div>
                     <div class="book-details">
                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
@@ -428,7 +361,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                             <div class="book-description" id="desc-<?php echo $book['id']; ?>">
                                 <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
                             </div>
-                            <?php if (strlen($book['description'] ?? '') > 400): ?>
+                            <?php if (strlen($book['description'] ?? '') > 100): ?>
                                 <button class="toggle-desc-btn" data-id="<?php echo $book['id']; ?>">Read More</button>
                             <?php endif; ?>
                         </div>
@@ -442,7 +375,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                                     <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                 <?php endif; ?>
                             </div>
-                            <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
+                            <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">
                                 <i class="fas fa-book-open"></i> Read
                             </a>
                         </div>
@@ -461,7 +394,6 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                 <h2>Featured <span class="rose-text">Books</span></h2>
                 <p>Explore Angella's latest writings and download free or purchase.</p>
             </div>
-
             <div class="books-grid">
                 <?php if (count($featured_books) > 0): ?>
                     <?php foreach ($featured_books as $book): ?>
@@ -472,11 +404,8 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                             <?php else: ?>
                                 <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                             <?php endif; ?>
-                            <?php if ($book['is_free']): ?>
-                                <span class="badge free">Free</span>
-                            <?php elseif ($book['is_sale']): ?>
-                                <span class="badge sale">Sale</span>
-                            <?php endif; ?>
+                            <?php if ($book['is_free']): ?><span class="badge free">Free</span><?php endif; ?>
+                            <?php if ($book['is_sale']): ?><span class="badge sale">Sale</span><?php endif; ?>
                         </div>
                         <div class="book-details">
                             <h3><?php echo htmlspecialchars($book['title']); ?></h3>
@@ -485,7 +414,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                                 <div class="book-description" id="desc-<?php echo $book['id']; ?>">
                                     <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
                                 </div>
-                                <?php if (strlen($book['description'] ?? '') > 400): ?>
+                                <?php if (strlen($book['description'] ?? '') > 100): ?>
                                     <button class="toggle-desc-btn" data-id="<?php echo $book['id']; ?>">Read More</button>
                                 <?php endif; ?>
                             </div>
@@ -499,7 +428,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                                         <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                     <?php endif; ?>
                                 </div>
-                                <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
+                                <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">
                                     <i class="fas fa-book-open"></i> Read
                                 </a>
                             </div>
@@ -569,7 +498,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
         </div>
     </section>
 
-    <!-- ===== COMMUNITY & SESSION CALL TO ACTION ===== -->
+    <!-- ===== CTA ===== -->
     <section class="cta-section section-padding" style="background: linear-gradient(135deg, #DBA1A2 0%, #EFD8D6 100%);">
         <div class="container">
             <div class="cta-content">
@@ -581,14 +510,12 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
                         <a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-white-outline">Join Community Q&A</a>
                     </div>
                 </div>
-                <div class="cta-image">
-                    <i class="fas fa-hands-praying"></i>
-                </div>
+                <div class="cta-image"><i class="fas fa-hands-praying"></i></div>
             </div>
         </div>
     </section>
 
-    <!-- ===== LATEST FROM THE BLOG ===== -->
+    <!-- ===== BLOG ===== -->
     <section class="latest-blog section-padding">
         <div class="container">
             <div class="section-header">
@@ -634,22 +561,16 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
         </div>
     </section>
 
-<?php endif; // End logged-in content ?>
+<?php endif; ?>
 
-<!-- ===== NEWSLETTER SIGNUP (visible to everyone) ===== -->
+<!-- ===== NEWSLETTER ===== -->
 <section class="newsletter-section section-padding" style="background-color: var(--fantasy);">
     <div class="container">
         <div class="newsletter-content">
             <h2>Stay <span class="rose-text">Inspired</span></h2>
             <p>Join the newsletter to receive Angella's latest writings, book updates, and free resources directly to your inbox.</p>
-            
-            <?php if (isset($newsletter_error)): ?>
-                <div class="alert alert-error"><?php echo htmlspecialchars($newsletter_error); ?></div>
-            <?php endif; ?>
-            <?php if (isset($newsletter_success)): ?>
-                <div class="alert alert-success"><?php echo htmlspecialchars($newsletter_success); ?></div>
-            <?php endif; ?>
-            
+            <?php if (isset($newsletter_error)): ?><div class="alert alert-error"><?php echo htmlspecialchars($newsletter_error); ?></div><?php endif; ?>
+            <?php if (isset($newsletter_success)): ?><div class="alert alert-success"><?php echo htmlspecialchars($newsletter_success); ?></div><?php endif; ?>
             <form action="<?php echo SITE_URL; ?>/index.php" method="POST" class="newsletter-form">
                 <input type="email" name="newsletter_email" placeholder="Your email address" required>
                 <input type="text" name="newsletter_name" placeholder="Your name (optional)">
@@ -662,7 +583,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 
 <!-- ===== STYLES ===== -->
 <style>
-/* ===== HERO SECTION ===== */
+/* ===== HERO ===== */
 .hero { padding: 60px 0; }
 .hero-content { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
 .hero-badge { display: inline-block; background: var(--rose); color: white; padding: 4px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; }
@@ -674,28 +595,11 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .hero-search .search-form { display: flex; gap: 8px; }
 .hero-search .search-form input { flex: 1; padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .hero-search .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+.hero-image-container { width: 420px; height: 420px; display: flex; justify-content: center; align-items: center; }
+.hero-image-container img { width: 100%; height: 100%; object-fit: contain; }
+.hero-image-container + div p { font-size: 1.15rem; color: var(--text); line-height: 1.6; font-weight: 500; text-align: center; max-width: 320px; margin: 16px auto 0; }
 
-/* ===== HERO IMAGE (NEW) ===== */
-.hero-image { display: flex; justify-content: center; align-items: center; flex-direction: column; }
-.hero-image-container {
-    width: 350px;
-    height: 350px;
-    border-radius: 50%;
-    overflow: hidden;
-    box-shadow: var(--shadow-hover);
-    border: 4px solid var(--rose);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: var(--rose-light);
-}
-.hero-image-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-/* ===== ABOUT SECTION ===== */
+/* ===== ABOUT ===== */
 .about-section { padding: 60px 0; }
 .about-grid { display: grid; grid-template-columns: 1fr 0.8fr; gap: 40px; align-items: center; }
 .about-text h2 { font-size: 2.4rem; margin-bottom: 8px; }
@@ -709,7 +613,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .about-cta { margin-top: 20px; }
 .about-small { margin-top: 10px; font-size: 0.9rem; color: var(--text-light); }
 
-/* ===== STATS SECTION ===== */
+/* ===== STATS ===== */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 24px; text-align: center; }
 .stat-item { background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
 .stat-number { font-size: 2.4rem; font-weight: 700; color: var(--rose); }
@@ -761,7 +665,74 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .checkbox-group { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
 .checkbox-group input[type="checkbox"] { width: auto; accent-color: var(--rose); }
 .modal-actions { display: flex; gap: 12px; margin-top: 12px; }
-.modal-actions .btn { flex: 1; justify-content: center; padding: 10px; }
+
+/* ===== BOOKS GRID – Compact ===== */
+.books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+.book-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: all 0.2s; display: flex; flex-direction: column; height: 100%; }
+.book-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+
+.book-cover-wrapper { position: relative; width: 100%; height: 200px; overflow: hidden; flex-shrink: 0; }
+.book-cover-wrapper img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+.book-cover-wrapper:hover img { transform: scale(1.05); }
+.placeholder-cover { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--vanilla); font-size: 3rem; color: var(--text-light); }
+.badge { position: absolute; top: 8px; right: 8px; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: white; }
+.badge.free { background: #28a745; }
+.badge.sale { background: #dc3545; }
+
+.book-details { padding: 12px 14px; display: flex; flex-direction: column; flex: 1; justify-content: space-between; }
+.book-details h3 { font-size: 1rem; margin: 0 0 4px; line-height: 1.3; }
+.book-author { font-size: 0.8rem; color: var(--text-light); margin-bottom: 6px; }
+
+.book-description-wrapper { margin-bottom: 8px; flex: 1; }
+.book-description { font-size: 0.8rem; line-height: 1.5; color: var(--text); max-height: 60px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; transition: max-height 0.3s; }
+.book-description.expanded { max-height: 500px; -webkit-line-clamp: unset; }
+.toggle-desc-btn { background: none; border: none; color: var(--rose); font-size: 0.75rem; cursor: pointer; padding: 2px 0; margin-top: 4px; font-weight: 600; }
+.toggle-desc-btn:hover { text-decoration: underline; }
+
+.book-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.book-price { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.free-text { color: #28a745; }
+.sale-text { color: #dc3545; text-decoration: line-through; }
+.book-bottom .btn { padding: 4px 12px; font-size: 0.75rem; border-radius: 20px; }
+
+/* ===== POEMS ===== */
+.poem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+.poem-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; transition: all 0.2s; }
+.poem-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+.poem-thumbnail { width: 100%; height: 180px; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+.poem-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.poem-content h3 { font-size: 1.1rem; margin: 0 0 8px; }
+.poem-intro-preview { margin-bottom: 8px; }
+.intro-label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.poem-excerpt { font-size: 0.9rem; color: var(--text-light); line-height: 1.6; }
+.read-more { display: inline-block; color: var(--rose); font-weight: 600; font-size: 0.85rem; text-decoration: none; margin-top: 4px; }
+.read-more:hover { text-decoration: underline; }
+.poem-audio { margin-top: 12px; }
+.poem-audio audio { width: 100%; }
+
+/* ===== BLOG ===== */
+.blog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+.blog-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: all 0.2s; }
+.blog-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+.blog-thumbnail { width: 100%; height: 180px; overflow: hidden; }
+.blog-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.blog-content { padding: 16px 20px; }
+.blog-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-light); margin-bottom: 4px; }
+.blog-content h3 { font-size: 1.1rem; margin: 0 0 6px; }
+.blog-excerpt { font-size: 0.9rem; color: var(--text-light); line-height: 1.6; margin: 0 0 8px; }
+
+/* ===== CTA ===== */
+.cta-section { padding: 60px 0; }
+.cta-content { display: flex; align-items: center; gap: 40px; flex-wrap: wrap; }
+.cta-text { flex: 1; }
+.cta-text h2 { font-size: 2rem; margin: 0 0 8px; }
+.cta-text p { font-size: 1.1rem; color: var(--text-light); }
+.cta-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.cta-image { flex: 0 0 120px; text-align: center; font-size: 5rem; color: white; opacity: 0.6; }
+.btn-white { background: white; color: var(--dark); }
+.btn-white:hover { background: var(--vanilla); }
+.btn-white-outline { background: transparent; border: 2px solid white; color: white; }
+.btn-white-outline:hover { background: white; color: var(--dark); }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
@@ -771,19 +742,21 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     .hero-buttons { justify-content: center; }
     .hero-search { margin: 0 auto; }
     .hero-search .search-form { flex-direction: column; }
-    .hero-image-container { width: 200px; height: 200px; }
+    .hero-image-container { width: 280px; height: 280px; }
     .about-grid { grid-template-columns: 1fr; text-align: center; }
     .about-features-grid { grid-template-columns: 1fr; }
-    .about-image { order: -1; }
     .sticky-cta .container { flex-direction: column; text-align: center; }
     .testimonial-card { width: 240px; height: 180px; }
+    .books-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .book-cover-wrapper { height: 160px; }
+    .poem-grid, .blog-grid { grid-template-columns: 1fr; }
 }
 </style>
 
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== TOGGLE DESCRIPTION =====
+    // Toggle Description
     document.querySelectorAll('.toggle-desc-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const id = this.dataset.id;
@@ -798,7 +771,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ===== LIVE STATS COUNTER =====
+    // Stats Counter
     const statNumbers = document.querySelectorAll('.stat-number');
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
@@ -809,7 +782,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }, { threshold: 0.5 });
-
     statNumbers.forEach(stat => observer.observe(stat));
 
     function animateNumber(element, target) {
@@ -826,34 +798,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 30);
     }
 
-    // ===== TESTIMONIAL MODAL =====
+    // Testimonial Modal
     const modal = document.getElementById('testimonialModal');
     const openBtn = document.getElementById('testimonialPromptBtn');
     const closeBtn = document.getElementById('closeTestimonialModal');
-
     if (openBtn && modal) {
-        openBtn.addEventListener('click', function() {
-            modal.style.display = 'flex';
-        });
+        openBtn.addEventListener('click', function() { modal.style.display = 'flex'; });
     }
-
     if (closeBtn && modal) {
-        closeBtn.addEventListener('click', function() {
-            modal.style.display = 'none';
-        });
+        closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
         window.addEventListener('click', function(e) {
             if (e.target === modal) modal.style.display = 'none';
         });
     }
 
-    // ===== STICKY CTA CLOSE =====
+    // Sticky CTA Close
     const stickyCta = document.getElementById('stickyCta');
     if (stickyCta) {
         const closeBtn = stickyCta.querySelector('.sticky-cta-close');
         if (closeBtn) {
-            closeBtn.addEventListener('click', function() {
-                stickyCta.style.display = 'none';
-            });
+            closeBtn.addEventListener('click', function() { stickyCta.style.display = 'none'; });
         }
     }
 });

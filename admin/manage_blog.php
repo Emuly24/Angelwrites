@@ -89,6 +89,9 @@ $pageTitle = 'Manage Blog';
                 <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
                     <i class="fas fa-moon"></i>
                 </button>
+                <button id="openCameraBtn" class="btn btn-secondary">
+                    <i class="fas fa-camera"></i> Capture Image
+                </button>
                 <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=blog" class="btn btn-primary">
                     <i class="fas fa-plus"></i> New Post
                 </a>
@@ -211,75 +214,73 @@ $pageTitle = 'Manage Blog';
     </div>
 </div>
 
-<!-- ===== JAVASCRIPT ===== -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // ===== THEME TOGGLE =====
-    const themeToggle = document.getElementById('themeToggle');
-    const currentTheme = localStorage.getItem('blogManagerTheme') || 'light';
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-    }
+<!-- ===== FULL-SCREEN CAMERA MODAL ===== -->
+<div id="cameraModal" class="camera-modal" style="display:none;">
+    <div class="camera-modal-inner">
+        <div class="camera-preview-wrapper">
+            <video id="cameraPreview" autoplay muted playsinline></video>
+        </div>
+        
+        <!-- Top Bar -->
+        <div class="camera-top-bar">
+            <button type="button" class="camera-close-btn" id="cameraCloseBtn">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="camera-mode-switch">
+                <button type="button" class="mode-btn active" data-mode="photo">📷 Photo</button>
+                <button type="button" class="mode-btn" data-mode="video">🎥 Video</button>
+            </div>
+        </div>
 
-    window.toggleTheme = function() {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('blogManagerTheme', isDark ? 'dark' : 'light');
-        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-    };
+        <!-- Bottom Controls -->
+        <div class="camera-bottom-controls">
+            <div class="camera-controls-left">
+                <button type="button" id="retakeMediaBtn" class="camera-btn" disabled>
+                    <i class="fas fa-redo"></i> Retake
+                </button>
+            </div>
+            <div class="camera-controls-center">
+                <button type="button" id="captureBtn" class="camera-shutter-btn">
+                    <span class="shutter-ring"></span>
+                    <span class="shutter-inner"></span>
+                </button>
+            </div>
+            <div class="camera-controls-right">
+                <button type="button" id="confirmMediaBtn" class="camera-btn" disabled>
+                    <i class="fas fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
 
-    // ===== BULK ACTIONS =====
-    const selectAllRows = document.getElementById('selectAllRows');
-    const rowCheckboxes = document.querySelectorAll('.row-select');
-    const executeBulkBtn = document.getElementById('executeBulkAction');
-    const bulkActionSelect = document.getElementById('bulkActionSelect');
+        <!-- Status / Timer -->
+        <div id="cameraStatus" class="camera-status">Ready</div>
+    </div>
+</div>
 
-    selectAllRows.addEventListener('change', function() {
-        rowCheckboxes.forEach(cb => cb.checked = this.checked);
-        updateBulkButton();
-    });
-    rowCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkButton));
-
-    function updateBulkButton() {
-        const checked = document.querySelectorAll('.row-select:checked').length;
-        executeBulkBtn.disabled = (checked === 0);
-    }
-
-    executeBulkBtn.addEventListener('click', function() {
-        const action = bulkActionSelect.value;
-        const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
-        if (!action || ids.length === 0) {
-            alert('Please select an action and at least one post.');
-            return;
-        }
-        if (!confirm(`Apply "${action}" to ${ids.length} post(s)?`)) return;
-        document.getElementById('bulkActionInput').value = action;
-        document.getElementById('selectedIdsInput').value = ids.join(',');
-        document.getElementById('bulkForm').submit();
-    });
-});
-</script>
+<!-- Hidden input for captured image -->
+<input type="file" id="liveThumbnailInput" name="live_thumbnail" accept="image/*" style="display:none;">
 
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --vanilla: #EFD8D6;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44, 30, 30, 0.08);
+    --shadow-hover: 0 8px 30px rgba(44, 30, 30, 0.15);
+    --input-bg: #ffffff;
 }
 body.dark-mode {
     --bg: #1a1a1a;
     --card-bg: #2a2a2a;
     --border: #444;
+    --text: #e8dddd;
     --text-light: #aaa;
     --input-bg: #333;
     --vanilla: #2a2a2a;
@@ -288,6 +289,7 @@ body.dark-mode {
 }
 body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 
+/* ===== ADMIN PAGE STYLES ===== */
 .admin-page { padding: 32px 0 60px; }
 .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
 .admin-header h1 { font-size: 2rem; margin: 0; }
@@ -321,11 +323,458 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .page-link:hover { border-color: var(--rose); }
 .page-link.active { background: var(--rose); color: white; border-color: var(--rose); }
 
+/* ===== FULL-SCREEN CAMERA MODAL STYLES ===== */
+.camera-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.camera-modal-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+}
+
+.camera-preview-wrapper {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+}
+
+.camera-preview-wrapper video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 20px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 2;
+}
+
+.camera-close-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.camera-close-btn:hover { background: rgba(255,255,255,0.3); }
+
+.camera-mode-switch {
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 30px;
+    padding: 4px;
+}
+
+.camera-mode-switch .mode-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.6);
+    padding: 8px 20px;
+    border-radius: 26px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.camera-mode-switch .mode-btn.active {
+    background: rgba(255,255,255,0.9);
+    color: #000;
+}
+
+.camera-bottom-controls {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    right: 0;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 2;
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%);
+    padding-top: 30px;
+    padding-bottom: 30px;
+}
+
+.camera-controls-left,
+.camera-controls-right {
+    flex: 0 0 80px;
+    display: flex;
+    justify-content: center;
+}
+
+.camera-controls-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.camera-shutter-btn {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.8);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.camera-shutter-btn .shutter-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.3);
+    top: -4px;
+    left: -4px;
+    pointer-events: none;
+}
+
+.camera-shutter-btn .shutter-inner {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #fff;
+    transition: all 0.2s;
+}
+
+.camera-shutter-btn:hover .shutter-inner { opacity: 0.8; }
+
+.camera-shutter-btn.recording .shutter-inner {
+    background: #ff3b30;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+}
+
+.camera-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.camera-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.camera-btn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
+
+.camera-status {
+    position: absolute;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 500;
+    text-shadow: 0 0 20px rgba(0,0,0,0.5);
+    z-index: 2;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+}
+
 @media (max-width: 480px) {
     .search-form { flex-direction: column; }
     .search-form input { width: 100%; }
     .admin-table th, .admin-table td { padding: 8px 10px; font-size: 0.85rem; }
+    .camera-bottom-controls { bottom: 16px; padding: 0 12px; padding-bottom: 16px; }
+    .camera-shutter-btn { width: 64px; height: 64px; }
+    .camera-shutter-btn .shutter-inner { width: 48px; height: 48px; }
+    .camera-btn { font-size: 0.75rem; padding: 6px 12px; }
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ============================================================
+    // THEME TOGGLE
+    // ============================================================
+    const themeToggle = document.getElementById('themeToggle');
+    const currentTheme = localStorage.getItem('blogManagerTheme') || 'light';
+    if (currentTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+    }
+
+    window.toggleTheme = function() {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        localStorage.setItem('blogManagerTheme', isDark ? 'dark' : 'light');
+        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    };
+
+    // ============================================================
+    // BULK ACTIONS
+    // ============================================================
+    const selectAllRows = document.getElementById('selectAllRows');
+    const rowCheckboxes = document.querySelectorAll('.row-select');
+    const executeBulkBtn = document.getElementById('executeBulkAction');
+    const bulkActionSelect = document.getElementById('bulkActionSelect');
+
+    selectAllRows.addEventListener('change', function() {
+        rowCheckboxes.forEach(cb => cb.checked = this.checked);
+        updateBulkButton();
+    });
+    rowCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkButton));
+
+    function updateBulkButton() {
+        const checked = document.querySelectorAll('.row-select:checked').length;
+        executeBulkBtn.disabled = (checked === 0);
+    }
+
+    executeBulkBtn.addEventListener('click', function() {
+        const action = bulkActionSelect.value;
+        const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
+        if (!action || ids.length === 0) {
+            alert('Please select an action and at least one post.');
+            return;
+        }
+        if (!confirm(`Apply "${action}" to ${ids.length} post(s)?`)) return;
+        document.getElementById('bulkActionInput').value = action;
+        document.getElementById('selectedIdsInput').value = ids.join(',');
+        document.getElementById('bulkForm').submit();
+    });
+
+    // ============================================================
+    // FULL-SCREEN CAMERA MODAL
+    // ============================================================
+    const cameraModal = document.getElementById('cameraModal');
+    const cameraPreview = document.getElementById('cameraPreview');
+    const cameraCloseBtn = document.getElementById('cameraCloseBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const retakeBtn = document.getElementById('retakeMediaBtn');
+    const confirmBtn = document.getElementById('confirmMediaBtn');
+    const cameraStatus = document.getElementById('cameraStatus');
+    const liveThumbnailInput = document.getElementById('liveThumbnailInput');
+    const modeBtns = document.querySelectorAll('.mode-btn');
+    const openCameraBtn = document.getElementById('openCameraBtn');
+
+    let cameraStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let capturedBlob = null;
+    let recordedBlob = null;
+    let currentMode = 'photo';
+
+    function openCamera(mode) {
+        currentMode = mode;
+        cameraModal.style.display = 'flex';
+        cameraStatus.textContent = 'Starting camera...';
+
+        modeBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+
+        if (mode === 'photo') {
+            captureBtn.classList.remove('recording');
+            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
+        } else {
+            captureBtn.classList.remove('recording');
+            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
+        }
+
+        retakeBtn.disabled = true;
+        confirmBtn.disabled = true;
+        capturedBlob = null;
+        recordedBlob = null;
+        recordedChunks = [];
+
+        startCameraStream();
+    }
+
+    function closeCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        cameraPreview.srcObject = null;
+        cameraPreview.src = '';
+        cameraModal.style.display = 'none';
+    }
+
+    async function startCameraStream() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                cameraStatus.textContent = '❌ Camera not supported';
+                return;
+            }
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: currentMode === 'video' });
+            cameraPreview.srcObject = cameraStream;
+            cameraStatus.textContent = currentMode === 'photo' ? 'Ready' : 'Ready to record';
+        } catch (error) {
+            cameraStatus.textContent = '❌ Camera access denied: ' + error.message;
+        }
+    }
+
+    function capturePhoto() {
+        if (!cameraStream) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = cameraPreview.videoWidth || 1280;
+        canvas.height = cameraPreview.videoHeight || 720;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+            capturedBlob = blob;
+            retakeBtn.disabled = false;
+            confirmBtn.disabled = false;
+            cameraStatus.textContent = '✅ Photo captured';
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraPreview.srcObject = null;
+        }, 'image/jpeg');
+    }
+
+    function startRecording() {
+        if (!cameraStream) return;
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(cameraStream);
+        mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = function() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            if (blob.size > 0) {
+                recordedBlob = blob;
+                retakeBtn.disabled = false;
+                confirmBtn.disabled = false;
+                cameraStatus.textContent = '✅ Recording complete';
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraPreview.srcObject = null;
+            }
+        };
+        mediaRecorder.start();
+        captureBtn.classList.add('recording');
+        captureBtn.querySelector('.shutter-inner').style.borderRadius = '6px';
+        cameraStatus.textContent = '🔴 Recording...';
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            captureBtn.classList.remove('recording');
+        }
+    }
+
+    function retakeMedia() {
+        capturedBlob = null;
+        recordedBlob = null;
+        recordedChunks = [];
+        retakeBtn.disabled = true;
+        confirmBtn.disabled = true;
+        cameraStatus.textContent = 'Retaking...';
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        startCameraStream();
+    }
+
+    function confirmMedia() {
+        if (currentMode === 'photo' && capturedBlob) {
+            const file = new File([capturedBlob], 'captured_image.jpg', { type: 'image/jpeg' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            liveThumbnailInput.files = dt.files;
+            closeCamera();
+            alert('✅ Image captured and ready for upload!');
+        } else if (currentMode === 'video' && recordedBlob) {
+            const file = new File([recordedBlob], 'captured_video.webm', { type: 'video/webm' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            liveThumbnailInput.files = dt.files;
+            closeCamera();
+            alert('✅ Video captured and ready for upload!');
+        }
+    }
+
+    openCameraBtn.addEventListener('click', function() { openCamera('photo'); });
+    cameraCloseBtn.addEventListener('click', closeCamera);
+
+    captureBtn.addEventListener('click', function() {
+        if (currentMode === 'photo') {
+            capturePhoto();
+        } else {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+    });
+
+    retakeBtn.addEventListener('click', retakeMedia);
+    confirmBtn.addEventListener('click', confirmMedia);
+
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const mode = this.dataset.mode;
+            if (mode === currentMode) return;
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            closeCamera();
+            setTimeout(() => openCamera(mode), 200);
+        });
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && cameraModal.style.display !== 'none') {
+            closeCamera();
+        }
+    });
+});
+</script>
 
 <?php require_once '../includes/footer.php'; ?>

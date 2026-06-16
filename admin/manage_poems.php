@@ -217,35 +217,14 @@ $pageTitle = 'Manage Poems';
                 <textarea id="editor" name="content" rows="10"></textarea>
             </div>
 
-            <!-- ===== LIVE PHOTO CAPTURE ===== -->
+            <!-- ===== CAMERA & IMAGE ===== -->
             <div class="form-group">
-                <label>Live Photo (capture with camera)</label>
-                <div class="camera-section">
-                    <div class="camera-preview-container">
-                        <video id="cameraPreview" autoplay muted playsinline></video>
-                        <div class="camera-placeholder" id="cameraPlaceholder">
-                            <i class="fas fa-camera"></i>
-                            <p>Camera preview will appear here.</p>
-                        </div>
-                    </div>
-                    <div class="camera-controls">
-                        <button type="button" id="startCameraBtn" class="btn btn-secondary btn-sm">
-                            <i class="fas fa-camera"></i> Start Camera
-                        </button>
-                        <button type="button" id="capturePhotoBtn" class="btn btn-primary btn-sm" disabled>
-                            <i class="fas fa-camera-retro"></i> Capture
-                        </button>
-                        <button type="button" id="retakePhotoBtn" class="btn btn-warning btn-sm" disabled>
-                            <i class="fas fa-redo"></i> Retake
-                        </button>
-                        <button type="button" id="confirmPhotoBtn" class="btn btn-success btn-sm" disabled>
-                            <i class="fas fa-check"></i> Use This Photo
-                        </button>
-                        <span id="cameraStatus" class="status-indicator">Camera ready</span>
-                    </div>
-                    <div class="captured-photo-container" id="capturedPhotoContainer" style="display:none;">
-                        <img id="capturedPhotoPreview" style="max-width:200px; max-height:200px; border-radius:8px;">
-                    </div>
+                <label>Image (Live Photo or Upload)</label>
+                <div class="camera-trigger-group">
+                    <button type="button" id="openCameraBtn" class="btn btn-secondary">
+                        <i class="fas fa-camera"></i> Open Camera (Photo)
+                    </button>
+                    <span id="photoStatus" class="status-indicator">No photo captured</span>
                     <input type="file" id="livePhotoInput" name="image" accept="image/*" style="display:none;">
                 </div>
             </div>
@@ -297,6 +276,49 @@ $pageTitle = 'Manage Poems';
                 <button type="button" class="btn btn-outline modal-close">Cancel</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- ===== FULL-SCREEN CAMERA MODAL ===== -->
+<div id="cameraModal" class="camera-modal" style="display:none;">
+    <div class="camera-modal-inner">
+        <div class="camera-preview-wrapper">
+            <video id="cameraPreview" autoplay muted playsinline></video>
+        </div>
+        
+        <!-- Top Bar -->
+        <div class="camera-top-bar">
+            <button type="button" class="camera-close-btn" id="cameraCloseBtn">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="camera-mode-switch">
+                <button type="button" class="mode-btn active" data-mode="photo">📷 Photo</button>
+                <button type="button" class="mode-btn" data-mode="video">🎥 Video</button>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="camera-bottom-controls">
+            <div class="camera-controls-left">
+                <button type="button" id="retakeMediaBtn" class="camera-btn" disabled>
+                    <i class="fas fa-redo"></i> Retake
+                </button>
+            </div>
+            <div class="camera-controls-center">
+                <button type="button" id="captureBtn" class="camera-shutter-btn">
+                    <span class="shutter-ring"></span>
+                    <span class="shutter-inner"></span>
+                </button>
+            </div>
+            <div class="camera-controls-right">
+                <button type="button" id="confirmMediaBtn" class="camera-btn" disabled>
+                    <i class="fas fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+
+        <!-- Status / Timer -->
+        <div id="cameraStatus" class="camera-status">Ready</div>
     </div>
 </div>
 
@@ -367,93 +389,209 @@ document.addEventListener('DOMContentLoaded', function() {
         editorInitialized = true;
     }
 
-    // ===== CAMERA (LIVE PHOTO) =====
+    // ============================================================
+    // FULL-SCREEN CAMERA MODAL
+    // ============================================================
+    const cameraModal = document.getElementById('cameraModal');
     const cameraPreview = document.getElementById('cameraPreview');
-    const cameraPlaceholder = document.getElementById('cameraPlaceholder');
-    const startCameraBtn = document.getElementById('startCameraBtn');
-    const capturePhotoBtn = document.getElementById('capturePhotoBtn');
-    const retakePhotoBtn = document.getElementById('retakePhotoBtn');
-    const confirmPhotoBtn = document.getElementById('confirmPhotoBtn');
+    const cameraCloseBtn = document.getElementById('cameraCloseBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const retakeBtn = document.getElementById('retakeMediaBtn');
+    const confirmBtn = document.getElementById('confirmMediaBtn');
     const cameraStatus = document.getElementById('cameraStatus');
-    const capturedPhotoContainer = document.getElementById('capturedPhotoContainer');
-    const capturedPhotoPreview = document.getElementById('capturedPhotoPreview');
+    const modeBtns = document.querySelectorAll('.mode-btn');
+    const openCameraBtn = document.getElementById('openCameraBtn');
     const livePhotoInput = document.getElementById('livePhotoInput');
+    const photoStatus = document.getElementById('photoStatus');
+
+    // For video, we map to audio input (or use a hidden video input)
+    const audioInput = document.getElementById('audioInput');
 
     let cameraStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
     let capturedBlob = null;
+    let recordedBlob = null;
+    let currentMode = 'photo';
 
-    async function startCamera() {
+    // ===== OPEN CAMERA =====
+    function openCamera(mode) {
+        currentMode = mode;
+        cameraModal.style.display = 'flex';
+        cameraStatus.textContent = 'Starting camera...';
+
+        modeBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+
+        if (mode === 'photo') {
+            captureBtn.classList.remove('recording');
+            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
+        } else {
+            captureBtn.classList.remove('recording');
+            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
+        }
+
+        retakeBtn.disabled = true;
+        confirmBtn.disabled = true;
+        capturedBlob = null;
+        recordedBlob = null;
+        recordedChunks = [];
+
+        startCameraStream();
+    }
+
+    function closeCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        cameraPreview.srcObject = null;
+        cameraPreview.src = '';
+        cameraModal.style.display = 'none';
+    }
+
+    async function startCameraStream() {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Your browser does not support camera access.');
+                cameraStatus.textContent = '❌ Camera not supported';
                 return;
             }
-            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: currentMode === 'video' });
             cameraPreview.srcObject = cameraStream;
-            cameraPreview.style.display = 'block';
-            cameraPlaceholder.style.display = 'none';
-            startCameraBtn.disabled = true;
-            capturePhotoBtn.disabled = false;
-            cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#27ae60';
+            cameraStatus.textContent = currentMode === 'photo' ? 'Ready' : 'Ready to record';
         } catch (error) {
-            alert('Camera access denied: ' + error.message);
+            cameraStatus.textContent = '❌ Camera access denied: ' + error.message;
         }
     }
 
+    // ===== CAPTURE PHOTO =====
     function capturePhoto() {
         if (!cameraStream) return;
         const canvas = document.createElement('canvas');
-        canvas.width = cameraPreview.videoWidth;
-        canvas.height = cameraPreview.videoHeight;
+        canvas.width = cameraPreview.videoWidth || 1280;
+        canvas.height = cameraPreview.videoHeight || 720;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
         canvas.toBlob((blob) => {
             capturedBlob = blob;
-            const url = URL.createObjectURL(blob);
-            capturedPhotoPreview.src = url;
-            capturedPhotoContainer.style.display = 'block';
-            capturePhotoBtn.disabled = true;
-            retakePhotoBtn.disabled = false;
-            confirmPhotoBtn.disabled = false;
-            cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#3498db';
+            retakeBtn.disabled = false;
+            confirmBtn.disabled = false;
+            cameraStatus.textContent = '✅ Photo captured';
             cameraStream.getTracks().forEach(track => track.stop());
             cameraPreview.srcObject = null;
-            cameraPreview.style.display = 'none';
-            cameraPlaceholder.style.display = 'flex';
-            startCameraBtn.disabled = false;
         }, 'image/jpeg');
     }
 
-    function retakePhoto() {
+    // ===== VIDEO RECORDING =====
+    function startRecording() {
+        if (!cameraStream) return;
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(cameraStream);
+        mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = function() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            if (blob.size > 0) {
+                recordedBlob = blob;
+                retakeBtn.disabled = false;
+                confirmBtn.disabled = false;
+                cameraStatus.textContent = '✅ Recording complete';
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraPreview.srcObject = null;
+            }
+        };
+        mediaRecorder.start();
+        captureBtn.classList.add('recording');
+        captureBtn.querySelector('.shutter-inner').style.borderRadius = '6px';
+        cameraStatus.textContent = '🔴 Recording...';
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            captureBtn.classList.remove('recording');
+        }
+    }
+
+    // ===== RETAKES =====
+    function retakeMedia() {
         capturedBlob = null;
-        capturedPhotoContainer.style.display = 'none';
-        capturedPhotoPreview.src = '';
-        capturePhotoBtn.disabled = true;
-        retakePhotoBtn.disabled = true;
-        confirmPhotoBtn.disabled = true;
-        cameraStatus.textContent = 'Camera ready';
-        cameraStatus.style.color = 'var(--text-light)';
-        startCameraBtn.disabled = false;
+        recordedBlob = null;
+        recordedChunks = [];
+        retakeBtn.disabled = true;
+        confirmBtn.disabled = true;
+        cameraStatus.textContent = 'Retaking...';
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        startCameraStream();
     }
 
-    function confirmPhoto() {
-        if (!capturedBlob) return;
-        const file = new File([capturedBlob], 'live_photo.jpg', { type: 'image/jpeg' });
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        livePhotoInput.files = dt.files;
-        confirmPhotoBtn.disabled = true;
-        retakePhotoBtn.disabled = true;
-        cameraStatus.textContent = '✅ Photo confirmed!';
-        cameraStatus.style.color = '#2ecc71';
+    // ===== CONFIRM MEDIA =====
+    function confirmMedia() {
+        if (currentMode === 'photo' && capturedBlob) {
+            const file = new File([capturedBlob], 'live_photo.jpg', { type: 'image/jpeg' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            livePhotoInput.files = dt.files;
+            photoStatus.textContent = '✅ Photo confirmed!';
+            photoStatus.style.color = '#2ecc71';
+            closeCamera();
+        } else if (currentMode === 'video' && recordedBlob) {
+            const file = new File([recordedBlob], 'live_video.webm', { type: 'video/webm' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            audioInput.files = dt.files;
+            document.getElementById('audioPreviewContainer').style.display = 'block';
+            const url = URL.createObjectURL(file);
+            document.getElementById('audioPreview').src = url;
+            closeCamera();
+            alert('✅ Video captured and saved as audio!');
+        }
     }
 
-    startCameraBtn.addEventListener('click', startCamera);
-    capturePhotoBtn.addEventListener('click', capturePhoto);
-    retakePhotoBtn.addEventListener('click', retakePhoto);
-    confirmPhotoBtn.addEventListener('click', confirmPhoto);
+    // ===== EVENT LISTENERS =====
+    openCameraBtn.addEventListener('click', function() { openCamera('photo'); });
+    cameraCloseBtn.addEventListener('click', closeCamera);
+
+    captureBtn.addEventListener('click', function() {
+        if (currentMode === 'photo') {
+            capturePhoto();
+        } else {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+    });
+
+    retakeBtn.addEventListener('click', retakeMedia);
+    confirmBtn.addEventListener('click', confirmMedia);
+
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const mode = this.dataset.mode;
+            if (mode === currentMode) return;
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            closeCamera();
+            setTimeout(() => openCamera(mode), 200);
+        });
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && cameraModal.style.display !== 'none') {
+            closeCamera();
+        }
+    });
 
     function resetCamera() {
         if (cameraStream) {
@@ -461,17 +599,13 @@ document.addEventListener('DOMContentLoaded', function() {
             cameraStream = null;
         }
         cameraPreview.srcObject = null;
-        cameraPreview.style.display = 'none';
-        cameraPlaceholder.style.display = 'flex';
-        startCameraBtn.disabled = false;
-        capturePhotoBtn.disabled = true;
-        retakePhotoBtn.disabled = true;
-        confirmPhotoBtn.disabled = true;
-        capturedPhotoContainer.style.display = 'none';
-        capturedPhotoPreview.src = '';
+        cameraPreview.src = '';
+        cameraModal.style.display = 'none';
         livePhotoInput.value = '';
-        cameraStatus.textContent = 'Camera ready';
-        cameraStatus.style.color = 'var(--text-light)';
+        photoStatus.textContent = 'No photo captured';
+        photoStatus.style.color = 'var(--text-light)';
+        // Reset video input if it was used
+        audioInput.value = '';
     }
 
     // ===== DRAG & DROP IMAGE =====
@@ -519,12 +653,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== AUDIO DRAG & DROP =====
     const audioDropZone = document.getElementById('audioDropZone');
-    const audioInput = document.getElementById('audioInput');
+    const audioInputFallback = document.getElementById('audioInput');
     const audioPreviewContainer = document.getElementById('audioPreviewContainer');
     const audioPreview = document.getElementById('audioPreview');
 
-    audioDropZone.addEventListener('click', () => audioInput.click());
-    audioInput.addEventListener('change', function(e) {
+    audioDropZone.addEventListener('click', () => audioInputFallback.click());
+    audioInputFallback.addEventListener('change', function(e) {
         if (e.target.files.length > 0) handleAudio(e.target.files[0]);
     });
     audioDropZone.addEventListener('dragover', function(e) {
@@ -554,7 +688,7 @@ document.addEventListener('DOMContentLoaded', function() {
         audioPreviewContainer.style.display = 'block';
         const dt = new DataTransfer();
         dt.items.add(file);
-        audioInput.files = dt.files;
+        audioInputFallback.files = dt.files;
     }
 
     // ===== AUDIO RECORDER =====
@@ -693,18 +827,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
 .modal-close:hover { color: var(--rose); }
 
-/* ===== CAMERA SECTION ===== */
-.camera-section { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--fantasy); margin-top: 8px; }
-.camera-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
-.camera-preview-container video { width: 100%; height: 100%; object-fit: cover; display: none; }
-.camera-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-light); text-align: center; padding: 24px; }
-.camera-placeholder i { font-size: 2.5rem; margin-bottom: 8px; color: var(--rose); }
-.camera-placeholder p { margin: 0; font-size: 0.9rem; }
-.camera-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; margin-top: 12px; }
-.camera-controls .btn { padding: 6px 14px; font-size: 0.85rem; }
-.captured-photo-container { text-align: center; margin-top: 12px; }
-.captured-photo-container img { border: 2px solid var(--rose); border-radius: 8px; }
-.status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
+/* ===== CAMERA TRIGGER ===== */
+.camera-trigger-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.status-indicator { font-size: 0.9rem; color: var(--text-light); font-weight: 500; }
 
 /* ===== UPLOAD ZONES ===== */
 .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--fantasy); }
@@ -720,6 +845,206 @@ document.addEventListener('DOMContentLoaded', function() {
 #recordingStatus { font-weight: 600; color: #e74c3c; }
 .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
 
+/* ===== FULL-SCREEN CAMERA MODAL ===== */
+.camera-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.camera-modal-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+}
+
+.camera-preview-wrapper {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+}
+
+.camera-preview-wrapper video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 20px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 2;
+}
+
+.camera-close-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.camera-close-btn:hover { background: rgba(255,255,255,0.3); }
+
+.camera-mode-switch {
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 30px;
+    padding: 4px;
+}
+
+.camera-mode-switch .mode-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.6);
+    padding: 8px 20px;
+    border-radius: 26px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.camera-mode-switch .mode-btn.active {
+    background: rgba(255,255,255,0.9);
+    color: #000;
+}
+
+.camera-bottom-controls {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    right: 0;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 2;
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%);
+    padding-top: 30px;
+    padding-bottom: 30px;
+}
+
+.camera-controls-left,
+.camera-controls-right {
+    flex: 0 0 80px;
+    display: flex;
+    justify-content: center;
+}
+
+.camera-controls-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.camera-shutter-btn {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.8);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.camera-shutter-btn .shutter-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.3);
+    top: -4px;
+    left: -4px;
+    pointer-events: none;
+}
+
+.camera-shutter-btn .shutter-inner {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #fff;
+    transition: all 0.2s;
+}
+
+.camera-shutter-btn:hover .shutter-inner { opacity: 0.8; }
+
+.camera-shutter-btn.recording .shutter-inner {
+    background: #ff3b30;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+}
+
+.camera-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.camera-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.camera-btn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
+
+.camera-status {
+    position: absolute;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 500;
+    text-shadow: 0 0 20px rgba(0,0,0,0.5);
+    z-index: 2;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+}
+
 /* ===== FORM ===== */
 .poem-form .form-group { margin-bottom: 16px; }
 .poem-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); }
@@ -734,6 +1059,10 @@ document.addEventListener('DOMContentLoaded', function() {
     .modal-content { padding: 20px; }
     .search-form { flex-direction: column; }
     .search-form input { width: 100%; }
+    .camera-bottom-controls { bottom: 16px; padding: 0 12px; padding-bottom: 16px; }
+    .camera-shutter-btn { width: 64px; height: 64px; }
+    .camera-shutter-btn .shutter-inner { width: 48px; height: 48px; }
+    .camera-btn { font-size: 0.75rem; padding: 6px 12px; }
 }
 </style>
 

@@ -135,6 +135,12 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             --input-bg: #ffffff;
             --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        .c-btn { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); margin-bottom: 8px; text-align: left; transition: all 0.2s; }
+        .c-btn:hover { border-color: var(--rose); }
+        .c-btn-author { font-size: 0.8rem; color: var(--text-light); }
+        .c-btn-date { font-size: 0.75rem; color: var(--text-light); }
+        .c-btn-admin { background: var(--vanilla); border-left: 4px solid var(--rose); }
+        .c-btn-admin .c-btn-author { font-weight: bold; color: var(--dark); }
 
         [data-theme="dark"] {
             --rose: #dba1a2;
@@ -262,25 +268,22 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         #scroll-container .page-break { display: none; }
 
-        /* ===== FLIP CONTAINER ===== */
-        #flip-container {
-            width: 90%; max-width: 900px; height: 85%; max-height: 900px;
-            display: none; justify-content: center; align-items: center;
-            border: 1px solid var(--border); border-radius: 16px;
-            background: var(--card-bg); box-shadow: var(--shadow-hover);
-            overflow: hidden; position: relative;
-        }
-        #flip-container .reader-page {
-            width: 100%; height: 100%; padding: 40px;
-            overflow-y: auto; font-family: 'Inter', sans-serif;
-            font-size: 1.05rem; line-height: 1.8; color: var(--text);
-        }
-        #flip-container .reader-page h1,
-        #flip-container .reader-page h2,
-        #flip-container .reader-page h3 {
-            font-family: 'Playfair Display', Georgia, serif;
-            color: var(--dark);
-        }
+        /* ===== 3D FLIP CONTAINER ===== */
+        .flip-3d-container { perspective:2000px; width:100%; height:100%; position:relative; display:none; }
+        .flip-3d-book { position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform 0.8s cubic-bezier(0.645,0.045,0.355,1); }
+        .flip-3d-page { position:absolute; top:0; left:0; width:100%; height:100%; backface-visibility:hidden; background:var(--card-bg); border:1px solid var(--border); border-radius:16px; padding:40px; box-shadow:var(--shadow-hover); overflow-y:auto; font-family:'Inter',sans-serif; font-size:1.05rem; line-height:1.8; color:var(--text); }
+        .flip-3d-page-left { z-index:2; transform:rotateY(0deg); transform-origin:left center; }
+        .flip-3d-page-right { transform:rotateY(180deg); transform-origin:right center; }
+        .flip-3d-book.page-right-flipped { transform:rotateY(-180deg); }
+        .flip-3d-book.page-left-flipped { transform:rotateY(180deg); }
+
+        /* ===== PAGE SHADOWS (CURL EFFECT) ===== */
+        .flip-3d-page::before { content:''; position:absolute; top:0; bottom:0; width:40px; pointer-events:none; background:linear-gradient(to right,rgba(0,0,0,0.08) 0%,transparent 100%); }
+        .flip-3d-page-left::before { left:0; background:linear-gradient(to right,rgba(0,0,0,0.08) 0%,transparent 100%); }
+        .flip-3d-page-right::before { right:0; background:linear-gradient(to left,rgba(0,0,0,0.08) 0%,transparent 100%); }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width:768px) { .flip-3d-page { padding:20px; } }
 
         /* ===== COVER IMAGE ===== */
         .cover-image {
@@ -460,6 +463,15 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .slider-group { display: flex; align-items: center; gap: 6px; }
         .slider-group input[type="range"] { width: 80px; accent-color: var(--rose); }
 
+        /* ===== FONT SELECTOR ===== */
+        .font-select-wrapper select {
+            width:100%; padding:6px 10px; border:1px solid var(--border); border-radius:6px;
+            background:var(--input-bg); color:var(--text); font-size:0.85rem;
+            appearance:none; -webkit-appearance:none; -moz-appearance:none;
+            background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat:no-repeat; background-position:right 10px center; background-size:14px;
+        }
+        .font-select-wrapper select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
         /* ======================================================= */
         /*  TOC DRAWER                                              */
         /* ======================================================= */
@@ -601,6 +613,28 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .focus-mode #toolbar { transform: translateY(-100%); opacity: 0; pointer-events: none; transition: all var(--transition); }
         .focus-mode #settings-panel.open { display: none !important; }
 
+        /* ===== New Modals ===== */
+        #commentsModal .modal-content { max-width: 600px; max-height: 80vh; }
+        #commentsModal .modal-body { max-height: 60vh; overflow-y: auto; padding: 10px; }
+        #commentsModal .modal-body textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; min-height: 60px; }
+        #commentsModal .modal-body .form-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .comment-list { margin-bottom: 16px; }
+        .comment-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+        .comment-item.admin { border-left: 4px solid var(--rose); }
+        .comment-author { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .comment-author .admin-badge { background: var(--rose); color: white; font-size: 0.65rem; padding: 2px 8px; border-radius: 12px; }
+        
+        /* ===== Modals ===== */
+        .modal { display: none; position: fixed; z-index: 20000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .modal-content { background: var(--card-bg); margin: 10% auto; padding: 20px; border-radius: 16px; width: 90%; max-width: 500px; box-shadow: var(--shadow-hover); }
+        .modal-close { float: right; font-size: 1.4rem; cursor: pointer; color: var(--text-light); transition: color 0.2s; }
+        .modal-close:hover { color: var(--rose); }
+        .modal h3 { margin-top: 0; }
+        .modal .form-group { margin-bottom: 12px; }
+        .modal .form-group label { display: block; margin-bottom: 4px; font-weight: 600; }
+        .modal .form-group input, .modal .form-group textarea, .modal .form-group select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg); color: var(--text); }
+        .modal .form-group textarea { resize: vertical; min-height: 60px; }
+        .modal .btn { margin-top: 4px; }
         /* ======================================================= */
         /*  RESPONSIVE                                              */
         /* ======================================================= */
@@ -653,7 +687,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         </div>
     </div>
 
-    <!-- SIDEBAR -->
+     <!-- SIDEBAR -->
     <div id="sidebar">
         <button class="sidebar-btn" id="searchBtn" title="Search"><i class="fas fa-search"></i></button>
         <button class="sidebar-btn" id="bookmarkBtn" title="Bookmark"><i class="far fa-bookmark"></i></button>
@@ -661,6 +695,10 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         <button class="sidebar-btn" id="notesBtn" title="Group Notes"><i class="fas fa-sticky-note"></i></button>
         <button class="sidebar-btn" id="settingsBtn" title="Settings"><i class="fas fa-cog"></i></button>
         <button class="sidebar-btn" id="focusBtn" title="Focus Mode"><i class="fas fa-expand"></i></button>
+        <hr class="sidebar-separator">
+        <button class="sidebar-btn" id="commentsBtn" title="Comments"><i class="fas fa-comments"></i></button>
+        <button class="sidebar-btn" id="errorReportBtn" title="Report Error"><i class="fas fa-exclamation-triangle"></i></button>
+        <button class="sidebar-btn" id="prayerBtn" title="Prayer Request"><i class="fas fa-hands-praying"></i></button>
         <hr class="sidebar-separator">
         <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights"><i class="fas fa-file-export"></i></button>
         <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress"><i class="fas fa-undo-alt"></i></button>
@@ -679,9 +717,14 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             <?php endif; ?>
             <?php foreach ($pages as $page_html) { echo $page_html; } ?>
         </div>
-        <div id="flip-container">
-            <button class="aw-nav-btn prev" id="prevFlipBtn"><i class="fas fa-chevron-left"></i></button>
-            <button class="aw-nav-btn next" id="nextFlipBtn"><i class="fas fa-chevron-right"></i></button>
+        <!-- ===== 3D FLIP CONTAINER ===== -->
+        <div id="flip3dContainer" class="flip-3d-container" style="display:none;">
+            <div class="flip-3d-book" id="flipBook">
+                <div class="flip-3d-page flip-3d-page-left" id="flipLeftPage"></div>
+                <div class="flip-3d-page flip-3d-page-right" id="flipRightPage"></div>
+            </div>
+            <button class="aw-nav-btn prev" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
+            <button class="aw-nav-btn next" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
         </div>
     </div>
 
@@ -711,6 +754,16 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
                     <input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5">
                     <button onclick="adjustFontSize(5)">A+</button>
                     <span id="fontSizeLabel">100%</span>
+                </div>
+            </div>
+            <div class="settings-group">
+                <label>Font Type</label>
+                <div class="font-select-wrapper">
+                    <select id="fontTypeSelect" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:0.85rem;">
+                        <option value="Inter, sans-serif">Inter</option>
+                        <option value="Georgia, serif">Georgia</option>
+                        <option value="'Playfair Display', Georgia, serif">Playfair Display</option>
+                    </select>
                 </div>
             </div>
             <div class="settings-group">
@@ -770,6 +823,69 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
                 <button class="note-submit" onclick="submitNote()">Post</button>
                 <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <!-- ===== NEW MODALS ===== -->
+    
+    <!-- 1. COMMENTS MODAL -->
+    <div id="commentsModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeCommentsModal()">&times;</span>
+            <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments (Page <span id="currentCommentPage">1</span>)</h3>
+            <div class="modal-body">
+                <div id="commentList" class="comment-list"></div>
+                <?php if (isLoggedIn()): ?>
+                    <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+                        <h4>Add a Comment</h4>
+                        <textarea id="commentInput" rows="2" placeholder="Share your thoughts on this page..."></textarea>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" onclick="submitComment()">Post</button>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <p style="color: var(--text-light);"><a href="<?php echo SITE_URL; ?>/login.php">Login</a> to comment.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. PROOFREADING (REPORT ERROR) MODAL -->
+    <div id="errorModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeErrorModal()">&times;</span>
+            <h3><i class="fas fa-exclamation-triangle" style="color: var(--rose);"></i> Report an Error</h3>
+            <p style="font-size: 0.9rem; color: var(--text-light);">Help us improve by reporting typos or errors on <strong>Page <span id="errorPageNum">1</span></strong>.</p>
+            <form id="errorForm">
+                <input type="hidden" id="errorBookId" value="<?php echo $book_id; ?>">
+                <input type="hidden" id="errorPageInput" value="1">
+                <div class="form-group">
+                    <label for="errorText">What is wrong?</label>
+                    <textarea id="errorText" rows="2" placeholder="e.g. Typo on line 3..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="errorCorrection">Suggested Correction (optional)</label>
+                    <input type="text" id="errorCorrection" placeholder="e.g. 'their' instead of 'there'">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="submitError()">Submit Report</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. PRAYER REQUEST MODAL -->
+    <div id="prayerModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePrayerModal()">&times;</span>
+            <h3><i class="fas fa-hands-praying" style="color: var(--rose);"></i> Send a Prayer Request</h3>
+            <p style="font-size: 0.9rem; color: var(--text-light);">Share your prayer request with Angella. It will be received and prayed over.</p>
+            <form id="prayerForm">
+                <input type="hidden" id="prayerBookId" value="<?php echo $book_id; ?>">
+                <div class="form-group">
+                    <label for="prayerText">Your Prayer Request</label>
+                    <textarea id="prayerText" rows="4" placeholder="Write your prayer request here..." required></textarea>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="submitPrayer()">Send Prayer Request</button>
+            </form>
         </div>
     </div>
 
@@ -875,6 +991,22 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     const exportHighlightsBtn = document.getElementById('exportHighlightsBtn');
     const resumeBtn = document.getElementById('resumeBtn');
     const challengeBtn = document.getElementById('challengeBtn');
+
+    // ===== NEW FEATURE REFERENCES =====
+    const commentsBtn = document.getElementById('commentsBtn');
+    const commentsModal = document.getElementById('commentsModal');
+    const currentCommentPageSpan = document.getElementById('currentCommentPage');
+    const commentList = document.getElementById('commentList');
+    const commentInput = document.getElementById('commentInput');
+    const errorReportBtn = document.getElementById('errorReportBtn');
+    const errorModal = document.getElementById('errorModal');
+    const errorPageNumSpan = document.getElementById('errorPageNum');
+    const errorPageInput = document.getElementById('errorPageInput');
+    const errorText = document.getElementById('errorText');
+    const errorCorrection = document.getElementById('errorCorrection');
+    const prayerBtn = document.getElementById('prayerBtn');
+    const prayerModal = document.getElementById('prayerModal');
+    const prayerText = document.getElementById('prayerText');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
     let readingMode = localStorage.getItem('reader_mode') || 'scroll';
@@ -1224,6 +1356,135 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (savedLine / 100).toFixed(1); });
     document.getElementById('lineHeightLabel').textContent = (savedLine / 100).toFixed(1);
 
+    // ===== 3D FLIP MODE IMPLEMENTATION =====
+
+const flip3dContainer = document.getElementById('flip3dContainer');
+const flipBook = document.getElementById('flipBook');
+const flipLeftPage = document.getElementById('flipLeftPage');
+const flipRightPage = document.getElementById('flipRightPage');
+const flipPrevBtn = document.getElementById('flipPrevBtn');
+const flipNextBtn = document.getElementById('flipNextBtn');
+
+let flipCurrentPage = currentPage;
+let flipIsAnimating = false;
+let flipDirection = 1; // 1 = forward, -1 = backward
+
+function loadFlipPages(pageNum) {
+    if (pageNum < 1 || pageNum > totalPages) return;
+    
+    // Load two pages side by side
+    const leftContent = pages[pageNum - 1] || '';
+    const rightContent = pages[pageNum] || '';
+    
+    flipLeftPage.innerHTML = leftContent;
+    flipRightPage.innerHTML = rightContent;
+    
+    // Reset book rotation
+    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
+    flipBook.style.transform = 'rotateY(0deg)';
+    
+    flipCurrentPage = pageNum;
+    updateUI(pageNum);
+    savePosition();
+}
+
+function flipToNext() {
+    if (flipIsAnimating) return;
+    if (flipCurrentPage >= totalPages) return;
+    
+    flipIsAnimating = true;
+    flipDirection = 1;
+    
+    // Load the next page into the right page slot
+    const nextContent = pages[flipCurrentPage + 1] || '';
+    flipRightPage.innerHTML = nextContent;
+    
+    // Animate: right page flips to the left
+    flipBook.classList.add('page-right-flipped');
+    
+    setTimeout(() => {
+        flipCurrentPage += 2;
+        if (flipCurrentPage > totalPages) flipCurrentPage = totalPages;
+        loadFlipPages(flipCurrentPage);
+        flipIsAnimating = false;
+        updateUI(flipCurrentPage);
+        savePosition();
+    }, 800);
+}
+
+function flipToPrev() {
+    if (flipIsAnimating) return;
+    if (flipCurrentPage <= 1) return;
+    
+    flipIsAnimating = true;
+    flipDirection = -1;
+    
+    // Load the previous page into the left page slot
+    const prevContent = pages[flipCurrentPage - 2] || '';
+    flipLeftPage.innerHTML = prevContent;
+    
+    // Animate: left page flips to the right
+    flipBook.classList.add('page-left-flipped');
+    
+    setTimeout(() => {
+        flipCurrentPage -= 2;
+        if (flipCurrentPage < 1) flipCurrentPage = 1;
+        loadFlipPages(flipCurrentPage);
+        flipIsAnimating = false;
+        updateUI(flipCurrentPage);
+        savePosition();
+    }, 800);
+}
+
+// Override the existing switchMode() to use the 3D flip
+const originalSwitchMode = window.switchMode || function(){};
+window.switchMode = function(mode) {
+    if (mode === 'flip') {
+        document.getElementById('scroll-container').style.display = 'none';
+        flip3dContainer.style.display = 'block';
+        loadFlipPages(currentPage);
+    } else {
+        flip3dContainer.style.display = 'none';
+        document.getElementById('scroll-container').style.display = 'block';
+        // Restore scroll view
+        const target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+};
+
+// Click handlers for navigation
+flipNextBtn.addEventListener('click', flipToNext);
+flipPrevBtn.addEventListener('click', flipToPrev);
+
+// Click on the right half of the book -> next page
+flip3dContainer.addEventListener('click', function(e) {
+    if (e.target.closest('button')) return;
+    const rect = this.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x > rect.width / 2) {
+        flipToNext();
+    } else {
+        flipToPrev();
+    }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (flip3dContainer.style.display !== 'block') return;
+    if (e.key === 'ArrowRight') flipToNext();
+    else if (e.key === 'ArrowLeft') flipToPrev();
+});
+
+// Make sure the mode toggle works
+document.querySelectorAll('#modeGroup button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const mode = this.dataset.mode;
+        document.querySelectorAll('#modeGroup button').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        window.switchMode(mode);
+    });
+});
+
     // ===== TOUCH / CLICK EVENTS =====
     document.getElementById('page-viewport').addEventListener('click', function(e) {
         if (e.target.closest('button') || e.target.closest('a')) return;
@@ -1266,6 +1527,26 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active', settingsPanel.classList.contains('open'));
     });
+    // ===== SETTINGS: FONT TYPE =====
+const fontTypeSelect = document.getElementById('fontTypeSelect');
+const savedFont = localStorage.getItem('reader_font_family') || 'Inter, sans-serif';
+if (savedFont) {
+    fontTypeSelect.value = savedFont;
+    applyFontType(savedFont);
+}
+
+fontTypeSelect.addEventListener('change', function() {
+    const font = this.value;
+    applyFontType(font);
+    localStorage.setItem('reader_font_family', font);
+});
+
+function applyFontType(font) {
+    // Apply to all content areas
+    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) {
+        el.style.fontFamily = font;
+    });
+}
 
     // ===== TOC TOGGLE =====
     tocBtn.addEventListener('click', function() {
@@ -1903,6 +2184,158 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     };
 
     overlay.addEventListener('click', closeAll);
+
+/ ============================================================
+    // ============================================================
+    //   NEW FEATURES: COMMENTS, PROOFREADING, PRAYER REQUESTS
+    // ============================================================
+    // ============================================================
+
+    // ===== 1. COMMENTS =====
+    function loadComments() {
+        if (userId === 0) return;
+        currentCommentPageSpan.textContent = currentPage;
+        const formData = new FormData();
+        formData.append('action', 'get_book_comments');
+        formData.append('book_id', bookId);
+        formData.append('page_num', currentPage);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                commentList.innerHTML = '';
+                if (data.comments.length === 0) {
+                    commentList.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px;">No comments on this page yet.</p>';
+                } else {
+                    data.comments.forEach(com => {
+                        const isAdmin = com.is_admin_reply == 1;
+                        const authorName = isAdmin ? 'Angella (Admin)' : com.author_name;
+                        const badge = isAdmin ? '<span class="admin-badge">🛡️ Admin</span>' : '';
+                        commentList.innerHTML += `
+                            <div class="comment-item ${isAdmin ? 'admin' : ''}">
+                                <div class="comment-author"><i class="fas fa-user-circle"></i> ${authorName} ${badge}</div>
+                                <div style="font-size:0.85rem;color:var(--text-light);">${timeAgo(com.created_at)}</div>
+                                <div style="margin-top:4px;">${com.comment}</div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+        });
+    }
+
+    window.submitComment = function() {
+        const text = commentInput.value.trim();
+        if (!text) return alert('Please write a comment.');
+        const formData = new FormData();
+        formData.append('action', 'add_book_comment');
+        formData.append('book_id', bookId);
+        formData.append('page_num', currentPage);
+        formData.append('comment', text);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                commentInput.value = '';
+                loadComments();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to post comment.'));
+            }
+        });
+    };
+
+    window.openCommentsModal = function() {
+        commentsModal.style.display = 'block';
+        loadComments();
+        overlay.classList.add('active');
+    };
+
+    window.closeCommentsModal = function() {
+        commentsModal.style.display = 'none';
+        overlay.classList.remove('active');
+    };
+
+    commentsBtn.addEventListener('click', openCommentsModal);
+
+    // ===== 2. PROOFREADING (ERROR REPORT) =====
+    window.openErrorModal = function() {
+        errorPageNumSpan.textContent = currentPage;
+        errorPageInput.value = currentPage;
+        errorText.value = '';
+        errorCorrection.value = '';
+        errorModal.style.display = 'block';
+        overlay.classList.add('active');
+    };
+
+    window.closeErrorModal = function() {
+        errorModal.style.display = 'none';
+        overlay.classList.remove('active');
+    };
+
+    window.submitError = function() {
+        if (userId === 0) { alert('Please login to report an error.'); return; }
+        const text = errorText.value.trim();
+        if (!text) return alert('Please describe the error.');
+        const formData = new FormData();
+        formData.append('action', 'report_book_error');
+        formData.append('book_id', bookId);
+        formData.append('page_num', errorPageInput.value);
+        formData.append('error_text', text);
+        formData.append('correction', errorCorrection.value);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Error report submitted. Thank you for helping improve the book!');
+                closeErrorModal();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to submit report.'));
+            }
+        });
+    };
+
+    errorReportBtn.addEventListener('click', openErrorModal);
+
+    // ===== 3. PRAYER REQUESTS =====
+    window.openPrayerModal = function() {
+        prayerText.value = '';
+        prayerModal.style.display = 'block';
+        overlay.classList.add('active');
+    };
+
+    window.closePrayerModal = function() {
+        prayerModal.style.display = 'none';
+        overlay.classList.remove('active');
+    };
+
+    window.submitPrayer = function() {
+        if (userId === 0) { alert('Please login to submit a prayer request.'); return; }
+        const text = prayerText.value.trim();
+        if (!text) return alert('Please write your prayer request.');
+        const formData = new FormData();
+        formData.append('action', 'submit_prayer_request');
+        formData.append('book_id', bookId);
+        formData.append('request_text', text);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Prayer request sent. Angella will pray for you.');
+                closePrayerModal();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to send request.'));
+            }
+        });
+    };
+
+    prayerBtn.addEventListener('click', openPrayerModal);
+
+    // Clicking on overlay closes specific modals if open
+    overlay.addEventListener('click', function() {
+        if (commentsModal.style.display === 'block') closeCommentsModal();
+        if (errorModal.style.display === 'block') closeErrorModal();
+        if (prayerModal.style.display === 'block') closePrayerModal();
+    });
 
 })();
 </script>

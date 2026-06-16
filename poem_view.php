@@ -126,16 +126,32 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
             </div>
         <?php endif; ?>
 
-        <!-- Audio Player -->
+        <!-- ===== ENHANCED AUDIO PLAYER WITH WAVE VISUALIZER ===== -->
         <?php if ($poem['audio_path']): ?>
             <div class="poem-audio-player">
                 <div class="audio-label">
                     <i class="fas fa-headphones"></i>
                     <span>Listen to this poem</span>
                 </div>
-                <audio controls>
-                    <source src="<?php echo SITE_URL . '/' . $poem['audio_path']; ?>" type="audio/mpeg">
-                </audio>
+                <div id="customAudioPlayer">
+                    <canvas id="waveCanvas"></canvas>
+                    <audio id="audioSource" src="<?php echo SITE_URL . '/' . $poem['audio_path']; ?>" preload="metadata"></audio>
+                    <div class="audio-controls-bar">
+                        <button id="playPauseBtn" class="play-btn" aria-label="Play">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="progressBar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                        <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+                        <div class="volume-control">
+                            <button id="muteBtn" aria-label="Mute"><i class="fas fa-volume-up"></i></button>
+                            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+                        </div>
+                    </div>
+                </div>
             </div>
         <?php endif; ?>
 
@@ -395,35 +411,238 @@ document.addEventListener('DOMContentLoaded', function() {
             themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
         };
     }
+
+    // ============================================================
+    // CUSTOM AUDIO PLAYER WITH WAVE VISUALIZER
+    // ============================================================
+    const audio = document.getElementById('audioSource');
+    const playBtn = document.getElementById('playPauseBtn');
+    const playIcon = playBtn.querySelector('i');
+    const progressFill = document.getElementById('progressFill');
+    const progressBar = document.getElementById('progressBar');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const muteBtn = document.getElementById('muteBtn');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let isPlaying = false;
+    let audioContext = null;
+    let analyser = null;
+    let source = null;
+    let animationId = null;
+    let dataArray = null;
+
+    // ---- Canvas setup ----
+    function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = 100;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ---- Audio context setup ----
+    function initAudioContext() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.8;
+            source = audioContext.createMediaElementSource(audio);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+        }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }
+
+    // ---- Draw wave on canvas ----
+    function drawWave() {
+        if (!analyser) return;
+        animationId = requestAnimationFrame(drawWave);
+
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const barCount = 64;
+        const barWidth = (canvas.width / barCount) * 0.6;
+        const gap = (canvas.width / barCount) * 0.4;
+        const halfHeight = canvas.height / 2;
+
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        gradient.addColorStop(0, '#DBA1A2');
+        gradient.addColorStop(0.5, '#e8c0c0');
+        gradient.addColorStop(1, '#DBA1A2');
+
+        ctx.fillStyle = gradient;
+
+        for (let i = 0; i < barCount; i++) {
+            const value = dataArray[i] / 255;
+            const barHeight = value * halfHeight * 1.5;
+            const x = i * (barWidth + gap) + gap / 2;
+            const y = halfHeight - barHeight / 2;
+
+            // Create a rounded rectangle
+            const radius = 4;
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + barWidth - radius, y);
+            ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+            ctx.lineTo(x + barWidth, y + barHeight - radius);
+            ctx.quadraticCurveTo(x + barWidth, y + barHeight, x + barWidth - radius, y + barHeight);
+            ctx.lineTo(x + radius, y + barHeight);
+            ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Gradient overlay for a glow effect
+        const overlayGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        overlayGradient.addColorStop(0, 'rgba(219, 161, 162, 0.15)');
+        overlayGradient.addColorStop(0.5, 'rgba(219, 161, 162, 0)');
+        overlayGradient.addColorStop(1, 'rgba(219, 161, 162, 0.15)');
+        ctx.fillStyle = overlayGradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // ---- Stop visualizer ----
+    function stopVisualizer() {
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // ---- Play/Pause ----
+    playBtn.addEventListener('click', function() {
+        if (audio.paused) {
+            initAudioContext();
+            audio.play();
+            isPlaying = true;
+            playIcon.className = 'fas fa-pause';
+            if (!animationId) drawWave();
+        } else {
+            audio.pause();
+            isPlaying = false;
+            playIcon.className = 'fas fa-play';
+            stopVisualizer();
+        }
+    });
+
+    // ---- Audio events ----
+    audio.addEventListener('ended', function() {
+        isPlaying = false;
+        playIcon.className = 'fas fa-play';
+        stopVisualizer();
+        progressFill.style.width = '0%';
+        updateTimeDisplay();
+    });
+
+    audio.addEventListener('timeupdate', function() {
+        const percent = (audio.currentTime / audio.duration) * 100;
+        progressFill.style.width = percent + '%';
+        updateTimeDisplay();
+    });
+
+    // ---- Progress bar click ----
+    progressBar.addEventListener('click', function(e) {
+        const rect = this.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const percent = x / rect.width;
+        audio.currentTime = percent * audio.duration;
+    });
+
+    // ---- Time display ----
+    function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return mins + ':' + (secs < 10 ? '0' : '') + secs;
+    }
+
+    function updateTimeDisplay() {
+        const current = formatTime(audio.currentTime || 0);
+        const total = formatTime(audio.duration || 0);
+        timeDisplay.textContent = current + ' / ' + total;
+    }
+
+    audio.addEventListener('loadedmetadata', updateTimeDisplay);
+
+    // ---- Volume controls ----
+    volumeSlider.addEventListener('input', function() {
+        audio.volume = this.value;
+        muteBtn.querySelector('i').className = this.value == 0 ? 'fas fa-volume-mute' : 'fas fa-volume-up';
+    });
+
+    muteBtn.addEventListener('click', function() {
+        if (audio.volume > 0) {
+            audio.volume = 0;
+            volumeSlider.value = 0;
+            muteBtn.querySelector('i').className = 'fas fa-volume-mute';
+        } else {
+            audio.volume = 1;
+            volumeSlider.value = 1;
+            muteBtn.querySelector('i').className = 'fas fa-volume-up';
+        }
+    });
+
+    // ---- Resume visualizer if tab becomes active ----
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && isPlaying && !animationId) {
+            drawWave();
+        }
+        if (document.hidden && animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+    });
+
+    // ---- Cleanup on page unload ----
+    window.addEventListener('beforeunload', function() {
+        if (audioContext) {
+            audioContext.close();
+        }
+    });
 });
 </script>
 
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44, 30, 30, 0.08);
+    --shadow-hover: 0 8px 30px rgba(44, 30, 30, 0.15);
+    --input-bg: #ffffff;
 }
 body.dark-mode {
     --bg: #1a1a1a;
     --card-bg: #2a2a2a;
     --border: #444;
+    --text: #e8dddd;
     --text-light: #aaa;
     --vanilla: #2a2a2a;
+    --fantasy: #1a1a1a;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
+    --input-bg: #333;
 }
 body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 
-/* ===== EXISTING STYLES (PRESERVED) ===== */
+/* ===== POEM VIEW ===== */
 .poem-view-page { padding: 32px 0 60px; }
 .poem-nav { margin-bottom: 24px; }
 .poem-nav .back-link { color: var(--text-light); font-size: 0.95rem; transition: color 0.2s; }
@@ -438,15 +657,32 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .poem-image-container { margin: 0 auto 32px; max-width: 700px; text-align: center; }
 .poem-feature-image { width: 100%; height: auto; border: 6px solid var(--rose); border-radius: 16px; box-shadow: var(--shadow-hover); display: block; }
 
-.poem-audio-player { max-width: 700px; margin: 0 auto 24px; background: var(--vanilla); border-radius: 12px; padding: 20px 24px; border: 1px solid var(--border); }
+/* ===== ENHANCED AUDIO PLAYER ===== */
+.poem-audio-player { max-width: 700px; margin: 0 auto 24px; background: var(--card-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .audio-label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 .audio-label i { color: var(--rose); font-size: 1.2rem; }
-.poem-audio-player audio { width: 100%; border-radius: 8px; }
 
+#customAudioPlayer { position: relative; }
+#waveCanvas { width: 100%; height: 100px; border-radius: 8px; display: block; }
+.audio-controls-bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.audio-controls-bar .play-btn { background: var(--rose); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
+.audio-controls-bar .play-btn:hover { background: var(--rose-dark); }
+.progress-container { flex: 1; min-width: 80px; }
+.progress-bar { height: 4px; background: var(--border); border-radius: 2px; cursor: pointer; position: relative; }
+.progress-fill { height: 100%; background: var(--rose); border-radius: 2px; width: 0%; transition: width 0.1s; }
+.time-display { font-size: 0.85rem; color: var(--text-light); min-width: 70px; text-align: center; }
+.volume-control { display: flex; align-items: center; gap: 4px; }
+.volume-control button { background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 0.9rem; padding: 2px; }
+.volume-control input[type="range"] { width: 60px; accent-color: var(--rose); background: var(--border); height: 4px; border-radius: 2px; }
+.volume-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--rose); cursor: pointer; }
+.volume-control input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--rose); cursor: pointer; border: none; }
+
+/* ===== POEM INTRO ===== */
 .poem-intro-section { max-width: 700px; margin: 0 auto 32px; background: var(--fantasy); border-left: 4px solid var(--rose); border-radius: 0 12px 12px 0; padding: 20px 24px; }
 .intro-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--rose); margin-bottom: 6px; }
 .intro-body { font-style: italic; font-size: 1.05rem; color: var(--text); line-height: 1.8; text-align: justify; }
 
+/* ===== POEM CONTENT ===== */
 .poem-content-section { max-width: 700px; margin: 0 auto 32px; border: 4px solid var(--rose); border-radius: 16px; padding: 32px; background: var(--card-bg); box-shadow: var(--shadow-hover); }
 .poem-body { font-family: 'Georgia', serif; font-size: 1.15rem; line-height: 2.4; color: var(--text); text-align: center; padding: 0; }
 .poem-body p { margin-bottom: 24px; }
@@ -523,6 +759,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     .poem-meta { flex-direction: column; gap: 4px; align-items: center; }
     .poem-footer-actions { flex-direction: column; align-items: center; }
     .poem-body { font-size: 1rem; line-height: 2; }
+    .audio-controls-bar { gap: 6px; }
+    .volume-control input[type="range"] { width: 40px; }
 }
 </style>
 
