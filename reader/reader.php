@@ -569,7 +569,19 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     <div id="notes-panel"><div class="notes-header"><h3>📝 Group Notes</h3><div><button class="note-submit" id="addNoteBtn">+ Add</button><button class="note-cancel" id="notesClose">&times;</button></div></div><div class="notes-body" id="notesBody"><div id="notesList"><p class="empty-notes">No notes for this chapter.</p></div><div id="noteForm"><textarea id="noteText" rows="2" placeholder="Write a note..."></textarea><div><label><input type="checkbox" id="notePrivate"> Private</label></div><button class="note-submit" onclick="submitNote()">Post</button><button class="note-cancel" onclick="toggleNoteForm()">Cancel</button></div></div></div>
 
-    <div id="share-modal" class="modal"><div class="modal-content"><span class="modal-close" onclick="closeShare()">&times;</span><h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3><div style="margin:16px 0;display:flex;flex-direction:column;gap:8px;"><button onclick="share('facebook')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-facebook-f" style="color:var(--rose);"></i> Facebook</button><button onclick="share('twitter')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-twitter" style="color:var(--rose);"></i> Twitter</button><button onclick="share('whatsapp')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-whatsapp" style="color:var(--rose);"></i> WhatsApp</button><button onclick="share('copy')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fas fa-link" style="color:var(--rose);"></i> Copy Link</button></div><button class="share-close" onclick="closeShare()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;width:100%;font-weight:600;">Close</button></div></div>
+   <div id="share-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeShare()">&times;</span>
+        <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
+        <div style="margin:16px 0;display:flex;flex-direction:column;gap:8px;">
+            <button onclick="share('facebook')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-facebook-f" style="color:var(--rose);"></i> Facebook</button>
+            <button onclick="share('twitter')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-twitter" style="color:var(--rose);"></i> Twitter</button>
+            <button onclick="share('whatsapp')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-whatsapp" style="color:var(--rose);"></i> WhatsApp</button>
+            <button onclick="share('copy')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fas fa-link" style="color:var(--rose);"></i> Copy Link</button>
+        </div>
+        <button class="share-close" onclick="closeShare()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;width:100%;font-weight:600;">Close</button>
+    </div>
+</div>
 
     <div id="challenge-widget"></div>
     <div id="overlay" onclick="closeAll()"></div>
@@ -1358,8 +1370,23 @@ html, body { height:100%; width:100%; overflow:hidden; }
         }
         closeShare();
     };
-    window.closeShare = function() { document.getElementById('share-modal').classList.remove('visible'); overlay.classList.remove('active'); };
+    // Function to close the share modal
+window.closeShare = function() {
+    document.getElementById('share-modal').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    // Also remove the visible class if you still use it
+    document.getElementById('share-modal').classList.remove('visible');
+    document.getElementById('overlay').classList.remove('active');
+};
 
+// In your share button click handler (or wherever you open it)
+shareBtn.addEventListener('click', function() {
+    document.getElementById('share-modal').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+    // If using the visible class:
+    document.getElementById('share-modal').classList.add('visible');
+    document.getElementById('overlay').classList.add('active');
+});
     // ===== CLOSE ALL =====
     window.closeAll = function() {
         settingsPanel.classList.remove('open');
