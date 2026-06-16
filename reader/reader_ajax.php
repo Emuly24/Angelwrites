@@ -1,6 +1,7 @@
 <?php
 // ============================================================
-//  READER_AJAX.PHP – COMPLETE (All endpoints)
+//  READER_AJAX.PHP – Complete SQLite Version
+//  All endpoints required by reader.php
 // ============================================================
 
 require_once '../includes/config.php';
@@ -92,6 +93,7 @@ if ($action === 'add_bookmark') {
     $chapter = isset($_POST['chapter']) ? (int)$_POST['chapter'] : 0;
     $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
     $note = isset($_POST['note']) ? trim($_POST['note']) : '';
+
     $stmt = $db->prepare("INSERT INTO bookmarks (user_id, book_id, chapter_index, offset, note) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$user_id, $book_id, $chapter, $offset, $note]);
     echo json_encode(['success' => true, 'bookmark_id' => $db->lastInsertId()]);
@@ -108,7 +110,7 @@ if ($action === 'remove_bookmark') {
 
 if ($action === 'list_bookmarks') {
     $book_id = (int)$_POST['book_id'];
-    $stmt = $db->prepare("SELECT id, chapter_index, offset, note, created_at FROM bookmarks WHERE user_id = ? AND book_id = ? ORDER BY chapter_index, created_at DESC");
+    $stmt = $db->prepare("SELECT id, chapter_index, offset, note, created_at FROM bookmarks WHERE user_id = ? AND book_id = ? ORDER BY chapter_index, created_at DESC LIMIT 100");
     $stmt->execute([$user_id, $book_id]);
     $bookmarks = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'bookmarks' => $bookmarks]);
@@ -147,15 +149,52 @@ if ($action === 'remove_highlight') {
 
 if ($action === 'list_highlights') {
     $book_id = (int)$_POST['book_id'];
-    $stmt = $db->prepare("SELECT id, chapter_index, paragraph_index, text, color, note, created_at FROM highlights WHERE user_id = ? AND book_id = ? ORDER BY chapter_index, paragraph_index");
+    $stmt = $db->prepare("SELECT id, chapter_index, paragraph_index, text, color, note, created_at FROM highlights WHERE user_id = ? AND book_id = ? ORDER BY chapter_index, paragraph_index LIMIT 200");
     $stmt->execute([$user_id, $book_id]);
     $highlights = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'highlights' => $highlights]);
     exit;
 }
 
+if ($action === 'get_highlights') {
+    $book_id = (int)$_POST['book_id'];
+    $chapter = (int)$_POST['chapter'];
+    $stmt = $db->prepare("SELECT paragraph_index, text, color, note FROM highlights WHERE user_id = ? AND book_id = ? AND chapter_index = ?");
+    $stmt->execute([$user_id, $book_id, $chapter]);
+    $highlights = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode(['success' => true, 'highlights' => $highlights]);
+    exit;
+}
+
 // ================================================================
-// 5. QUESTIONS & TYPO REPORTS
+// 5. EXPORT HIGHLIGHTS
+// ================================================================
+if ($action === 'export_highlights') {
+    $book_id = (int)$_POST['book_id'];
+    $stmt = $db->prepare("SELECT chapter_index, text, note, color FROM highlights WHERE user_id = ? AND book_id = ? ORDER BY chapter_index, created_at");
+    $stmt->execute([$user_id, $book_id]);
+    $highlights = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $txt = "Highlights for book ID: $book_id\n";
+    $txt .= "Exported on: " . date('Y-m-d H:i:s') . "\n\n";
+    foreach ($highlights as $h) {
+        $txt .= "--- Chapter " . ($h['chapter_index'] + 1) . " ---\n";
+        $txt .= "Text: " . $h['text'] . "\n";
+        $txt .= "Color: " . $h['color'] . "\n";
+        if (!empty($h['note'])) {
+            $txt .= "Note: " . $h['note'] . "\n";
+        }
+        $txt .= "\n";
+    }
+
+    header('Content-Type: text/plain');
+    header('Content-Disposition: attachment; filename="highlights.txt"');
+    echo $txt;
+    exit;
+}
+
+// ================================================================
+// 6. QUESTIONS & TYPO REPORTS
 // ================================================================
 if ($action === 'ask_question') {
     $book_id = (int)$_POST['book_id'];
@@ -198,6 +237,11 @@ if ($action === 'report_typo') {
     $chapter = (int)$_POST['chapter'];
     $description = trim($_POST['description']);
 
+    if (empty($description)) {
+        echo json_encode(['success' => false, 'error' => 'Description cannot be empty.']);
+        exit;
+    }
+
     $stmt = $db->prepare("SELECT title FROM books WHERE id = ?");
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -215,11 +259,16 @@ if ($action === 'report_typo') {
 }
 
 // ================================================================
-// 6. GOALS
+// 7. GOALS
 // ================================================================
 if ($action === 'update_goal') {
     $goal_id = (int)$_POST['goal_id'];
     $progress = (int)$_POST['progress'];
+
+    if ($progress <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Progress must be positive.']);
+        exit;
+    }
 
     $stmt = $db->prepare("UPDATE reading_goals SET current_value = current_value + ? WHERE id = ? AND user_id = ?");
     $stmt->execute([$progress, $goal_id, $user_id]);
@@ -234,7 +283,7 @@ if ($action === 'update_goal') {
         $current = $stmt->fetchColumn();
 
         if ($current >= $goal['target_value']) {
-            $stmt = $db->prepare("UPDATE reading_goals SET completed = 1 WHERE id = ? AND user_id = ?");
+            $stmt = $db->prepare("UPDATE reading_goals SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?");
             $stmt->execute([$goal_id, $user_id]);
             $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
             $stmt->execute([$user_id, 'goal_completed']);
@@ -246,7 +295,7 @@ if ($action === 'update_goal') {
 }
 
 // ================================================================
-// 7. STATS
+// 8. STATS
 // ================================================================
 if ($action === 'get_stats') {
     $book_id = (int)$_POST['book_id'];
@@ -263,7 +312,7 @@ if ($action === 'get_stats') {
     $stmt->execute([$user_id]);
     $streak = $stmt->fetchColumn() ?? 0;
 
-    $stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC");
+    $stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC LIMIT 20");
     $stmt->execute([$user_id]);
     $achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -278,7 +327,7 @@ if ($action === 'get_stats') {
 }
 
 // ================================================================
-// 8. MONTHLY CHALLENGE
+// 9. MONTHLY CHALLENGE
 // ================================================================
 if ($action === 'get_monthly_challenge') {
     $user_id = (int)$_POST['user_id'];
@@ -315,6 +364,12 @@ if ($action === 'get_monthly_challenge') {
 if ($action === 'update_challenge_progress') {
     $user_id = (int)$_POST['user_id'];
     $pages_read = (int)$_POST['pages_read'];
+
+    if ($pages_read <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Pages read must be positive.']);
+        exit;
+    }
+
     $month = date('m');
     $year = date('Y');
 
@@ -335,12 +390,20 @@ if ($action === 'update_challenge_progress') {
 }
 
 // ================================================================
-// 9. GROUP NOTES
+// 10. GROUP NOTES
 // ================================================================
 if ($action === 'get_notes') {
     $group_id = (int)$_GET['group_id'];
     $book_id = (int)$_GET['book_id'];
     $chapter = (int)$_GET['chapter'];
+
+    // Verify group membership
+    $stmt = $db->prepare("SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?");
+    $stmt->execute([$group_id, $user_id]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['success' => false, 'error' => 'Access denied to this group.']);
+        exit;
+    }
 
     $stmt = $db->prepare("
         SELECT n.*, u.username, u.display_name, u.avatar
@@ -348,6 +411,7 @@ if ($action === 'get_notes') {
         JOIN users u ON n.user_id = u.id
         WHERE n.group_id = ? AND n.book_id = ? AND n.chapter_index = ?
         ORDER BY n.created_at DESC
+        LIMIT 50
     ");
     $stmt->execute([$group_id, $book_id, $chapter]);
     $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -379,6 +443,14 @@ if ($action === 'add_reader_note') {
         exit;
     }
 
+    // Verify group membership
+    $stmt = $db->prepare("SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?");
+    $stmt->execute([$group_id, $user_id]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['success' => false, 'error' => 'Access denied to this group.']);
+        exit;
+    }
+
     $stmt = $db->prepare("
         INSERT INTO group_notes (group_id, user_id, book_id, chapter_index, text, is_private)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -401,6 +473,21 @@ if ($action === 'add_reader_reaction') {
     $note_id = (int)$_POST['note_id'];
     $reaction_type = $_POST['reaction_type'];
 
+    // Verify group membership via the note's group
+    $stmt = $db->prepare("SELECT group_id FROM group_notes WHERE id = ?");
+    $stmt->execute([$note_id]);
+    $group_id = $stmt->fetchColumn();
+    if (!$group_id) {
+        echo json_encode(['success' => false, 'error' => 'Note not found.']);
+        exit;
+    }
+    $stmt = $db->prepare("SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?");
+    $stmt->execute([$group_id, $user_id]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['success' => false, 'error' => 'Access denied.']);
+        exit;
+    }
+
     $stmt = $db->prepare("SELECT id FROM group_reactions WHERE target_type = 'note' AND target_id = ? AND user_id = ? AND reaction_type = ?");
     $stmt->execute([$note_id, $user_id, $reaction_type]);
     if (!$stmt->fetch()) {
@@ -414,6 +501,21 @@ if ($action === 'add_reader_reaction') {
 if ($action === 'toggle_note_reaction') {
     $note_id = (int)$_POST['note_id'];
     $reaction_type = $_POST['reaction_type'];
+
+    // Verify group membership via the note's group
+    $stmt = $db->prepare("SELECT group_id FROM group_notes WHERE id = ?");
+    $stmt->execute([$note_id]);
+    $group_id = $stmt->fetchColumn();
+    if (!$group_id) {
+        echo json_encode(['success' => false, 'error' => 'Note not found.']);
+        exit;
+    }
+    $stmt = $db->prepare("SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?");
+    $stmt->execute([$group_id, $user_id]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['success' => false, 'error' => 'Access denied.']);
+        exit;
+    }
 
     $stmt = $db->prepare("SELECT id FROM group_reactions WHERE target_type = 'note' AND target_id = ? AND user_id = ? AND reaction_type = ?");
     $stmt->execute([$note_id, $user_id, $reaction_type]);
@@ -431,7 +533,185 @@ if ($action === 'toggle_note_reaction') {
 }
 
 // ================================================================
-// 10. HELPER FUNCTIONS
+// 11. RESET PROGRESS
+// ================================================================
+if ($action === 'reset_progress') {
+    $book_id = (int)$_POST['book_id'];
+    $stmt = $db->prepare("UPDATE reading_progress SET position_offset = 0, position_section = 0, progress_percent = 0, last_accessed_at = CURRENT_TIMESTAMP WHERE user_id = ? AND book_id = ?");
+    $stmt->execute([$user_id, $book_id]);
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ================================================================
+// 12. SET READING STATUS
+// ================================================================
+if ($action === 'set_reading_status') {
+    $book_id = (int)$_POST['book_id'];
+    $status = $_POST['status'];
+    $allowed = ['not_started', 'currently_reading', 'finished', 'want_to_read', 'dropped'];
+    if (!in_array($status, $allowed)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid status.']);
+        exit;
+    }
+
+    $stmt = $db->prepare("SELECT id FROM reading_status WHERE user_id = ? AND book_id = ?");
+    $stmt->execute([$user_id, $book_id]);
+    if ($stmt->fetch()) {
+        $stmt = $db->prepare("UPDATE reading_status SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND book_id = ?");
+        $stmt->execute([$status, $user_id, $book_id]);
+    } else {
+        $stmt = $db->prepare("INSERT INTO reading_status (user_id, book_id, status) VALUES (?, ?, ?)");
+        $stmt->execute([$user_id, $book_id, $status]);
+    }
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+if ($action === 'get_reading_status') {
+    $book_id = (int)$_POST['book_id'];
+    $stmt = $db->prepare("SELECT status FROM reading_status WHERE user_id = ? AND book_id = ?");
+    $stmt->execute([$user_id, $book_id]);
+    $status = $stmt->fetchColumn();
+    echo json_encode(['success' => true, 'status' => $status ?: 'not_started']);
+    exit;
+}
+
+// ================================================================
+// 13. BOOK COMMENTS
+// ================================================================
+if ($action === 'get_book_comments') {
+    $book_id = (int)$_POST['book_id'];
+    $page_num = (int)$_POST['page_num'];
+
+    $stmt = $db->prepare("
+        SELECT c.*, u.username, u.display_name, u.avatar, u.is_admin
+        FROM book_comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.book_id = ? AND c.page_num = ?
+        ORDER BY c.created_at DESC
+        LIMIT 50
+    ");
+    $stmt->execute([$book_id, $page_num]);
+    $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode(['success' => true, 'comments' => $comments]);
+    exit;
+}
+
+if ($action === 'add_book_comment') {
+    $book_id = (int)$_POST['book_id'];
+    $page_num = (int)$_POST['page_num'];
+    $comment = trim($_POST['comment']);
+
+    if (empty($comment)) {
+        echo json_encode(['success' => false, 'error' => 'Comment cannot be empty.']);
+        exit;
+    }
+
+    $stmt = $db->prepare("INSERT INTO book_comments (user_id, book_id, page_num, comment) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$user_id, $book_id, $page_num, $comment]);
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ================================================================
+// 14. PRAYER REQUEST
+// ================================================================
+if ($action === 'submit_prayer_request') {
+    $book_id = (int)$_POST['book_id'];
+    $request_text = trim($_POST['request_text']);
+
+    if (empty($request_text)) {
+        echo json_encode(['success' => false, 'error' => 'Prayer request cannot be empty.']);
+        exit;
+    }
+
+    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, book_id, request_text) VALUES (?, ?, ?)");
+    $stmt->execute([$user_id, $book_id, $request_text]);
+
+    $stmt = $db->prepare("SELECT email FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $stmt = $db->prepare("SELECT title FROM books WHERE id = ?");
+    $stmt->execute([$book_id]);
+    $book = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $admin_email = 'angelwrites@zohomail.com';
+    $subject = '🙏 Prayer Request from ' . $user['email'];
+    $body = "<h2>New Prayer Request</h2>";
+    $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";
+    $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
+    $body .= "<p><strong>Request:</strong><br>" . nl2br(htmlspecialchars($request_text)) . "</p>";
+    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ================================================================
+// 15. BOOK ERROR REPORT
+// ================================================================
+if ($action === 'report_book_error') {
+    $book_id = (int)$_POST['book_id'];
+    $page_num = (int)$_POST['page_num'];
+    $error_text = trim($_POST['error_text']);
+    $correction = isset($_POST['correction']) ? trim($_POST['correction']) : '';
+
+    if (empty($error_text)) {
+        echo json_encode(['success' => false, 'error' => 'Error description cannot be empty.']);
+        exit;
+    }
+
+    $stmt = $db->prepare("INSERT INTO book_error_reports (user_id, book_id, page_num, error_text, correction) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$user_id, $book_id, $page_num, $error_text, $correction]);
+
+    $stmt = $db->prepare("SELECT title FROM books WHERE id = ?");
+    $stmt->execute([$book_id]);
+    $book = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $admin_email = 'angelwrites@zohomail.com';
+    $subject = '⚠️ Book Error Report: ' . $book['title'];
+    $body = "<h2>New Error Report</h2>";
+    $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
+    $body .= "<p><strong>Page:</strong> " . $page_num . "</p>";
+    $body .= "<p><strong>Error:</strong><br>" . nl2br(htmlspecialchars($error_text)) . "</p>";
+    if (!empty($correction)) {
+        $body .= "<p><strong>Suggested Correction:</strong><br>" . nl2br(htmlspecialchars($correction)) . "</p>";
+    }
+    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ================================================================
+// 16. UPDATE READING SPEED
+// ================================================================
+if ($action === 'update_reading_speed') {
+    $speed = (int)$_POST['speed'];
+    if ($speed < 50 || $speed > 1000) {
+        echo json_encode(['success' => false, 'error' => 'Invalid reading speed.']);
+        exit;
+    }
+
+    $stmt = $db->prepare("SELECT id FROM user_settings WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    if ($stmt->fetch()) {
+        $stmt = $db->prepare("UPDATE user_settings SET reading_speed_wpm = ? WHERE user_id = ?");
+        $stmt->execute([$speed, $user_id]);
+    } else {
+        $stmt = $db->prepare("INSERT INTO user_settings (user_id, reading_speed_wpm) VALUES (?, ?)");
+        $stmt->execute([$user_id, $speed]);
+    }
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ================================================================
+// 17. HELPER FUNCTIONS
 // ================================================================
 
 function updateReadingStreak($user_id) {
