@@ -153,7 +153,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .page-content-inner p{margin-bottom:16px}
         .page-content-inner p:last-child{margin-bottom:0}
 
-        #flip-container{display:none;width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg)}
+        #flip-container{background: var(--bg); display:none;width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg)}
         .flip-book{position:relative;width:95%;max-width:900px;height:92%;max-height:900px;transform-style:preserve-3d;transition:transform 0.9s cubic-bezier(0.645,0.045,0.355,1)}
         .flip-page{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-hover);border:1px solid var(--border)}
         .flip-page-front{z-index:2;transform:rotateY(0deg);transform-origin:left center}
