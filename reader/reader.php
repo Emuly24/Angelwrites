@@ -991,11 +991,10 @@ window.switchMode = function(mode) {
     } else {
         flipContainer.style.display = 'none';
         document.getElementById('scroll-container').style.display = 'block';
-        const target = document.querySelector('.page-content-wrapper[data-page="' + currentPage + '"]');
+        const target = document.querySelector(`.page-content-inner[data-page="${currentPage}"]`);
         if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 };
-
 // ===== OVERRIDE NAVIGATION FUNCTIONS =====
 function nextPage() {
     if (readingMode === 'flip') { flipToNext(); }
@@ -1010,11 +1009,22 @@ function prevPage() {
 function goToPage(pageNum) {
     if (pageNum < 1 || pageNum > totalPages) return;
     currentPage = pageNum;
+    
     if (readingMode === 'flip') {
-        loadFlipPages(pageNum);
+        // Flip mode uses the loadFlipPages function
+        if (typeof loadFlipPages === 'function') {
+            loadFlipPages(pageNum);
+        } else {
+            // Fallback if loadFlipPages is not available
+            prepareFlipChunks(pageNum);
+            renderFlipChunk(0);
+        }
     } else {
-        const target = document.querySelector('.page-content-wrapper[data-page="' + pageNum + '"]');
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // SCROLL MODE FIX: Use the correct selector
+        const target = document.querySelector(`.page-content-inner[data-page="${pageNum}"]`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
         updateUI(pageNum);
     }
     savePosition();
