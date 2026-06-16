@@ -372,17 +372,21 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             <?php endforeach; ?>
         </div>
         <div id="flip-container" style="display:none;">
-    <div class="flip-book" id="flipBook">
-        <div class="flip-page flip-page-front" id="flipLeftPage">
-            <div class="flip-page-inner" id="flipLeftContent"></div>
+            <div class="flip-book" id="flipBook">
+                <div class="flip-page flip-page-front" id="flipLeftPage">
+                    <div class="flip-page-inner" id="flipLeftContent"></div>
+                </div>
+                <div class="flip-page flip-page-back" id="flipRightPage">
+                    <div class="flip-page-inner" id="flipRightContent"></div>
+                </div>
+            </div>
+            <div class="flip-nav-btn-wrapper" id="flipPrevBtnWrapper">
+                <button class="aw-nav-btn" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <div class="flip-nav-btn-wrapper" id="flipNextBtnWrapper">
+                <button class="aw-nav-btn" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
+            </div>
         </div>
-        <div class="flip-page flip-page-back" id="flipRightPage">
-            <div class="flip-page-inner" id="flipRightContent"></div>
-        </div>
-    </div>
-    <button class="aw-nav-btn prev" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
-    <button class="aw-nav-btn next" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
-</div>
 
     <div id="settings-panel">
         <div class="settings-grid">
@@ -522,6 +526,13 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     backBtn.addEventListener('click', function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
 
+    // ===== HELPER: Escape HTML =====
+    function escapeHtml(text) {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+        // ===== SWITCH MODE =====
     function switchMode(mode) {
         readingMode = mode;
         localStorage.setItem('reader_mode', mode);
@@ -538,13 +549,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         updateUI(currentPage);
     }
 
-    // ===== HELPER: Escape HTML =====
-    function escapeHtml(text) {
-        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-    }
-
-    // ===== FLIP MODE – STATIC DOM (NO BLANK SCREENS) =====
+    // ===== FLIP MODE – CHUNKED CONTENT + NO INNER WRAPPER =====
 
     function loadFlipPages(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
@@ -593,62 +598,144 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
         }
 
-        function wrapInContainer(html) {
-            return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`;
-        }
-
-        let leftHtml, rightHtml;
-
+        let contentToSplit;
         if (pageNum === 1) {
-            leftHtml = getCoverHTML();
-            rightHtml = wrapInContainer(formatPageHTML(pages[0] || ''));
+            contentToSplit = getCoverHTML();
         } else {
-            leftHtml = wrapInContainer(formatPageHTML(pages[pageNum - 1] || ''));
-            rightHtml = wrapInContainer(formatPageHTML(pages[pageNum] || ''));
+            // Format the page content but do NOT wrap it in .page-content-wrapper
+            contentToSplit = formatPageHTML(pages[pageNum - 1] || '');
         }
 
-        // Update the static DOM elements directly – no rebuild
-        document.getElementById('flipLeftContent').innerHTML = leftHtml;
-        document.getElementById('flipRightContent').innerHTML = rightHtml;
+        // Split the content into smaller chunks (approx. 1500 characters)
+        const chunks = splitContent(contentToSplit, 1500);
 
+        // Store chunks and current index
+        flipBook.dataset.chunks = JSON.stringify(chunks);
+        flipBook.dataset.currentChunk = 0;
+        flipBook.dataset.pageNum = pageNum;
+
+        // Render the first chunk
+        renderChunk(chunks[0] || '');
+    }
+
+    function splitContent(html, charLimit) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const text = tempDiv.textContent || tempDiv.innerText || '';
+        const words = text.split(/\s+/);
+        const chunks = [];
+        let currentChunk = '';
+        let currentChunkHTML = '';
+
+        // Helper to extract valid HTML for a given text chunk
+        function getHTMLForText(sourceDiv, textChunk) {
+            // Simple approach: rebuild from paragraphs
+            const paragraphs = sourceDiv.querySelectorAll('p, h2, h3');
+            let result = '';
+            let charCount = 0;
+            for (let p of paragraphs) {
+                const pText = p.textContent.trim();
+                if (pText.length === 0) continue;
+                if (charCount + pText.length > charLimit && charCount > 0) break;
+                result += p.outerHTML;
+                charCount += pText.length;
+            }
+            if (result.length === 0) {
+                // Fallback: return the first paragraph
+                const firstP = sourceDiv.querySelector('p');
+                return firstP ? firstP.outerHTML : textChunk;
+            }
+            return result;
+        }
+
+        // Iterate through words to build chunks
+        for (let i = 0; i < words.length; i++) {
+            if ((currentChunk.length + words[i].length + 1) > charLimit) {
+                // Wrap the chunk in a way that preserves HTML structure
+                const chunkHTML = getHTMLForText(tempDiv, currentChunk);
+                if (chunkHTML) chunks.push(chunkHTML);
+                currentChunk = words[i];
+            } else {
+                if (currentChunk.length > 0) currentChunk += ' ';
+                currentChunk += words[i];
+            }
+        }
+        if (currentChunk.length > 0) {
+            const chunkHTML = getHTMLForText(tempDiv, currentChunk);
+            if (chunkHTML) chunks.push(chunkHTML);
+        }
+
+        // If no chunks were created, return the original HTML
+        if (chunks.length === 0) {
+            return [html];
+        }
+        return chunks;
+    }
+
+    function renderChunk(html) {
+        // Update the left page content (front)
+        flipLeftContent.innerHTML = html;
+        // Clear the right page (back)
+        flipRightContent.innerHTML = '';
+
+        // Reset book rotation
         flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
         flipBook.style.transform = 'rotateY(0deg)';
-
-        flipCurrentPage = pageNum;
-        updateUI(pageNum);
-        savePosition();
     }
 
     function flipToNext() {
-        const nextPage = flipCurrentPage + 2;
-        if (nextPage > totalPages) {
-            if (flipCurrentPage < totalPages) {
-                loadFlipPages(totalPages);
+        const chunks = JSON.parse(flipBook.dataset.chunks || '[]');
+        const currentChunk = parseInt(flipBook.dataset.currentChunk);
+        const pageNum = parseInt(flipBook.dataset.pageNum);
+
+        if (currentChunk < chunks.length - 1) {
+            // Move to the next chunk within the same page
+            flipBook.classList.add('page-right-flipped');
+            setTimeout(() => {
+                renderChunk(chunks[currentChunk + 1]);
+                flipBook.dataset.currentChunk = currentChunk + 1;
+                updateUI(pageNum);
+            }, 800);
+        } else {
+            // Move to the next actual page
+            if (pageNum < totalPages) {
+                flipBook.classList.add('page-right-flipped');
+                setTimeout(() => {
+                    loadFlipPages(pageNum + 1);
+                    updateUI(pageNum + 1);
+                    savePosition();
+                }, 800);
             }
-            return;
         }
-        flipBook.classList.add('page-right-flipped');
-        setTimeout(() => {
-            loadFlipPages(nextPage);
-        }, 800);
     }
 
     function flipToPrev() {
-        const prevPage = flipCurrentPage - 2;
-        if (prevPage < 1) {
-            return;
+        const currentChunk = parseInt(flipBook.dataset.currentChunk);
+        const pageNum = parseInt(flipBook.dataset.pageNum);
+
+        if (currentChunk > 0) {
+            // Move to the previous chunk within the same page
+            const chunks = JSON.parse(flipBook.dataset.chunks || '[]');
+            flipBook.classList.add('page-left-flipped');
+            setTimeout(() => {
+                renderChunk(chunks[currentChunk - 1]);
+                flipBook.dataset.currentChunk = currentChunk - 1;
+                updateUI(pageNum);
+            }, 800);
+        } else {
+            // Move to the previous actual page
+            if (pageNum > 1) {
+                flipBook.classList.add('page-left-flipped');
+                setTimeout(() => {
+                    loadFlipPages(pageNum - 1);
+                    updateUI(pageNum - 1);
+                    savePosition();
+                }, 800);
+            }
         }
-        flipBook.classList.add('page-left-flipped');
-        setTimeout(() => {
-            loadFlipPages(prevPage);
-        }, 800);
     }
 
-    // ===== ATTACH EVENT LISTENERS ONCE =====
-    document.getElementById('flipPrevBtn').addEventListener('click', flipToPrev);
-    document.getElementById('flipNextBtn').addEventListener('click', flipToNext);
-
-    // ===== NAVIGATION =====
+    // ===== NAVIGATION FUNCTIONS =====
     function goToPage(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
         currentPage = pageNum;
@@ -662,6 +749,10 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         savePosition();
         loadNotes();
     }
+
+    // ===== ATTACH EVENT LISTENERS =====
+    document.getElementById('flipPrevBtn').addEventListener('click', flipToPrev);
+    document.getElementById('flipNextBtn').addEventListener('click', flipToNext);
 
     function updateUI(page) {
         pageNumEl.textContent = page;
