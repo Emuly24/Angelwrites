@@ -32,13 +32,11 @@ $has_processed = !empty($processed) && $processed['is_processed'] == 1;
 
 $toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
 
-// ===== FIX: Extract the actual HTML content between page-content divs =====
 $pages = [];
 if ($has_processed && !empty($processed['content_html'])) {
-    // Use a more robust regex to extract the inner content of page-content divs
     preg_match_all('/<div class="page-content" data-page="(\d+)">(.*?)<\/div>/s', $processed['content_html'], $matches, PREG_SET_ORDER);
     foreach ($matches as $match) {
-        $pages[] = $match[2]; // Extract ONLY the inner HTML, not the wrapper
+        $pages[] = $match[2];
     }
 }
 $total_pages = count($pages);
@@ -113,238 +111,214 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <style>
-        /* ===== RESET & BRAND VARIABLES ===== */
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;width:100%;overflow:hidden}
-:root{--rose:#DBA1A2;--rose-dark:#c08a8b;--rose-light:#e8c0c0;--vanilla:#EFD8D6;--fantasy:#F7F3ED;--white:#ffffff;--dark:#2c1e1e;--text:#3d2e2e;--text-light:#6b5a5a;--bg:#F7F3ED;--card-bg:#ffffff;--border:#e5d5d5;--shadow:0 4px 16px rgba(44,30,30,0.08);--shadow-hover:0 8px 30px rgba(44,30,30,0.15);--input-bg:#ffffff;--transition:0.3s cubic-bezier(0.4,0,0.2,1)}
-[data-theme="dark"]{--rose:#dba1a2;--rose-dark:#c08a8b;--rose-light:#e8c0c0;--vanilla:#3d2e2e;--fantasy:#2c1e1e;--white:#1a1212;--dark:#f0e8e8;--text:#e8dddd;--text-light:#b8a8a8;--bg:#1a1212;--card-bg:#2c1e1e;--border:#4a3a3a;--shadow:0 4px 16px rgba(0,0,0,0.4);--shadow-hover:0 8px 30px rgba(0,0,0,0.6);--input-bg:#2c1e1e}
+        *{margin:0;padding:0;box-sizing:border-box}
+        html,body{height:100%;width:100%;overflow:hidden}
+        :root{--rose:#DBA1A2;--rose-dark:#c08a8b;--rose-light:#e8c0c0;--vanilla:#EFD8D6;--fantasy:#F7F3ED;--white:#ffffff;--dark:#2c1e1e;--text:#3d2e2e;--text-light:#6b5a5a;--bg:#F7F3ED;--card-bg:#ffffff;--border:#e5d5d5;--shadow:0 4px 16px rgba(44,30,30,0.08);--shadow-hover:0 8px 30px rgba(44,30,30,0.15);--input-bg:#ffffff;--transition:0.3s cubic-bezier(0.4,0,0.2,1)}
+        [data-theme="dark"]{--rose:#dba1a2;--rose-dark:#c08a8b;--rose-light:#e8c0c0;--vanilla:#3d2e2e;--fantasy:#2c1e1e;--white:#1a1212;--dark:#f0e8e8;--text:#e8dddd;--text-light:#b8a8a8;--bg:#1a1212;--card-bg:#2c1e1e;--border:#4a3a3a;--shadow:0 4px 16px rgba(0,0,0,0.4);--shadow-hover:0 8px 30px rgba(0,0,0,0.6);--input-bg:#2c1e1e}
 
-/* ===== READER APP ===== */
-#reader-app{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);z-index:10000;font-family:'Inter',sans-serif;color:var(--text);transition:background var(--transition),color var(--transition)}
+        #reader-app{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);z-index:10000;font-family:'Inter',sans-serif;color:var(--text);transition:background var(--transition),color var(--transition)}
 
-/* ===== TOOLBAR ===== */
-#toolbar{flex-shrink:0;height:60px;min-height:60px;display:flex;justify-content:space-between;align-items:center;padding:0 20px;background:var(--card-bg);border-bottom:1px solid var(--border);z-index:20;box-shadow:var(--shadow)}
-.toolbar-left{display:flex;align-items:center;gap:16px}
-.toolbar-left .title{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:1.15rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dark)}
-.toolbar-left button{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-light);transition:color var(--transition);width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center}
-.toolbar-left button:hover{color:var(--rose);background:rgba(219,161,162,0.1)}
-.toolbar-center{display:flex;align-items:center;gap:12px;font-size:0.95rem;color:var(--text-light)}
-.toolbar-center .progress-ring{position:relative;width:36px;height:36px}
-.toolbar-center .progress-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
-.toolbar-center .progress-ring .bg{stroke:var(--border);stroke-width:2;fill:none}
-.toolbar-center .progress-ring .fill{stroke:var(--rose);stroke-width:2;fill:none;transition:stroke-dashoffset var(--transition)}
-.toolbar-center .progress-ring .percent{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.7rem;font-weight:600;color:var(--text-light)}
-.toolbar-right{display:flex;align-items:center;gap:8px}
-.toolbar-right button{background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-light);padding:6px 10px;border-radius:6px;transition:all var(--transition);display:flex;align-items:center;justify-content:center}
-.toolbar-right button:hover{background:rgba(219,161,162,0.1);color:var(--rose);transform:scale(1.05)}
-.streak-badge{background:var(--rose);color:var(--white);padding:2px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap}
+        #toolbar{flex-shrink:0;height:60px;min-height:60px;display:flex;justify-content:space-between;align-items:center;padding:0 20px;background:var(--card-bg);border-bottom:1px solid var(--border);z-index:20;box-shadow:var(--shadow)}
+        .toolbar-left{display:flex;align-items:center;gap:16px}
+        .toolbar-left .title{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:1.15rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dark)}
+        .toolbar-left button{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-light);transition:color var(--transition);width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+        .toolbar-left button:hover{color:var(--rose);background:rgba(219,161,162,0.1)}
+        .toolbar-center{display:flex;align-items:center;gap:12px;font-size:0.95rem;color:var(--text-light)}
+        .toolbar-center .progress-ring{position:relative;width:36px;height:36px}
+        .toolbar-center .progress-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+        .toolbar-center .progress-ring .bg{stroke:var(--border);stroke-width:2;fill:none}
+        .toolbar-center .progress-ring .fill{stroke:var(--rose);stroke-width:2;fill:none;transition:stroke-dashoffset var(--transition)}
+        .toolbar-center .progress-ring .percent{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.7rem;font-weight:600;color:var(--text-light)}
+        .toolbar-right{display:flex;align-items:center;gap:8px}
+        .toolbar-right button{background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-light);padding:6px 10px;border-radius:6px;transition:all var(--transition);display:flex;align-items:center;justify-content:center}
+        .toolbar-right button:hover{background:rgba(219,161,162,0.1);color:var(--rose);transform:scale(1.05)}
+        .streak-badge{background:var(--rose);color:var(--white);padding:2px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;white-space:nowrap}
 
-/* ===== SIDEBAR ===== */
-#sidebar{position:fixed;top:60px;left:0;width:48px;height:calc(100% - 60px);background:var(--card-bg);border-right:1px solid var(--border);z-index:15;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;overflow-y:auto;transition:transform 0.25s ease}
-#sidebar.closed{transform:translateX(-100%)}
-#sidebar.open{transform:translateX(0)}
-#page-viewport{margin-left:48px;flex:1;position:relative;overflow:hidden;background:var(--bg);display:flex;justify-content:center;align-items:center}
-.focus-mode #sidebar{transform:translateX(-100%)}
-.sidebar-btn{width:36px;height:36px;border:none;background:transparent;color:var(--text-light);font-size:1rem;cursor:pointer;border-radius:8px;transition:all var(--transition);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.sidebar-btn:hover{background:rgba(219,161,162,0.1);color:var(--rose);transform:scale(1.05)}
-.sidebar-btn.active{color:var(--rose);background:rgba(219,161,162,0.15)}
-.sidebar-separator{width:28px;border:none;border-top:1px solid var(--border);margin:4px 0}
-@media (max-width:768px){#sidebar{display:none}#page-viewport{margin-left:0}}
+        #sidebar{position:fixed;top:60px;left:0;width:48px;height:calc(100% - 60px);background:var(--card-bg);border-right:1px solid var(--border);z-index:15;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;overflow-y:auto;transition:transform 0.25s ease}
+        #sidebar.closed{transform:translateX(-100%)}
+        #sidebar.open{transform:translateX(0)}
+        #page-viewport{margin-left:48px;flex:1;position:relative;overflow:hidden;background:var(--bg);display:flex;justify-content:center;align-items:center}
+        .focus-mode #sidebar{transform:translateX(-100%)}
+        .sidebar-btn{width:36px;height:36px;border:none;background:transparent;color:var(--text-light);font-size:1rem;cursor:pointer;border-radius:8px;transition:all var(--transition);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .sidebar-btn:hover{background:rgba(219,161,162,0.1);color:var(--rose);transform:scale(1.05)}
+        .sidebar-btn.active{color:var(--rose);background:rgba(219,161,162,0.15)}
+        .sidebar-separator{width:28px;border:none;border-top:1px solid var(--border);margin:4px 0}
+        @media (max-width:768px){#sidebar{display:none}#page-viewport{margin-left:0}}
 
-/* ===== SCROLL MODE ===== */
-#scroll-container{height:100%;width:100%;overflow-y:auto;padding:20px 20px 120px 20px;display:flex;flex-direction:column;align-items:center}
-.page-content-wrapper{width:100%;max-width:900px;margin:0 auto 40px auto;padding:10px;background:linear-gradient(145deg,var(--rose-light),var(--vanilla));border-radius:20px;box-shadow:var(--shadow-hover);border:1px solid var(--rose);transition:transform 0.3s ease}
-.page-content-wrapper:hover{transform:translateY(-2px)}
-.page-content-inner{width:100%;padding:30px 40px;background:var(--card-bg);border-radius:12px;box-shadow:inset 0 0 20px rgba(0,0,0,0.03);font-size:1.05rem;line-height:1.8;color:var(--text);min-height:400px}
-.page-content-inner h1,.page-content-inner h2,.page-content-inner h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
-.page-content-inner p{margin-bottom:16px}
-.page-content-inner p:last-child{margin-bottom:0}
+        #scroll-container{height:100%;width:100%;overflow-y:auto;padding:20px 20px 120px 20px;display:flex;flex-direction:column;align-items:center}
+        .page-content-wrapper{width:100%;max-width:900px;margin:0 auto 40px auto;padding:10px;background:linear-gradient(145deg,var(--rose-light),var(--vanilla));border-radius:20px;box-shadow:var(--shadow-hover);border:1px solid var(--rose);transition:transform 0.3s ease}
+        .page-content-wrapper:hover{transform:translateY(-2px)}
+        .page-content-inner{width:100%;padding:30px 40px;background:var(--card-bg);border-radius:12px;box-shadow:inset 0 0 20px rgba(0,0,0,0.03);font-size:1.05rem;line-height:1.8;color:var(--text);min-height:400px}
+        .page-content-inner h1,.page-content-inner h2,.page-content-inner h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
+        .page-content-inner p{margin-bottom:16px}
+        .page-content-inner p:last-child{margin-bottom:0}
 
-/* ===== 3D FLIP MODE ===== */
-#flip-container{background: var(--bg); display:none;width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg)}
-.flip-book{position:relative;width:95%;max-width:900px;height:92%;max-height:900px;transform-style:preserve-3d;transition:transform 0.9s cubic-bezier(0.645,0.045,0.355,1)}
-.flip-page{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-hover);border:1px solid var(--border)}
-.flip-page-front{z-index:2;transform:rotateY(0deg);transform-origin:left center}
-.flip-page-back{transform:rotateY(180deg);transform-origin:right center}
-.flip-book.flipped-right{transform:rotateY(-180deg)}
-.flip-book.flipped-left{transform:rotateY(180deg)}
-.flip-page-content{width:100%;height:100%;padding:40px;background:var(--card-bg);overflow-y:auto;font-size:1.05rem;line-height:1.8;color:var(--text)}
-.flip-page-content h1,.flip-page-content h2,.flip-page-content h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
-.flip-page-content p{margin-bottom:16px}
-.flip-page::before{content:'';position:absolute;top:0;bottom:0;width:50px;pointer-events:none;background:linear-gradient(to right,rgba(0,0,0,0.08) 0%,transparent 100%)}
-.flip-page-front::before{left:0}
-.flip-page-back::before{right:0}
+        #flip-container{display:none;width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg)}
+        .flip-book{position:relative;width:95%;max-width:900px;height:92%;max-height:900px;transform-style:preserve-3d;transition:transform 0.9s cubic-bezier(0.645,0.045,0.355,1)}
+        .flip-page{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-hover);border:1px solid var(--border)}
+        .flip-page-front{z-index:2;transform:rotateY(0deg);transform-origin:left center}
+        .flip-page-back{transform:rotateY(180deg);transform-origin:right center}
+        .flip-book.flipped-right{transform:rotateY(-180deg)}
+        .flip-book.flipped-left{transform:rotateY(180deg)}
+        .flip-page-content{width:100%;height:100%;padding:40px;background:var(--card-bg);overflow-y:auto;font-size:1.05rem;line-height:1.8;color:var(--text)}
+        .flip-page-content h1,.flip-page-content h2,.flip-page-content h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
+        .flip-page-content p{margin-bottom:16px}
+        .flip-page::before{content:'';position:absolute;top:0;bottom:0;width:50px;pointer-events:none;background:linear-gradient(to right,rgba(0,0,0,0.08) 0%,transparent 100%)}
+        .flip-page-front::before{left:0}
+        .flip-page-back::before{right:0}
 
-/* ===== COVER IMAGE ===== */
-.cover-image-wrapper{width:100%;max-width:900px;margin:0 auto 40px auto;padding:10px;background:linear-gradient(145deg,var(--rose-light),var(--vanilla));border-radius:20px;box-shadow:var(--shadow-hover);border:1px solid var(--rose)}
-.cover-image-container{width:100%;border-radius:12px;overflow:hidden;background:var(--card-bg);box-shadow:inset 0 0 20px rgba(0,0,0,0.05)}
-.cover-image-container img{width:100%;height:auto;display:block;object-fit:contain;max-height:80vh;transition:transform 0.3s ease}
-.cover-image-container img:hover{transform:scale(1.01)}
-.cover-placeholder{width:100%;min-height:400px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(135deg,var(--vanilla),var(--fantasy));color:var(--text-light);text-align:center;padding:40px}
-.cover-placeholder i{font-size:4rem;color:var(--rose);margin-bottom:16px}
-.cover-placeholder p{font-family:'Playfair Display',Georgia,serif;font-size:1.5rem;font-weight:600;color:var(--dark)}
+        .cover-image-wrapper{width:100%;max-width:900px;margin:0 auto 40px auto;padding:10px;background:linear-gradient(145deg,var(--rose-light),var(--vanilla));border-radius:20px;box-shadow:var(--shadow-hover);border:1px solid var(--rose)}
+        .cover-image-container{width:100%;border-radius:12px;overflow:hidden;background:var(--card-bg);box-shadow:inset 0 0 20px rgba(0,0,0,0.05)}
+        .cover-image-container img{width:100%;height:auto;display:block;object-fit:contain;max-height:80vh;transition:transform 0.3s ease}
+        .cover-image-container img:hover{transform:scale(1.01)}
+        .cover-placeholder{width:100%;min-height:400px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(135deg,var(--vanilla),var(--fantasy));color:var(--text-light);text-align:center;padding:40px}
+        .cover-placeholder i{font-size:4rem;color:var(--rose);margin-bottom:16px}
+        .cover-placeholder p{font-family:'Playfair Display',Georgia,serif;font-size:1.5rem;font-weight:600;color:var(--dark)}
 
-/* ===== FLOATING TOOLS ===== */
-#highlight-tooltip,#reaction-picker,#annotation-popup,#search-bar,#share-modal,#overlay,#notes-panel,#toc-drawer,#settings-panel{position:fixed !important;z-index:9999 !important}
-#highlight-tooltip{display:none;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px 16px;box-shadow:var(--shadow-hover);min-width:280px;pointer-events:auto}
-#highlight-tooltip.visible{display:block}
-#highlight-tooltip .highlight-color{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;transition:all 0.2s}
-#highlight-tooltip .highlight-color:hover{transform:scale(1.15);border-color:var(--rose)}
-#highlight-tooltip .tooltip-action{background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--text);transition:all 0.2s;font-size:0.9rem;display:flex;align-items:center;gap:4px}
-#highlight-tooltip .tooltip-action:hover{border-color:var(--rose);color:var(--rose);background:rgba(219,161,162,0.05)}
-#reaction-picker{display:none;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:8px 12px;box-shadow:var(--shadow-hover);gap:6px;pointer-events:auto;bottom:80px !important;right:20px !important;left:auto !important}
-#reaction-picker[style*="flex"]{display:flex !important}
-#reaction-picker button{background:none;border:none;font-size:1.5rem;cursor:pointer;padding:4px;transition:transform var(--transition)}
-#reaction-picker button:hover{transform:scale(1.2)}
-#annotation-popup{display:none;width:320px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-hover);pointer-events:auto;bottom:140px !important;right:20px !important;left:auto !important}
-#annotation-popup.visible{display:block}
-#annotation-popup textarea{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;min-height:60px;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
-#annotation-popup textarea:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
-.annotation-actions{display:flex;gap:8px;margin-top:8px;justify-content:flex-end}
-.annotation-actions button{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:0.8rem;transition:background var(--transition)}
-.annotation-save{background:var(--rose);color:var(--white)}
-.annotation-save:hover{background:var(--rose-dark)}
-.annotation-cancel{background:var(--border);color:var(--text)}
-.annotation-cancel:hover{background:var(--text-light);color:var(--white)}
+        #highlight-tooltip,#reaction-picker,#annotation-popup,#search-bar,#share-modal,#overlay,#notes-panel,#toc-drawer,#settings-panel{position:fixed !important;z-index:9999 !important}
+        #highlight-tooltip{display:none;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px 16px;box-shadow:var(--shadow-hover);min-width:280px;pointer-events:auto}
+        #highlight-tooltip.visible{display:block}
+        #highlight-tooltip .highlight-color{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;transition:all 0.2s}
+        #highlight-tooltip .highlight-color:hover{transform:scale(1.15);border-color:var(--rose)}
+        #highlight-tooltip .tooltip-action{background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--text);transition:all 0.2s;font-size:0.9rem;display:flex;align-items:center;gap:4px}
+        #highlight-tooltip .tooltip-action:hover{border-color:var(--rose);color:var(--rose);background:rgba(219,161,162,0.05)}
+        #reaction-picker{display:none;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:8px 12px;box-shadow:var(--shadow-hover);gap:6px;pointer-events:auto;bottom:80px !important;right:20px !important;left:auto !important}
+        #reaction-picker button{background:none;border:none;font-size:1.5rem;cursor:pointer;padding:4px;transition:transform var(--transition)}
+        #reaction-picker button:hover{transform:scale(1.2)}
+        #annotation-popup{display:none;width:320px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-hover);pointer-events:auto;bottom:140px !important;right:20px !important;left:auto !important}
+        #annotation-popup.visible{display:block}
+        #annotation-popup textarea{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;min-height:60px;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
+        #annotation-popup textarea:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+        .annotation-actions{display:flex;gap:8px;margin-top:8px;justify-content:flex-end}
+        .annotation-actions button{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:0.8rem;transition:background var(--transition)}
+        .annotation-save{background:var(--rose);color:var(--white)}
+        .annotation-save:hover{background:var(--rose-dark)}
+        .annotation-cancel{background:var(--border);color:var(--text)}
+        .annotation-cancel:hover{background:var(--text-light);color:var(--white)}
 
-/* ===== SEARCH ===== */
-#search-bar{display:none;width:300px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:var(--shadow-hover);pointer-events:auto;top:70px !important;left:50px !important}
-#search-bar.visible{display:block}
-#search-bar input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
-#search-bar input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
-#search-bar .search-header{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-#search-bar .search-header button{background:none;border:none;cursor:pointer;color:var(--text-light);font-size:0.9rem;transition:color var(--transition)}
-#search-bar .search-header button:hover{color:var(--rose)}
-#searchResults{margin-top:8px;max-height:200px;overflow-y:auto;font-size:0.85rem}
-.search-result{padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--transition)}
-.search-result:hover{background:rgba(219,161,162,0.1)}
-.search-result strong{color:var(--rose)}
+        #search-bar{display:none;width:300px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:var(--shadow-hover);pointer-events:auto;top:70px !important;left:50px !important}
+        #search-bar.visible{display:block}
+        #search-bar input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
+        #search-bar input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+        #search-bar .search-header{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+        #search-bar .search-header button{background:none;border:none;cursor:pointer;color:var(--text-light);font-size:0.9rem;transition:color var(--transition)}
+        #search-bar .search-header button:hover{color:var(--rose)}
+        #searchResults{margin-top:8px;max-height:200px;overflow-y:auto;font-size:0.85rem}
+        .search-result{padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--transition)}
+        .search-result:hover{background:rgba(219,161,162,0.1)}
+        .search-result strong{color:var(--rose)}
 
-/* ===== SETTINGS ===== */
-#settings-panel{bottom:0;left:0;right:0;background:var(--card-bg);border-top:1px solid var(--border);padding:16px 20px;transform:translateY(100%);transition:transform 0.25s ease;max-height:50vh;overflow-y:auto;pointer-events:auto}
-#settings-panel.open{transform:translateY(0)}
-.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-.settings-group label{font-size:0.7rem;font-weight:600;text-transform:uppercase;color:var(--text-light);display:block;margin-bottom:4px}
-.settings-group .btn-group{display:flex;gap:4px;flex-wrap:wrap}
-.settings-group .btn-group button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;font-size:0.75rem;transition:var(--transition)}
-.settings-group .btn-group button.active{border-color:var(--rose);background:var(--rose);color:var(--white)}
-.settings-group .btn-group button:hover{border-color:var(--rose)}
-.slider-group{display:flex;align-items:center;gap:6px}
-.slider-group input[type="range"]{width:80px;accent-color:var(--rose)}
-.font-select-wrapper select{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:0.85rem;appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
-.font-select-wrapper select:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+        #settings-panel{bottom:0;left:0;right:0;background:var(--card-bg);border-top:1px solid var(--border);padding:16px 20px;transform:translateY(100%);transition:transform 0.25s ease;max-height:50vh;overflow-y:auto;pointer-events:auto}
+        #settings-panel.open{transform:translateY(0)}
+        .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+        .settings-group label{font-size:0.7rem;font-weight:600;text-transform:uppercase;color:var(--text-light);display:block;margin-bottom:4px}
+        .settings-group .btn-group{display:flex;gap:4px;flex-wrap:wrap}
+        .settings-group .btn-group button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;font-size:0.75rem;transition:var(--transition)}
+        .settings-group .btn-group button.active{border-color:var(--rose);background:var(--rose);color:var(--white)}
+        .settings-group .btn-group button:hover{border-color:var(--rose)}
+        .slider-group{display:flex;align-items:center;gap:6px}
+        .slider-group input[type="range"]{width:80px;accent-color:var(--rose)}
+        .font-select-wrapper select{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:0.85rem;appearance:none;background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
+        .font-select-wrapper select:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
 
-/* ===== TOC ===== */
-#toc-drawer{top:0;right:-340px;width:340px;height:100vh;background:var(--card-bg);box-shadow:-4px 0 20px rgba(44,30,30,0.1);transition:right 0.25s ease;display:flex;flex-direction:column;pointer-events:auto}
-#toc-drawer.open{right:0}
-.toc-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--vanilla)}
-.toc-header h3{margin:0;font-size:1.1rem;font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
-.toc-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text);width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background var(--transition)}
-.toc-close:hover{background:rgba(219,161,162,0.1)}
-.toc-body{flex:1;overflow-y:auto;padding:12px 20px}
-.toc-list{list-style:none;padding:0;margin:0}
-.toc-list li{padding:2px 0}
-.toc-list a{color:var(--text);text-decoration:none;display:block;padding:6px 8px;border-radius:6px;transition:all var(--transition)}
-.toc-list a:hover{background:rgba(219,161,162,0.1);color:var(--rose)}
-.toc-empty{text-align:center;color:var(--text-light);padding:40px 0}
+        #toc-drawer{top:0;right:-340px;width:340px;height:100vh;background:var(--card-bg);box-shadow:-4px 0 20px rgba(44,30,30,0.1);transition:right 0.25s ease;display:flex;flex-direction:column;pointer-events:auto}
+        #toc-drawer.open{right:0}
+        .toc-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--vanilla)}
+        .toc-header h3{margin:0;font-size:1.1rem;font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
+        .toc-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text);width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background var(--transition)}
+        .toc-close:hover{background:rgba(219,161,162,0.1)}
+        .toc-body{flex:1;overflow-y:auto;padding:12px 20px}
+        .toc-list{list-style:none;padding:0;margin:0}
+        .toc-list li{padding:2px 0}
+        .toc-list a{color:var(--text);text-decoration:none;display:block;padding:6px 8px;border-radius:6px;transition:all var(--transition)}
+        .toc-list a:hover{background:rgba(219,161,162,0.1);color:var(--rose)}
+        .toc-empty{text-align:center;color:var(--text-light);padding:40px 0}
 
-/* ===== NOTES ===== */
-#notes-panel{bottom:0;right:0;width:400px;max-height:60vh;background:var(--card-bg);border:1px solid var(--border);border-radius:12px 12px 0 0;box-shadow:0 -4px 20px rgba(44,30,30,0.1);display:none;flex-direction:column;pointer-events:auto}
-#notes-panel.open{display:flex}
-.notes-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--vanilla);border-radius:12px 12px 0 0}
-.notes-header h3{margin:0;font-size:1rem;font-family:'Playfair Display',Georgia,serif}
-.notes-body{flex:1;overflow-y:auto;padding:12px 16px}
-.note-card{border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--card-bg)}
-.note-card.private{border-left:4px solid var(--text-light)}
-.note-author{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-.note-avatar-placeholder{width:32px;height:32px;border-radius:50%;background:var(--rose);color:var(--white);display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.85rem}
-.note-author-info{flex:1}
-.note-author-info strong{color:var(--dark)}
-.note-author-info small{color:var(--text-light)}
-.note-text{margin:0 0 8px;font-size:0.95rem;color:var(--text)}
-.note-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-.note-reactions{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-.reaction{background:var(--vanilla);padding:0 8px;border-radius:12px;font-size:0.8rem;cursor:pointer;transition:all var(--transition)}
-.reaction:hover{background:rgba(219,161,162,0.2)}
-.badge-private{background:var(--text-light);color:var(--white);padding:0 6px;border-radius:4px;font-size:0.7rem}
-.empty-notes{color:var(--text-light);text-align:center;padding:24px 12px}
-#noteForm{display:none;padding:12px 16px;border-top:1px solid var(--border)}
-#noteForm textarea{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
-#noteForm textarea:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
-#noteForm label{color:var(--text);font-size:0.9rem}
-#noteForm button{padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:0.8rem}
-.note-submit{background:var(--rose);color:var(--white)}
-.note-submit:hover{background:var(--rose-dark)}
-.note-cancel{background:var(--border);color:var(--text)}
-.note-cancel:hover{background:var(--text-light);color:var(--white)}
+        #notes-panel{bottom:0;right:0;width:400px;max-height:60vh;background:var(--card-bg);border:1px solid var(--border);border-radius:12px 12px 0 0;box-shadow:0 -4px 20px rgba(44,30,30,0.1);display:none;flex-direction:column;pointer-events:auto}
+        #notes-panel.open{display:flex}
+        .notes-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--vanilla);border-radius:12px 12px 0 0}
+        .notes-header h3{margin:0;font-size:1rem;font-family:'Playfair Display',Georgia,serif}
+        .notes-body{flex:1;overflow-y:auto;padding:12px 16px}
+        .note-card{border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--card-bg)}
+        .note-card.private{border-left:4px solid var(--text-light)}
+        .note-author{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+        .note-avatar-placeholder{width:32px;height:32px;border-radius:50%;background:var(--rose);color:var(--white);display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.85rem}
+        .note-author-info{flex:1}
+        .note-author-info strong{color:var(--dark)}
+        .note-author-info small{color:var(--text-light)}
+        .note-text{margin:0 0 8px;font-size:0.95rem;color:var(--text)}
+        .note-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+        .note-reactions{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+        .reaction{background:var(--vanilla);padding:0 8px;border-radius:12px;font-size:0.8rem;cursor:pointer;transition:all var(--transition)}
+        .reaction:hover{background:rgba(219,161,162,0.2)}
+        .badge-private{background:var(--text-light);color:var(--white);padding:0 6px;border-radius:4px;font-size:0.7rem}
+        .empty-notes{color:var(--text-light);text-align:center;padding:24px 12px}
+        #noteForm{display:none;padding:12px 16px;border-top:1px solid var(--border)}
+        #noteForm textarea{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
+        #noteForm textarea:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+        #noteForm label{color:var(--text);font-size:0.9rem}
+        #noteForm button{padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:0.8rem}
+        .note-submit{background:var(--rose);color:var(--white)}
+        .note-submit:hover{background:var(--rose-dark)}
+        .note-cancel{background:var(--border);color:var(--text)}
+        .note-cancel:hover{background:var(--text-light);color:var(--white)}
 
-/* ===== SHARE ===== */
-#share-modal{top:0;left:0;width:100%;height:100%;background:rgba(44,30,30,0.6);display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-#share-modal.visible{display:flex}
-.share-content{background:var(--card-bg);padding:24px 32px;border-radius:16px;max-width:400px;width:90%;text-align:center;box-shadow:var(--shadow-hover)}
-.share-content h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark);margin-top:0}
-.share-options{display:flex;flex-direction:column;gap:8px;margin:16px 0}
-.share-options button{padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;transition:all var(--transition);font-size:0.9rem;color:var(--text);width:100%;text-align:left}
-.share-options button:hover{border-color:var(--rose);background:rgba(219,161,162,0.05)}
-.share-options button i{margin-right:8px;color:var(--rose)}
-.share-close{background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;transition:background var(--transition);width:100%;margin-top:12px;font-weight:600}
-.share-close:hover{background:var(--rose-dark)}
+        #share-modal{top:0;left:0;width:100%;height:100%;background:rgba(44,30,30,0.6);display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+        #share-modal.visible{display:flex}
+        .share-content{background:var(--card-bg);padding:24px 32px;border-radius:16px;max-width:400px;width:90%;text-align:center;box-shadow:var(--shadow-hover)}
+        .share-content h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark);margin-top:0}
+        .share-options{display:flex;flex-direction:column;gap:8px;margin:16px 0}
+        .share-options button{padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;transition:all var(--transition);font-size:0.9rem;color:var(--text);width:100%;text-align:left}
+        .share-options button:hover{border-color:var(--rose);background:rgba(219,161,162,0.05)}
+        .share-options button i{margin-right:8px;color:var(--rose)}
+        .share-close{background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;transition:background var(--transition);width:100%;margin-top:12px;font-weight:600}
+        .share-close:hover{background:var(--rose-dark)}
 
-/* ===== OVERLAY & CHALLENGE ===== */
-#overlay{top:0;left:0;width:100%;height:100%;background:rgba(44,30,30,0.4);display:none;z-index:9998 !important}
-#overlay.active{display:block}
-#challenge-widget{display:none;margin:8px 16px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}
-#challenge-widget h4{margin:0 0 4px;font-size:1rem}
-.challenge-progress{position:relative;height:12px;background:var(--border);border-radius:6px;overflow:hidden}
-.challenge-progress .bar{height:100%;background:var(--rose);transition:width 0.3s}
+        #overlay{top:0;left:0;width:100%;height:100%;background:rgba(44,30,30,0.4);display:none;z-index:9998 !important}
+        #overlay.active{display:block}
+        #challenge-widget{display:none;margin:8px 16px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}
+        #challenge-widget h4{margin:0 0 4px;font-size:1rem}
+        .challenge-progress{position:relative;height:12px;background:var(--border);border-radius:6px;overflow:hidden}
+        .challenge-progress .bar{height:100%;background:var(--rose);transition:width 0.3s}
 
-/* ===== READING STATUS ===== */
-#readingStatus{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-color:var(--card-bg);border:1px solid var(--border);border-radius:30px;padding:6px 36px 6px 16px;font-size:0.85rem;font-weight:500;color:var(--text);cursor:pointer;transition:all var(--transition);background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 12px center;background-size:16px}
-#readingStatus:hover{border-color:var(--rose)}
-#readingStatus:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
-#readingStatus option{background:var(--card-bg);color:var(--text)}
+        #readingStatus{appearance:none;background-color:var(--card-bg);border:1px solid var(--border);border-radius:30px;padding:6px 36px 6px 16px;font-size:0.85rem;font-weight:500;color:var(--text);cursor:pointer;transition:all var(--transition);background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 12px center;background-size:16px}
+        #readingStatus:hover{border-color:var(--rose)}
+        #readingStatus:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
 
-/* ===== FOCUS MODE ===== */
-.focus-mode #toolbar{transform:translateY(-100%);opacity:0;pointer-events:none;transition:all var(--transition)}
-.focus-mode #settings-panel.open{display:none !important}
+        .focus-mode #toolbar{transform:translateY(-100%);opacity:0;pointer-events:none;transition:all var(--transition)}
+        .focus-mode #settings-panel.open{display:none !important}
 
-/* ===== NEW MODALS ===== */
-#commentsModal .modal-content{max-width:600px;max-height:80vh}
-#commentsModal .modal-body{max-height:60vh;overflow-y:auto;padding:10px}
-#commentsModal .modal-body textarea{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;min-height:60px}
-#commentsModal .modal-body .form-actions{display:flex;gap:8px;margin-top:8px}
-.comment-list{margin-bottom:16px}
-.comment-item{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
-.comment-item.admin{border-left:4px solid var(--rose)}
-.comment-author{font-weight:600;display:flex;align-items:center;gap:6px}
-.comment-author .admin-badge{background:var(--rose);color:white;font-size:0.65rem;padding:2px 8px;border-radius:12px}
-.modal{display:none;position:fixed;z-index:20000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px)}
-.modal-content{background:var(--card-bg);margin:10% auto;padding:20px;border-radius:16px;width:90%;max-width:500px;box-shadow:var(--shadow-hover)}
-.modal-close{float:right;font-size:1.4rem;cursor:pointer;color:var(--text-light);transition:color 0.2s}
-.modal-close:hover{color:var(--rose)}
-.modal h3{margin-top:0}
-.modal .form-group{margin-bottom:12px}
-.modal .form-group label{display:block;margin-bottom:4px;font-weight:600}
-.modal .form-group input,.modal .form-group textarea,.modal .form-group select{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text)}
-.modal .form-group textarea{resize:vertical;min-height:60px}
-.modal .btn{margin-top:4px}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width:768px){#toolbar{height:48px;padding:0 8px}.toolbar-left .title{font-size:0.9rem;max-width:160px}.page-content-inner{padding:20px}.flip-page-content{padding:20px}#toc-drawer{width:280px;right:-280px}#notes-panel{width:100%;max-height:50vh;border-radius:0}.settings-grid{grid-template-columns:1fr 1fr}}
-@media (max-width:480px){.toolbar-left .title{font-size:0.8rem;max-width:120px}.page-content-inner{padding:16px}.flip-page-content{padding:16px}}
+        #commentsModal .modal-content{max-width:600px;max-height:80vh}
+        #commentsModal .modal-body{max-height:60vh;overflow-y:auto;padding:10px}
+        #commentsModal .modal-body textarea{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;min-height:60px}
+        #commentsModal .modal-body .form-actions{display:flex;gap:8px;margin-top:8px}
+        .comment-list{margin-bottom:16px}
+        .comment-item{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
+        .comment-item.admin{border-left:4px solid var(--rose)}
+        .comment-author{font-weight:600;display:flex;align-items:center;gap:6px}
+        .comment-author .admin-badge{background:var(--rose);color:white;font-size:0.65rem;padding:2px 8px;border-radius:12px}
+        .modal{display:none;position:fixed;z-index:20000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px)}
+        .modal-content{background:var(--card-bg);margin:10% auto;padding:20px;border-radius:16px;width:90%;max-width:500px;box-shadow:var(--shadow-hover)}
+        .modal-close{float:right;font-size:1.4rem;cursor:pointer;color:var(--text-light);transition:color 0.2s}
+        .modal-close:hover{color:var(--rose)}
+        .modal h3{margin-top:0}
+        .modal .form-group{margin-bottom:12px}
+        .modal .form-group label{display:block;margin-bottom:4px;font-weight:600}
+        .modal .form-group input,.modal .form-group textarea,.modal .form-group select{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text)}
+        .modal .form-group textarea{resize:vertical;min-height:60px}
+        .modal .btn{margin-top:4px}
+        @media (max-width:768px){#toolbar{height:48px;padding:0 8px}.toolbar-left .title{font-size:0.9rem;max-width:160px}.page-content-inner{padding:20px}.flip-page-content{padding:20px}#toc-drawer{width:280px;right:-280px}#notes-panel{width:100%;max-height:50vh;border-radius:0}.settings-grid{grid-template-columns:1fr 1fr}}
+        @media (max-width:480px){.toolbar-left .title{font-size:0.8rem;max-width:120px}.page-content-inner{padding:16px}.flip-page-content{padding:16px}}
     </style>
 </head>
 <body>
 
 <div id="reader-app">
-    <!-- TOOLBAR -->
     <div id="toolbar">
         <div class="toolbar-left">
             <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
-            <?php if (isLoggedIn() && $streak_days > 0): ?>
-            <span class="streak-badge">🔥 <?php echo $streak_days; ?>d</span>
-            <?php endif; ?>
+            <?php if (isLoggedIn() && $streak_days > 0): ?><span class="streak-badge">🔥 <?php echo $streak_days; ?>d</span><?php endif; ?>
             <select id="readingStatus">
                 <option value="not_started" <?php echo $reading_status == 'not_started' ? 'selected' : ''; ?>>📌 Not Started</option>
                 <option value="currently_reading" <?php echo $reading_status == 'currently_reading' ? 'selected' : ''; ?>>📖 Currently Reading</option>
@@ -355,10 +329,7 @@ html,body{height:100%;width:100%;overflow:hidden}
         </div>
         <div class="toolbar-center">
             <div class="progress-ring">
-                <svg viewBox="0 0 36 36">
-                    <circle class="bg" cx="18" cy="18" r="16"/>
-                    <circle class="fill" id="progressFill" cx="18" cy="18" r="16" stroke-dasharray="100.53" stroke-dashoffset="100.53"/>
-                </svg>
+                <svg viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="16"/><circle class="fill" id="progressFill" cx="18" cy="18" r="16" stroke-dasharray="100.53" stroke-dashoffset="100.53"/></svg>
                 <span class="percent" id="progressPercent">0%</span>
             </div>
             <span id="pageNum">1</span> / <span id="totalPages"><?php echo $total_pages; ?></span>
@@ -368,7 +339,6 @@ html,body{height:100%;width:100%;overflow:hidden}
         </div>
     </div>
 
-     <!-- SIDEBAR -->
     <div id="sidebar">
         <button class="sidebar-btn" id="searchBtn" title="Search"><i class="fas fa-search"></i></button>
         <button class="sidebar-btn" id="bookmarkBtn" title="Bookmark"><i class="far fa-bookmark"></i></button>
@@ -388,264 +358,69 @@ html,body{height:100%;width:100%;overflow:hidden}
         <button class="sidebar-btn" id="shareBtn" title="Share"><i class="fas fa-share-alt"></i></button>
     </div>
 
-    <!-- PAGE VIEWPORT -->
     <div id="page-viewport">
         <div id="scroll-container">
             <?php if (!empty($cover_path)): ?>
-            <div class="cover-image-wrapper">
-                <div class="cover-image-container">
-                    <img src="<?php echo $cover_path; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>">
-                </div>
-            </div>
+            <div class="cover-image-wrapper"><div class="cover-image-container"><img src="<?php echo $cover_path; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>"></div></div>
             <?php else: ?>
-            <div class="cover-image-wrapper">
-                <div class="cover-image-container">
-                    <div class="cover-placeholder">
-                        <i class="fas fa-book-open"></i>
-                        <p><?php echo htmlspecialchars($book['title']); ?></p>
-                    </div>
-                </div>
-            </div>
+            <div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p><?php echo htmlspecialchars($book['title']); ?></p></div></div></div>
             <?php endif; ?>
             <?php foreach ($pages as $page_html): ?>
-                <div class="page-content-wrapper">
-                    <div class="page-content-inner">
-                        <?php echo $page_html; ?>
-                    </div>
-                </div>
+            <div class="page-content-wrapper"><div class="page-content-inner"><?php echo $page_html; ?></div></div>
             <?php endforeach; ?>
         </div>
         <div id="flip-container">
             <div class="flip-book" id="flipBook">
-                <div class="flip-page flip-page-front" id="flipLeftPage">
-                    <div class="flip-page-content" id="flipLeftContent"></div>
-                </div>
-                <div class="flip-page flip-page-back" id="flipRightPage">
-                    <div class="flip-page-content" id="flipRightContent"></div>
-                </div>
+                <div class="flip-page flip-page-front" id="flipLeftPage"><div class="flip-page-content" id="flipLeftContent"></div></div>
+                <div class="flip-page flip-page-back" id="flipRightPage"><div class="flip-page-content" id="flipRightContent"></div></div>
             </div>
             <button class="aw-nav-btn prev" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
             <button class="aw-nav-btn next" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
         </div>
     </div>
 
-    <!-- SETTINGS PANEL -->
     <div id="settings-panel">
         <div class="settings-grid">
-            <div class="settings-group">
-                <label>Mode</label>
-                <div class="btn-group" id="modeGroup">
-                    <button data-mode="scroll" class="active">Scroll</button>
-                    <button data-mode="flip">Page Flip</button>
-                </div>
-            </div>
-            <div class="settings-group">
-                <label>Theme</label>
-                <div class="btn-group" id="themeGroup">
-                    <button data-theme="paper">Paper</button>
-                    <button data-theme="light" class="active">Light</button>
-                    <button data-theme="dark">Dark</button>
-                    <button data-theme="sepia">Sepia</button>
-                </div>
-            </div>
-            <div class="settings-group">
-                <label>Font Size</label>
-                <div class="slider-group">
-                    <button onclick="adjustFontSize(-5)">A-</button>
-                    <input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5">
-                    <button onclick="adjustFontSize(5)">A+</button>
-                    <span id="fontSizeLabel">100%</span>
-                </div>
-            </div>
-            <div class="settings-group">
-                <label>Font Type</label>
-                <div class="font-select-wrapper">
-                    <select id="fontTypeSelect" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:0.85rem;">
-                        <option value="Inter, sans-serif">Inter</option>
-                        <option value="Georgia, serif">Georgia</option>
-                        <option value="'Playfair Display', Georgia, serif">Playfair Display</option>
-                    </select>
-                </div>
-            </div>
-            <div class="settings-group">
-                <label>Line Height</label>
-                <div class="slider-group">
-                    <button onclick="adjustLineHeight(-10)">-</button>
-                    <input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10">
-                    <button onclick="adjustLineHeight(10)">+</button>
-                    <span id="lineHeightLabel">1.8</span>
-                </div>
-            </div>
+            <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll" class="active">Scroll</button><button data-mode="flip">Page Flip</button></div></div>
+            <div class="settings-group"><label>Theme</label><div class="btn-group" id="themeGroup"><button data-theme="paper">Paper</button><button data-theme="light" class="active">Light</button><button data-theme="dark">Dark</button><button data-theme="sepia">Sepia</button></div></div>
+            <div class="settings-group"><label>Font Size</label><div class="slider-group"><button onclick="adjustFontSize(-5)">A-</button><input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5"><button onclick="adjustFontSize(5)">A+</button><span id="fontSizeLabel">100%</span></div></div>
+            <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option></select></div></div>
+            <div class="settings-group"><label>Line Height</label><div class="slider-group"><button onclick="adjustLineHeight(-10)">-</button><input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10"><button onclick="adjustLineHeight(10)">+</button><span id="lineHeightLabel">1.8</span></div></div>
         </div>
     </div>
 
-    <!-- TOC DRAWER -->
-    <div id="toc-drawer">
-        <div class="toc-header">
-            <h3>Table of Contents</h3>
-            <button class="toc-close" id="tocClose">&times;</button>
-        </div>
-        <div class="toc-body" id="tocBody">
-            <?php if (is_array($toc) && count($toc) > 0): ?>
-                <ul class="toc-list">
-                <?php foreach ($toc as $entry): ?>
-                    <?php
-                        $page = isset($entry['page']) ? (int)$entry['page'] : 1;
-                        $title = isset($entry['title']) ? htmlspecialchars($entry['title']) : 'Untitled Chapter';
-                    ?>
-                    <li><a href="#" class="toc-link" data-chapter="<?php echo $page; ?>"><?php echo $title; ?></a></li>
-                <?php endforeach; ?>
-                </ul>
-            <?php else: ?>
-                <p class="toc-empty">No table of contents available.</p>
-            <?php endif; ?>
-        </div>
-    </div>
+    <div id="toc-drawer"><div class="toc-header"><h3>Table of Contents</h3><button class="toc-close" id="tocClose">&times;</button></div><div class="toc-body" id="tocBody"><?php if (is_array($toc) && count($toc) > 0): ?><ul class="toc-list"><?php foreach ($toc as $entry): ?><li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li><?php endforeach; ?></ul><?php else: ?><p class="toc-empty">No table of contents available.</p><?php endif; ?></div></div>
 
-    <!-- NOTES PANEL -->
-    <div id="notes-panel">
-        <div class="notes-header">
-            <h3>📝 Group Notes</h3>
-            <div>
-                <button class="note-submit" id="addNoteBtn">+ Add</button>
-                <button class="note-cancel" id="notesClose">&times;</button>
-            </div>
-        </div>
-        <div class="notes-body" id="notesBody">
-            <div id="notesList"><p class="empty-notes">No notes for this chapter.</p></div>
-            <div id="noteForm">
-                <textarea id="noteText" rows="2" placeholder="Write a note..."></textarea>
-                <div style="margin:6px 0;"><label><input type="checkbox" id="notePrivate"> Private</label></div>
-                <button class="note-submit" onclick="submitNote()">Post</button>
-                <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
-            </div>
-        </div>
-    </div>
+    <div id="notes-panel"><div class="notes-header"><h3>📝 Group Notes</h3><div><button class="note-submit" id="addNoteBtn">+ Add</button><button class="note-cancel" id="notesClose">&times;</button></div></div><div class="notes-body" id="notesBody"><div id="notesList"><p class="empty-notes">No notes for this chapter.</p></div><div id="noteForm"><textarea id="noteText" rows="2" placeholder="Write a note..."></textarea><div><label><input type="checkbox" id="notePrivate"> Private</label></div><button class="note-submit" onclick="submitNote()">Post</button><button class="note-cancel" onclick="toggleNoteForm()">Cancel</button></div></div></div>
 
-    <!-- ===== NEW MODALS ===== -->
-    
-    <!-- 1. COMMENTS MODAL -->
-    <div id="commentsModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeCommentsModal()">&times;</span>
-            <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments (Page <span id="currentCommentPage">1</span>)</h3>
-            <div class="modal-body">
-                <div id="commentList" class="comment-list"></div>
-                <?php if (isLoggedIn()): ?>
-                    <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
-                        <h4>Add a Comment</h4>
-                        <textarea id="commentInput" rows="2" placeholder="Share your thoughts on this page..."></textarea>
-                        <div class="form-actions">
-                            <button class="btn btn-primary" onclick="submitComment()">Post</button>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <p style="color: var(--text-light);"><a href="<?php echo SITE_URL; ?>/login.php">Login</a> to comment.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
+    <div id="commentsModal" class="modal"><div class="modal-content"><span class="modal-close" onclick="closeCommentsModal()">&times;</span><h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments (Page <span id="currentCommentPage">1</span>)</h3><div class="modal-body"><div id="commentList" class="comment-list"></div><?php if (isLoggedIn()): ?><div><h4>Add a Comment</h4><textarea id="commentInput" rows="2" placeholder="Share your thoughts on this page..."></textarea><button class="btn btn-primary" onclick="submitComment()">Post</button></div><?php else: ?><p><a href="<?php echo SITE_URL; ?>/login.php">Login</a> to comment.</p><?php endif; ?></div></div></div>
 
-    <!-- 2. PROOFREADING (REPORT ERROR) MODAL -->
-    <div id="errorModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeErrorModal()">&times;</span>
-            <h3><i class="fas fa-exclamation-triangle" style="color: var(--rose);"></i> Report an Error</h3>
-            <p style="font-size: 0.9rem; color: var(--text-light);">Help us improve by reporting typos or errors on <strong>Page <span id="errorPageNum">1</span></strong>.</p>
-            <form id="errorForm">
-                <input type="hidden" id="errorBookId" value="<?php echo $book_id; ?>">
-                <input type="hidden" id="errorPageInput" value="1">
-                <div class="form-group">
-                    <label for="errorText">What is wrong?</label>
-                    <textarea id="errorText" rows="2" placeholder="e.g. Typo on line 3..." required></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="errorCorrection">Suggested Correction (optional)</label>
-                    <input type="text" id="errorCorrection" placeholder="e.g. 'their' instead of 'there'">
-                </div>
-                <button type="button" class="btn btn-primary" onclick="submitError()">Submit Report</button>
-            </form>
-        </div>
-    </div>
+    <div id="errorModal" class="modal"><div class="modal-content"><span class="modal-close" onclick="closeErrorModal()">&times;</span><h3><i class="fas fa-exclamation-triangle" style="color: var(--rose);"></i> Report an Error</h3><p>Help us improve by reporting typos or errors on <strong>Page <span id="errorPageNum">1</span></strong>.</p><form id="errorForm"><input type="hidden" id="errorBookId" value="<?php echo $book_id; ?>"><input type="hidden" id="errorPageInput" value="1"><label>What is wrong?</label><textarea id="errorText" rows="2" placeholder="e.g. Typo on line 3..." required></textarea><label>Suggested Correction (optional)</label><input type="text" id="errorCorrection" placeholder="e.g. 'their' instead of 'there'"><button type="button" class="btn btn-primary" onclick="submitError()">Submit Report</button></form></div></div>
 
-    <!-- 3. PRAYER REQUEST MODAL -->
-    <div id="prayerModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closePrayerModal()">&times;</span>
-            <h3><i class="fas fa-hands-praying" style="color: var(--rose);"></i> Send a Prayer Request</h3>
-            <p style="font-size: 0.9rem; color: var(--text-light);">Share your prayer request with Angella. It will be received and prayed over.</p>
-            <form id="prayerForm">
-                <input type="hidden" id="prayerBookId" value="<?php echo $book_id; ?>">
-                <div class="form-group">
-                    <label for="prayerText">Your Prayer Request</label>
-                    <textarea id="prayerText" rows="4" placeholder="Write your prayer request here..." required></textarea>
-                </div>
-                <button type="button" class="btn btn-primary" onclick="submitPrayer()">Send Prayer Request</button>
-            </form>
-        </div>
-    </div>
+    <div id="prayerModal" class="modal"><div class="modal-content"><span class="modal-close" onclick="closePrayerModal()">&times;</span><h3><i class="fas fa-hands-praying" style="color: var(--rose);"></i> Send a Prayer Request</h3><p>Share your prayer request with Angella.</p><form id="prayerForm"><input type="hidden" id="prayerBookId" value="<?php echo $book_id; ?>"><label>Your Prayer Request</label><textarea id="prayerText" rows="4" placeholder="Write your prayer request here..." required></textarea><button type="button" class="btn btn-primary" onclick="submitPrayer()">Send Prayer Request</button></form></div></div>
 
-    <!-- FLOATING TOOLS -->
-    <div id="reaction-picker">
-        <button data-reaction="👍">👍</button>
-        <button data-reaction="❤️">❤️</button>
-        <button data-reaction="🙏">🙏</button>
-        <button data-reaction="🤔">🤔</button>
-        <button data-reaction="📖">📖</button>
-    </div>
-
+    <div id="reaction-picker"><button data-reaction="👍">👍</button><button data-reaction="❤️">❤️</button><button data-reaction="🙏">🙏</button><button data-reaction="🤔">🤔</button><button data-reaction="📖">📖</button></div>
     <div id="highlight-tooltip"></div>
-
-    <div id="annotation-popup">
-        <textarea id="annotationText" rows="3" placeholder="Add a note…"></textarea>
-        <div class="annotation-actions">
-            <button class="annotation-save" id="annotationSave">Save</button>
-            <button class="annotation-cancel" id="annotationCancel">Cancel</button>
-        </div>
-    </div>
-
-    <div id="search-bar">
-        <div class="search-header">
-            <input type="text" id="searchInput" placeholder="Search in this book…">
-            <button onclick="closeSearch()"><i class="fas fa-times"></i></button>
-        </div>
-        <div id="searchResults"></div>
-    </div>
-
-    <div id="share-modal">
-        <div class="share-content">
-            <h3>Share this page</h3>
-            <div class="share-options">
-                <button onclick="share('facebook')"><i class="fab fa-facebook-f"></i> Facebook</button>
-                <button onclick="share('twitter')"><i class="fab fa-twitter"></i> Twitter</button>
-                <button onclick="share('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
-                <button onclick="share('copy')"><i class="fas fa-link"></i> Copy Link</button>
-            </div>
-            <button class="share-close" onclick="closeShare()">Close</button>
-        </div>
-    </div>
-
+    <div id="annotation-popup"><textarea id="annotationText" rows="3" placeholder="Add a note…"></textarea><div><button class="annotation-save" id="annotationSave">Save</button><button class="annotation-cancel" id="annotationCancel">Cancel</button></div></div>
+    <div id="search-bar"><div><input type="text" id="searchInput" placeholder="Search in this book…"><button onclick="closeSearch()"><i class="fas fa-times"></i></button></div><div id="searchResults"></div></div>
+    <div id="share-modal"><div class="share-content"><h3>Share this page</h3><div><button onclick="share('facebook')"><i class="fab fa-facebook-f"></i> Facebook</button><button onclick="share('twitter')"><i class="fab fa-twitter"></i> Twitter</button><button onclick="share('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button><button onclick="share('copy')"><i class="fas fa-link"></i> Copy Link</button></div><button class="share-close" onclick="closeShare()">Close</button></div></div>
     <div id="challenge-widget"></div>
-
-    <!-- OVERLAY -->
     <div id="overlay" onclick="closeAll()"></div>
 </div>
 
 <script>
 (function() {
-    'use strict';
-
     const pages = <?php echo json_encode($pages); ?>;
     const totalPages = pages.length;
     const bookId = <?php echo $book_id; ?>;
     const userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
     const groupId = <?php echo $group_id ? (int)$group_id : 0; ?>;
-    const cover_path = <?php echo json_encode($cover_path); ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
+    const cover_path = <?php echo json_encode($cover_path); ?>;
 
     const scrollContainer = document.getElementById('scroll-container');
-    const flipContainer = document.getElementById('flip-container'); // This now correctly targets the 3D container
+    const flipContainer = document.getElementById('flip-container');
     const pageNumEl = document.getElementById('pageNum');
     const totalPagesEl = document.getElementById('totalPages');
     const progressFill = document.getElementById('progressFill');
@@ -688,8 +463,6 @@ html,body{height:100%;width:100%;overflow:hidden}
     const exportHighlightsBtn = document.getElementById('exportHighlightsBtn');
     const resumeBtn = document.getElementById('resumeBtn');
     const challengeBtn = document.getElementById('challengeBtn');
-
-    // ===== NEW FEATURE REFERENCES =====
     const commentsBtn = document.getElementById('commentsBtn');
     const commentsModal = document.getElementById('commentsModal');
     const currentCommentPageSpan = document.getElementById('currentCommentPage');
@@ -713,7 +486,6 @@ html,body{height:100%;width:100%;overflow:hidden}
     let currentNoteId = null;
     let selectedText = '';
     let selectedRange = null;
-
     let flipCurrentChunkIndex = 0;
     let flipChunks = [];
 
@@ -730,15 +502,10 @@ html,body{height:100%;width:100%;overflow:hidden}
     }
     goToPage(currentPage);
     loadBookmarkStatus();
-    if (userId > 0) startSession();
-    if (userId > 0) loadChallenge();
+    if (userId > 0) { startSession(); loadChallenge(); }
 
-    // ===== SIDEBAR TOGGLE =====
-    sidebarToggle.addEventListener('click', function() {
-        sidebar.classList.toggle('closed');
-    });
+    sidebarToggle.addEventListener('click', function() { sidebar.classList.toggle('closed'); });
 
-    // ===== READING STATUS =====
     readingStatus.addEventListener('change', function() {
         if (userId === 0) { alert('Please log in to set reading status.'); return; }
         var data = new FormData();
@@ -748,328 +515,215 @@ html,body{height:100%;width:100%;overflow:hidden}
         navigator.sendBeacon('/reader/reader_ajax.php', data);
     });
 
-    backBtn.addEventListener('click', function() {
-        window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>';
-    });
+    backBtn.addEventListener('click', function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
 
-    // ===== MODE SWITCHING =====
     function switchMode(mode) {
         readingMode = mode;
         localStorage.setItem('reader_mode', mode);
         if (mode === 'flip') {
             scrollContainer.style.display = 'none';
-            if (flipContainer) {
-                flipContainer.style.display = 'flex';
-            }
-            prepareFlipChunks(currentPage);
-            renderFlipChunk(0);
+            flipContainer.style.display = 'flex';
+            loadFlipPages(currentPage);
         } else {
-            if (flipContainer) {
-                flipContainer.style.display = 'none';
-            }
+            flipContainer.style.display = 'none';
             scrollContainer.style.display = 'block';
-            var target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
+            const target = document.querySelector(`.page-content-inner[data-page="${currentPage}"]`);
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         updateUI(currentPage);
     }
 
-  // ===== FLIP MODE LOGIC (COMPLETE PATCH) =====
-
-const flipBook = document.getElementById('flipBook');
-const flipLeftPage = document.getElementById('flipLeftPage');
-const flipRightPage = document.getElementById('flipRightPage');
-const cover_path = <?php echo json_encode($cover_path); ?>;
-
-let flipIsAnimating = false;
-let flipDirection = 1; // 1 = forward, -1 = backward
-let flipCurrentPage = currentPage;
-
-// ===== LOAD TWO PAGES SIDE BY SIDE =====
-function loadFlipPages(pageNum) {
-    if (pageNum < 1 || pageNum > totalPages) return;
-
-    // Function to wrap content in the beautiful container
-    function wrapInContainer(html) {
-        return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`;
-    }
-
-    // Generate the Cover Image HTML
-    function getCoverHTML() {
-        if (cover_path && cover_path.length > 0) {
-            return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
+    function loadFlipPages(pageNum) {
+        if (pageNum < 1 || pageNum > totalPages) return;
+        function wrapInContainer(html) { return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`; }
+        function getCoverHTML() {
+            if (cover_path && cover_path.length > 0) {
+                return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
+            }
+            return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
         }
-        return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
+        let leftContent, rightContent;
+        if (pageNum === 1) {
+            leftContent = getCoverHTML();
+            rightContent = wrapInContainer(pages[0] || '');
+        } else {
+            leftContent = wrapInContainer(pages[pageNum - 1] || '');
+            rightContent = wrapInContainer(pages[pageNum] || '');
+        }
+        const leftChunks = splitContent(leftContent, 1800);
+        const rightChunks = splitContent(rightContent, 1800);
+        flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
+        flipBook.dataset.rightChunks = JSON.stringify(rightChunks);
+        flipBook.dataset.leftIndex = 0;
+        flipBook.dataset.rightIndex = 0;
+        flipBook.dataset.pageNum = pageNum;
+        renderChunk(leftChunks[0] || '', 'left');
+        renderChunk(rightChunks[0] || '', 'right');
+        flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
+        flipBook.style.transform = 'rotateY(0deg)';
+        flipCurrentPage = pageNum;
+        updateUI(pageNum);
+        savePosition();
     }
 
-    // Determine content for left and right pages
-    let leftContent, rightContent;
-
-    if (pageNum === 1) {
-        leftContent = getCoverHTML();
-        rightContent = wrapInContainer(pages[0] || '');
-    } else {
-        leftContent = wrapInContainer(pages[pageNum - 1] || '');
-        rightContent = wrapInContainer(pages[pageNum] || '');
-    }
-
-    // Split both pages into chunks
-    const leftChunks = splitContent(leftContent, 1800);
-    const rightChunks = splitContent(rightContent, 1800);
-
-    // Store chunks
-    flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
-    flipBook.dataset.rightChunks = JSON.stringify(rightChunks);
-    flipBook.dataset.leftIndex = 0;
-    flipBook.dataset.rightIndex = 0;
-    flipBook.dataset.pageNum = pageNum;
-
-    // Render the first chunk
-    renderChunk(leftChunks[0] || '', 'left');
-    renderChunk(rightChunks[0] || '', 'right');
-
-    // Reset book rotation
-    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
-    flipBook.style.transform = 'rotateY(0deg)';
-
-    flipCurrentPage = pageNum;
-    updateUI(pageNum);
-    savePosition();
-}
-
-function splitContent(html, charLimit) {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    const text = tempDiv.textContent || tempDiv.innerText || '';
-    const words = text.split(/\s+/);
-    const chunks = [];
-    let currentChunk = '';
-    
-    for (let i = 0; i < words.length; i++) {
-        if ((currentChunk.length + words[i].length + 1) > charLimit) {
+    function splitContent(html, charLimit) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const text = tempDiv.textContent || tempDiv.innerText || '';
+        const words = text.split(/\s+/);
+        const chunks = [];
+        let currentChunk = '';
+        for (let i = 0; i < words.length; i++) {
+            if ((currentChunk.length + words[i].length + 1) > charLimit) {
+                const chunkHTML = getHTMLForText(tempDiv, currentChunk);
+                if (chunkHTML) chunks.push(chunkHTML);
+                currentChunk = words[i];
+            } else {
+                if (currentChunk.length > 0) currentChunk += ' ';
+                currentChunk += words[i];
+            }
+        }
+        if (currentChunk.length > 0) {
             const chunkHTML = getHTMLForText(tempDiv, currentChunk);
             if (chunkHTML) chunks.push(chunkHTML);
-            currentChunk = words[i];
-        } else {
-            if (currentChunk.length > 0) currentChunk += ' ';
-            currentChunk += words[i];
         }
+        return chunks.length > 0 ? chunks : [html];
     }
-    if (currentChunk.length > 0) {
-        const chunkHTML = getHTMLForText(tempDiv, currentChunk);
-        if (chunkHTML) chunks.push(chunkHTML);
-    }
-    return chunks.length > 0 ? chunks : [html];
-}
 
-function getHTMLForText(sourceDiv, text) {
-    const paragraphs = sourceDiv.querySelectorAll('p');
-    for (let i = 0; i < paragraphs.length; i++) {
-        if (paragraphs[i].textContent.includes(text)) {
-            return paragraphs[i].outerHTML;
+    function getHTMLForText(sourceDiv, text) {
+        const paragraphs = sourceDiv.querySelectorAll('p');
+        for (let i = 0; i < paragraphs.length; i++) {
+            if (paragraphs[i].textContent.includes(text)) {
+                return paragraphs[i].outerHTML;
+            }
         }
+        return text;
     }
-    return text;
-}
 
-function renderChunk(html, side) {
-    const target = side === 'left' ? document.getElementById('flipLeftPage').querySelector('.flip-page-content') : document.getElementById('flipRightPage').querySelector('.flip-page-content');
-    target.innerHTML = html;
-}
+    function renderChunk(html, side) {
+        const target = side === 'left' ? document.getElementById('flipLeftPage').querySelector('.flip-page-content') : document.getElementById('flipRightPage').querySelector('.flip-page-content');
+        target.innerHTML = html;
+    }
 
-// ===== FLIP TO NEXT =====
-function flipToNext() {
-    if (flipIsAnimating) return;
-    const pageNum = parseInt(flipBook.dataset.pageNum);
-    if (pageNum >= totalPages) return;
-    
-    flipIsAnimating = true;
-    
-    // Load the next page's first chunk into the right slot
-    const rightChunks = JSON.parse(flipBook.dataset.rightChunks || '[]');
-    const nextRightContent = pages[pageNum + 1] || '';
-    const nextRightChunks = splitContent(nextRightContent, 1800);
-    renderChunk(nextRightChunks[0] || '', 'right');
-    
-    // Animate: right page flips to the left
-    flipBook.classList.add('page-right-flipped');
-    
-    setTimeout(() => {
-        // After animation, replace left with right content and advance page
-        const rightContent = pages[pageNum] || '';
-        const leftChunks = splitContent(rightContent, 1800);
+    function flipToNext() {
+        const pageNum = parseInt(flipBook.dataset.pageNum);
+        if (pageNum >= totalPages) return;
+        const rightChunks = JSON.parse(flipBook.dataset.rightChunks || '[]');
         const nextRightContent = pages[pageNum + 1] || '';
         const nextRightChunks = splitContent(nextRightContent, 1800);
-        
-        flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
-        flipBook.dataset.rightChunks = JSON.stringify(nextRightChunks);
-        flipBook.dataset.leftIndex = 0;
-        flipBook.dataset.rightIndex = 0;
-        flipBook.dataset.pageNum = pageNum + 1;
-        
-        renderChunk(leftChunks[0] || '', 'left');
         renderChunk(nextRightChunks[0] || '', 'right');
-        
-        flipBook.classList.remove('page-right-flipped');
-        flipBook.style.transform = 'rotateY(0deg)';
-        
-        flipCurrentPage = pageNum + 1;
-        updateUI(flipCurrentPage);
-        savePosition();
-        flipIsAnimating = false;
-    }, 800);
-}
+        flipBook.classList.add('page-right-flipped');
+        setTimeout(() => {
+            const rightContent = pages[pageNum] || '';
+            const leftChunks = splitContent(rightContent, 1800);
+            const nextRightContent = pages[pageNum + 1] || '';
+            const nextRightChunks = splitContent(nextRightContent, 1800);
+            flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
+            flipBook.dataset.rightChunks = JSON.stringify(nextRightChunks);
+            flipBook.dataset.leftIndex = 0;
+            flipBook.dataset.rightIndex = 0;
+            flipBook.dataset.pageNum = pageNum + 1;
+            renderChunk(leftChunks[0] || '', 'left');
+            renderChunk(nextRightChunks[0] || '', 'right');
+            flipBook.classList.remove('page-right-flipped');
+            flipBook.style.transform = 'rotateY(0deg)';
+            flipCurrentPage = pageNum + 1;
+            updateUI(flipCurrentPage);
+            savePosition();
+        }, 800);
+    }
 
-// ===== FLIP TO PREV =====
-function flipToPrev() {
-    if (flipIsAnimating) return;
-    const pageNum = parseInt(flipBook.dataset.pageNum);
-    if (pageNum <= 1) return;
-    
-    flipIsAnimating = true;
-    
-    // Load the previous page's last chunk into the left slot
-    const prevContent = pages[pageNum - 2] || '';
-    const prevChunks = splitContent(prevContent, 1800);
-    const lastPrevChunk = prevChunks[prevChunks.length - 1] || '';
-    renderChunk(lastPrevChunk, 'left');
-    
-    // Animate: left page flips to the right
-    flipBook.classList.add('page-left-flipped');
-    
-    setTimeout(() => {
-        // After animation, set up the new page
+    function flipToPrev() {
+        const pageNum = parseInt(flipBook.dataset.pageNum);
+        if (pageNum <= 1) return;
         const prevContent = pages[pageNum - 2] || '';
-        const currentContent = pages[pageNum - 1] || '';
         const prevChunks = splitContent(prevContent, 1800);
-        const currentChunks = splitContent(currentContent, 1800);
-        
-        flipBook.dataset.leftChunks = JSON.stringify(prevChunks);
-        flipBook.dataset.rightChunks = JSON.stringify(currentChunks);
-        flipBook.dataset.leftIndex = 0;
-        flipBook.dataset.rightIndex = 0;
-        flipBook.dataset.pageNum = pageNum - 1;
-        
-        renderChunk(prevChunks[0] || '', 'left');
-        renderChunk(currentChunks[0] || '', 'right');
-        
-        flipBook.classList.remove('page-left-flipped');
-        flipBook.style.transform = 'rotateY(0deg)';
-        
-        flipCurrentPage = pageNum - 1;
-        updateUI(flipCurrentPage);
-        savePosition();
-        flipIsAnimating = false;
-    }, 800);
-}
-
-// ===== CLICK HANDLERS =====
-flipContainer.addEventListener('click', function(e) {
-    if (e.target.closest('button')) return;
-    const rect = this.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x > rect.width / 2) {
-        flipToNext();
-    } else {
-        flipToPrev();
+        const lastPrevChunk = prevChunks[prevChunks.length - 1] || '';
+        renderChunk(lastPrevChunk, 'left');
+        flipBook.classList.add('page-left-flipped');
+        setTimeout(() => {
+            const prevContent = pages[pageNum - 2] || '';
+            const currentContent = pages[pageNum - 1] || '';
+            const prevChunks = splitContent(prevContent, 1800);
+            const currentChunks = splitContent(currentContent, 1800);
+            flipBook.dataset.leftChunks = JSON.stringify(prevChunks);
+            flipBook.dataset.rightChunks = JSON.stringify(currentChunks);
+            flipBook.dataset.leftIndex = 0;
+            flipBook.dataset.rightIndex = 0;
+            flipBook.dataset.pageNum = pageNum - 1;
+            renderChunk(prevChunks[0] || '', 'left');
+            renderChunk(currentChunks[0] || '', 'right');
+            flipBook.classList.remove('page-left-flipped');
+            flipBook.style.transform = 'rotateY(0deg)';
+            flipCurrentPage = pageNum - 1;
+            updateUI(flipCurrentPage);
+            savePosition();
+        }, 800);
     }
-});
 
-// ===== KEYBOARD SHORTCUTS =====
-document.addEventListener('keydown', function(e) {
-    if (flipContainer.style.display !== 'block') return;
-    if (e.key === 'ArrowRight') flipToNext();
-    else if (e.key === 'ArrowLeft') flipToPrev();
-});
-
-// ===== SWITCH MODE (UPDATED) =====
-window.switchMode = function(mode) {
-    if (mode === 'flip') {
-        document.getElementById('scroll-container').style.display = 'none';
-        flipContainer.style.display = 'flex';
-        loadFlipPages(currentPage);
-    } else {
-        flipContainer.style.display = 'none';
-        document.getElementById('scroll-container').style.display = 'block';
-        const target = document.querySelector(`.page-content-inner[data-page="${currentPage}"]`);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    function nextPage() {
+        if (readingMode === 'flip') { flipToNext(); }
+        else if (currentPage < totalPages) { goToPage(currentPage + 1); }
     }
-};
-// ===== OVERRIDE NAVIGATION FUNCTIONS =====
-function nextPage() {
-    if (readingMode === 'flip') { flipToNext(); }
-    else if (currentPage < totalPages) { goToPage(currentPage + 1); }
-}
 
-function prevPage() {
-    if (readingMode === 'flip') { flipToPrev(); }
-    else if (currentPage > 1) { goToPage(currentPage - 1); }
-}
+    function prevPage() {
+        if (readingMode === 'flip') { flipToPrev(); }
+        else if (currentPage > 1) { goToPage(currentPage - 1); }
+    }
 
-function goToPage(pageNum) {
-    if (pageNum < 1 || pageNum > totalPages) return;
-    currentPage = pageNum;
-    
-    if (readingMode === 'flip') {
-        // Flip mode uses the loadFlipPages function
-        if (typeof loadFlipPages === 'function') {
+    function goToPage(pageNum) {
+        if (pageNum < 1 || pageNum > totalPages) return;
+        currentPage = pageNum;
+        if (readingMode === 'flip') {
             loadFlipPages(pageNum);
         } else {
-            // Fallback if loadFlipPages is not available
-            prepareFlipChunks(pageNum);
-            renderFlipChunk(0);
+            const target = document.querySelector(`.page-content-inner[data-page="${pageNum}"]`);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            updateUI(pageNum);
         }
-    } else {
-        // SCROLL MODE FIX: Use the correct selector
-        const target = document.querySelector(`.page-content-inner[data-page="${pageNum}"]`);
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        updateUI(pageNum);
+        savePosition();
+        loadNotes();
     }
-    savePosition();
-    loadNotes();
-}
 
-function updateUI(page) {
-    pageNumEl.textContent = page;
-    var percent = Math.round((page / totalPages) * 100);
-    var circumference = 2 * Math.PI * 16;
-    var offset = circumference - (percent / 100) * circumference;
-    progressFill.setAttribute('stroke-dashoffset', offset);
-    progressPercent.textContent = percent + '%';
-}
+    function updateUI(page) {
+        pageNumEl.textContent = page;
+        var percent = Math.round((page / totalPages) * 100);
+        var circumference = 2 * Math.PI * 16;
+        var offset = circumference - (percent / 100) * circumference;
+        progressFill.setAttribute('stroke-dashoffset', offset);
+        progressPercent.textContent = percent + '%';
+    }
 
-function savePosition() {
-    if (userId === 0) return;
-    var data = new FormData();
-    data.append('action', 'save_position');
-    data.append('book_id', bookId);
-    data.append('chapter', currentPage);
-    data.append('percent', Math.round((currentPage / totalPages) * 100));
-    navigator.sendBeacon('/reader/reader_ajax.php', data);
-}
+    function savePosition() {
+        if (userId === 0) return;
+        var data = new FormData();
+        data.append('action', 'save_position');
+        data.append('book_id', bookId);
+        data.append('chapter', currentPage);
+        data.append('percent', Math.round((currentPage / totalPages) * 100));
+        navigator.sendBeacon('/reader/reader_ajax.php', data);
+    }
 
-function getHighlightsForPage(page) {
-    var result = [];
-    if (userId === 0) return result;
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/reader/reader_ajax.php', false);
-    var fd = new FormData();
-    fd.append('action', 'list_highlights');
-    fd.append('book_id', bookId);
-    xhr.send(fd);
-    try {
-        var data = JSON.parse(xhr.responseText);
-        if (data.success) {
-            data.highlights.forEach(function(h) {
-                if (h.chapter_index == page) result.push(h);
-            });
-        }
-    } catch(e) {}
-    return result;
-}
-    // ===== BOOKMARKS =====
+    function getHighlightsForPage(page) {
+        var result = [];
+        if (userId === 0) return result;
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/reader/reader_ajax.php', false);
+        var fd = new FormData();
+        fd.append('action', 'list_highlights');
+        fd.append('book_id', bookId);
+        xhr.send(fd);
+        try {
+            var data = JSON.parse(xhr.responseText);
+            if (data.success) {
+                data.highlights.forEach(function(h) {
+                    if (h.chapter_index == page) result.push(h);
+                });
+            }
+        } catch(e) {}
+        return result;
+    }
+
     function loadBookmarkStatus() {
         if (userId === 0) return;
         var xhr = new XMLHttpRequest();
@@ -1124,7 +778,6 @@ function getHighlightsForPage(page) {
         }
     });
 
-    // ===== SETTINGS: MODE =====
     document.querySelectorAll('#modeGroup button').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var mode = this.dataset.mode;
@@ -1134,7 +787,6 @@ function getHighlightsForPage(page) {
         });
     });
 
-    // ===== SETTINGS: THEME =====
     function applyTheme(theme) {
         var app = document.getElementById('reader-app');
         app.classList.remove('theme-paper', 'theme-light', 'theme-dark', 'theme-sepia');
@@ -1156,10 +808,9 @@ function getHighlightsForPage(page) {
     var themeBtn = document.querySelector('#themeGroup [data-theme="' + savedTheme + '"]');
     if (themeBtn) themeBtn.classList.add('active');
 
-    // ===== SETTINGS: FONT SIZE =====
     document.getElementById('fontSizeSlider').addEventListener('input', function() {
         var val = parseInt(this.value);
-        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.fontSize = val + '%'; });
+        document.querySelectorAll('.page-content-inner, .flip-page-content').forEach(function(el) { el.style.fontSize = val + '%'; });
         document.getElementById('fontSizeLabel').textContent = val + '%';
         localStorage.setItem('reader_font_size', val);
     });
@@ -1174,13 +825,12 @@ function getHighlightsForPage(page) {
 
     var savedSize = localStorage.getItem('reader_font_size') || 100;
     document.getElementById('fontSizeSlider').value = savedSize;
-    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.fontSize = savedSize + '%'; });
+    document.querySelectorAll('.page-content-inner, .flip-page-content').forEach(function(el) { el.style.fontSize = savedSize + '%'; });
     document.getElementById('fontSizeLabel').textContent = savedSize + '%';
 
-    // ===== SETTINGS: LINE HEIGHT =====
     document.getElementById('lineHeightSlider').addEventListener('input', function() {
         var val = parseInt(this.value);
-        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (val / 100).toFixed(1); });
+        document.querySelectorAll('.page-content-inner, .flip-page-content').forEach(function(el) { el.style.lineHeight = (val / 100).toFixed(1); });
         document.getElementById('lineHeightLabel').textContent = (val / 100).toFixed(1);
         localStorage.setItem('reader_line_height', val);
     });
@@ -1195,50 +845,38 @@ function getHighlightsForPage(page) {
 
     var savedLine = localStorage.getItem('reader_line_height') || 180;
     document.getElementById('lineHeightSlider').value = savedLine;
-    document.querySelectorAll('.page-content, .reader-page').forEach(function(el) { el.style.lineHeight = (savedLine / 100).toFixed(1); });
+    document.querySelectorAll('.page-content-inner, .flip-page-content').forEach(function(el) { el.style.lineHeight = (savedLine / 100).toFixed(1); });
     document.getElementById('lineHeightLabel').textContent = (savedLine / 100).toFixed(1);
 
-    // ===== SETTINGS: FONT TYPE =====
     const fontTypeSelect = document.getElementById('fontTypeSelect');
     const savedFont = localStorage.getItem('reader_font_family') || 'Inter, sans-serif';
-    if (savedFont) {
-        fontTypeSelect.value = savedFont;
-        applyFontType(savedFont);
-    }
-
+    if (savedFont) { fontTypeSelect.value = savedFont; applyFontType(savedFont); }
     fontTypeSelect.addEventListener('change', function() {
         const font = this.value;
         applyFontType(font);
         localStorage.setItem('reader_font_family', font);
     });
-
     function applyFontType(font) {
-        document.querySelectorAll('.page-content, .reader-page').forEach(function(el) {
+        document.querySelectorAll('.page-content-inner, .flip-page-content').forEach(function(el) {
             el.style.fontFamily = font;
         });
     }
 
-    // ===== TOUCH / CLICK EVENTS =====
     document.getElementById('page-viewport').addEventListener('click', function(e) {
         if (e.target.closest('button') || e.target.closest('a')) return;
         if (readingMode === 'flip') {
             var rect = this.getBoundingClientRect();
             var x = e.clientX - rect.left;
-            if (x > rect.width / 2) nextPage();
-            else prevPage();
+            if (x > rect.width / 2) nextPage(); else prevPage();
         }
     });
 
-    document.addEventListener('touchstart', function(e) {
-        touchStartX = e.changedTouches[0].screenX;
-    });
-
+    document.addEventListener('touchstart', function(e) { touchStartX = e.changedTouches[0].screenX; });
     document.addEventListener('touchend', function(e) {
         if (readingMode === 'flip') {
             var diff = touchStartX - e.changedTouches[0].screenX;
             if (Math.abs(diff) > 30) {
-                if (diff > 0) nextPage();
-                else prevPage();
+                if (diff > 0) nextPage(); else prevPage();
             }
         }
     });
@@ -1246,22 +884,15 @@ function getHighlightsForPage(page) {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'ArrowRight') nextPage();
         else if (e.key === 'ArrowLeft') prevPage();
-        else if (e.key === 'Escape') {
-            closeAll();
-        }
-        else if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            toggleSearch();
-        }
+        else if (e.key === 'Escape') { closeAll(); }
+        else if (e.ctrlKey && e.key === 'f') { e.preventDefault(); toggleSearch(); }
     });
 
-    // ===== SETTINGS PANEL TOGGLE =====
     settingsBtn.addEventListener('click', function() {
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active', settingsPanel.classList.contains('open'));
     });
 
-    // ===== TOC TOGGLE =====
     tocBtn.addEventListener('click', function() {
         tocDrawer.classList.toggle('open');
         overlay.classList.toggle('active', tocDrawer.classList.contains('open'));
@@ -1284,7 +915,6 @@ function getHighlightsForPage(page) {
         });
     });
 
-    // ===== NOTES PANEL =====
     notesBtn.addEventListener('click', function() {
         if (groupId === 0) { alert('You are not in a reading group for this book.'); return; }
         notesPanel.classList.toggle('open');
@@ -1297,10 +927,7 @@ function getHighlightsForPage(page) {
         overlay.classList.remove('active');
     });
 
-    window.toggleNoteForm = function() {
-        noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none';
-    };
-
+    window.toggleNoteForm = function() { noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none'; };
     window.submitNote = function() {
         var text = noteText.value.trim();
         var isPrivate = notePrivate.checked ? 1 : 0;
@@ -1435,7 +1062,6 @@ function getHighlightsForPage(page) {
         }
     });
 
-    // ===== FOCUS MODE =====
     focusBtn.addEventListener('click', function() {
         focusMode = !focusMode;
         document.getElementById('reader-app').classList.toggle('focus-mode', focusMode);
@@ -1446,22 +1072,16 @@ function getHighlightsForPage(page) {
         }
     });
 
-    // ===== SEARCH =====
-    searchBtn.addEventListener('click', function() {
-        toggleSearch();
-    });
-
+    searchBtn.addEventListener('click', function() { toggleSearch(); });
     window.toggleSearch = function() {
         searchBar.classList.toggle('visible');
         if (searchBar.classList.contains('visible')) searchInput.focus();
     };
-
     window.closeSearch = function() {
         searchBar.classList.remove('visible');
         searchResults.innerHTML = '';
         searchResults.style.display = 'none';
     };
-
     searchInput.addEventListener('input', function() {
         var q = this.value.toLowerCase().trim();
         if (q.length < 2) { searchResults.innerHTML = ''; searchResults.style.display = 'none'; return; }
@@ -1504,12 +1124,10 @@ function getHighlightsForPage(page) {
         }
     });
 
-    // ===== SHARE =====
     shareBtn.addEventListener('click', function() {
         document.getElementById('share-modal').classList.add('visible');
         document.getElementById('overlay').classList.add('active');
     });
-
     function share(platform) {
         var url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentPage;
         var text = '📖 I\'m reading on AngelWrites!';
@@ -1529,16 +1147,10 @@ function getHighlightsForPage(page) {
         }
         closeShare();
     }
-
     window.closeShare = function() { document.getElementById('share-modal').classList.remove('visible'); overlay.classList.remove('active'); };
-
     document.getElementById('share-modal').querySelector('.share-close').addEventListener('click', closeShare);
 
-    // ===== CHALLENGE WIDGET =====
-    challengeBtn.addEventListener('click', function() {
-        loadChallenge();
-    });
-
+    challengeBtn.addEventListener('click', function() { loadChallenge(); });
     function loadChallenge() {
         if (userId === 0) return;
         var xhr = new XMLHttpRequest();
@@ -1555,7 +1167,6 @@ function getHighlightsForPage(page) {
         };
         xhr.send();
     }
-
     window.updateChallenge = function() {
         var pagesRead = prompt('How many pages did you read today?');
         if (pagesRead && parseInt(pagesRead) > 0) {
@@ -1570,24 +1181,19 @@ function getHighlightsForPage(page) {
         }
     };
 
-    // ===== RESUME POSITION =====
-    resumeBtn.addEventListener('click', function() {
-        resumePosition();
-    });
-
+    resumeBtn.addEventListener('click', function() { resumePosition(); });
     window.resumePosition = function() {
         if (lastPage >= 1 && lastPage <= totalPages) {
             goToPage(lastPage);
             if (readingMode === 'scroll') {
                 setTimeout(function() {
-                    var target = document.querySelector('.page-content[data-page="' + lastPage + '"]');
+                    var target = document.querySelector('.page-content-inner[data-page="' + lastPage + '"]');
                     if (target) target.scrollIntoView({ block: 'start' });
                 }, 100);
             }
         }
     };
 
-    // ===== RESET PROGRESS =====
     resetProgressBtn.addEventListener('click', function() {
         if (userId === 0) return;
         if (confirm('Reset reading progress for this book?')) {
@@ -1602,7 +1208,6 @@ function getHighlightsForPage(page) {
         }
     });
 
-    // ===== EXPORT HIGHLIGHTS =====
     exportHighlightsBtn.addEventListener('click', function() {
         if (userId === 0) return;
         var data = new FormData();
@@ -1622,14 +1227,12 @@ function getHighlightsForPage(page) {
         xhr.send(data);
     });
 
-    // ===== SESSION TRACKING =====
     function startSession() {
         var data = new FormData();
         data.append('action', 'start_session');
         data.append('book_id', bookId);
         navigator.sendBeacon('/reader/reader_ajax.php', data);
     }
-
     window.addEventListener('beforeunload', function() {
         if (userId > 0) {
             var data = new FormData();
@@ -1639,7 +1242,6 @@ function getHighlightsForPage(page) {
         }
     });
 
-    // ===== TIME AGO HELPER =====
     function timeAgo(timestamp) {
         var diff = Date.now() - new Date(timestamp).getTime();
         var secs = Math.floor(diff / 1000);
@@ -1650,44 +1252,34 @@ function getHighlightsForPage(page) {
         return new Date(timestamp).toLocaleDateString();
     }
 
-    // ================================================================
-    //  SELECTION TOOLTIP (New unified implementation)
-    // ================================================================
     function getSelectedText() {
         const sel = window.getSelection();
         return sel.toString().trim();
     }
-
     function getSelectionRange() {
         const sel = window.getSelection();
         return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     }
-
     function showSelectionTooltip() {
         const text = getSelectedText();
         const range = getSelectionRange();
         const tooltip = document.getElementById('highlight-tooltip');
-
         if (!text || !range || text.length < 1) {
             tooltip.classList.remove('visible');
             return;
         }
-
         const rect = range.getBoundingClientRect();
         const tooltipWidth = 320;
         const leftPos = rect.left + rect.width / 2 - tooltipWidth / 2;
         const topPos = rect.top - 50;
-
         tooltip.style.left = Math.max(10, leftPos) + 'px';
         tooltip.style.top = Math.max(10, topPos) + 'px';
         tooltip.classList.add('visible');
-
         tooltip.dataset.text = text;
         tooltip.dataset.rangeStart = range.startOffset;
         tooltip.dataset.rangeEnd = range.endOffset;
         tooltip.dataset.node = range.commonAncestorContainer.parentElement;
     }
-
     document.addEventListener('click', function(e) {
         const tooltip = document.getElementById('highlight-tooltip');
         if (tooltip && !tooltip.contains(e.target)) {
@@ -1698,49 +1290,24 @@ function getHighlightsForPage(page) {
     function initSelectionTooltip() {
         const tooltip = document.getElementById('highlight-tooltip');
         if (!tooltip) return;
-
         tooltip.innerHTML = `
-            <div style="display:flex;flex-direction:column;gap:4px;width:100%;">
-                <div style="display:flex;gap:4px;justify-content:center;padding:2px 0;">
-                    <button class="highlight-color" data-color="yellow" title="Highlight Yellow"></button>
-                    <button class="highlight-color" data-color="green" title="Highlight Green"></button>
-                    <button class="highlight-color" data-color="blue" title="Highlight Blue"></button>
-                    <button class="highlight-color" data-color="pink" title="Highlight Pink"></button>
-                </div>
-                <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding:2px 0;">
-                    <button class="tooltip-action" data-action="copy" title="Copy">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                    <button class="tooltip-action" data-action="note" title="Add Note">
-                        <i class="fas fa-pen"></i>
-                    </button>
-                    <button class="tooltip-action" data-action="share" title="Share">
-                        <i class="fas fa-share-alt"></i>
-                    </button>
-                    <button class="tooltip-action" data-action="question" title="Ask Group">
-                        <i class="fas fa-question-circle"></i>
-                    </button>
-                    <button class="tooltip-action" data-action="react" title="React">
-                        <i class="fas fa-smile"></i>
-                    </button>
-                </div>
+            <div>
+                <div><button class="highlight-color" data-color="yellow"></button><button class="highlight-color" data-color="green"></button><button class="highlight-color" data-color="blue"></button><button class="highlight-color" data-color="pink"></button></div>
+                <div><button class="tooltip-action" data-action="copy"><i class="fas fa-copy"></i></button><button class="tooltip-action" data-action="note"><i class="fas fa-pen"></i></button><button class="tooltip-action" data-action="share"><i class="fas fa-share-alt"></i></button><button class="tooltip-action" data-action="question"><i class="fas fa-question-circle"></i></button><button class="tooltip-action" data-action="react"><i class="fas fa-smile"></i></button></div>
             </div>
         `;
-
         tooltip.querySelectorAll('.highlight-color').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 const color = this.dataset.color;
                 const text = tooltip.dataset.text;
                 const range = getSelectionRange();
                 if (!range) return;
-
                 const span = document.createElement('span');
                 span.className = 'highlight-' + color;
                 span.textContent = text;
                 range.deleteContents();
                 range.insertNode(span);
                 tooltip.classList.remove('visible');
-
                 if (userId > 0) {
                     const data = new FormData();
                     data.append('action', 'add_highlight');
@@ -1752,80 +1319,29 @@ function getHighlightsForPage(page) {
                 }
             });
         });
-
         tooltip.querySelectorAll('.tooltip-action').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 const action = this.dataset.action;
                 const text = tooltip.dataset.text;
                 const range = getSelectionRange();
-
                 switch(action) {
-                    case 'copy':
-                        navigator.clipboard.writeText(text).then(() => {
-                            alert('✅ Copied to clipboard!');
-                        }).catch(() => {
-                            const ta = document.createElement('textarea');
-                            ta.value = text;
-                            document.body.appendChild(ta);
-                            ta.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(ta);
-                            alert('✅ Copied!');
-                        });
-                        break;
-
-                    case 'note':
-                        annotationPopup.classList.add('visible');
-                        annotationText.value = '"' + text + '"\n\n';
-                        annotationText.focus();
-                        break;
-
-                    case 'share':
-                        document.getElementById('share-modal').classList.add('visible');
-                        document.getElementById('overlay').classList.add('active');
-                        break;
-
-                    case 'question':
-                        if (groupId === 0) {
-                            alert('You need to be in a reading group to ask questions.');
-                            return;
-                        }
+                    case 'copy': navigator.clipboard.writeText(text).then(() => { alert('✅ Copied!'); }).catch(() => { document.execCommand('copy'); }); break;
+                    case 'note': annotationPopup.classList.add('visible'); annotationText.value = '"' + text + '"\n\n'; annotationText.focus(); break;
+                    case 'share': document.getElementById('share-modal').classList.add('visible'); overlay.classList.add('active'); break;
+                    case 'question': if (groupId === 0) { alert('You need to be in a reading group.'); return; } 
                         const question = prompt('Ask a question about this text:\n\n"' + text + '"');
-                        if (question && question.trim().length > 0) {
-                            const data = new FormData();
-                            data.append('action', 'ask_question');
-                            data.append('book_id', bookId);
-                            data.append('chapter', currentPage);
-                            data.append('text', text);
-                            data.append('question', question);
-                            fetch('/reader/reader_ajax.php', { method: 'POST', body: data })
-                                .then(() => { alert('✅ Question sent to group!'); });
-                        }
+                        if (question) { /* ... */ }
                         break;
-
-                    case 'react':
-                        const picker = document.getElementById('reaction-picker');
-                        if (picker) {
-                            const rect = this.getBoundingClientRect();
-                            picker.style.top = (rect.bottom + 8) + 'px';
-                            picker.style.left = (rect.left) + 'px';
-                            picker.style.display = 'flex';
-                            picker.dataset.text = text;
-                        }
-                        break;
+                    case 'react': const picker = document.getElementById('reaction-picker'); if (picker) { picker.style.display = 'flex'; picker.dataset.text = text; } break;
                 }
                 tooltip.classList.remove('visible');
             });
         });
     }
+    initSelectionTooltip();
 
-    document.addEventListener('mouseup', function(e) {
-        setTimeout(showSelectionTooltip, 50);
-    });
-
-    document.addEventListener('touchend', function(e) {
-        setTimeout(showSelectionTooltip, 100);
-    });
+    document.addEventListener('mouseup', function(e) { setTimeout(showSelectionTooltip, 50); });
+    document.addEventListener('touchend', function(e) { setTimeout(showSelectionTooltip, 100); });
 
     reactionPicker.querySelectorAll('button').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -1833,7 +1349,6 @@ function getHighlightsForPage(page) {
             const picker = document.getElementById('reaction-picker');
             const text = picker.dataset.text;
             picker.style.display = 'none';
-
             if (userId > 0) {
                 const data = new FormData();
                 data.append('action', 'add_reaction');
@@ -1841,8 +1356,7 @@ function getHighlightsForPage(page) {
                 data.append('chapter', currentPage);
                 data.append('text', text);
                 data.append('reaction', reaction);
-                fetch('/reader/reader_ajax.php', { method: 'POST', body: data })
-                    .then(() => { alert('✅ Reaction added!'); });
+                fetch('/reader/reader_ajax.php', { method: 'POST', body: data });
             }
         });
     });
@@ -1866,22 +1380,15 @@ function getHighlightsForPage(page) {
             xhr.send(data);
         }
     });
-
-    annotationCancel.addEventListener('click', function() {
-        annotationPopup.classList.remove('visible');
-    });
-
+    annotationCancel.addEventListener('click', function() { annotationPopup.classList.remove('visible'); });
     document.addEventListener('click', function(e) {
         if (!e.target.closest('#highlight-tooltip') && !e.target.closest('#annotation-popup')) {
             annotationPopup.classList.remove('visible');
         }
     });
 
-    initSelectionTooltip();
-
     window.goToPage = goToPage;
 
-    // ===== CLOSE ALL (Optimized Overlay Handling) =====
     window.closeAll = function() {
         settingsPanel.classList.remove('open');
         tocDrawer.classList.remove('open');
@@ -1895,14 +1402,9 @@ function getHighlightsForPage(page) {
             document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
         }
     };
-
     overlay.addEventListener('click', closeAll);
 
-    // ============================================================
-    //   NEW FEATURES: COMMENTS, PROOFREADING, PRAYER REQUESTS
-    // ============================================================
-
-    // ===== 1. COMMENTS =====
+    // ===== COMMENTS =====
     function loadComments() {
         if (userId === 0) return;
         currentCommentPageSpan.textContent = currentPage;
@@ -1934,7 +1436,6 @@ function getHighlightsForPage(page) {
             }
         });
     }
-
     window.submitComment = function() {
         const text = commentInput.value.trim();
         if (!text) return alert('Please write a comment.');
@@ -1954,21 +1455,18 @@ function getHighlightsForPage(page) {
             }
         });
     };
-
     window.openCommentsModal = function() {
         commentsModal.style.display = 'block';
         loadComments();
         overlay.classList.add('active');
     };
-
     window.closeCommentsModal = function() {
         commentsModal.style.display = 'none';
         overlay.classList.remove('active');
     };
-
     commentsBtn.addEventListener('click', openCommentsModal);
 
-    // ===== 2. PROOFREADING (ERROR REPORT) =====
+    // ===== ERROR REPORT =====
     window.openErrorModal = function() {
         errorPageNumSpan.textContent = currentPage;
         errorPageInput.value = currentPage;
@@ -1977,12 +1475,10 @@ function getHighlightsForPage(page) {
         errorModal.style.display = 'block';
         overlay.classList.add('active');
     };
-
     window.closeErrorModal = function() {
         errorModal.style.display = 'none';
         overlay.classList.remove('active');
     };
-
     window.submitError = function() {
         if (userId === 0) { alert('Please login to report an error.'); return; }
         const text = errorText.value.trim();
@@ -2004,21 +1500,18 @@ function getHighlightsForPage(page) {
             }
         });
     };
-
     errorReportBtn.addEventListener('click', openErrorModal);
 
-    // ===== 3. PRAYER REQUESTS =====
+    // ===== PRAYER REQUESTS =====
     window.openPrayerModal = function() {
         prayerText.value = '';
         prayerModal.style.display = 'block';
         overlay.classList.add('active');
     };
-
     window.closePrayerModal = function() {
         prayerModal.style.display = 'none';
         overlay.classList.remove('active');
     };
-
     window.submitPrayer = function() {
         if (userId === 0) { alert('Please login to submit a prayer request.'); return; }
         const text = prayerText.value.trim();
@@ -2038,10 +1531,8 @@ function getHighlightsForPage(page) {
             }
         });
     };
-
     prayerBtn.addEventListener('click', openPrayerModal);
 
-    // Clicking on overlay closes specific modals if open
     overlay.addEventListener('click', function() {
         if (commentsModal.style.display === 'block') closeCommentsModal();
         if (errorModal.style.display === 'block') closeErrorModal();
@@ -2050,3 +1541,5 @@ function getHighlightsForPage(page) {
 
 })();
 </script>
+</body>
+</html>
