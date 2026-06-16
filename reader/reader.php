@@ -1173,6 +1173,10 @@ html, body { height:100%; width:100%; overflow:hidden; }
             overlay.classList.remove('active');
         }
     });
+    tocClose.addEventListener('click', function() {
+        document.getElementById('toc-drawer').style.display = 'none';
+        overlay.classList.remove('active');
+    });
     commentsBtn.addEventListener('click',function() {
         if (userId === 0) { alert('Please log in to view comments.'); return; }
         loadComments();
@@ -1473,7 +1477,37 @@ html, body { height:100%; width:100%; overflow:hidden; }
         document.getElementById('notes-panel').style.display = 'none';
         overlay.classList.remove('active');
     });
-
+    // ===== SEARCH FUNCTIONALITY =====
+    function toggleSearch() {
+        const bar = document.getElementById('search-bar');
+        if (bar.style.display === 'none' || bar.style.display === '') {
+            bar.style.display = 'block';
+            document.getElementById('searchInput').focus();
+        } else {
+            bar.style.display = 'none';
+            document.getElementById('searchResults').innerHTML = '';
+        }
+    }
+    function closeSearch() {
+        document.getElementById('search-bar').style.display = 'none';
+        document.getElementById('searchResults').innerHTML = '';
+    }
+    searchBtn.addEventListener('click', toggleSearch);
+    // ===== ERROR REPORT MODAL =====
+    function openErrorModal() {
+        document.getElementById('errorPageNum').textContent = currentPage;
+        document.getElementById('errorPageInput').value = currentPage;
+        document.getElementById('errorText').value = '';
+        document.getElementById('errorCorrection').value = '';
+        document.getElementById('errorModal').style.display = 'block';
+        overlay.classList.add('active');
+    }
+    function closeErrorModal() {
+        document.getElementById('errorModal').style.display = 'none';
+        overlay.classList.remove('active');
+    }
+    errorReportBtn.addEventListener('click', openErrorModal);
+    
     // ===== NOTE FORM FUNCTIONS =====
     function toggleNoteForm() {
         const form = document.getElementById('noteForm');
@@ -1539,7 +1573,40 @@ html, body { height:100%; width:100%; overflow:hidden; }
         picker.style.left = (rect.left) + 'px';
         picker.style.display = 'flex';
     }
+    // ===== PRAYER REQUEST MODAL =====
+    function openPrayerModal() {
+        document.getElementById('prayerText').value = '';
+        document.getElementById('prayerModal').style.display = 'block';
+        overlay.classList.add('active');
+    }
+    function closePrayerModal() {
+        document.getElementById('prayerModal').style.display = 'none';
+        overlay.classList.remove('active');
+    }
+    prayerBtn.addEventListener('click', openPrayerModal);
 
+exportHighlightsBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to export highlights.'); return; }
+        const formData = new FormData();
+        formData.append('action', 'export_highlights');
+        formData.append('book_id', bookId);
+        fetch('/reader/reader_ajax.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.blob())
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'highlights.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        })
+        .catch(() => alert('Export failed.'));
+    });
     // ===== COMMENT FUNCTIONS =====
     function loadComments() {
         if (userId === 0) return;
@@ -1636,6 +1703,12 @@ html, body { height:100%; width:100%; overflow:hidden; }
     window.loadComments = loadComments;
     window.submitComment = submitComment;
     window.closeCommentsModal = closeCommentsModal;
+    window.toggleSearch = toggleSearch;
+    window.closeSearch = closeSearch;
+    window.openErrorModal = openErrorModal;
+    window.closeErrorModal = closeErrorModal;
+    window.openPrayerModal = openPrayerModal;
+    window.closePrayerModal = closePrayerModal;
 
     // ===== INIT =====
     totalPagesEl.textContent = totalPages;
