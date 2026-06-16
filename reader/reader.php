@@ -307,8 +307,6 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .modal .form-group input,.modal .form-group textarea,.modal .form-group select{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text)}
         .modal .form-group textarea{resize:vertical;min-height:60px}
         .modal .btn{margin-top:4px}
-        @media (max-width:768px){#toolbar{height:48px;padding:0 8px}.toolbar-left .title{font-size:0.9rem;max-width:160px}.page-content-inner{padding:20px}.flip-page-content{padding:20px}#toc-drawer{width:280px;right:-280px}#notes-panel{width:100%;max-height:50vh;border-radius:0}.settings-grid{grid-template-columns:1fr 1fr}}
-        @media (max-width:480px){.toolbar-left .title{font-size:0.8rem;max-width:120px}.page-content-inner{padding:16px}.flip-page-content{padding:16px}}
     </style>
 </head>
 <body>
