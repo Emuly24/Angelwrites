@@ -1,3 +1,627 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/mail_helper.php';
+
+$book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if (!$book_id) {
+    header('Location: ' . SITE_URL . '/books.php');
+    exit;
+}
+
+$stmt = $db->prepare("SELECT * FROM books WHERE id = ?");
+$stmt->execute([$book_id]);
+$book = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$book) {
+    header('Location: ' . SITE_URL . '/books.php');
+    exit;
+}
+
+$stmt = $db->prepare("UPDATE books SET view_count = view_count + 1 WHERE id = ?");
+$stmt->execute([$book_id]);
+
+$stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
+$stmt->execute([$book_id]);
+$processed = $stmt->fetch(PDO::FETCH_ASSOC);
+$has_processed = !empty($processed) && $processed['is_processed'] == 1;
+
+$toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
+
+$pages = [];
+if ($has_processed && !empty($processed['content_html'])) {
+    preg_match_all('/<div class="page-content" data-page="(\d+)">(.*?)<\/div>/s', $processed['content_html'], $matches, PREG_SET_ORDER);
+    foreach ($matches as $match) {
+        $pages[] = $match[2];
+    }
+}
+$total_pages = count($pages);
+
+// ------- CHAPTER DETECTION & PAGE MAPPING -------
+$chapterMap = []; // $chapterMap[chapter_index] = array of page numbers
+$currentChapter = 0;
+$chapterTitles = [];
+$pageToChapter = [];
+
+if ($has_processed) {
+    foreach ($pages as $idx => $html) {
+        $pageNum = $idx + 1;
+        // Look for chapter headings
+        if (preg_match('/<h[2-3][^>]*>(.*?Chapter\s+(\d+|[IVXLCDM]+).*?)<\/h[2-3]>/i', $html, $matches)) {
+            $currentChapter++;
+            $chapterTitles[$currentChapter] = trim(strip_tags($matches[1]));
+            $chapterMap[$currentChapter] = [];
+        }
+        $pageToChapter[$pageNum] = $currentChapter ?: 1;
+        if ($currentChapter > 0) {
+            $chapterMap[$currentChapter][] = $pageNum;
+        }
+    }
+}
+// If no chapters detected, treat whole book as one chapter
+if (empty($chapterMap)) {
+    $chapterMap[1] = range(1, $total_pages);
+    $chapterTitles[1] = 'Chapter 1';
+    foreach (range(1, $total_pages) as $p) {
+        $pageToChapter[$p] = 1;
+    }
+}
+
+// ------- USER PROGRESS -------
+$user_progress = null;
+$last_offset = 0;
+$last_chapter = 0;
+$progress_percent = 0;
+$streak_days = 0;
+$group_id = null;
+$reading_status = 'not_started';
+$reading_speed_wpm = 250; // default: words per minute
+
+if (isLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $stmt = $db->prepare("SELECT * FROM reading_progress WHERE user_id = ? AND book_id = ?");
+    $stmt->execute([$user_id, $book_id]);
+    $user_progress = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user_progress) {
+        $last_offset = (int)$user_progress['position_offset'];
+        $last_chapter = (int)$user_progress['position_section'];
+        $progress_percent = (int)$user_progress['progress_percent'];
+    } else {
+        $stmt = $db->prepare("INSERT INTO reading_progress (user_id, book_id, position_offset, position_section, progress_percent) VALUES (?, ?, 0, 0, 0)");
+        $stmt->execute([$user_id, $book_id]);
+    }
+
+    $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $streak = $stmt->fetchColumn();
+    $streak_days = $streak ? (int)$streak : 0;
+
+    $stmt = $db->prepare("
+        SELECT g.id FROM reading_groups g
+        JOIN group_members m ON g.id = m.group_id
+        WHERE g.book_id = ? AND m.user_id = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$book_id, $user_id]);
+    $group_id = $stmt->fetchColumn();
+
+    $stmt = $db->prepare("SELECT status FROM reading_status WHERE user_id = ? AND book_id = ?");
+    $stmt->execute([$user_id, $book_id]);
+    $reading_status = $stmt->fetchColumn() ?: 'not_started';
+
+    // Load user reading speed preference
+    $stmt = $db->prepare("SELECT reading_speed_wpm FROM user_settings WHERE user_id = ?");
+    $stmt->execute([$user_id]);
+    $speed = $stmt->fetchColumn();
+    if ($speed) $reading_speed_wpm = (int)$speed;
+}
+
+$bookmarks = [];
+$highlights = [];
+if (isLoggedIn()) {
+    $user_id = $_SESSION['user_id'];
+    $stmt = $db->prepare("SELECT id, chapter_index, note, created_at FROM bookmarks WHERE user_id = ? AND book_id = ? ORDER BY chapter_index, created_at DESC");
+    $stmt->execute([$user_id, $book_id]);
+    $bookmarks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $db->prepare("SELECT id, chapter_index, paragraph_index, text, color, note FROM highlights WHERE user_id = ? AND book_id = ? ORDER BY chapter_index, paragraph_index");
+    $stmt->execute([$user_id, $book_id]);
+    $highlights = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+$last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter : 1;
+$cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_URL . '/' . $book['cover_path'] : '';
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title><?php echo htmlspecialchars($book['title']); ?></title>
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<style>
+:root {
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
+    --card-bg: #ffffff;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --input-bg: #ffffff;
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.theme-paper { --bg: #EFD8D6; --card-bg: #fffdf9; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
+.theme-light { --bg: #F7F3ED; --card-bg: #ffffff; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
+.theme-dark { --bg: #1a1212; --card-bg: #2c1e1e; --text: #e8dddd; --border: #4a3a3a; --input-bg: #2c1e1e; }
+.theme-sepia { --bg: #fbf3e9; --card-bg: #fdf5ec; --text: #4a3d36; --border: #d9c9b8; --input-bg: #fdf5ec; }
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; width:100%; overflow:hidden; }
+#reader-app {
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    display:flex; flex-direction:column;
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    transition:background var(--transition), color var(--transition);
+}
+
+#toolbar {
+    flex-shrink:0; height:60px; min-height:60px;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:0 20px;
+    background:var(--card-bg);
+    border-bottom:1px solid var(--border);
+    box-shadow:var(--shadow); z-index:20;
+}
+.toolbar-left { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.toolbar-left .title {
+    font-family:'Playfair Display',Georgia,serif;
+    font-weight:700; font-size:1.15rem;
+    max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    color:var(--dark);
+}
+.toolbar-left button {
+    background:none; border:none; font-size:1.2rem;
+    cursor:pointer; color:var(--text-light);
+    width:40px; height:40px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    transition:color var(--transition);
+}
+.toolbar-left button:hover { color:var(--rose); background:rgba(219,161,162,0.1); }
+.toolbar-center {
+    display:flex; align-items:center; gap:16px;
+    font-size:0.95rem; color:var(--text-light); flex-wrap:wrap; justify-content:center;
+}
+.progress-ring {
+    position:relative; width:36px; height:36px;
+}
+.progress-ring svg { width:100%; height:100%; transform:rotate(-90deg); }
+.progress-ring .bg { stroke:var(--border); stroke-width:2; fill:none; }
+.progress-ring .fill { stroke:var(--rose); stroke-width:2; fill:none; transition:stroke-dashoffset var(--transition); }
+.progress-ring .percent {
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    font-size:0.7rem; font-weight:600; color:var(--text-light);
+}
+#chapterInfo {
+    font-size:0.9rem; color:var(--text-light); white-space:nowrap;
+}
+#remainingInfo {
+    font-size:0.85rem; color:var(--text-light); white-space:nowrap;
+}
+.toolbar-right { display:flex; align-items:center; gap:8px; }
+.toolbar-right button {
+    background:none; border:none; font-size:1.1rem; cursor:pointer;
+    color:var(--text-light); padding:6px 10px; border-radius:6px;
+    transition:all var(--transition);
+    display:flex; align-items:center; justify-content:center;
+}
+.toolbar-right button:hover { background:rgba(219,161,162,0.1); color:var(--rose); transform:scale(1.05); }
+.streak-badge {
+    background:var(--rose); color:var(--white);
+    padding:2px 12px; border-radius:20px;
+    font-size:0.75rem; font-weight:600; white-space:nowrap;
+}
+
+#sidebar {
+    position:fixed; top:60px; left:0; width:48px;
+    height:calc(100% - 60px);
+    background:var(--card-bg);
+    border-right:1px solid var(--border);
+    z-index:15;
+    display:flex; flex-direction:column; align-items:center;
+    padding:8px 0; gap:4px; overflow-y:auto;
+    transition:transform 0.25s ease;
+}
+#sidebar.closed { transform:translateX(-100%); }
+#sidebar.open { transform:translateX(0); }
+.sidebar-btn {
+    width:36px; height:36px; border:none; background:transparent;
+    color:var(--text-light); font-size:1rem; cursor:pointer;
+    border-radius:8px; transition:all var(--transition);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+}
+.sidebar-btn:hover { background:rgba(219,161,162,0.1); color:var(--rose); transform:scale(1.05); }
+.sidebar-btn.active { color:var(--rose); background:rgba(219,161,162,0.15); }
+.sidebar-separator { width:28px; border:none; border-top:1px solid var(--border); margin:4px 0; }
+
+#page-viewport {
+    margin-left:48px; flex:1;
+    position:relative; overflow:hidden;
+    background:var(--bg);
+    display:flex; justify-content:center; align-items:center;
+}
+.focus-mode #sidebar { transform:translateX(-100%); }
+
+#scroll-container {
+    height:100%; width:100%; overflow-y:auto;
+    padding:20px 20px 120px 20px;
+    display:flex; flex-direction:column; align-items:center;
+}
+.page-content-wrapper {
+    width:100%; max-width:900px;
+    margin:0 auto 40px auto; padding:10px;
+    background:linear-gradient(145deg,var(--rose-light),var(--vanilla));
+    border-radius:20px; box-shadow:var(--shadow-hover);
+    border:1px solid var(--rose);
+    transition:transform 0.3s ease;
+}
+.page-content-wrapper:hover { transform:translateY(-2px); }
+.page-content-inner {
+    width:100%; padding:30px 40px;
+    background:var(--card-bg);
+    border-radius:12px;
+    box-shadow:inset 0 0 20px rgba(0,0,0,0.03);
+    font-size:1.05rem; line-height:1.8;
+    color:var(--text); min-height:400px;
+}
+.page-content-inner h1, .page-content-inner h2, .page-content-inner h3 {
+    font-family:'Playfair Display',Georgia,serif;
+    color:var(--dark);
+}
+.page-content-inner h1, .page-content-inner h2 { text-align:center; margin-bottom:1.2rem; }
+.page-content-inner p { margin-bottom:16px; }
+.page-content-inner p:last-child { margin-bottom:0; }
+
+#flip-container {
+    width:100%; height:100%;
+    position:relative; perspective:2500px;
+    justify-content:center; align-items:center;
+    background:var(--bg); display:none;
+}
+.flip-book {
+    position:relative; width:95%; max-width:900px;
+    height:92%; max-height:900px;
+    transform-style:preserve-3d;
+    transition:transform 1.2s cubic-bezier(0.645,0.045,0.355,1);
+}
+.flip-page {
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    backface-visibility:hidden;
+    border-radius:20px; box-shadow:var(--shadow-hover);
+    border:1px solid var(--rose);
+    background:linear-gradient(145deg,var(--rose-light),var(--vanilla));
+    padding:10px; overflow:hidden;
+}
+.flip-page-front { z-index:2; transform-origin:left center; transform:rotateY(0deg); }
+.flip-page-back { transform-origin:right center; transform:rotateY(180deg); }
+.flip-page-inner {
+    width:100%; height:100%; padding:30px 40px;
+    background:var(--card-bg);
+    border-radius:12px;
+    box-shadow:inset 0 0 20px rgba(0,0,0,0.03);
+    font-size:1.05rem; line-height:1.8;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    overflow:hidden; display:flex; flex-direction:column;
+}
+.flip-page-inner h1, .flip-page-inner h2, .flip-page-inner h3 {
+    font-family:'Playfair Display',Georgia,serif;
+    color:var(--dark);
+}
+.flip-page-inner h1, .flip-page-inner h2 { text-align:center; margin-bottom:1.2rem; }
+.flip-page-inner p { margin-bottom:16px; }
+.flip-page-inner p:last-child { margin-bottom:0; }
+.flip-page-inner.special-page {
+    display:flex; flex-direction:column;
+    justify-content:center; align-items:center;
+    text-align:center;
+}
+.flip-page-inner.special-page h1, .flip-page-inner.special-page h2, .flip-page-inner.special-page h3, .flip-page-inner.special-page p { text-align:center; }
+
+.flip-page-front::before {
+    content:''; position:absolute; top:0; left:0;
+    width:40px; height:100%;
+    background:linear-gradient(to right,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.02) 80%,transparent 100%);
+    pointer-events:none; z-index:3;
+}
+.flip-page-back::before {
+    content:''; position:absolute; top:0; right:0;
+    width:40px; height:100%;
+    background:linear-gradient(to left,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.02) 80%,transparent 100%);
+    pointer-events:none; z-index:3;
+}
+.flip-book.flipped-right { transform:rotateY(-180deg); }
+.flip-book.flipped-left { transform:rotateY(180deg); }
+.flip-book.flipping { transition:transform 1.2s cubic-bezier(0.645,0.045,0.355,1); }
+
+.cover-image-wrapper-flip {
+    width:100%; height:100%; border-radius:12px;
+    overflow:hidden; background:var(--card-bg);
+    display:flex; align-items:center; justify-content:center;
+}
+.cover-image-wrapper-flip img {
+    width:100%; height:100%; object-fit:contain; display:block;
+}
+.cover-placeholder-flip {
+    width:100%; height:100%;
+    display:flex; flex-direction:column;
+    justify-content:center; align-items:center;
+    background:linear-gradient(135deg,var(--vanilla),var(--fantasy));
+    color:var(--text-light); text-align:center; padding:40px;
+}
+.cover-placeholder-flip i { font-size:4rem; color:var(--rose); margin-bottom:16px; }
+.cover-placeholder-flip p { font-family:'Playfair Display',Georgia,serif; font-size:1.5rem; font-weight:600; color:var(--dark); }
+
+.flip-nav-btn-wrapper {
+    position:absolute; top:50%; transform:translateY(-50%);
+    width:44px; height:44px; border-radius:50%;
+    background:rgba(255,255,255,0.85); backdrop-filter:blur(4px);
+    box-shadow:0 4px 16px rgba(0,0,0,0.1);
+    display:flex; align-items:center; justify-content:center;
+    z-index:10; transition:background .3s;
+    border:1px solid var(--rose-light);
+}
+.flip-nav-btn-wrapper:hover { background:rgba(255,255,255,1); box-shadow:0 4px 24px rgba(0,0,0,0.15); }
+.flip-nav-btn-wrapper .aw-nav-btn {
+    position:static !important; transform:none !important;
+    background:transparent !important; border:none !important;
+    box-shadow:none !important; color:var(--text) !important;
+    width:44px; height:44px; margin:0; padding:0;
+    display:flex; align-items:center; justify-content:center;
+}
+.flip-nav-btn-wrapper .aw-nav-btn i { font-size:1.2rem; }
+.flip-nav-btn-wrapper .aw-nav-btn:hover { color:var(--rose) !important; transform:scale(1.1) !important; }
+#flipPrevBtnWrapper { left:16px; }
+#flipNextBtnWrapper { right:16px; }
+
+.highlight-yellow { background:#fff9c4; padding:0 4px; border-radius:3px; }
+.highlight-green { background:#c8e6c9; padding:0 4px; border-radius:3px; }
+.highlight-blue { background:#bbdefb; padding:0 4px; border-radius:3px; }
+.highlight-pink { background:#f8bbd0; padding:0 4px; border-radius:3px; }
+
+#highlight-tooltip,#reaction-picker,#annotation-popup,#search-bar,#share-modal,#overlay,#notes-panel,#toc-drawer,#settings-panel{position:fixed !important;z-index:9999 !important}
+#highlight-tooltip{display:none;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px 16px;box-shadow:var(--shadow-hover);min-width:280px;pointer-events:auto}
+#highlight-tooltip.visible{display:block}
+#highlight-tooltip .highlight-color{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;transition:all 0.2s}
+#highlight-tooltip .highlight-color:hover{transform:scale(1.15);border-color:var(--rose)}
+#highlight-tooltip .tooltip-action{background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--text);transition:all 0.2s;font-size:0.9rem;display:flex;align-items:center;gap:4px}
+#highlight-tooltip .tooltip-action:hover{border-color:var(--rose);color:var(--rose);background:rgba(219,161,162,0.05)}
+#reaction-picker{display:none;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:8px 12px;box-shadow:var(--shadow-hover);gap:6px;pointer-events:auto;bottom:80px !important;right:20px !important;left:auto !important}
+#reaction-picker button{background:none;border:none;font-size:1.5rem;cursor:pointer;padding:4px;transition:transform var(--transition)}
+#reaction-picker button:hover{transform:scale(1.2)}
+#annotation-popup{display:none;width:320px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-hover);pointer-events:auto;bottom:140px !important;right:20px !important;left:auto !important}
+#annotation-popup.visible{display:block}
+#annotation-popup textarea{width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;min-height:60px;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
+#annotation-popup textarea:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+.annotation-actions{display:flex;gap:8px;margin-top:8px;justify-content:flex-end}
+.annotation-actions button{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:0.8rem;transition:background var(--transition)}
+.annotation-save{background:var(--rose);color:var(--white)}
+.annotation-save:hover{background:var(--rose-dark)}
+.annotation-cancel{background:var(--border);color:var(--text)}
+.annotation-cancel:hover{background:var(--text-light);color:var(--white)}
+#search-bar{display:none;width:300px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:var(--shadow-hover);pointer-events:auto;top:70px !important;left:50px !important}
+#search-bar.visible{display:block}
+#search-bar input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
+#search-bar input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+#search-bar .search-header{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+#search-bar .search-header button{background:none;border:none;cursor:pointer;color:var(--text-light);font-size:0.9rem;transition:color var(--transition)}
+#search-bar .search-header button:hover{color:var(--rose)}
+#searchResults{margin-top:8px;max-height:200px;overflow-y:auto;font-size:0.85rem}
+.search-result{padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--transition)}
+.search-result:hover{background:rgba(219,161,162,0.1)}
+.search-result strong{color:var(--rose)}
+#settings-panel{bottom:0;left:0;right:0;background:var(--card-bg);border-top:1px solid var(--border);padding:16px 20px;transform:translateY(100%);transition:transform 0.25s ease;max-height:50vh;overflow-y:auto;pointer-events:auto}
+#settings-panel.open{transform:translateY(0)}
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.settings-group label{font-size:0.7rem;font-weight:600;text-transform:uppercase;color:var(--text-light);display:block;margin-bottom:4px}
+.settings-group .btn-group{display:flex;gap:4px;flex-wrap:wrap}
+.settings-group .btn-group button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;font-size:0.75rem;transition:var(--transition)}
+.settings-group .btn-group button.active{border-color:var(--rose);background:var(--rose);color:var(--white)}
+.settings-group .btn-group button:hover{border-color:var(--rose)}
+.slider-group{display:flex;align-items:center;gap:6px}
+.slider-group input[type="range"]{width:80px;accent-color:var(--rose)}
+.font-select-wrapper select{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:0.85rem;appearance:none;background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
+.font-select-wrapper select:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+#overlay{top:0;left:0;width:100%;height:100%;background:rgba(44,30,30,0.4);display:none;z-index:9998 !important}
+#overlay.active{display:block}
+#toc-drawer{top:0;right:-340px;width:340px;height:100vh;background:var(--card-bg);box-shadow:-4px 0 20px rgba(44,30,30,0.1);transition:right 0.25s ease;display:flex;flex-direction:column;pointer-events:auto}
+#toc-drawer.open{right:0}
+.toc-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--vanilla)}
+.toc-header h3{margin:0;font-size:1.1rem;font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
+.toc-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text);width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background var(--transition)}
+.toc-close:hover{background:rgba(219,161,162,0.1)}
+.toc-body{flex:1;overflow-y:auto;padding:12px 20px}
+.toc-list{list-style:none;padding:0;margin:0}
+.toc-list li{padding:2px 0}
+.toc-list a{color:var(--text);text-decoration:none;display:block;padding:6px 8px;border-radius:6px;transition:all var(--transition)}
+.toc-list a:hover{background:rgba(219,161,162,0.1);color:var(--rose)}
+.toc-empty{text-align:center;color:var(--text-light);padding:40px 0}
+#challenge-widget{display:none;margin:8px 16px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}
+#challenge-widget h4{margin:0 0 4px;font-size:1rem}
+.challenge-progress{position:relative;height:12px;background:var(--border);border-radius:6px;overflow:hidden}
+.challenge-progress .bar{height:100%;background:var(--rose);transition:width 0.3s}
+#readingStatus{appearance:none;background-color:var(--card-bg);border:1px solid var(--border);border-radius:30px;padding:6px 36px 6px 16px;font-size:0.85rem;font-weight:500;color:var(--text);cursor:pointer;transition:all var(--transition);background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 12px center;background-size:16px}
+#readingStatus:hover{border-color:var(--rose)}
+#readingStatus:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
+.focus-mode #toolbar{transform:translateY(-100%);opacity:0;pointer-events:none;transition:all var(--transition)}
+.focus-mode #settings-panel.open{display:none !important}
+@media (max-width:768px){#toolbar{height:48px;padding:0 8px}.toolbar-left .title{font-size:0.9rem;max-width:160px}.page-content-inner{padding:20px}.flip-page-inner{padding:20px}#toc-drawer{width:280px;right:-280px}.settings-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.toolbar-left .title{font-size:0.8rem;max-width:120px}.page-content-inner{padding:16px}.flip-page-inner{padding:16px}}
+</style>
+</head>
+<body>
+
+<div id="reader-app">
+    <div id="toolbar">
+        <div class="toolbar-left">
+            <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
+            <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
+            <?php if (isLoggedIn() && $streak_days > 0): ?><span class="streak-badge">🔥 <?php echo $streak_days; ?>d</span><?php endif; ?>
+            <select id="readingStatus">
+                <option value="not_started" <?php echo $reading_status == 'not_started' ? 'selected' : ''; ?>>📌 Not Started</option>
+                <option value="currently_reading" <?php echo $reading_status == 'currently_reading' ? 'selected' : ''; ?>>📖 Currently Reading</option>
+                <option value="finished" <?php echo $reading_status == 'finished' ? 'selected' : ''; ?>>✅ Finished</option>
+                <option value="want_to_read" <?php echo $reading_status == 'want_to_read' ? 'selected' : ''; ?>>📚 Want to Read</option>
+                <option value="dropped" <?php echo $reading_status == 'dropped' ? 'selected' : ''; ?>>❌ Dropped</option>
+            </select>
+        </div>
+        <div class="toolbar-center">
+            <div class="progress-ring">
+                <svg viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="16"/><circle class="fill" id="progressFill" cx="18" cy="18" r="16" stroke-dasharray="100.53" stroke-dashoffset="100.53"/></svg>
+                <span class="percent" id="progressPercent">0%</span>
+            </div>
+            <span id="pageNum">1</span> / <span id="totalPages"><?php echo $total_pages; ?></span>
+            <span id="chapterInfo"></span>
+            <span id="remainingInfo"></span>
+        </div>
+        <div class="toolbar-right">
+            <button id="sidebarToggle"><i class="fas fa-bars"></i></button>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <button class="sidebar-btn" id="searchBtn" title="Search"><i class="fas fa-search"></i></button>
+        <button class="sidebar-btn" id="bookmarkBtn" title="Bookmark"><i class="fas fa-bookmark"></i></button>
+        <button class="sidebar-btn" id="tocBtn" title="Table of Contents"><i class="fas fa-list-ul"></i></button>
+        <button class="sidebar-btn" id="notesBtn" title="Group Notes"><i class="fas fa-sticky-note"></i></button>
+        <button class="sidebar-btn" id="settingsBtn" title="Settings"><i class="fas fa-cog"></i></button>
+        <button class="sidebar-btn" id="focusBtn" title="Focus Mode"><i class="fas fa-expand"></i></button>
+        <hr class="sidebar-separator">
+        <button class="sidebar-btn" id="commentsBtn" title="Comments"><i class="fas fa-comments"></i></button>
+        <button class="sidebar-btn" id="errorReportBtn" title="Report Error"><i class="fas fa-exclamation-triangle"></i></button>
+        <button class="sidebar-btn" id="prayerBtn" title="Prayer Request"><i class="fas fa-hands-praying"></i></button>
+        <hr class="sidebar-separator">
+        <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights"><i class="fas fa-file-export"></i></button>
+        <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress"><i class="fas fa-undo-alt"></i></button>
+        <button class="sidebar-btn" id="resumeBtn" title="Resume Position"><i class="fas fa-history"></i></button>
+        <button class="sidebar-btn" id="challengeBtn" title="Challenge"><i class="fas fa-trophy"></i></button>
+        <button class="sidebar-btn" id="shareBtn" title="Share"><i class="fas fa-share-alt"></i></button>
+    </div>
+
+    <div id="page-viewport">
+        <div id="scroll-container">
+            <?php if (!empty($cover_path)): ?>
+            <div class="cover-image-wrapper"><div class="cover-image-container"><img src="<?php echo $cover_path; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>"></div></div>
+            <?php else: ?>
+            <div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p><?php echo htmlspecialchars($book['title']); ?></p></div></div></div>
+            <?php endif; ?>
+            <?php foreach ($pages as $index => $page_html): ?>
+            <div class="page-content-wrapper"><div class="page-content-inner" data-page="<?php echo $index+1; ?>"><?php echo $page_html; ?></div></div>
+            <?php endforeach; ?>
+        </div>
+
+        <div id="flip-container" style="display:none;">
+            <div class="flip-book" id="flipBook">
+                <div class="flip-page flip-page-front" id="flipLeftPage">
+                    <div class="flip-page-inner" id="flipLeftContent"></div>
+                </div>
+                <div class="flip-page flip-page-back" id="flipRightPage">
+                    <div class="flip-page-inner" id="flipRightContent"></div>
+                </div>
+            </div>
+            <div class="flip-nav-btn-wrapper" id="flipPrevBtnWrapper">
+                <button class="aw-nav-btn" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
+            </div>
+            <div class="flip-nav-btn-wrapper" id="flipNextBtnWrapper">
+                <button class="aw-nav-btn" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-panel">
+        <div class="settings-grid">
+            <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll" class="active">Scroll</button><button data-mode="flip">Page Flip</button></div></div>
+            <div class="settings-group"><label>Theme</label><div class="btn-group" id="themeGroup"><button data-theme="paper">Paper</button><button data-theme="light" class="active">Light</button><button data-theme="dark">Dark</button><button data-theme="sepia">Sepia</button></div></div>
+            <div class="settings-group"><label>Font Size</label><div class="slider-group"><button onclick="adjustFontSize(-5)">A-</button><input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5"><button onclick="adjustFontSize(5)">A+</button><span id="fontSizeLabel">100%</span></div></div>
+            <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option></select></div></div>
+            <div class="settings-group"><label>Line Height</label><div class="slider-group"><button onclick="adjustLineHeight(-10)">-</button><input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10"><button onclick="adjustLineHeight(10)">+</button><span id="lineHeightLabel">1.8</span></div></div>
+            <div class="settings-group"><label>Reading Speed</label><div class="slider-group"><input type="range" id="readingSpeedSlider" min="100" max="500" value="<?php echo $reading_speed_wpm; ?>" step="10"><span id="readingSpeedLabel"><?php echo $reading_speed_wpm; ?> wpm</span></div></div>
+        </div>
+    </div>
+
+   <div id="toc-drawer" style="display: none;">
+    <div class="toc-header">
+        <h3>Table of Contents</h3>
+        <button class="toc-close" id="tocClose">&times;</button>
+    </div>
+    <div class="toc-body" id="tocBody">
+        <?php if (is_array($toc) && count($toc) > 0): ?>
+        <ul class="toc-list">
+            <?php foreach ($toc as $entry): ?>
+            <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
+            <?php endforeach; ?>
+        </ul>
+        <?php else: ?>
+        <p class="toc-empty">No table of contents available.</p>
+        <?php endif; ?>
+    </div>
+</div>
+
+    <div id="notes-panel" style="display: none;">
+    <div class="notes-header">
+        <h3>📝 Group Notes</h3>
+        <div>
+            <button class="note-submit" id="addNoteBtn">+ Add</button>
+            <button class="note-cancel" id="notesClose">&times;</button>
+        </div>
+    </div>
+    <div class="notes-body" id="notesBody">
+        <div id="notesList">
+            <p class="empty-notes">No notes for this chapter.</p>
+        </div>
+        <div id="noteForm">
+            <textarea id="noteText" rows="2" placeholder="Write a note..."></textarea>
+            <div>
+                <label><input type="checkbox" id="notePrivate"> Private</label>
+            </div>
+            <button class="note-submit" onclick="submitNote()">Post</button>
+            <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
+        </div>
+    </div>
+</div>
+   <div id="share-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeShare()">&times;</span>
+        <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
+        <div style="margin:16px 0;display:flex;flex-direction:column;gap:8px;">
+            <button onclick="share('facebook')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-facebook-f" style="color:var(--rose);"></i> Facebook</button>
+            <button onclick="share('twitter')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-twitter" style="color:var(--rose);"></i> Twitter</button>
+            <button onclick="share('whatsapp')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-whatsapp" style="color:var(--rose);"></i> WhatsApp</button>
+            <button onclick="share('copy')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fas fa-link" style="color:var(--rose);"></i> Copy Link</button>
+        </div>
+        <button class="share-close" onclick="closeShare()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;width:100%;font-weight:600;">Close</button>
+    </div>
+</div>
+
+    <div id="challenge-widget"></div>
+    <div id="overlay" onclick="closeAll()"></div>
+</div>
 <script>
 (function() {
     // ===== DATA =====
