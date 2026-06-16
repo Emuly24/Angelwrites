@@ -153,10 +153,12 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .page-content-inner p{margin-bottom:16px}
         .page-content-inner p:last-child{margin-bottom:0}
 
+        #flip-container{width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg);display:none}
+        .flip-book{position:relative;width:95%;max-width:900px;height:92%;max-height:900px;transform-style:preserve-3d;transition:transform 0.9s cubic-bezier(0.645,0.045,0.355,1)}
         .flip-page{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden;border-radius:20px;box-shadow:var(--shadow-hover);border:1px solid var(--rose);background:linear-gradient(145deg,var(--rose-light),var(--vanilla));padding:10px;overflow:hidden}
         .flip-page-front{z-index:2;transform:rotateY(0deg);transform-origin:left center}
         .flip-page-back{transform:rotateY(180deg);transform-origin:right center}
-        .flip-page-inner{width:100%;height:100%;padding:30px 40px;background:var(--card-bg);border-radius:12px;box-shadow:inset 0 0 20px rgba(0,0,0,0.03);overflow:hidden;font-size:1.05rem;line-height:1.8;color:var(--text);font-family:'Inter',sans-serif}
+        .flip-page-inner{width:100%;height:100%;padding:30px 40px;background:var(--card-bg);border-radius:12px;box-shadow:inset 0 0 20px rgba(0,0,0,0.03);overflow-y:auto;font-size:1.05rem;line-height:1.8;color:var(--text);font-family:'Inter',sans-serif}
         .flip-page-inner h1,.flip-page-inner h2,.flip-page-inner h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
         .flip-page-inner p{margin-bottom:16px}
         .flip-page-inner p:last-child{margin-bottom:0}
@@ -369,15 +371,18 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             <div class="page-content-wrapper"><div class="page-content-inner"><?php echo $page_html; ?></div></div>
             <?php endforeach; ?>
         </div>
-        <div id="flip-container">
-            <div class="flip-book" id="flipBook">
-                <div class="flip-page flip-page-front" id="flipLeftPage"><div class="flip-page-content" id="flipLeftContent"></div></div>
-                <div class="flip-page flip-page-back" id="flipRightPage"><div class="flip-page-content" id="flipRightContent"></div></div>
-            </div>
-            <button class="aw-nav-btn prev" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
-            <button class="aw-nav-btn next" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
+        <div id="flip-container" style="display:none;">
+    <div class="flip-book" id="flipBook">
+        <div class="flip-page flip-page-front" id="flipLeftPage">
+            <div class="flip-page-inner" id="flipLeftContent"></div>
+        </div>
+        <div class="flip-page flip-page-back" id="flipRightPage">
+            <div class="flip-page-inner" id="flipRightContent"></div>
         </div>
     </div>
+    <button class="aw-nav-btn prev" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
+    <button class="aw-nav-btn next" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
+</div>
 
     <div id="settings-panel">
         <div class="settings-grid">
@@ -489,7 +494,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     let flipCurrentChunkIndex = 0;
     let flipChunks = [];
 
-    totalPagesEl.textContent = totalPages;
+       totalPagesEl.textContent = totalPages;
 
     const savedMode = localStorage.getItem('reader_mode');
     if (savedMode === 'flip') {
@@ -532,153 +537,118 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         updateUI(currentPage);
     }
-    function escapeHtml(text) {
-    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-    }
-// ===== FLIP MODE – COMPLETE FIX =====
 
-function loadFlipPages(pageNum) {
-    if (pageNum < 1 || pageNum > totalPages) return;
-
-    // Helper: Format a page's HTML with headings (Chapter, Acknowledgements, etc.)
-    function formatPageHTML(rawHtml) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = rawHtml;
-        const paragraphs = tempDiv.querySelectorAll('p');
-        let result = '';
-        paragraphs.forEach(p => {
-            const text = p.textContent.trim();
-            if (!text) return;
-
-            if (/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)/i.test(text)) {
-                result += `<h2 class="chapter-heading">${escapeHtml(text)}</h2>`;
-            }
-            else if (text.startsWith('ACKNOWLEDGEMENT')) {
-                const rest = text.substring('ACKNOWLEDGEMENT'.length).trim();
-                result += `<h3>Acknowledgements</h3><p>${escapeHtml(rest)}</p>`;
-            }
-            else if (text.startsWith("AUTHOR'S NOTE")) {
-                const rest = text.substring("AUTHOR'S NOTE".length).trim();
-                result += `<h3>Author's Note</h3><p>${escapeHtml(rest)}</p>`;
-            }
-            else if (text.startsWith('ABOUT THE AUTHOR')) {
-                const rest = text.substring('ABOUT THE AUTHOR'.length).trim();
-                result += `<h3>About the Author</h3><p>${escapeHtml(rest)}</p>`;
-            }
-            else if (/^Psalm\s+(\d+)/i.test(text)) {
-                result += `<h3>${escapeHtml(text)}</h3>`;
-            }
-            else if (/^To\s+[A-Za-z]/.test(text)) {
-                result += `<p class="dedication">${escapeHtml(text)}</p>`;
-            }
-            else {
-                result += `<p>${escapeHtml(text)}</p>`;
-            }
-        });
-        return result;
-    }
-
+    // ===== HELPER: Escape HTML =====
     function escapeHtml(text) {
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
         return text.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
-    function getCoverHTML() {
-        if (cover_path && cover_path.length > 0) {
-            return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
+    // ===== FLIP MODE – STATIC DOM (NO BLANK SCREENS) =====
+
+    function loadFlipPages(pageNum) {
+        if (pageNum < 1 || pageNum > totalPages) return;
+
+        function formatPageHTML(rawHtml) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = rawHtml;
+            const paragraphs = tempDiv.querySelectorAll('p');
+            let result = '';
+            paragraphs.forEach(p => {
+                const text = p.textContent.trim();
+                if (!text) return;
+
+                if (/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)/i.test(text)) {
+                    result += `<h2 class="chapter-heading">${escapeHtml(text)}</h2>`;
+                }
+                else if (text.startsWith('ACKNOWLEDGEMENT')) {
+                    const rest = text.substring('ACKNOWLEDGEMENT'.length).trim();
+                    result += `<h3>Acknowledgements</h3><p>${escapeHtml(rest)}</p>`;
+                }
+                else if (text.startsWith("AUTHOR'S NOTE")) {
+                    const rest = text.substring("AUTHOR'S NOTE".length).trim();
+                    result += `<h3>Author's Note</h3><p>${escapeHtml(rest)}</p>`;
+                }
+                else if (text.startsWith('ABOUT THE AUTHOR')) {
+                    const rest = text.substring('ABOUT THE AUTHOR'.length).trim();
+                    result += `<h3>About the Author</h3><p>${escapeHtml(rest)}</p>`;
+                }
+                else if (/^Psalm\s+(\d+)/i.test(text)) {
+                    result += `<h3>${escapeHtml(text)}</h3>`;
+                }
+                else if (/^To\s+[A-Za-z]/.test(text)) {
+                    result += `<p class="dedication">${escapeHtml(text)}</p>`;
+                }
+                else {
+                    result += `<p>${escapeHtml(text)}</p>`;
+                }
+            });
+            return result;
         }
-        return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
+
+        function getCoverHTML() {
+            if (cover_path && cover_path.length > 0) {
+                return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
+            }
+            return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
+        }
+
+        function wrapInContainer(html) {
+            return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`;
+        }
+
+        let leftHtml, rightHtml;
+
+        if (pageNum === 1) {
+            leftHtml = getCoverHTML();
+            rightHtml = wrapInContainer(formatPageHTML(pages[0] || ''));
+        } else {
+            leftHtml = wrapInContainer(formatPageHTML(pages[pageNum - 1] || ''));
+            rightHtml = wrapInContainer(formatPageHTML(pages[pageNum] || ''));
+        }
+
+        // Update the static DOM elements directly – no rebuild
+        document.getElementById('flipLeftContent').innerHTML = leftHtml;
+        document.getElementById('flipRightContent').innerHTML = rightHtml;
+
+        flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
+        flipBook.style.transform = 'rotateY(0deg)';
+
+        flipCurrentPage = pageNum;
+        updateUI(pageNum);
+        savePosition();
     }
 
-    function wrapInContainer(html) {
-        return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`;
+    function flipToNext() {
+        const nextPage = flipCurrentPage + 2;
+        if (nextPage > totalPages) {
+            if (flipCurrentPage < totalPages) {
+                loadFlipPages(totalPages);
+            }
+            return;
+        }
+        flipBook.classList.add('page-right-flipped');
+        setTimeout(() => {
+            loadFlipPages(nextPage);
+        }, 800);
     }
 
-    let leftContent, rightContent;
-
-    if (pageNum === 1) {
-        leftContent = getCoverHTML();
-        rightContent = wrapInContainer(formatPageHTML(pages[0] || ''));
-    } else {
-        leftContent = wrapInContainer(formatPageHTML(pages[pageNum - 1] || ''));
-        rightContent = wrapInContainer(formatPageHTML(pages[pageNum] || ''));
+    function flipToPrev() {
+        const prevPage = flipCurrentPage - 2;
+        if (prevPage < 1) {
+            return;
+        }
+        flipBook.classList.add('page-left-flipped');
+        setTimeout(() => {
+            loadFlipPages(prevPage);
+        }, 800);
     }
 
-    // Render the spread
-    renderSpread(leftContent, rightContent);
-
-    // Reset book rotation
-    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
-    flipBook.style.transform = 'rotateY(0deg)';
-
-    flipCurrentPage = pageNum;
-    updateUI(pageNum);
-    savePosition();
-}
-
-function renderSpread(leftHtml, rightHtml) {
-    // Create the flip book HTML
-    flipContainer.innerHTML = `
-        <div class="flip-book" id="flipBook">
-            <div class="flip-page flip-page-front" id="flipLeftPage">
-                <div class="flip-page-inner">${leftHtml}</div>
-            </div>
-            <div class="flip-page flip-page-back" id="flipRightPage">
-                <div class="flip-page-inner">${rightHtml}</div>
-            </div>
-        </div>
-        <button class="aw-nav-btn prev" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
-        <button class="aw-nav-btn next" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
-    `;
-
-    // Re-attach event listeners for the buttons
+    // ===== ATTACH EVENT LISTENERS ONCE =====
     document.getElementById('flipPrevBtn').addEventListener('click', flipToPrev);
     document.getElementById('flipNextBtn').addEventListener('click', flipToNext);
-}
 
-function flipToNext() {
-    const nextPage = flipCurrentPage + 2;
-    if (nextPage > totalPages) {
-        // If it's the last page, just show the last page on the left
-        if (flipCurrentPage < totalPages) {
-            loadFlipPages(totalPages);
-        }
-        return;
-    }
-    // Animate the flip
-    const rightPage = document.getElementById('flipRightPage');
-    if (rightPage) {
-        // The flip is done by rotating the entire book
-        const book = document.getElementById('flipBook');
-        if (book) {
-            book.classList.add('page-right-flipped');
-            setTimeout(() => {
-                loadFlipPages(nextPage);
-            }, 800);
-        }
-    }
-}
-
-function flipToPrev() {
-    const prevPage = flipCurrentPage - 2;
-    if (prevPage < 1) {
-        // If it's the first page, just stay
-        return;
-    }
-    // Animate the flip
-    const leftPage = document.getElementById('flipLeftPage');
-    if (leftPage) {
-        const book = document.getElementById('flipBook');
-        if (book) {
-            book.classList.add('page-left-flipped');
-            setTimeout(() => {
-                loadFlipPages(prevPage);
-            }, 800);
-        }
-    }
-}
-
+    // ===== NAVIGATION =====
     function goToPage(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
         currentPage = pageNum;
