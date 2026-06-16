@@ -6,5 +6,5 @@ define('SITE_URL', getenv('SITE_URL'));
 define('UPLOAD_PATH', getenv('UPLOAD_PATH'));
 define('BIBLE_PATH', getenv('BIBLE_PATH'));
 define('ADMIN_EMAIL', getenv('ADMIN_EMAIL'));
-define('DB_PATH', __DIR__ . '/angelwrites.sqlite');
+define('DB_PATH', __DIR__ . '/../data/site.db');
 ?>
