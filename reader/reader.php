@@ -167,6 +167,13 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .flip-page-back::before{right:0}
         .flip-book.page-right-flipped{transform:rotateY(-180deg)}
         .flip-book.page-left-flipped{transform:rotateY(180deg)}
+        .flip-nav-btn-wrapper{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.8);backdrop-filter:blur(4px);box-shadow:0 4px 16px rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;z-index:10;transition:background .3s;border:1px solid var(--rose-light)}
+        .flip-nav-btn-wrapper:hover{background:rgba(255,255,255,1);box-shadow:0 4px 24px rgba(0,0,0,0.15)}
+        .flip-nav-btn-wrapper .aw-nav-btn{position:static !important;transform:none !important;background:transparent !important;border:none !important;box-shadow:none !important;color:var(--text) !important;width:44px;height:44px;margin:0;padding:0;display:flex;align-items:center;justify-content:center}
+        .flip-nav-btn-wrapper .aw-nav-btn i{font-size:1.2rem}
+        .flip-nav-btn-wrapper .aw-nav-btn:hover{color:var(--rose) !important;transform:scale(1.1) !important}
+        #flipPrevBtnWrapper{left:16px}
+        #flipNextBtnWrapper{right:16px}
 
 
         .cover-image-wrapper{width:100%;max-width:900px;margin:0 auto 40px auto;padding:10px;background:linear-gradient(145deg,var(--rose-light),var(--vanilla));border-radius:20px;box-shadow:var(--shadow-hover);border:1px solid var(--rose)}
