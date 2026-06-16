@@ -1163,21 +1163,16 @@ html, body { height:100%; width:100%; overflow:hidden; }
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active',settingsPanel.classList.contains('open'));
     });
-    tocBtn.addEventListener('click', function() {
-        const drawer = document.getElementById('toc-drawer');
-        if (drawer.style.display === 'none' || drawer.style.display === '') {
-            drawer.style.display = 'block';
-            overlay.classList.add('active');
-        } else {
-            drawer.style.display = 'none';
-            overlay.classList.remove('active');
-        }
+     tocBtn.addEventListener('click', function() {
+    const drawer = document.getElementById('toc-drawer');
+        drawer.classList.toggle('open');
+        overlay.classList.toggle('active', drawer.classList.contains('open'));
     });
-    tocClose.addEventListener('click', function() {
-        document.getElementById('toc-drawer').style.display = 'none';
+        tocClose.addEventListener('click', function() {
+        document.getElementById('toc-drawer').classList.remove('open');
         overlay.classList.remove('active');
     });
-    commentsBtn.addEventListener('click',function() {
+        commentsBtn.addEventListener('click',function() {
         if (userId === 0) { alert('Please log in to view comments.'); return; }
         loadComments();
         commentsModal.style.display = 'block';
@@ -1666,8 +1661,8 @@ exportHighlightsBtn.addEventListener('click', function() {
 
     // ===== CLOSE ALL =====
     function closeAll() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.style.display = 'none';
+       settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open'); // Changed from style.display = 'none'
         notesPanel.style.display = 'none';
         document.getElementById('share-modal').style.display = 'none';
         overlay.classList.remove('active');
