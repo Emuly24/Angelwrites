@@ -153,17 +153,14 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .page-content-inner p{margin-bottom:16px}
         .page-content-inner p:last-child{margin-bottom:0}
 
-        #flip-container{display:none;width:100%;height:100%;position:relative;perspective:2500px;justify-content:center;align-items:center;background:var(--bg)}
-        .flip-book{position:relative;width:95%;max-width:900px;height:92%;max-height:900px;transform-style:preserve-3d;transition:transform 0.9s cubic-bezier(0.645,0.045,0.355,1)}
-        .flip-page{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-hover);border:1px solid var(--border)}
+        .flip-page-front,.flip-page-back{background:linear-gradient(145deg,var(--rose-light),var(--vanilla));padding:10px;border-radius:20px;border:1px solid var(--rose);box-shadow:var(--shadow-hover);backface-visibility:hidden;width:100%;height:100%;overflow:hidden}
         .flip-page-front{z-index:2;transform:rotateY(0deg);transform-origin:left center}
         .flip-page-back{transform:rotateY(180deg);transform-origin:right center}
-        .flip-book.flipped-right{transform:rotateY(-180deg)}
-        .flip-book.flipped-left{transform:rotateY(180deg)}
-        .flip-page-content{width:100%;height:100%;padding:40px;background:var(--card-bg);overflow-y:auto;font-size:1.05rem;line-height:1.8;color:var(--text)}
+        .flip-page-content{width:100%;height:100%;padding:30px 40px;background:var(--card-bg);border-radius:12px;box-shadow:inset 0 0 20px rgba(0,0,0,0.03);overflow-y:auto;font-size:1.05rem;line-height:1.8;color:var(--text);font-family:'Inter',sans-serif}
         .flip-page-content h1,.flip-page-content h2,.flip-page-content h3{font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
         .flip-page-content p{margin-bottom:16px}
-        .flip-page::before{content:'';position:absolute;top:0;bottom:0;width:50px;pointer-events:none;background:linear-gradient(to right,rgba(0,0,0,0.08) 0%,transparent 100%)}
+        .flip-page-content p:last-child{margin-bottom:0}
+        .flip-page::before{content:'';position:absolute;top:0;bottom:0;width:40px;pointer-events:none;background:linear-gradient(to right,rgba(0,0,0,0.08) 0%,transparent 100%)}
         .flip-page-front::before{left:0}
         .flip-page-back::before{right:0}
 
@@ -532,39 +529,90 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         updateUI(currentPage);
     }
+    function escapeHtml(text) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    function formatPageContentForFlip(rawHtml) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = rawHtml;
+        const paragraphs = tempDiv.querySelectorAll('p');
+        let result = '';
+        paragraphs.forEach(p => {
+            const text = p.textContent.trim();
+            if (!text) return;
+
+            if (/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)/i.test(text)) {
+                result += `<h2 class="chapter-heading">${escapeHtml(text)}</h2>`;
+            }
+            else if (text.startsWith('ACKNOWLEDGEMENT')) {
+                const rest = text.substring('ACKNOWLEDGEMENT'.length).trim();
+                result += `<h3>Acknowledgements</h3><p>${escapeHtml(rest)}</p>`;
+            }
+            else if (text.startsWith("AUTHOR'S NOTE")) {
+                const rest = text.substring("AUTHOR'S NOTE".length).trim();
+                result += `<h3>Author's Note</h3><p>${escapeHtml(rest)}</p>`;
+            }
+            else if (text.startsWith('ABOUT THE AUTHOR')) {
+                const rest = text.substring('ABOUT THE AUTHOR'.length).trim();
+                result += `<h3>About the Author</h3><p>${escapeHtml(rest)}</p>`;
+            }
+            else if (/^Psalm\s+(\d+)/i.test(text)) {
+                result += `<h3>${escapeHtml(text)}</h3>`;
+            }
+            else if (/^To\s+[A-Za-z]/.test(text)) {
+                result += `<p class="dedication">${escapeHtml(text)}</p>`;
+            }
+            else {
+                result += `<p>${escapeHtml(text)}</p>`;
+            }
+        });
+        return result;
+    }
 
     function loadFlipPages(pageNum) {
-        if (pageNum < 1 || pageNum > totalPages) return;
-        function wrapInContainer(html) { return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`; }
-        function getCoverHTML() {
-            if (cover_path && cover_path.length > 0) {
-                return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
-            }
-            return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
-        }
-        let leftContent, rightContent;
-        if (pageNum === 1) {
-            leftContent = getCoverHTML();
-            rightContent = wrapInContainer(pages[0] || '');
-        } else {
-            leftContent = wrapInContainer(pages[pageNum - 1] || '');
-            rightContent = wrapInContainer(pages[pageNum] || '');
-        }
-        const leftChunks = splitContent(leftContent, 1800);
-        const rightChunks = splitContent(rightContent, 1800);
-        flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
-        flipBook.dataset.rightChunks = JSON.stringify(rightChunks);
-        flipBook.dataset.leftIndex = 0;
-        flipBook.dataset.rightIndex = 0;
-        flipBook.dataset.pageNum = pageNum;
-        renderChunk(leftChunks[0] || '', 'left');
-        renderChunk(rightChunks[0] || '', 'right');
-        flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
-        flipBook.style.transform = 'rotateY(0deg)';
-        flipCurrentPage = pageNum;
-        updateUI(pageNum);
-        savePosition();
+    if (pageNum < 1 || pageNum > totalPages) return;
+
+    function wrapInContainer(html) {
+        return `<div class="page-content-wrapper"><div class="page-content-inner">${html}</div></div>`;
     }
+
+    function getCoverHTML() {
+        if (cover_path && cover_path.length > 0) {
+            return `<div class="cover-image-wrapper"><div class="cover-image-container"><img src="${cover_path}" alt="Cover" /></div></div>`;
+        }
+        return `<div class="cover-image-wrapper"><div class="cover-image-container"><div class="cover-placeholder"><i class="fas fa-book-open"></i><p>Cover Image</p></div></div></div>`;
+    }
+
+    let leftContent, rightContent;
+    if (pageNum === 1) {
+        leftContent = getCoverHTML();
+        rightContent = wrapInContainer(formatPageContentForFlip(pages[0] || ''));
+    } else {
+        leftContent = wrapInContainer(formatPageContentForFlip(pages[pageNum - 1] || ''));
+        rightContent = wrapInContainer(formatPageContentForFlip(pages[pageNum] || ''));
+    }
+
+    const leftChunks = splitContent(leftContent, 1800);
+    const rightChunks = splitContent(rightContent, 1800);
+
+    flipBook.dataset.leftChunks = JSON.stringify(leftChunks);
+    flipBook.dataset.rightChunks = JSON.stringify(rightChunks);
+    flipBook.dataset.leftIndex = 0;
+    flipBook.dataset.rightIndex = 0;
+    flipBook.dataset.pageNum = pageNum;
+
+    renderChunk(leftChunks[0] || '', 'left');
+    renderChunk(rightChunks[0] || '', 'right');
+
+    flipBook.classList.remove('page-right-flipped', 'page-left-flipped');
+    flipBook.style.transform = 'rotateY(0deg)';
+
+    flipCurrentPage = pageNum;
+    updateUI(pageNum);
+    savePosition();
+}
 
     function splitContent(html, charLimit) {
         const tempDiv = document.createElement('div');
