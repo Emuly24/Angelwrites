@@ -644,7 +644,6 @@ html,body{height:100%;width:100%;overflow:hidden}
     const lastPage = <?php echo $last_page; ?>;
 
     const scrollContainer = document.getElementById('scroll-container');
-    const flipContainer = document.getElementById('flip-container');
     const flipBook = document.getElementById('flipBook');
     const flipLeftContent = document.getElementById('flipLeftContent');
     const flipRightContent = document.getElementById('flipRightContent');
@@ -767,9 +766,8 @@ html,body{height:100%;width:100%;overflow:hidden}
         }
         updateUI(currentPage);
     }
-// ===== FINAL MERGED FLIP MODE IMPLEMENTATION =====
+// ===== FLIP MODE IMPLEMENTATION =====
 
-const flipContainer = document.getElementById('flip-container');
 const flipBook = document.getElementById('flipBook');
 const flipLeftContent = document.getElementById('flipLeftContent');
 const flipRightContent = document.getElementById('flipRightContent');
@@ -975,7 +973,6 @@ window.switchMode = function(mode) {
         if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 };
-
     // ===== NAVIGATION =====
     function nextPage() {
         if (readingMode === 'flip') { flipToNext(); }
