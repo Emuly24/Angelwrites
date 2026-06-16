@@ -58,7 +58,7 @@ foreach ($reminders as $reminder) {
     $body .= "<p>Hello $name,</p>";
     $body .= "<p>You last read on <strong>$last_accessed</strong>.</p>";
     $body .= "<p>You were <strong>$progress%</strong> through the book — only <strong>$remaining%</strong> left to finish!</p>";
-    $body .= "<p>Don't let the story wait. <a href='" . SITE_URL . "/reader.php?id=$book_id'>Continue reading</a>.</p>";
+    $body .= "<p>Don't let the story wait. <a href='" . SITE_URL . "/reader/reader.php?id=$book_id'>Continue reading</a>.</p>";
     $body .= "<hr>";
     $body .= "<p style='font-size:0.8rem; color:#999;'>— AngelWrites</p>";
 

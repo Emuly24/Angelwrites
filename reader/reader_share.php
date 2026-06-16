@@ -13,7 +13,7 @@ class ReaderShare {
 
     // Generate a shareable URL
     getShareUrl() {
-        const base = window.location.origin + '/reader/reader.php';
+        const base = window.location.origin + '/reader/reader/reader.php';
         return base + '?id=' + this.bookId + '&chapter=' + this.chapterIndex + '&page=' + this.pageNumber + '&share=1';
     }
 

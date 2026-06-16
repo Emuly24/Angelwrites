@@ -239,7 +239,7 @@ $pageTitle = 'My Library';
                                     <span class="progress-text"><?php echo min($book['progress'] ?? 0, 100); ?>% complete</span>
                                 </div>
                                 <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
+                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
                                         <i class="fas fa-book-open"></i> Continue
                                     </a>
                                     <div class="action-group">
@@ -306,7 +306,7 @@ $pageTitle = 'My Library';
                                 <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                                 <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                 <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
+                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
                                         <i class="fas fa-book-open"></i> Start Reading
                                     </a>
                                     <div class="action-group">
@@ -374,7 +374,7 @@ $pageTitle = 'My Library';
                                 <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                                 <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                 <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">
+                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">
                                         <i class="fas fa-eye"></i> Re-read
                                     </a>
                                     <div class="action-group">
@@ -440,7 +440,7 @@ $pageTitle = 'My Library';
                                 <h3><?php echo htmlspecialchars($book['title']); ?></h3>
                                 <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
                                 <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
+                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
                                         <i class="fas fa-book-open"></i> Read
                                     </a>
                                     <form method="POST" class="status-form">

@@ -3,7 +3,7 @@
 // ============================================================
 const CACHE_NAME = 'angelwrites-reader-v1';
 const READER_URLS = [
-    '/reader/reader.php',
+    '/reader/reader/reader.php',
     '/assets/css/style.css',
     '/assets/js/reader.js',
     // Add fonts, logos, etc.
