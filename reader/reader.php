@@ -1002,26 +1002,26 @@ html, body { height:100%; width:100%; overflow:hidden; }
     });
 
     // ===== BOOKMARK =====
-    bookmarkBtn.addEventListener('click',function() {
+    bookmarkBtn.addEventListener('click', function() {
         if (userId === 0) { alert('Please log in to bookmark.'); return; }
         if (isBookmarked) {
             const xhr = new XMLHttpRequest();
-            xhr.open('POST','/reader/reader_ajax.php',true);
+            xhr.open('POST', '/reader/reader_ajax.php', true);
             const fd = new FormData();
-            fd.append('action','remove_bookmark');
-            fd.append('book_id',bookId);
+            fd.append('action', 'remove_bookmark');
+            fd.append('book_id', bookId);
             xhr.send(fd);
             isBookmarked = false;
             bookmarkBtn.querySelector('i').className = 'far fa-bookmark';
             bookmarkBtn.style.color = '#555';
         } else {
             const xhr = new XMLHttpRequest();
-            xhr.open('POST','/reader/reader_ajax.php',true);
+            xhr.open('POST', '/reader/reader_ajax.php', true);
             const fd = new FormData();
-            fd.append('action','add_bookmark');
-            fd.append('book_id',bookId);
-            fd.append('chapter',currentPage);
-            fd.append('offset',0);
+            fd.append('action', 'add_bookmark');
+            fd.append('book_id', bookId);
+            fd.append('chapter', currentPage);
+            fd.append('offset', 0);
             xhr.send(fd);
             isBookmarked = true;
             bookmarkBtn.querySelector('i').className = 'fas fa-bookmark';
@@ -1032,10 +1032,10 @@ html, body { height:100%; width:100%; overflow:hidden; }
     function loadBookmarkStatus() {
         if (userId === 0) return;
         const xhr = new XMLHttpRequest();
-        xhr.open('POST','/reader/reader_ajax.php',false);
+        xhr.open('POST', '/reader/reader_ajax.php', false);
         const fd = new FormData();
-        fd.append('action','list_bookmarks');
-        fd.append('book_id',bookId);
+        fd.append('action', 'list_bookmarks');
+        fd.append('book_id', bookId);
         xhr.send(fd);
         try {
             const data = JSON.parse(xhr.responseText);
@@ -1067,6 +1067,41 @@ html, body { height:100%; width:100%; overflow:hidden; }
                 overlay.classList.remove('active');
             }
         });
+    });
+    // ===== SIDEBAR TOGGLES =====
+    sidebarToggle.addEventListener('click', function() { sidebar.classList.toggle('closed'); });
+    settingsBtn.addEventListener('click', function() {
+        settingsPanel.classList.toggle('open');
+        overlay.classList.toggle('active', settingsPanel.classList.contains('open'));
+    });
+    tocBtn.addEventListener('click', function() {
+        tocDrawer.classList.toggle('open');
+        overlay.classList.toggle('active', tocDrawer.classList.contains('open'));
+    });
+    tocClose.addEventListener('click', function() {
+        tocDrawer.classList.remove('open');
+        overlay.classList.remove('active');
+    });
+    document.querySelectorAll('.toc-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const page = parseInt(this.dataset.chapter);
+            if (page >= 1 && page <= totalPages) {
+                goToPage(page);
+                tocDrawer.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+        });
+    });
+    notesBtn.addEventListener('click', function() {
+        if (groupId === 0) { alert('You are not in a reading group for this book.'); return; }
+        notesPanel.classList.toggle('open');
+        overlay.classList.toggle('active', notesPanel.classList.contains('open'));
+        if (notesPanel.classList.contains('open')) loadNotes();
+    });
+    notesClose.addEventListener('click', function() {
+        notesPanel.classList.remove('open');
+        overlay.classList.remove('active');
     });
 
     // ===== SETTINGS =====
@@ -1157,221 +1192,72 @@ html, body { height:100%; width:100%; overflow:hidden; }
         updateUI(currentPage);
     });
 
-    // ===== SIDEBAR TOGGLES =====
-    sidebarToggle.addEventListener('click',function() { sidebar.classList.toggle('closed'); });
-    settingsBtn.addEventListener('click',function() {
-        settingsPanel.classList.toggle('open');
-        overlay.classList.toggle('active',settingsPanel.classList.contains('open'));
-    });
-     tocBtn.addEventListener('click', function() {
-    const drawer = document.getElementById('toc-drawer');
-        drawer.classList.toggle('open');
-        overlay.classList.toggle('active', drawer.classList.contains('open'));
-    });
-        tocClose.addEventListener('click', function() {
-        document.getElementById('toc-drawer').classList.remove('open');
-        overlay.classList.remove('active');
-    });
-        commentsBtn.addEventListener('click',function() {
-        if (userId === 0) { alert('Please log in to view comments.'); return; }
-        loadComments();
-        commentsModal.style.display = 'block';
-        overlay.classList.add('active');
-    });
-    tocClose.addEventListener('click',function() {
-        tocDrawer.style.display = 'none';
-        overlay.classList.remove('active');
-    });
-    focusBtn.addEventListener('click',function() {
-        focusMode = !focusMode;
-        document.getElementById('reader-app').classList.toggle('focus-mode',focusMode);
-        this.querySelector('i').className = focusMode ? 'fas fa-compress' : 'fas fa-expand';
-        if (focusMode) {
-            settingsPanel.classList.remove('open');
-            overlay.classList.remove('active');
-        }
-    });
-
-    // ===== CHALLENGE =====
-    challengeBtn.addEventListener('click',function() { loadChallenge(); });
-    function loadChallenge() {
-        if (userId === 0) { alert('Please log in to view challenges.'); return; }
+    // ===== NOTES =====
+    window.toggleNoteForm = function() { noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none'; };
+    window.submitNote = function() {
+        const text = noteText.value.trim();
+        const isPrivate = notePrivate.checked ? 1 : 0;
+        if (!text) return alert('Please enter a note.');
+        const data = new FormData();
+        data.append('action', 'add_reader_note');
+        data.append('group_id', groupId);
+        data.append('book_id', bookId);
+        data.append('chapter_index', currentPage);
+        data.append('text', text);
+        data.append('is_private', isPrivate);
         const xhr = new XMLHttpRequest();
-        xhr.open('GET','/reader/reader_ajax.php?action=get_monthly_challenge&user_id='+userId,true);
+        xhr.open('POST', '/reader/reader_ajax.php', true);
         xhr.onload = function() {
             try {
-                const data = JSON.parse(this.responseText);
-                if (data.success) {
-                    challengeWidget.style.display = 'block';
-                    const percent = Math.min(100,Math.round((data.progress/data.target)*100));
-                    challengeWidget.innerHTML = `
-                        <h4>📖 Monthly Challenge</h4>
-                        <p>${data.goal}</p>
-                        <div class="challenge-progress"><div class="bar" style="width:${percent}%;"></div></div>
-                        <p style="font-size:0.9rem;">${data.progress} / ${data.target} pages</p>
-                        <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:var(--rose);color:white;cursor:pointer;" onclick="updateChallenge()">📈 Update</button>
-                    `;
+                const d = JSON.parse(this.responseText);
+                if (d.success) {
+                    loadNotes();
+                    noteText.value = '';
+                    notePrivate.checked = false;
+                    noteForm.style.display = 'none';
+                } else {
+                    alert('Error: ' + d.error);
                 }
-            } catch(e) { console.error('Challenge error:',e); alert('Could not load challenge.'); }
+            } catch(e) { alert('Error submitting note.'); }
         };
-        xhr.send();
-    }
-    function updateChallenge() {
-        const pagesRead = prompt('How many pages did you read today?');
-        if (pagesRead && parseInt(pagesRead) > 0) {
-            const data = new FormData();
-            data.append('action','update_challenge_progress');
-            data.append('user_id',userId);
-            data.append('pages_read',pagesRead);
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST','/reader/reader_ajax.php',true);
-            xhr.onload = function() { loadChallenge(); alert('✅ Updated!'); };
-            xhr.send(data);
-        }
-    }
-
-    // ===== HIGHLIGHT =====
-    function getSelectedText() {
-        const sel = window.getSelection();
-        return sel.toString().trim();
-    }
-    function getSelectionRange() {
-        const sel = window.getSelection();
-        return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-    }
-    function showSelectionTooltip(e) {
-        e.stopPropagation();
-        const text = getSelectedText();
-        const range = getSelectionRange();
-        const tooltip = document.getElementById('highlight-tooltip');
-        if (!text || !range || text.length < 1) {
-            tooltip.classList.remove('visible');
-            document.getElementById('notes-panel').style.display = 'none';
-            overlay.classList.remove('active');
-            return;
-        }
-        const rect = range.getBoundingClientRect();
-        const tooltipWidth = 320;
-        const leftPos = rect.left + rect.width/2 - tooltipWidth/2;
-        const topPos = rect.top - 50;
-        tooltip.style.left = Math.max(10,leftPos) + 'px';
-        tooltip.style.top = Math.max(10,topPos) + 'px';
-        tooltip.classList.add('visible');
-        tooltip.dataset.text = text;
-    }
-    document.addEventListener('click',function(e) {
-        const tooltip = document.getElementById('highlight-tooltip');
-        if (tooltip && !tooltip.contains(e.target)) {
-            tooltip.classList.remove('visible');
-        }
+        xhr.send(data);
+    };
+    addNoteBtn.addEventListener('click', function() {
+        noteForm.style.display = noteForm.style.display === 'none' ? 'block' : 'none';
+        if (noteForm.style.display === 'block') noteText.focus();
     });
-    document.addEventListener('click', function(e) {
-        const tooltip = document.getElementById('highlight-tooltip');
-        const notesPanel = document.getElementById('notes-panel');
-        if (tooltip && !tooltip.contains(e.target) && notesPanel && !notesPanel.contains(e.target)) {
-            tooltip.classList.remove('visible');
-            notesPanel.style.display = 'none';
-            overlay.classList.remove('active');
-        }
-    });
-    document.addEventListener('mouseup',function(e) {
-        if (getSelectedText().length > 0) {
-            setTimeout(function() { showSelectionTooltip(e); }, 50);
-        }
-    });
-    document.addEventListener('touchend',function(e) {
-        setTimeout(function() { showSelectionTooltip(e); }, 100);
-    });
-
-    function initSelectionTooltip() {
-        const tooltip = document.getElementById('highlight-tooltip');
-        if (!tooltip) return;
-        tooltip.innerHTML = `
-            <div>
-                <div style="display:flex;gap:4px;">
-                    <button class="highlight-color" data-color="yellow" style="background:#fff9c4;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
-                    <button class="highlight-color" data-color="green" style="background:#c8e6c9;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
-                    <button class="highlight-color" data-color="blue" style="background:#bbdefb;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
-                    <button class="highlight-color" data-color="pink" style="background:#f8bbd0;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
-                </div>
-                <div style="display:flex;gap:4px;margin-top:4px;">
-                    <button class="tooltip-action" data-action="copy"><i class="fas fa-copy"></i></button>
-                    <button class="tooltip-action" data-action="note"><i class="fas fa-pen"></i></button>
-                    <button class="tooltip-action" data-action="share"><i class="fas fa-share-alt"></i></button>
-                    <button class="tooltip-action" data-action="question"><i class="fas fa-question-circle"></i></button>
-                    <button class="tooltip-action" data-action="react"><i class="fas fa-smile"></i></button>
-                </div>
-            </div>
-        `;
-        tooltip.querySelectorAll('.highlight-color').forEach(function(btn) {
-            btn.addEventListener('click',function() {
-                const color = this.dataset.color;
-                const text = tooltip.dataset.text;
-                const range = getSelectionRange();
-                if (!range) return;
-                const span = document.createElement('span');
-                span.className = 'highlight-'+color;
-                span.textContent = text;
-                range.deleteContents();
-                range.insertNode(span);
-                tooltip.classList.remove('visible');
-                if (userId > 0) {
-                    const data = new FormData();
-                    data.append('action','add_highlight');
-                    data.append('book_id',bookId);
-                    data.append('chapter',currentPage);
-                    data.append('text',text);
-                    data.append('color',color);
-                    fetch('/reader/reader_ajax.php',{method:'POST',body:data});
-                }
-            });
-        });
-        tooltip.querySelectorAll('.tooltip-action').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                const action = this.dataset.action;
-                const text = tooltip.dataset.text;
-                switch(action) {
-                    case 'copy': navigator.clipboard.writeText(text).then(()=>{alert('✅ Copied!');}).catch(()=>{document.execCommand('copy');}); break;
-                    case 'note':
-                        if (groupId > 0) {
-                            const panel = document.getElementById('notes-panel');
-                            panel.style.display = 'flex';
-                            overlay.classList.add('active');
-                            loadNotes();
-                            const noteTextarea = document.getElementById('noteText');
-                            if (noteTextarea) {
-                                noteTextarea.value = '"' + text + '"\n\n';
-                                noteTextarea.focus();
-                            }
-                        } else {
-                            alert('You need to be in a reading group to add notes.');
-                        }
-                        break;
-                    case 'share':
-                        document.getElementById('share-modal').style.display = 'block';
-                        overlay.classList.add('active');
-                        break;
-                    case 'question':
-                        if (groupId === 0) { alert('You need to be in a reading group.'); return; }
-                        const question = prompt('Ask a question about this text:\n\n"' + text + '"');
-                        if (question) { /* TODO: send question via AJAX */ }
-                        break;
-                    case 'react':
-                        const picker = document.getElementById('reaction-picker');
-                        if (picker) { picker.style.display = 'flex'; picker.dataset.text = text; }
-                        break;
-                }
-                tooltip.classList.remove('visible');
-            });
-        });
-    }
-    initSelectionTooltip();
-
-    // ===== NOTES =====
+    window.deleteNote = function(noteId) {
+        if (!confirm('Delete this note?')) return;
+        const data = new FormData();
+        data.append('action', 'delete_reader_note');
+        data.append('note_id', noteId);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/reader/reader_ajax.php', true);
+        xhr.onload = function() { loadNotes(); };
+        xhr.send(data);
+    };
+    window.reactNote = function(noteId, reaction) {
+        const data = new FormData();
+        data.append('action', 'toggle_note_reaction');
+        data.append('note_id', noteId);
+        data.append('reaction_type', reaction);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/reader/reader_ajax.php', true);
+        xhr.onload = function() { loadNotes(); };
+        xhr.send(data);
+    };
+    window.showReactionPicker = function(noteId, event) {
+        currentNoteId = noteId;
+        const btn = event.target.closest('button');
+        const rect = btn.getBoundingClientRect();
+        reactionPicker.style.top = (rect.bottom + 8) + 'px';
+        reactionPicker.style.left = (rect.left) + 'px';
+        reactionPicker.style.display = 'flex';
+    };
     function loadNotes() {
         if (groupId === 0) return;
         const xhr = new XMLHttpRequest();
-        xhr.open('GET','/reader/reader_ajax.php?action=get_notes&group_id='+groupId+'&book_id='+bookId+'&chapter='+currentPage,true);
+        xhr.open('GET', '/reader/reader_ajax.php?action=get_notes&group_id=' + groupId + '&book_id=' + bookId + '&chapter=' + currentPage, true);
         xhr.onload = function() {
             try {
                 const data = JSON.parse(this.responseText);
@@ -1384,23 +1270,23 @@ html, body { height:100%; width:100%; overflow:hidden; }
                             let reactionsHtml = '';
                             if (n.reactions && n.reactions.length > 0) {
                                 n.reactions.forEach(function(r) {
-                                    reactionsHtml += '<span class="reaction" onclick="reactNote('+n.id+',\''+r.reaction_type+'\')">'+r.reaction_type+' '+r.count+'</span>';
+                                    reactionsHtml += '<span class="reaction" onclick="reactNote(' + n.id + ', \'' + r.reaction_type + '\')">' + r.reaction_type + ' ' + r.count + '</span>';
                                 });
                             }
                             const canReact = !n.is_private || n.user_id == userId;
                             const isMyNote = n.user_id == userId;
-                            html += '<div class="note-card'+(n.is_private?' private':'')+'">';
+                            html += '<div class="note-card' + (n.is_private ? ' private' : '') + '">';
                             html += '<div class="note-author">';
-                            html += '<div class="note-avatar-placeholder">'+(n.display_name||n.username).charAt(0).toUpperCase()+'</div>';
-                            html += '<div class="note-author-info"><strong>'+(n.display_name||n.username)+'</strong> <small>'+timeAgo(n.created_at)+'</small>';
+                            html += '<div class="note-avatar-placeholder">' + (n.display_name || n.username).charAt(0).toUpperCase() + '</div>';
+                            html += '<div class="note-author-info"><strong>' + (n.display_name || n.username) + '</strong> <small>' + timeAgo(n.created_at) + '</small>';
                             if (n.is_private) html += ' <span class="badge-private">🔒 Private</span>';
                             html += '</div></div>';
-                            html += '<p class="note-text">'+n.text+'</p>';
+                            html += '<p class="note-text">' + n.text + '</p>';
                             html += '<div class="note-footer">';
-                            html += '<div class="note-reactions">'+reactionsHtml;
-                            if (canReact) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="showReactionPicker('+n.id+',event)">➕</button>';
+                            html += '<div class="note-reactions">' + reactionsHtml;
+                            if (canReact) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="showReactionPicker(' + n.id + ', event)">➕</button>';
                             html += '</div>';
-                            if (isMyNote) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="deleteNote('+n.id+')">🗑️</button>';
+                            if (isMyNote) html += ' <button style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;" onclick="deleteNote(' + n.id + ')">🗑️</button>';
                             html += '</div></div>';
                         });
                     }
@@ -1411,220 +1297,343 @@ html, body { height:100%; width:100%; overflow:hidden; }
         xhr.send();
     }
 
-    function timeAgo(timestamp) {
-        const diff = Date.now() - new Date(timestamp).getTime();
-        const secs = Math.floor(diff/1000);
-        if (secs<60) return 'just now';
-        if (secs<3600) return Math.floor(secs/60)+'m ago';
-        if (secs<86400) return Math.floor(secs/3600)+'h ago';
-        if (secs<604800) return Math.floor(secs/86400)+'d ago';
-        return new Date(timestamp).toLocaleDateString();
+    // ===== REACTION PICKER =====
+    reactionPicker.querySelectorAll('button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (!currentNoteId) return;
+            const reaction = this.dataset.reaction;
+            const data = new FormData();
+            data.append('action', 'add_reader_reaction');
+            data.append('note_id', currentNoteId);
+            data.append('reaction_type', reaction);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            xhr.onload = function() {
+                loadNotes();
+                reactionPicker.style.display = 'none';
+                currentNoteId = null;
+            };
+            xhr.send(data);
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#reaction-picker') && !e.target.closest('button')) {
+            reactionPicker.style.display = 'none';
+            currentNoteId = null;
+        }
+    });   
+    // ===== FOCUS MODE =====
+    focusBtn.addEventListener('click', function() {
+        focusMode = !focusMode;
+        document.getElementById('reader-app').classList.toggle('focus-mode', focusMode);
+        this.querySelector('i').className = focusMode ? 'fas fa-compress' : 'fas fa-expand';
+        if (focusMode) {
+            settingsPanel.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+    });
+
+    // ===== SEARCH =====
+    searchBtn.addEventListener('click', function() { toggleSearch(); });
+    window.toggleSearch = function() {
+        searchBar.classList.toggle('visible');
+        if (searchBar.classList.contains('visible')) searchInput.focus();
+    };
+    window.closeSearch = function() {
+        searchBar.classList.remove('visible');
+        searchResults.innerHTML = '';
+        searchResults.style.display = 'none';
+    };
+    searchInput.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        if (q.length < 2) { searchResults.innerHTML = ''; searchResults.style.display = 'none'; return; }
+        if (readingMode === 'flip') {
+            // Search only current page's chunks? For simplicity, search all pages
+            let found = [];
+            pages.forEach(function(html, idx) {
+                const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+                if (text.toLowerCase().includes(q)) {
+                    found.push({ page: idx + 1, snippet: text.substring(0, 80) + '…' });
+                }
+            });
+            if (found.length === 0) {
+                searchResults.innerHTML = '<div style="color:#999;">No matches</div>';
+                searchResults.style.display = 'block';
+            } else {
+                let html = '';
+                found.slice(0, 10).forEach(function(f) {
+                    html += '<div class="search-result" onclick="goToPage(' + f.page + ')"><strong>Page ' + f.page + '</strong> – ' + f.snippet + '</div>';
+                });
+                searchResults.innerHTML = html;
+                searchResults.style.display = 'block';
+            }
+        } else {
+            const text = document.querySelector('#scroll-container').innerText;
+            const lines = text.split('\n');
+            let html = '';
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].toLowerCase().includes(q)) {
+                    html += '<div class="search-result">' + lines[i] + '</div>';
+                    if (html.split('</div>').length > 20) break;
+                }
+            }
+            if (html) {
+                searchResults.innerHTML = html;
+                searchResults.style.display = 'block';
+            } else {
+                searchResults.innerHTML = '<div style="color:#999;">No matches</div>';
+                searchResults.style.display = 'block';
+            }
+        }
+    });
+
+    // ===== SHARE =====
+    shareBtn.addEventListener('click', function() {
+        document.getElementById('share-modal').classList.add('visible');
+        document.getElementById('overlay').classList.add('active');
+    });
+    function share(platform) {
+        const url = window.location.origin + '/reader/reader.php?id=' + bookId + '&chapter=' + currentPage;
+        const text = '📖 I\'m reading on AngelWrites!';
+        switch(platform) {
+            case 'facebook': window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank'); break;
+            case 'twitter': window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url), '_blank'); break;
+            case 'whatsapp': window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text + ' ' + url), '_blank'); break;
+            case 'copy': navigator.clipboard.writeText(url).then(function() { alert('✅ Copied!'); }).catch(function() {
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                alert('✅ Copied!');
+            }); break;
+        }
+        closeShare();
     }
+    window.closeShare = function() { document.getElementById('share-modal').classList.remove('visible'); overlay.classList.remove('active'); };
+    document.getElementById('share-modal').querySelector('.share-close').addEventListener('click', closeShare);
+
+    // ===== CHALLENGE =====
+    challengeBtn.addEventListener('click', function() { loadChallenge(); });
+    function loadChallenge() {
+        if (userId === 0) return;
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/reader/reader_ajax.php?action=get_monthly_challenge&user_id=' + userId, true);
+        xhr.onload = function() {
+            try {
+                const data = JSON.parse(this.responseText);
+                if (data.success) {
+                    challengeWidget.style.display = 'block';
+                    const percent = Math.min(100, Math.round((data.progress / data.target) * 100));
+                    challengeWidget.innerHTML = '<h4>📖 Monthly Challenge</h4><p>' + data.goal + '</p><div class="challenge-progress"><div class="bar" style="width:' + percent + '%;"></div></div><p style="font-size:0.9rem;">' + data.progress + ' / ' + data.target + ' pages</p><button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:var(--rose);color:white;cursor:pointer;" onclick="updateChallenge()">📈 Update</button>';
+                }
+            } catch(e) {}
+        };
+        xhr.send();
+    }
+    window.updateChallenge = function() {
+        const pagesRead = prompt('How many pages did you read today?');
+        if (pagesRead && parseInt(pagesRead) > 0) {
+            const data = new FormData();
+            data.append('action', 'update_challenge_progress');
+            data.append('user_id', userId);
+            data.append('pages_read', pagesRead);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            xhr.onload = function() { loadChallenge(); alert('✅ Updated!'); };
+            xhr.send(data);
+        }
+    };
 
     // ===== RESUME =====
-    resumeBtn.addEventListener('click',function() { resumePosition(); });
-    function resumePosition() {
+    resumeBtn.addEventListener('click', function() { resumePosition(); });
+    window.resumePosition = function() {
         if (lastPage >= 1 && lastPage <= totalPages) {
             goToPage(lastPage);
             if (readingMode === 'scroll') {
                 setTimeout(function() {
-                    const target = document.querySelector('.page-content-inner[data-page="'+lastPage+'"]');
-                    if (target) target.scrollIntoView({ block:'start' });
+                    const target = document.querySelector('.page-content-inner[data-page="' + lastPage + '"]');
+                    if (target) target.scrollIntoView({ block: 'start' });
                 }, 100);
             }
         }
-    }
+    };
 
-    // ===== SHARE =====
-    function share(platform) {
-        const url = window.location.origin+'/reader/reader.php?id='+bookId+'&chapter='+currentPage;
-        const text = '📖 I\'m reading on AngelWrites!';
-        switch(platform) {
-            case 'facebook': window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url),'_blank'); break;
-            case 'twitter': window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank'); break;
-            case 'whatsapp': window.open('https://api.whatsapp.com/send?text='+encodeURIComponent(text+' '+url),'_blank'); break;
-            case 'copy': navigator.clipboard.writeText(url).then(function(){alert('✅ Copied!');}).catch(function(){ const ta=document.createElement('textarea'); ta.value=url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert('✅ Copied!'); }); break;
-        }
-        closeShare();
-    }
-    function closeShare() {
-        document.getElementById('share-modal').style.display = 'none';
-        overlay.classList.remove('active');
-    }
-
-    // ===== NOTES PANEL TOGGLE =====
-    notesBtn.addEventListener('click', function() {
-        if (groupId === 0) {
-            alert('You are not in a reading group for this book.');
-            return;
-        }
-        const panel = document.getElementById('notes-panel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            panel.style.display = 'flex';
-            overlay.classList.add('active');
-            loadNotes();
-        } else {
-            panel.style.display = 'none';
-            overlay.classList.remove('active');
+    // ===== RESET PROGRESS =====
+    resetProgressBtn.addEventListener('click', function() {
+        if (userId === 0) return;
+        if (confirm('Reset reading progress for this book?')) {
+            const data = new FormData();
+            data.append('action', 'reset_progress');
+            data.append('book_id', bookId);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/reader/reader_ajax.php', true);
+            xhr.send(data);
+            goToPage(1);
+            alert('✅ Progress reset.');
         }
     });
-    notesClose.addEventListener('click', function() {
-        document.getElementById('notes-panel').style.display = 'none';
-        overlay.classList.remove('active');
-    });
-    // ===== SEARCH FUNCTIONALITY =====
-    function toggleSearch() {
-        const bar = document.getElementById('search-bar');
-        if (bar.style.display === 'none' || bar.style.display === '') {
-            bar.style.display = 'block';
-            document.getElementById('searchInput').focus();
-        } else {
-            bar.style.display = 'none';
-            document.getElementById('searchResults').innerHTML = '';
-        }
-    }
-    function closeSearch() {
-        document.getElementById('search-bar').style.display = 'none';
-        document.getElementById('searchResults').innerHTML = '';
-    }
-    searchBtn.addEventListener('click', toggleSearch);
-    // ===== ERROR REPORT MODAL =====
-    function openErrorModal() {
-        document.getElementById('errorPageNum').textContent = currentPage;
-        document.getElementById('errorPageInput').value = currentPage;
-        document.getElementById('errorText').value = '';
-        document.getElementById('errorCorrection').value = '';
-        document.getElementById('errorModal').style.display = 'block';
-        overlay.classList.add('active');
-    }
-    function closeErrorModal() {
-        document.getElementById('errorModal').style.display = 'none';
-        overlay.classList.remove('active');
-    }
-    errorReportBtn.addEventListener('click', openErrorModal);
-    
-    // ===== NOTE FORM FUNCTIONS =====
-    function toggleNoteForm() {
-        const form = document.getElementById('noteForm');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        if (form.style.display === 'block') {
-            document.getElementById('noteText').focus();
-        }
-    }
-    function submitNote() {
-        const text = document.getElementById('noteText').value.trim();
-        const isPrivate = document.getElementById('notePrivate').checked ? 1 : 0;
-        if (!text) return alert('Please enter a note.');
+
+    // ===== EXPORT HIGHLIGHTS =====
+    exportHighlightsBtn.addEventListener('click', function() {
+        if (userId === 0) return;
         const data = new FormData();
-        data.append('action','add_reader_note');
-        data.append('group_id',groupId);
-        data.append('book_id',bookId);
-        data.append('chapter_index',currentPage);
-        data.append('text',text);
-        data.append('is_private',isPrivate);
+        data.append('action', 'export_highlights');
+        data.append('book_id', bookId);
         const xhr = new XMLHttpRequest();
-        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.open('POST', '/reader/reader_ajax.php', true);
+        xhr.responseType = 'blob';
         xhr.onload = function() {
-            try {
-                const d = JSON.parse(this.responseText);
-                if (d.success) {
-                    loadNotes();
-                    document.getElementById('noteText').value = '';
-                    document.getElementById('notePrivate').checked = false;
-                    document.getElementById('noteForm').style.display = 'none';
-                } else {
-                    alert('Error: ' + d.error);
-                }
-            } catch(e) { alert('Error submitting note.'); }
-        };
-        xhr.send(data);
-    }
-    function deleteNote(noteId) {
-        if (!confirm('Delete this note?')) return;
-        const data = new FormData();
-        data.append('action','delete_reader_note');
-        data.append('note_id',noteId);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() { loadNotes(); };
-        xhr.send(data);
-    }
-    function reactNote(noteId, reaction) {
-        const data = new FormData();
-        data.append('action','toggle_note_reaction');
-        data.append('note_id',noteId);
-        data.append('reaction_type',reaction);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() { loadNotes(); };
-        xhr.send(data);
-    }
-    function showReactionPicker(noteId, event) {
-        currentNoteId = noteId;
-        const btn = event.target.closest('button');
-        const rect = btn.getBoundingClientRect();
-        const picker = document.getElementById('reaction-picker');
-        picker.style.top = (rect.bottom + 8) + 'px';
-        picker.style.left = (rect.left) + 'px';
-        picker.style.display = 'flex';
-    }
-    // ===== PRAYER REQUEST MODAL =====
-    function openPrayerModal() {
-        document.getElementById('prayerText').value = '';
-        document.getElementById('prayerModal').style.display = 'block';
-        overlay.classList.add('active');
-    }
-    function closePrayerModal() {
-        document.getElementById('prayerModal').style.display = 'none';
-        overlay.classList.remove('active');
-    }
-    prayerBtn.addEventListener('click', openPrayerModal);
-
-exportHighlightsBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to export highlights.'); return; }
-        const formData = new FormData();
-        formData.append('action', 'export_highlights');
-        formData.append('book_id', bookId);
-        fetch('/reader/reader_ajax.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.blob())
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
+            const url = URL.createObjectURL(this.response);
             const a = document.createElement('a');
             a.href = url;
             a.download = 'highlights.txt';
-            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        })
-        .catch(() => alert('Export failed.'));
+        };
+        xhr.send(data);
     });
-    // ===== COMMENT FUNCTIONS =====
+
+    // ===== SESSION =====
+    function startSession() {
+        const data = new FormData();
+        data.append('action', 'start_session');
+        data.append('book_id', bookId);
+        navigator.sendBeacon('/reader/reader_ajax.php', data);
+    }
+    window.addEventListener('beforeunload', function() {
+        if (userId > 0) {
+            const data = new FormData();
+            data.append('action', 'end_session');
+            data.append('book_id', bookId);
+            navigator.sendBeacon('/reader/reader_ajax.php', data);
+        }
+    });
+
+    // ===== TIME AGO =====
+    function timeAgo(timestamp) {
+        const diff = Date.now() - new Date(timestamp).getTime();
+        const secs = Math.floor(diff / 1000);
+        if (secs < 60) return 'just now';
+        if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+        if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+        if (secs < 604800) return Math.floor(secs / 86400) + 'd ago';
+        return new Date(timestamp).toLocaleDateString();
+    }
+
+    // ===== HIGHLIGHT TOOLTIP (simplified from original) =====
+    function getSelectedText() {
+        const sel = window.getSelection();
+        return sel.toString().trim();
+    }
+    function getSelectionRange() {
+        const sel = window.getSelection();
+        return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    }
+    function showSelectionTooltip() {
+        const text = getSelectedText();
+        const range = getSelectionRange();
+        const tooltip = document.getElementById('highlight-tooltip');
+        if (!text || !range || text.length < 1) {
+            tooltip.classList.remove('visible');
+            return;
+        }
+        const rect = range.getBoundingClientRect();
+        const tooltipWidth = 320;
+        const leftPos = rect.left + rect.width / 2 - tooltipWidth / 2;
+        const topPos = rect.top - 50;
+        tooltip.style.left = Math.max(10, leftPos) + 'px';
+        tooltip.style.top = Math.max(10, topPos) + 'px';
+        tooltip.classList.add('visible');
+        tooltip.dataset.text = text;
+        tooltip.dataset.rangeStart = range.startOffset;
+        tooltip.dataset.rangeEnd = range.endOffset;
+        tooltip.dataset.node = range.commonAncestorContainer.parentElement;
+    }
+    document.addEventListener('click', function(e) {
+        const tooltip = document.getElementById('highlight-tooltip');
+        if (tooltip && !tooltip.contains(e.target)) {
+            tooltip.classList.remove('visible');
+        }
+    });
+    function initSelectionTooltip() {
+        const tooltip = document.getElementById('highlight-tooltip');
+        if (!tooltip) return;
+        tooltip.innerHTML = `
+            <div>
+                <div><button class="highlight-color" data-color="yellow"></button><button class="highlight-color" data-color="green"></button><button class="highlight-color" data-color="blue"></button><button class="highlight-color" data-color="pink"></button></div>
+                <div><button class="tooltip-action" data-action="copy"><i class="fas fa-copy"></i></button><button class="tooltip-action" data-action="note"><i class="fas fa-pen"></i></button><button class="tooltip-action" data-action="share"><i class="fas fa-share-alt"></i></button><button class="tooltip-action" data-action="question"><i class="fas fa-question-circle"></i></button><button class="tooltip-action" data-action="react"><i class="fas fa-smile"></i></button></div>
+            </div>
+        `;
+        tooltip.querySelectorAll('.highlight-color').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const color = this.dataset.color;
+                const text = tooltip.dataset.text;
+                const range = getSelectionRange();
+                if (!range) return;
+                const span = document.createElement('span');
+                span.className = 'highlight-' + color;
+                span.textContent = text;
+                range.deleteContents();
+                range.insertNode(span);
+                tooltip.classList.remove('visible');
+                if (userId > 0) {
+                    const data = new FormData();
+                    data.append('action', 'add_highlight');
+                    data.append('book_id', bookId);
+                    data.append('chapter', currentPage);
+                    data.append('text', text);
+                    data.append('color', color);
+                    fetch('/reader/reader_ajax.php', { method: 'POST', body: data });
+                }
+            });
+        });
+        tooltip.querySelectorAll('.tooltip-action').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const action = this.dataset.action;
+                const text = tooltip.dataset.text;
+                const range = getSelectionRange();
+                switch(action) {
+                    case 'copy': navigator.clipboard.writeText(text).then(() => { alert('✅ Copied!'); }).catch(() => { document.execCommand('copy'); }); break;
+                    case 'note': annotationPopup.classList.add('visible'); annotationText.value = '"' + text + '"\n\n'; annotationText.focus(); break;
+                    case 'share': document.getElementById('share-modal').classList.add('visible'); overlay.classList.add('active'); break;
+                    case 'question': if (groupId === 0) { alert('You need to be in a reading group.'); return; } 
+                        const question = prompt('Ask a question about this text:\n\n"' + text + '"');
+                        if (question) { /* TODO: send question */ }
+                        break;
+                    case 'react': const picker = document.getElementById('reaction-picker'); if (picker) { picker.style.display = 'flex'; picker.dataset.text = text; } break;
+                }
+                tooltip.classList.remove('visible');
+            });
+        });
+    }
+    initSelectionTooltip();
+    document.addEventListener('mouseup', function(e) { setTimeout(showSelectionTooltip, 50); });
+    document.addEventListener('touchend', function(e) { setTimeout(showSelectionTooltip, 100); });
+
+    // ===== COMMENTS =====
     function loadComments() {
         if (userId === 0) return;
-        document.getElementById('currentCommentPage').textContent = currentPage;
+        currentCommentPageSpan.textContent = currentPage;
         const formData = new FormData();
-        formData.append('action','get_book_comments');
-        formData.append('book_id',bookId);
-        formData.append('page_num',currentPage);
-        fetch('/reader/reader_ajax.php',{method:'POST',body:formData})
-        .then(r=>r.json())
-        .then(data=>{
+        formData.append('action', 'get_book_comments');
+        formData.append('book_id', bookId);
+        formData.append('page_num', currentPage);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
             if (data.success) {
-                const list = document.getElementById('commentList');
-                list.innerHTML = '';
+                commentList.innerHTML = '';
                 if (data.comments.length === 0) {
-                    list.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px;">No comments on this page yet.</p>';
+                    commentList.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px;">No comments on this page yet.</p>';
                 } else {
-                    data.comments.forEach(com=>{
+                    data.comments.forEach(com => {
                         const isAdmin = com.is_admin_reply == 1;
                         const authorName = isAdmin ? 'Angella (Admin)' : com.author_name;
                         const badge = isAdmin ? '<span class="admin-badge">🛡️ Admin</span>' : '';
-                        list.innerHTML += `
-                            <div class="comment-item ${isAdmin?'admin':''}">
+                        commentList.innerHTML += `
+                            <div class="comment-item ${isAdmin ? 'admin' : ''}">
                                 <div class="comment-author"><i class="fas fa-user-circle"></i> ${authorName} ${badge}</div>
                                 <div style="font-size:0.85rem;color:var(--text-light);">${timeAgo(com.created_at)}</div>
                                 <div style="margin-top:4px;">${com.comment}</div>
@@ -1635,46 +1644,120 @@ exportHighlightsBtn.addEventListener('click', function() {
             }
         });
     }
-    function submitComment() {
-        const text = document.getElementById('commentInput').value.trim();
+    window.submitComment = function() {
+        const text = commentInput.value.trim();
         if (!text) return alert('Please write a comment.');
         const formData = new FormData();
-        formData.append('action','add_book_comment');
-        formData.append('book_id',bookId);
-        formData.append('page_num',currentPage);
-        formData.append('comment',text);
-        fetch('/reader/reader_ajax.php',{method:'POST',body:formData})
-        .then(r=>r.json())
-        .then(data=>{
+        formData.append('action', 'add_book_comment');
+        formData.append('book_id', bookId);
+        formData.append('page_num', currentPage);
+        formData.append('comment', text);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
             if (data.success) {
-                document.getElementById('commentInput').value = '';
+                commentInput.value = '';
                 loadComments();
             } else {
                 alert('Error: ' + (data.error || 'Failed to post comment.'));
             }
         });
-    }
-    function closeCommentsModal() {
-        document.getElementById('commentsModal').style.display = 'none';
+    };
+    window.openCommentsModal = function() {
+        commentsModal.style.display = 'block';
+        loadComments();
+        overlay.classList.add('active');
+    };
+    window.closeCommentsModal = function() {
+        commentsModal.style.display = 'none';
         overlay.classList.remove('active');
-    }
+    };
+    commentsBtn.addEventListener('click', openCommentsModal);
+
+    // ===== ERROR REPORT =====
+    window.openErrorModal = function() {
+        errorPageNumSpan.textContent = currentPage;
+        errorPageInput.value = currentPage;
+        errorText.value = '';
+        errorCorrection.value = '';
+        errorModal.style.display = 'block';
+        overlay.classList.add('active');
+    };
+    window.closeErrorModal = function() {
+        errorModal.style.display = 'none';
+        overlay.classList.remove('active');
+    };
+    window.submitError = function() {
+        if (userId === 0) { alert('Please login to report an error.'); return; }
+        const text = errorText.value.trim();
+        if (!text) return alert('Please describe the error.');
+        const formData = new FormData();
+        formData.append('action', 'report_book_error');
+        formData.append('book_id', bookId);
+        formData.append('page_num', errorPageInput.value);
+        formData.append('error_text', text);
+        formData.append('correction', errorCorrection.value);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Error report submitted. Thank you for helping improve the book!');
+                closeErrorModal();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to submit report.'));
+            }
+        });
+    };
+    errorReportBtn.addEventListener('click', openErrorModal);
+
+    // ===== PRAYER REQUESTS =====
+    window.openPrayerModal = function() {
+        prayerText.value = '';
+        prayerModal.style.display = 'block';
+        overlay.classList.add('active');
+    };
+    window.closePrayerModal = function() {
+        prayerModal.style.display = 'none';
+        overlay.classList.remove('active');
+    };
+    window.submitPrayer = function() {
+        if (userId === 0) { alert('Please login to submit a prayer request.'); return; }
+        const text = prayerText.value.trim();
+        if (!text) return alert('Please write your prayer request.');
+        const formData = new FormData();
+        formData.append('action', 'submit_prayer_request');
+        formData.append('book_id', bookId);
+        formData.append('request_text', text);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Prayer request sent. Angella will pray for you.');
+                closePrayerModal();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to send request.'));
+            }
+        });
+    };
+    prayerBtn.addEventListener('click', openPrayerModal);
 
     // ===== CLOSE ALL =====
-    function closeAll() {
-       settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open'); // Changed from style.display = 'none'
-        notesPanel.style.display = 'none';
-        document.getElementById('share-modal').style.display = 'none';
+    window.closeAll = function() {
+        settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open');
+        notesPanel.classList.remove('open');
+        searchBar.classList.remove('visible');
+        document.getElementById('share-modal').classList.remove('visible');
         overlay.classList.remove('active');
         if (focusMode) {
             focusMode = false;
             document.getElementById('reader-app').classList.remove('focus-mode');
             document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
         }
-        if (commentsModal.style.display === 'block') { commentsModal.style.display = 'none'; }
-        if (errorModal.style.display === 'block') { errorModal.style.display = 'none'; }
-        if (prayerModal.style.display === 'block') { prayerModal.style.display = 'none'; }
-    }
+        if (commentsModal.style.display === 'block') closeCommentsModal();
+        if (errorModal.style.display === 'block') closeErrorModal();
+        if (prayerModal.style.display === 'block') closePrayerModal();
+    };
     overlay.addEventListener('click', closeAll);
 
     // ===== BACK BUTTON =====
