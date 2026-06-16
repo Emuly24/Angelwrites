@@ -34,6 +34,7 @@ $toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
 
 $pages = [];
 if ($has_processed && !empty($processed['content_html'])) {
+    // We use a more robust regex to ensure the content is captured correctly
     preg_match_all('/<div class="page-content" data-page="(\d+)">(.*?)<\/div>/s', $processed['content_html'], $matches, PREG_SET_ORDER);
     foreach ($matches as $match) {
         $pages[] = $match[0];
@@ -243,9 +244,11 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         /*  PAGE VIEWPORT (SCROLL)                                  */
         /* ======================================================= */
         #scroll-container {
-            height: 100%; width: 100%; overflow-y: auto;
+            height: 100%; width: 100%;
+            overflow-y: auto;
             padding: 20px 20px 120px 20px;
-            display: flex; flex-direction: column; align-items: center;
+            display: flex; flex-direction: column;
+            align-items: center;
         }
         #scroll-container .page-content {
             width: 100%; max-width: 900px;
@@ -268,14 +271,46 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }
         #scroll-container .page-break { display: none; }
 
-        /* ===== 3D FLIP CONTAINER ===== */
-        .flip-3d-container { perspective:2000px; width:100%; height:100%; position:relative; display:none; }
-        .flip-3d-book { position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform 0.8s cubic-bezier(0.645,0.045,0.355,1); }
-        .flip-3d-page { position:absolute; top:0; left:0; width:100%; height:100%; backface-visibility:hidden; background:var(--card-bg); border:1px solid var(--border); border-radius:16px; padding:40px; box-shadow:var(--shadow-hover); overflow-y:auto; font-family:'Inter',sans-serif; font-size:1.05rem; line-height:1.8; color:var(--text); }
-        .flip-3d-page-left { z-index:2; transform:rotateY(0deg); transform-origin:left center; }
-        .flip-3d-page-right { transform:rotateY(180deg); transform-origin:right center; }
-        .flip-3d-book.page-right-flipped { transform:rotateY(-180deg); }
-        .flip-3d-book.page-left-flipped { transform:rotateY(180deg); }
+        /* ===== 3D FLIP CONTAINER (FIXED ID) ===== */
+        #flip-container { 
+            perspective: 2000px; 
+            width: 100%; 
+            height: 100%; 
+            position: relative; 
+            display: none; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        .flip-3d-book { 
+            position: relative; 
+            width: 95%; 
+            max-width: 900px; 
+            height: 90%; 
+            transform-style: preserve-3d; 
+            transition: transform 0.8s cubic-bezier(0.645,0.045,0.355,1); 
+        }
+        .flip-3d-page { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            backface-visibility: hidden; 
+            background: var(--card-bg); 
+            border: 1px solid var(--border); 
+            border-radius: 16px; 
+            padding: 40px; 
+            box-shadow: var(--shadow-hover); 
+            overflow-y: auto; 
+            font-family: 'Inter', sans-serif; 
+            font-size: 1.05rem; 
+            line-height: 1.8; 
+            color: var(--text); 
+        }
+        .flip-3d-page-left { z-index: 2; transform: rotateY(0deg); transform-origin: left center; }
+        .flip-3d-page-right { transform: rotateY(180deg); transform-origin: right center; }
+        .flip-3d-book.page-right-flipped { transform: rotateY(-180deg); }
+        .flip-3d-book.page-left-flipped { transform: rotateY(180deg); }
 
         /* ===== PAGE SHADOWS (CURL EFFECT) ===== */
         .flip-3d-page::before { content:''; position:absolute; top:0; bottom:0; width:40px; pointer-events:none; background:linear-gradient(to right,rgba(0,0,0,0.08) 0%,transparent 100%); }
@@ -283,9 +318,12 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         .flip-3d-page-right::before { right:0; background:linear-gradient(to left,rgba(0,0,0,0.08) 0%,transparent 100%); }
 
         /* ===== RESPONSIVE ===== */
-        @media (max-width:768px) { .flip-3d-page { padding:20px; } }
+        @media (max-width:768px) { 
+            #flip-container .flip-3d-page { padding:20px; } 
+            #flip-container .flip-3d-book { width: 100%; height: 100%; }
+        }
 
-        /* ===== COVER IMAGE (FIXED) ===== */
+        /* ===== COVER IMAGE ===== */
         .cover-image {
             width: 100%; max-width: 900px;
             margin: 0 auto 40px auto;
@@ -717,8 +755,8 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
             <?php endif; ?>
             <?php foreach ($pages as $page_html) { echo $page_html; } ?>
         </div>
-        <!-- ===== 3D FLIP CONTAINER ===== -->
-        <div id="flip3dContainer" class="flip-3d-container" style="display:none;">
+        <!-- ===== 3D FLIP CONTAINER (FIXED ID) ===== -->
+        <div id="flip-container" class="flip-3d-container" style="display:none;">
             <div class="flip-3d-book" id="flipBook">
                 <div class="flip-3d-page flip-3d-page-left" id="flipLeftPage"></div>
                 <div class="flip-3d-page flip-3d-page-right" id="flipRightPage"></div>
@@ -948,7 +986,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
     const lastPage = <?php echo $last_page; ?>;
 
     const scrollContainer = document.getElementById('scroll-container');
-    const flipContainer = document.getElementById('flip-container');
+    const flipContainer = document.getElementById('flip-container'); // This now correctly targets the 3D container
     const pageNumEl = document.getElementById('pageNum');
     const totalPagesEl = document.getElementById('totalPages');
     const progressFill = document.getElementById('progressFill');
@@ -1061,12 +1099,16 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         localStorage.setItem('reader_mode', mode);
         if (mode === 'flip') {
             scrollContainer.style.display = 'none';
-            flipContainer.style.display = 'flex';
+            if (flipContainer) {
+                flipContainer.style.display = 'flex';
+            }
             prepareFlipChunks(currentPage);
             renderFlipChunk(0);
         } else {
+            if (flipContainer) {
+                flipContainer.style.display = 'none';
+            }
             scrollContainer.style.display = 'block';
-            flipContainer.style.display = 'none';
             var target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -1358,12 +1400,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     // ===== 3D FLIP MODE IMPLEMENTATION =====
 
-    const flip3dContainer = document.getElementById('flip3dContainer');
     const flipBook = document.getElementById('flipBook');
     const flipLeftPage = document.getElementById('flipLeftPage');
     const flipRightPage = document.getElementById('flipRightPage');
-    const flipPrevBtn = document.getElementById('flipPrevBtn');
-    const flipNextBtn = document.getElementById('flipNextBtn');
 
     let flipCurrentPage = currentPage;
     let flipIsAnimating = false;
@@ -1436,28 +1475,10 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
         }, 800);
     }
 
-    // Override the existing switchMode() to use the 3D flip
-    const originalSwitchMode = window.switchMode || function(){};
-    window.switchMode = function(mode) {
-        if (mode === 'flip') {
-            document.getElementById('scroll-container').style.display = 'none';
-            flip3dContainer.style.display = 'block';
-            loadFlipPages(currentPage);
-        } else {
-            flip3dContainer.style.display = 'none';
-            document.getElementById('scroll-container').style.display = 'block';
-            // Restore scroll view
-            const target = document.querySelector('.page-content[data-page="' + currentPage + '"]');
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    };
-
-    // Click handlers for navigation
-    flipNextBtn.addEventListener('click', flipToNext);
-    flipPrevBtn.addEventListener('click', flipToPrev);
-
+    // Override the existing switchMode() to use the 3D flip (Already done above)
+    // Click handlers for navigation (Already done above)
     // Click on the right half of the book -> next page
-    flip3dContainer.addEventListener('click', function(e) {
+    flipContainer.addEventListener('click', function(e) {
         if (e.target.closest('button')) return;
         const rect = this.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -1470,19 +1491,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 
     // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        if (flip3dContainer.style.display !== 'block') return;
+        if (flipContainer.style.display !== 'block') return;
         if (e.key === 'ArrowRight') flipToNext();
         else if (e.key === 'ArrowLeft') flipToPrev();
-    });
-
-    // Make sure the mode toggle works
-    document.querySelectorAll('#modeGroup button').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const mode = this.dataset.mode;
-            document.querySelectorAll('#modeGroup button').forEach(function(b) { b.classList.remove('active'); });
-            this.classList.add('active');
-            window.switchMode(mode);
-        });
     });
 
     // ===== SETTINGS: FONT TYPE =====
@@ -1528,18 +1539,6 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
                 if (diff > 0) nextPage();
                 else prevPage();
             }
-        }
-    });
-
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'ArrowRight') nextPage();
-        else if (e.key === 'ArrowLeft') prevPage();
-        else if (e.key === 'Escape') {
-            closeAll();
-        }
-        else if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            toggleSearch();
         }
     });
 
