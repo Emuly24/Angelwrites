@@ -471,6 +471,209 @@ html, body { height:100%; width:100%; overflow:hidden; }
 #readingStatus:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
 .focus-mode #toolbar{transform:translateY(-100%);opacity:0;pointer-events:none;transition:all var(--transition)}
 .focus-mode #settings-panel.open{display:none !important}
+.modal-wrapper, #search-bar, #challenge-widget, #notes-panel {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 100000 !important;
+    width: 90%;
+    max-width: 500px;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 28px 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    border: 1px solid var(--rose-light);
+    display: none; /* hidden by default */
+    flex-direction: column;
+    pointer-events: auto;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    backdrop-filter: blur(4px);
+}
+
+/* When a modal is visible, use flex to center children */
+.modal-wrapper.visible, #search-bar.visible, #challenge-widget.visible, #notes-panel.visible {
+    display: flex !important;
+}
+
+/* Semi-Transparent Dark Overlay */
+#overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(30, 20, 20, 0.6) !important;
+    backdrop-filter: blur(6px) !important;
+    z-index: 99999 !important;
+    display: none !important;
+    pointer-events: auto !important;
+}
+#overlay.active {
+    display: block !important;
+}
+
+/* --- UNIFIED MODAL CLOSE BUTTON --- */
+.modal-close, .close-btn, .toc-close, #notesClose {
+    position: absolute !important;
+    top: 14px !important;
+    right: 18px !important;
+    background: transparent !important;
+    border: none !important;
+    font-size: 1.8rem !important;
+    cursor: pointer !important;
+    color: var(--text-light) !important;
+    line-height: 1 !important;
+    transition: transform 0.3s ease, color 0.3s ease !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+}
+.modal-close:hover, .close-btn:hover, .toc-close:hover, #notesClose:hover {
+    color: var(--rose) !important;
+    transform: rotate(90deg) scale(1.1) !important;
+    background: rgba(219, 161, 162, 0.1) !important;
+}
+
+/* --- REACTION PICKER --- */
+#reaction-picker {
+    position: fixed !important;
+    z-index: 100002 !important;
+    display: none !important;
+    background: var(--card-bg) !important;
+    border-radius: 16px !important;
+    padding: 8px 12px !important;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15) !important;
+    border: 1px solid var(--rose-light) !important;
+    gap: 6px !important;
+    align-items: center !important;
+    pointer-events: auto !important;
+}
+#reaction-picker button {
+    font-size: 1.4rem !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 4px !important;
+    transition: transform 0.2s !important;
+}
+#reaction-picker button:hover {
+    transform: scale(1.25) !important;
+}
+#reaction-picker .close-picker {
+    font-size: 0.9rem !important;
+    color: var(--text-light) !important;
+    margin-left: 4px !important;
+}
+/* --- HIGHLIGHT TOOLTIP --- */
+#highlight-tooltip {
+    position: fixed !important;
+    z-index: 100001 !important;
+    background: var(--card-bg) !important;
+    border-radius: 16px !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.2) !important;
+    border: 1px solid var(--rose-light) !important;
+    display: none !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    min-width: 200px !important;
+    pointer-events: auto !important;
+}
+#highlight-tooltip.visible {
+    display: flex !important;
+}
+
+/* --- SEARCH BAR --- */
+#search-bar {
+    max-width: 600px !important;
+    width: 90% !important;
+}
+#search-bar input {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--border) !important;
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+}
+
+/* --- CHALLENGE WIDGET --- */
+#challenge-widget {
+    text-align: center !important;
+    gap: 12px !important;
+}
+.challenge-progress {
+    height: 14px !important;
+    background: var(--border) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    width: 100% !important;
+}
+.challenge-progress .bar {
+    height: 100% !important;
+    background: var(--rose) !important;
+    transition: width 0.4s ease !important;
+}
+
+/* --- NOTES PANEL --- */
+#notes-panel {
+    max-width: 550px !important;
+    background: var(--card-bg) !important;
+    border-radius: 24px !important;
+}
+.notes-header {
+    border-bottom: 1px solid var(--border) !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 16px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+}
+#noteForm {
+    margin-top: 16px !important;
+}
+#noteText {
+    width: 100% !important;
+    min-height: 80px !important;
+    padding: 12px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--border) !important;
+    background: var(--input-bg) !important;
+    color: var(--text) !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.9rem !important;
+}
+.note-submit {
+    background: var(--rose) !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 20px !important;
+    border-radius: 30px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: background 0.2s !important;
+}
+.note-submit:hover { background: var(--rose-dark) !important; }
+.note-cancel {
+    background: var(--border) !important;
+    color: var(--text) !important;
+    border: none !important;
+    padding: 8px 20px !important;
+    border-radius: 30px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: 0.2s !important;
+}
+
+/* Share & Comment Buttons inside modals */
+.modal-content { background: var(--card-bg); border-radius: 24px; padding: 12px; }
+.modal-content h3 { margin-top: 0; color: var(--dark); font-family: 'Playfair Display', serif; }
+.modal-content button { border-radius: 30px; padding: 10px 20px; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+.modal-content button:hover { border-color: var(--rose); background: rgba(219, 161, 162, 0.05); }
+.modal-content textarea { border-radius: 16px; border: 1px solid var(--border); padding: 12px; background: var(--input-bg); color: var(--text); width: 100%; font-family: 'Inter', sans-serif; }
 @media (max-width:768px){#toolbar{height:48px;padding:0 8px}.toolbar-left .title{font-size:0.9rem;max-width:160px}.page-content-inner{padding:20px}.flip-page-inner{padding:20px}#toc-drawer{width:280px;right:-280px}.settings-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:480px){.toolbar-left .title{font-size:0.8rem;max-width:120px}.page-content-inner{padding:16px}.flip-page-inner{padding:16px}}
 </style>
@@ -608,19 +811,47 @@ html, body { height:100%; width:100%; overflow:hidden; }
     </div>
 
     <!-- SHARE MODAL -->
-    <div id="share-modal" style="display: none;">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeShare()">&times;</span>
-            <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
-            <div style="margin:16px 0;display:flex;flex-direction:column;gap:8px;">
-                <button onclick="share('facebook')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-facebook-f" style="color:var(--rose);"></i> Facebook</button>
-                <button onclick="share('twitter')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-twitter" style="color:var(--rose);"></i> Twitter</button>
-                <button onclick="share('whatsapp')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-whatsapp" style="color:var(--rose);"></i> WhatsApp</button>
-                <button onclick="share('copy')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fas fa-link" style="color:var(--rose);"></i> Copy Link</button>
+    <div id="share-modal" class="modal-wrapper">
+    <button class="modal-close" onclick="closeShare()">&times;</button>
+    <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+        <button onclick="share('facebook')"><i class="fab fa-facebook-f"></i> Facebook</button>
+        <button onclick="share('twitter')"><i class="fab fa-twitter"></i> Twitter</button>
+        <button onclick="share('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+        <button onclick="share('copy')"><i class="fas fa-link"></i> Copy Link</button>
+    </div>
+</div>
+<!-- ===== NOTES PANEL (Replaces the old #notes-panel) ===== -->
+<div id="notes-panel" class="modal-wrapper" data-visible="false">
+    <button class="modal-close" id="notesClose">&times;</button>
+    <div class="notes-header" style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;font-size:1.2rem;">📝 Group Notes</h3>
+        <button class="note-submit" id="addNoteBtn" style="padding:6px 16px;font-size:0.85rem;">+ Add Note</button>
+    </div>
+    <div id="notesBody" style="flex:1;overflow-y:auto;">
+        <div id="notesList" style="max-height:200px;overflow-y:auto;"></div>
+        <div id="noteForm" style="display:none;margin-top:12px;">
+            <textarea id="noteText" rows="3" placeholder="Write a note..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
+            <div style="margin:6px 0;">
+                <label><input type="checkbox" id="notePrivate"> Private note</label>
             </div>
-            <button class="share-close" onclick="closeShare()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;width:100%;font-weight:600;">Close</button>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="note-submit" onclick="submitNote()">Post</button>
+                <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
+            </div>
         </div>
     </div>
+</div>
+
+<!-- ===== REACTION PICKER (Small floating panel for note reactions) ===== -->
+<div id="reaction-picker" style="position:fixed;bottom:80px;right:20px;z-index:100002;display:none;background:var(--card-bg);border-radius:16px;padding:8px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.15);border:1px solid var(--rose-light);gap:6px;align-items:center;pointer-events:auto;">
+    <button onclick="reactNote(currentNoteId, '❤️')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">❤️</button>
+    <button onclick="reactNote(currentNoteId, '🙏')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">🙏</button>
+    <button onclick="reactNote(currentNoteId, '🔥')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">🔥</button>
+    <button onclick="reactNote(currentNoteId, '📖')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">📖</button>
+    <button onclick="reactNote(currentNoteId, '💔')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">💔</button>
+    <button onclick="document.getElementById('reaction-picker').style.display='none'" style="font-size:0.9rem;background:transparent;border:none;cursor:pointer;color:var(--text-light);">✕</button>
+</div>
 
     <!-- CHALLENGE WIDGET -->
     <div id="challenge-widget"></div>
@@ -629,50 +860,41 @@ html, body { height:100%; width:100%; overflow:hidden; }
     <div id="overlay"></div>
 
     <!-- COMMENTS MODAL -->
-    <div id="commentsModal" style="display: none;">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeComments()">&times;</span>
-            <h3><i class="fas fa-comments" style="color:var(--rose);"></i> Comments</h3>
-            <div id="commentList" style="margin:16px 0;max-height:300px;overflow-y:auto;"></div>
-            <textarea id="commentInput" rows="3" placeholder="Write a comment..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;margin-bottom:8px;"></textarea>
-            <button onclick="submitComment()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;font-weight:600;">Post Comment</button>
-        </div>
-    </div>
+    <div id="commentsModal" class="modal-wrapper">
+    <button class="modal-close" onclick="closeComments()">&times;</button>
+    <h3><i class="fas fa-comments" style="color:var(--rose);"></i> Comments</h3>
+    <div id="commentList" style="margin:12px 0;max-height:200px;overflow-y:auto;"></div>
+    <textarea id="commentInput" rows="3" placeholder="Write a comment..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);margin-bottom:8px;"></textarea>
+    <button onclick="submitComment()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Post Comment</button>
+</div>
+
 
     <!-- ERROR REPORT MODAL -->
-    <div id="errorModal" style="display: none;">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeErrorModal()">&times;</span>
-            <h3><i class="fas fa-exclamation-triangle" style="color:var(--rose);"></i> Report Error</h3>
-            <div style="margin:12px 0;">
-                <label style="display:block;font-weight:600;font-size:0.9rem;">Page number:</label>
-                <input type="number" id="errorPageInput" min="1" max="<?php echo $total_pages; ?>" value="<?php echo $last_page; ?>" style="width:80px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);">
-                <span id="errorPageNum" style="font-size:0.9rem;color:var(--text-light);margin-left:8px;">(current: <?php echo $last_page; ?>)</span>
-            </div>
-            <div style="margin:12px 0;">
-                <label style="display:block;font-weight:600;font-size:0.9rem;">Error description:</label>
-                <textarea id="errorText" rows="3" placeholder="Describe the error..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
-            </div>
-            <div style="margin:12px 0;">
-                <label style="display:block;font-weight:600;font-size:0.9rem;">Suggested correction (optional):</label>
-                <textarea id="errorCorrection" rows="2" placeholder="What should be written instead?" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
-            </div>
-            <button onclick="submitError()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;font-weight:600;">Submit Error Report</button>
-        </div>
+    <div id="errorModal" class="modal-wrapper">
+    <button class="modal-close" onclick="closeErrorModal()">&times;</button>
+    <h3><i class="fas fa-exclamation-triangle" style="color:var(--rose);"></i> Report Error</h3>
+    <div style="margin:12px 0;">
+        <label style="font-weight:600;font-size:0.9rem;">Page number:</label>
+        <input type="number" id="errorPageInput" min="1" max="<?php echo $total_pages; ?>" value="<?php echo $last_page; ?>" style="width:80px;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
     </div>
+    <div style="margin:12px 0;">
+        <label style="font-weight:600;font-size:0.9rem;">Error description:</label>
+        <textarea id="errorText" rows="3" placeholder="Describe the error..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);"></textarea>
+    </div>
+    <button onclick="submitError()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Submit Error Report</button>
+</div>
 
     <!-- PRAYER REQUEST MODAL -->
-    <div id="prayerModal" style="display: none;">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closePrayerModal()">&times;</span>
-            <h3><i class="fas fa-hands-praying" style="color:var(--rose);"></i> Prayer Request</h3>
-            <div style="margin:12px 0;">
-                <label style="display:block;font-weight:600;font-size:0.9rem;">Your prayer request:</label>
-                <textarea id="prayerText" rows="4" placeholder="Write your prayer request here..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
-            </div>
-            <button onclick="submitPrayer()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;font-weight:600;">Submit Prayer Request</button>
-        </div>
+    <div id="prayerModal" class="modal-wrapper">
+    <button class="modal-close" onclick="closePrayerModal()">&times;</button>
+    <h3><i class="fas fa-hands-praying" style="color:var(--rose);"></i> Prayer Request</h3>
+    <div style="margin:12px 0;">
+        <label style="font-weight:600;font-size:0.9rem;">Your prayer request:</label>
+        <textarea id="prayerText" rows="4" placeholder="Write your prayer request here..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);"></textarea>
     </div>
+    <button onclick="submitPrayer()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Submit Prayer Request</button>
+</div>
+
 
     <!-- SEARCH BAR -->
     <div id="search-bar">
@@ -1249,30 +1471,43 @@ html, body { height:100%; width:100%; overflow:hidden; }
     });
 
     // ===== CHALLENGE =====
-    challengeBtn.addEventListener('click',function() { loadChallenge(); });
-    function loadChallenge() {
-        if (userId === 0) { alert('Please log in to view challenges.'); return; }
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET','/reader/reader_ajax.php?action=get_monthly_challenge&user_id='+userId,true);
-        xhr.onload = function() {
-            try {
-                const data = JSON.parse(this.responseText);
-                if (data.success) {
-                    const challengeWidget = document.getElementById('challenge-widget');
-                    challengeWidget.style.display = 'block';
-                    const percent = Math.min(100,Math.round((data.progress/data.target)*100));
-                    challengeWidget.innerHTML = `
-                        <h4>📖 Monthly Challenge</h4>
-                        <p>${data.goal}</p>
-                        <div class="challenge-progress"><div class="bar" style="width:${percent}%;"></div></div>
-                        <p style="font-size:0.9rem;">${data.progress} / ${data.target} pages</p>
-                        <button style="padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:var(--rose);color:white;cursor:pointer;" onclick="updateChallenge()">📈 Update</button>
-                    `;
-                }
-            } catch(e) { console.error('Challenge error:',e); alert('Could not load challenge.'); }
-        };
-        xhr.send();
-    }
+    // REPLACE loadChallenge function with this:
+function loadChallenge() {
+    if (userId === 0) { alert('Please log in to view challenges.'); return; }
+    
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/reader/reader_ajax.php?action=get_monthly_challenge&user_id=' + userId, true);
+    xhr.onload = function() {
+        try {
+            const data = JSON.parse(this.responseText);
+            if (data.success) {
+                const widget = document.getElementById('challenge-widget');
+                const percent = Math.min(100, Math.round((data.progress / data.target) * 100));
+                widget.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+                        <h4 style="margin:0;font-size:1.1rem;">📖 Monthly Challenge</h4>
+                        <button class="modal-close" onclick="document.getElementById('challenge-widget').classList.remove('visible'); overlay.classList.remove('active');">&times;</button>
+                    </div>
+                    <p style="margin:4px 0;font-size:0.95rem;color:var(--text-light);">${data.goal}</p>
+                    <div class="challenge-progress"><div class="bar" style="width:${percent}%;"></div></div>
+                    <div style="display:flex;justify-content:space-between;width:100%;font-size:0.9rem;">
+                        <span>${data.progress} / ${data.target} pages</span>
+                        <span>${percent}%</span>
+                    </div>
+                    <button class="note-submit" style="margin-top:8px;" onclick="updateChallenge()">📈 Log Progress</button>
+                `;
+                widget.classList.add('visible');
+                overlay.classList.add('active');
+            } else {
+                alert('No active challenge found. Start one today!');
+            }
+        } catch (e) {
+            console.error('Challenge error:', e);
+            alert('Could not load challenge.');
+        }
+    };
+    xhr.send();
+}
     function updateChallenge() {
         const pagesRead = prompt('How many pages did you read today?');
         if (pagesRead && parseInt(pagesRead) > 0) {
@@ -1296,26 +1531,35 @@ html, body { height:100%; width:100%; overflow:hidden; }
         const sel = window.getSelection();
         return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     }
-    function showSelectionTooltip(e) {
-        e.stopPropagation();
-        const text = getSelectedText();
-        const range = getSelectionRange();
-        const tooltip = document.getElementById('highlight-tooltip');
-        if (!text || !range || text.length < 1) {
-            tooltip.classList.remove('visible');
-            document.getElementById('notes-panel').style.display = 'none';
-            overlay.classList.remove('active');
-            return;
-        }
-        const rect = range.getBoundingClientRect();
-        const tooltipWidth = 320;
-        const leftPos = rect.left + rect.width/2 - tooltipWidth/2;
-        const topPos = rect.top - 50;
-        tooltip.style.left = Math.max(10,leftPos) + 'px';
-        tooltip.style.top = Math.max(10,topPos) + 'px';
-        tooltip.classList.add('visible');
-        tooltip.dataset.text = text;
+   // REPLACE the showSelectionTooltip function with this:
+function showSelectionTooltip(e) {
+    e.stopPropagation();
+    const text = getSelectedText();
+    const range = getSelectionRange();
+    const tooltip = document.getElementById('highlight-tooltip');
+    
+    // Dont't show if no text or range is collapsed (just a click)
+    if (!text || !range || range.collapsed || text.length < 2) {
+        tooltip.classList.remove('visible');
+        return;
     }
+    
+    const rect = range.getBoundingClientRect();
+    // Position tooltip directly above the selection
+    const tooltipWidth = 260;
+    let leftPos = rect.left + rect.width/2 - tooltipWidth/2;
+    let topPos = rect.top - 60;
+    
+    // Clamp to viewport
+    if (leftPos < 10) leftPos = 10;
+    if (leftPos + tooltipWidth > window.innerWidth - 10) leftPos = window.innerWidth - tooltipWidth - 10;
+    if (topPos < 10) topPos = rect.bottom + 10; // fallback to below
+    
+    tooltip.style.left = leftPos + 'px';
+    tooltip.style.top = topPos + 'px';
+    tooltip.dataset.text = text;
+    tooltip.classList.add('visible');
+}
     document.addEventListener('click',function(e) {
         const tooltip = document.getElementById('highlight-tooltip');
         if (tooltip && !tooltip.contains(e.target)) {
@@ -1510,91 +1754,146 @@ html, body { height:100%; width:100%; overflow:hidden; }
     }
 
     // ===== NOTES PANEL TOGGLE =====
-    notesBtn.addEventListener('click', function() {
-        if (groupId === 0) {
-            alert('You are not in a reading group for this book.');
-            return;
-        }
-        const panel = document.getElementById('notes-panel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-            panel.style.display = 'flex';
-            overlay.classList.add('active');
-            loadNotes();
-        } else {
-            panel.style.display = 'none';
-            overlay.classList.remove('active');
-        }
-    });
-    notesClose.addEventListener('click', function() {
-        document.getElementById('notes-panel').style.display = 'none';
+notesBtn.addEventListener('click', function() {
+    if (groupId === 0) {
+        alert('You are not in a reading group for this book.');
+        return;
+    }
+    const panel = document.getElementById('notes-panel');
+    if (!panel.classList.contains('visible')) {
+        panel.classList.add('visible');
+        overlay.classList.add('active');
+        loadNotes();
+    } else {
+        panel.classList.remove('visible');
         overlay.classList.remove('active');
-    });
+    }
+});
 
-    // ===== NOTE FORM FUNCTIONS =====
-    function toggleNoteForm() {
-        const form = document.getElementById('noteForm');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        if (form.style.display === 'block') {
-            document.getElementById('noteText').focus();
-        }
-    }
-    function submitNote() {
-        const text = document.getElementById('noteText').value.trim();
-        const isPrivate = document.getElementById('notePrivate').checked ? 1 : 0;
-        if (!text) return alert('Please enter a note.');
-        const data = new FormData();
-        data.append('action','add_reader_note');
-        data.append('group_id',groupId);
-        data.append('book_id',bookId);
-        data.append('chapter_index',currentPage);
-        data.append('text',text);
-        data.append('is_private',isPrivate);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() {
-            try {
-                const d = JSON.parse(this.responseText);
-                if (d.success) {
-                    loadNotes();
-                    document.getElementById('noteText').value = '';
-                    document.getElementById('notePrivate').checked = false;
-                    document.getElementById('noteForm').style.display = 'none';
+// Update notesClose handler
+document.getElementById('notesClose').addEventListener('click', function() {
+    document.getElementById('notes-panel').classList.remove('visible');
+    overlay.classList.remove('active');
+});
+
+// ===== NOTE FUNCTIONS (updated for new classes) =====
+function loadNotes() {
+    if (groupId === 0) return;
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/reader/reader_ajax.php?action=get_notes&group_id='+groupId+'&book_id='+bookId+'&chapter='+currentPage, true);
+    xhr.onload = function() {
+        try {
+            const data = JSON.parse(this.responseText);
+            if (data.success) {
+                let html = '';
+                if (data.notes.length === 0) {
+                    html = '<p class="empty-notes" style="color:var(--text-light);text-align:center;padding:20px;">No notes for this chapter.</p>';
                 } else {
-                    alert('Error: ' + d.error);
+                    data.notes.forEach(function(n) {
+                        const avatar = n.display_name || n.username || 'User';
+                        const initial = avatar.charAt(0).toUpperCase();
+                        html += `<div class="note-card ${n.is_private ? 'private' : ''}" style="padding:12px;border-bottom:1px solid var(--border);">`;
+                        html += `<div style="display:flex;align-items:center;gap:8px;">`;
+                        html += `<div style="width:32px;height:32px;border-radius:50%;background:var(--rose);color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;">${initial}</div>`;
+                        html += `<div><strong>${n.display_name || n.username}</strong> <small style="color:var(--text-light);">${timeAgo(n.created_at)}</small>`;
+                        if (n.is_private) html += ' <span style="background:var(--rose-light);padding:2px 10px;border-radius:12px;font-size:0.7rem;">🔒 Private</span>';
+                        html += `</div></div>`;
+                        html += `<p style="margin:6px 0;">${n.text}</p>`;
+                        html += `<div style="display:flex;gap:6px;flex-wrap:wrap;">`;
+                        if (n.reactions) {
+                            n.reactions.forEach(function(r) {
+                                html += `<span style="background:var(--bg);padding:2px 10px;border-radius:12px;cursor:pointer;font-size:0.85rem;" onclick="reactNote(${n.id}, '${r.reaction_type}')">${r.reaction_type} ${r.count}</span>`;
+                            });
+                        }
+                        html += `<button style="background:transparent;border:none;cursor:pointer;font-size:1.1rem;" onclick="showReactionPicker(${n.id}, event)">➕</button>`;
+                        if (n.user_id == userId) {
+                            html += `<button style="background:transparent;border:none;cursor:pointer;color:var(--text-light);" onclick="deleteNote(${n.id})">🗑️</button>`;
+                        }
+                        html += `</div></div>`;
+                    });
                 }
-            } catch(e) { alert('Error submitting note.'); }
-        };
-        xhr.send(data);
+                document.getElementById('notesList').innerHTML = html;
+            }
+        } catch(e) {
+            console.error('Load notes error:', e);
+        }
+    };
+    xhr.send();
+}
+
+function toggleNoteForm() {
+    const form = document.getElementById('noteForm');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') {
+        document.getElementById('noteText').focus();
     }
-    function deleteNote(noteId) {
-        if (!confirm('Delete this note?')) return;
-        const data = new FormData();
-        data.append('action','delete_reader_note');
-        data.append('note_id',noteId);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() { loadNotes(); };
-        xhr.send(data);
-    }
-    function reactNote(noteId, reaction) {
-        const data = new FormData();
-        data.append('action','toggle_note_reaction');
-        data.append('note_id',noteId);
-        data.append('reaction_type',reaction);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() { loadNotes(); };
-        xhr.send(data);
-    }
-    function showReactionPicker(noteId, event) {
-        currentNoteId = noteId;
-        const btn = event.target.closest('button');
-        const rect = btn.getBoundingClientRect();
-        const picker = document.getElementById('reaction-picker');
-        picker.style.top = (rect.bottom + 8) + 'px';
-        picker.style.left = (rect.left) + 'px';
-        picker.style.display = 'flex';
-    }
+}
+
+function submitNote() {
+    const text = document.getElementById('noteText').value.trim();
+    const isPrivate = document.getElementById('notePrivate').checked ? 1 : 0;
+    if (!text) return alert('Please enter a note.');
+    const data = new FormData();
+    data.append('action', 'add_reader_note');
+    data.append('group_id', groupId);
+    data.append('book_id', bookId);
+    data.append('chapter_index', currentPage);
+    data.append('text', text);
+    data.append('is_private', isPrivate);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/reader/reader_ajax.php', true);
+    xhr.onload = function() {
+        try {
+            const d = JSON.parse(this.responseText);
+            if (d.success) {
+                loadNotes();
+                document.getElementById('noteText').value = '';
+                document.getElementById('notePrivate').checked = false;
+                document.getElementById('noteForm').style.display = 'none';
+            } else {
+                alert('Error: ' + d.error);
+            }
+        } catch(e) {
+            alert('Error submitting note.');
+        }
+    };
+    xhr.send(data);
+}
+
+function deleteNote(noteId) {
+    if (!confirm('Delete this note?')) return;
+    const data = new FormData();
+    data.append('action', 'delete_reader_note');
+    data.append('note_id', noteId);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/reader/reader_ajax.php', true);
+    xhr.onload = function() { loadNotes(); };
+    xhr.send(data);
+}
+
+function reactNote(noteId, reaction) {
+    const data = new FormData();
+    data.append('action', 'toggle_note_reaction');
+    data.append('note_id', noteId);
+    data.append('reaction_type', reaction);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/reader/reader_ajax.php', true);
+    xhr.onload = function() {
+        loadNotes();
+        document.getElementById('reaction-picker').style.display = 'none';
+    };
+    xhr.send(data);
+}
+
+function showReactionPicker(noteId, event) {
+    currentNoteId = noteId;
+    const picker = document.getElementById('reaction-picker');
+    const btn = event.target.closest('button');
+    const rect = btn.getBoundingClientRect();
+    picker.style.top = (rect.top - 50) + 'px';
+    picker.style.left = (rect.left) + 'px';
+    picker.style.display = 'flex';
+}
 
     // ===== COMMENT FUNCTIONS =====
     function loadComments() {
@@ -1654,21 +1953,24 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     // ===== CLOSE ALL =====
     function closeAll() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.style.display = 'none';
-        document.getElementById('share-modal').style.display = 'none';
-        overlay.classList.remove('active');
-        if (focusMode) {
-            focusMode = false;
-            document.getElementById('reader-app').classList.remove('focus-mode');
-            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
-        }
-        if (commentsModal.style.display === 'block') { commentsModal.style.display = 'none'; }
-        if (errorModal.style.display === 'block') { errorModal.style.display = 'none'; }
-        if (prayerModal.style.display === 'block') { prayerModal.style.display = 'none'; }
+    settingsPanel.classList.remove('open');
+    tocDrawer.classList.remove('open');
+    notesPanel.classList.remove('visible');
+    document.getElementById('share-modal').classList.remove('visible');
+    document.getElementById('prayerModal').classList.remove('visible');
+    document.getElementById('errorModal').classList.remove('visible');
+    document.getElementById('commentsModal').classList.remove('visible');
+    document.getElementById('challenge-widget').classList.remove('visible');
+    document.getElementById('search-bar').classList.remove('visible');
+    document.getElementById('notes-panel').classList.remove('visible');
+    document.getElementById('reaction-picker').style.display = 'none';
+    overlay.classList.remove('active');
+    if (focusMode) {
+        focusMode = false;
+        document.getElementById('reader-app').classList.remove('focus-mode');
+        document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
     }
-
+}
     // ===== BACK BUTTON =====
     backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
 
