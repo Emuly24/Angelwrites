@@ -180,10 +180,13 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     <div class="container">
         <div class="about-grid">
             <div class="about-text">
-                <h2>Welcome to <span class="rose-text">AngelWrites</span></h2>
-                <p class="about-lead">You're here because something inside you is crying out for hope. You've been carrying pain, confusion, or loneliness — and you're looking for a place where you can just be real. You've found it.</p>
-                <p>AngelWrites is not about one person. It's about <strong>you</strong> and every human like you who needs to know that God hasn't given up on you. This is a <strong>community</strong> where you can heal, grow, and discover that your story matters.</p>
-                <p>Here, you will find:</p>
+                    <h2>Welcome to <span class="rose-text">AngelWrites</span></h2>
+                    <div class="about-lead-wrapper">
+                        <p class="about-lead">You're here because something inside you is crying out for hope. You've been carrying pain, confusion, or loneliness — and you're looking for a place where you can just be real. You've found it.</p>
+                    </div>
+                    <p class="about-body">AngelWrites is not about one person. It's about <strong>you</strong> and every human like you who needs to know that God hasn't given up on you. This is a <strong>community</strong> where you can heal, grow, and discover that your story matters.</p>
+                    <p class="about-body-intro">Here, you will find:</p>
+                </div>
                 <div class="about-features-grid">
                     <div class="about-feature"><i class="fas fa-book-reader"></i><h4>Books &amp; Poems</h4><p>Read words that speak to your soul.</p></div>
                     <div class="about-feature"><i class="fas fa-pen-fancy"></i><h4>Reflections &amp; Blog</h4><p>Daily thoughts, honest stories, and insights.</p></div>
@@ -597,6 +600,106 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 
     .rose-text { color:var(--rose); }
     .text-center { text-align:center; }
+
+    /* ===== PROFESSIONAL ABOUT TEXT ===== */
+.about-section {
+    background: var(--fantasy);
+    border-top: 1px solid var(--rose-light);
+    border-bottom: 1px solid var(--rose-light);
+    padding: 60px 0;
+}
+
+.about-text {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 0 20px;
+    text-align: center;
+}
+
+/* ---- Heading ---- */
+.about-text h2 {
+    font-size: 2.4rem;
+    margin-bottom: 12px;
+    position: relative;
+    display: inline-block;
+    padding-bottom: 10px;
+}
+.about-text h2::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: var(--rose);
+    border-radius: 4px;
+}
+
+/* ---- Lead (the first long sentence) ---- */
+.about-lead-wrapper {
+    margin: 20px 0 24px;
+}
+.about-lead {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.35rem;
+    line-height: 1.7;
+    color: var(--rose-dark);
+    font-weight: 500;
+    font-style: italic;
+    padding: 20px 28px;
+    background: rgba(219, 161, 162, 0.08);
+    border-left: 4px solid var(--rose);
+    border-radius: 0 12px 12px 0;
+    text-align: left;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+/* ---- Body paragraphs ---- */
+.about-body {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--text);
+    max-width: 650px;
+    margin: 0 auto 18px;
+    text-align: center;
+}
+.about-body strong {
+    color: var(--rose-dark);
+    font-weight: 700;
+}
+
+/* ---- "Here, you will find:" ---- */
+.about-body-intro {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dark);
+    margin-top: 8px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+}
+
+/* ---- Features Grid (already included from previous) ---- */
+.about-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+}
+.about-feature {
+    background: var(--card-bg);
+    border: 1px solid var(--rose-light);
+    border-radius: 16px;
+    padding: 24px 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.about-feature:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+    border-color: var(--rose);
+}
 
     /* ===== ENHANCED BUTTONS ===== */
     .btn {
