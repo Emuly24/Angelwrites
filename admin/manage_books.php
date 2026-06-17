@@ -186,9 +186,13 @@ $pageTitle = 'Manage Books';
 
 <div class="admin-page">
     <div class="container">
-        <div class="admin-header">
-            <h1>Manage Books</h1>
-            <div class="admin-actions">
+        <!-- ===== HERO / HEADER ===== -->
+        <div class="admin-hero">
+            <div class="admin-hero-content">
+                <h1>📚 Manage Books</h1>
+                <p class="admin-hero-sub">Add, edit, and manage all books on AngelWrites.</p>
+            </div>
+            <div class="admin-hero-actions">
                 <button id="showAddForm" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Add New Book
                 </button>
@@ -198,6 +202,7 @@ $pageTitle = 'Manage Books';
             </div>
         </div>
 
+        <!-- ===== ALERT MESSAGES ===== -->
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
@@ -205,22 +210,23 @@ $pageTitle = 'Manage Books';
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- Search Bar -->
+        <!-- ===== SEARCH BAR ===== -->
         <div class="search-bar">
             <form method="GET" class="search-form">
                 <input type="text" name="search" placeholder="Search books by title, author, or description..." value="<?php echo htmlspecialchars($search); ?>">
-                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
                 <?php if (!empty($search)): ?>
-                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-outline btn-sm">Clear</a>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
                 <?php endif; ?>
             </form>
         </div>
 
-        <!-- Book Form (hidden by default) -->
+        <!-- ===== BOOK FORM ===== -->
         <div class="book-form-container" id="bookFormContainer" style="display: <?php echo ($edit_book || isset($_GET['edit'])) ? 'block' : 'none'; ?>;">
             <div class="card">
                 <div class="card-header">
                     <h2 id="formTitle"><?php echo $edit_book ? 'Edit Book' : 'Add New Book'; ?></h2>
+                    <button type="button" class="btn btn-sm btn-outline" id="cancelForm"><i class="fas fa-times"></i> Close</button>
                 </div>
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data" class="admin-form" id="bookForm">
@@ -297,7 +303,7 @@ $pageTitle = 'Manage Books';
                             <input type="file" id="cover" name="cover" accept="image/*">
                             <?php if ($edit_book && $edit_book['cover_path']): ?>
                                 <div class="current-file">
-                                    <img src="<?php echo SITE_URL . '/' . $edit_book['cover_path']; ?>" alt="Current cover" style="max-width:100px;">
+                                    <img src="<?php echo SITE_URL . '/' . $edit_book['cover_path']; ?>" alt="Current cover" style="max-width:100px; border-radius:8px;">
                                     <small>Current cover. Upload new to replace.</small>
                                 </div>
                             <?php endif; ?>
@@ -308,28 +314,30 @@ $pageTitle = 'Manage Books';
                             <label for="book_file">Book File (PDF, EPUB, DOC, DOCX)</label>
                             <input type="file" id="book_file" name="book_file" accept=".pdf,.epub,.doc,.docx">
                             <?php if ($edit_book && $edit_book['file_path']): ?>
-                                <div class="current-file"><small>Current file: <?php echo basename($edit_book['file_path']); ?></small></div>
+                                <div class="current-file">
+                                    <small>📁 Current file: <?php echo basename($edit_book['file_path']); ?></small>
+                                </div>
                             <?php endif; ?>
                         </div>
 
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Book</button>
-                            <button type="button" class="btn btn-outline" id="cancelForm">Cancel</button>
+                            <button type="button" class="btn btn-outline" id="cancelFormBtn">Cancel</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
-        <!-- Book List -->
+        <!-- ===== BOOK LIST ===== -->
         <div class="book-list">
             <div class="card">
                 <div class="card-header">
-                    <h2>All Books (<?php echo $total_books; ?>)</h2>
-                    <div class="card-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <select id="bulkActionSelect" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);font-size:0.85rem;">
+                    <h2>All Books <span class="count-badge"><?php echo $total_books; ?></span></h2>
+                    <div class="card-header-actions">
+                        <select id="bulkActionSelect" class="bulk-select">
                             <option value="">Bulk Actions</option>
-                            <option value="delete">Delete Selected</option>
+                            <option value="delete">🗑️ Delete Selected</option>
                         </select>
                         <button id="executeBulkAction" class="btn btn-sm btn-primary" disabled>Apply</button>
                     </div>
@@ -343,31 +351,39 @@ $pageTitle = 'Manage Books';
                                 <table class="admin-table">
                                     <thead>
                                         <tr>
-                                            <th><input type="checkbox" id="selectAllRows"></th>
-                                            <th>Cover</th>
+                                            <th class="check-col"><input type="checkbox" id="selectAllRows" class="styled-checkbox"></th>
+                                            <th class="cover-col">Cover</th>
                                             <th>Title</th>
                                             <th>Author</th>
                                             <th>Price</th>
                                             <th>File Info</th>
-                                            <th>Actions</th>
+                                            <th class="actions-col">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php foreach ($books as $book): ?>
                                             <tr>
-                                                <td><input type="checkbox" class="row-select" value="<?php echo $book['id']; ?>"></td>
+                                                <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $book['id']; ?>"></td>
                                                 <td>
                                                     <?php if ($book['cover_path']): ?>
-                                                        <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" style="max-width:50px;max-height:50px;object-fit:cover;border-radius:6px;">
+                                                        <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" class="book-thumb">
                                                     <?php else: ?>
-                                                        <i class="fas fa-book" style="font-size:1.5rem;color:var(--rose);"></i>
+                                                        <div class="book-thumb-placeholder"><i class="fas fa-book"></i></div>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <strong><?php echo htmlspecialchars($book['title']); ?></strong>
-                                                    <?php if ($book['release_date']): ?><br><small>Released: <?php echo htmlspecialchars($book['release_date']); ?></small><?php endif; ?>
-                                                    <?php if ($book['file_author']): ?><br><small>File Author: <?php echo htmlspecialchars($book['file_author']); ?></small><?php endif; ?>
-                                                    <?php if ($book['file_size']): ?><br><small>Size: <?php echo number_format($book['file_size'] / 1024, 1); ?> KB</small><?php endif; ?>
+                                                    <div class="book-title-cell">
+                                                        <strong><?php echo htmlspecialchars($book['title']); ?></strong>
+                                                        <?php if ($book['release_date']): ?>
+                                                            <span class="cell-meta">Released: <?php echo htmlspecialchars($book['release_date']); ?></span>
+                                                        <?php endif; ?>
+                                                        <?php if ($book['file_author']): ?>
+                                                            <span class="cell-meta">File Author: <?php echo htmlspecialchars($book['file_author']); ?></span>
+                                                        <?php endif; ?>
+                                                        <?php if ($book['file_size']): ?>
+                                                            <span class="cell-meta">Size: <?php echo number_format($book['file_size'] / 1024, 1); ?> KB</span>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </td>
                                                 <td><?php echo htmlspecialchars($book['author']); ?></td>
                                                 <td>
@@ -381,16 +397,24 @@ $pageTitle = 'Manage Books';
                                                 </td>
                                                 <td>
                                                     <?php if ($book['file_path']): ?>
-                                                        <span class="status-badge available"><?php echo strtoupper($book['file_type'] ?? 'Unknown'); ?></span>
+                                                        <span class="status-badge available"><?php echo strtoupper($book['file_type'] ?? 'PDF'); ?></span>
                                                     <?php else: ?>
                                                         <span class="status-badge missing">No file</span>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td class="actions">
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary"><i class="fas fa-edit"></i></a>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-info"><i class="fas fa-cogs"></i> Process</a>
-                                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary" target="_blank"><i class="fas fa-eye"></i></a>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this book?');"><i class="fas fa-trash"></i></a>
+                                                <td class="actions-cell">
+                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary action-btn" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-info action-btn" title="Process">
+                                                        <i class="fas fa-cogs"></i>
+                                                    </a>
+                                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary action-btn" target="_blank" title="View">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this book?');" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -399,7 +423,7 @@ $pageTitle = 'Manage Books';
                             </div>
                         </form>
 
-                        <!-- Pagination -->
+                        <!-- ===== PAGINATION ===== -->
                         <?php if ($total_pages > 1): ?>
                             <div class="pagination">
                                 <?php if ($page > 1): ?>
@@ -420,7 +444,11 @@ $pageTitle = 'Manage Books';
                             </div>
                         <?php endif; ?>
                     <?php else: ?>
-                        <p class="no-items">No books yet. Click "Add New Book" to get started.</p>
+                        <div class="empty-state">
+                            <i class="fas fa-book empty-icon"></i>
+                            <h3>No books yet</h3>
+                            <p>Click "Add New Book" to get started.</p>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -428,12 +456,14 @@ $pageTitle = 'Manage Books';
     </div>
 </div>
 
+<!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ===== FORM TOGGLE =====
     const showAddBtn = document.getElementById('showAddForm');
     const formContainer = document.getElementById('bookFormContainer');
-    const cancelBtn = document.getElementById('cancelForm');
+    const cancelFormBtn = document.getElementById('cancelFormBtn');
+    const cancelHeaderBtn = document.getElementById('cancelForm');
     const formTitle = document.getElementById('formTitle');
 
     function toggleForm(show) {
@@ -449,7 +479,9 @@ document.addEventListener('DOMContentLoaded', function() {
         resetForm();
         toggleForm(true);
     });
-    cancelBtn.addEventListener('click', function() { toggleForm(false); });
+
+    if (cancelFormBtn) cancelFormBtn.addEventListener('click', function() { toggleForm(false); });
+    if (cancelHeaderBtn) cancelHeaderBtn.addEventListener('click', function() { toggleForm(false); });
 
     function resetForm() {
         document.querySelector('input[name="book_id"]').value = 0;
@@ -469,7 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleForm(true);
     }
 
-    // ===== CAMERA (LIVE PHOTO) =====
+    // ===== CAMERA =====
     const cameraPreview = document.getElementById('cameraPreview');
     const cameraPlaceholder = document.getElementById('cameraPlaceholder');
     const startCameraBtn = document.getElementById('startCameraBtn');
@@ -608,86 +640,184 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ===== STYLES ===== -->
 <style>
-.admin-page { padding: 32px 0 60px; }
-.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.admin-header h1 { font-size: 2rem; margin: 0; }
-.admin-actions { display: flex; gap: 12px; }
+/* ===== BRAND VARIABLES ===== */
+:root {
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
+    --card-bg: #ffffff;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
 
+/* ===== PAGE ===== */
+.admin-page { padding: 32px 0 60px; font-family: 'Inter', sans-serif; background: var(--bg); }
+
+/* ===== HERO ===== */
+.admin-hero {
+    background: linear-gradient(135deg, var(--vanilla), var(--fantasy));
+    border-radius: 20px;
+    padding: 24px 32px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    border: 1px solid var(--rose-light);
+    box-shadow: var(--shadow);
+}
+.admin-hero-content h1 { font-size: 2rem; margin: 0 0 4px 0; font-family: 'Playfair Display', Georgia, serif; color: var(--dark); }
+.admin-hero-sub { color: var(--text-light); font-size: 1.05rem; margin: 0; }
+.admin-hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* ===== ALERTS ===== */
+.alert { padding: 14px 20px; border-radius: 16px; margin-bottom: 20px; font-weight: 500; }
+.alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+
+/* ===== SEARCH BAR ===== */
 .search-bar { margin-bottom: 24px; }
 .search-form { display: flex; gap: 8px; flex-wrap: wrap; }
-.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
+.search-form input { flex: 1; min-width: 200px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 50px; font-size: 0.95rem; background: var(--card-bg); color: var(--text); transition: border-color 0.2s; }
 .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
+.search-form .btn { padding: 8px 20px; font-size: 0.85rem; border-radius: 50px; }
 
-.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+/* ===== BUTTONS ===== */
+.btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px;
+    border-radius: 50px; font-weight: 700; font-size: 0.95rem; border: none;
+    cursor: pointer; text-decoration: none; transition: all var(--transition);
+    box-shadow: 0 3px 10px rgba(44,30,30,0.12); letter-spacing: 0.3px;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.btn-primary { background: var(--rose); color: var(--white); border: 2px solid var(--rose); }
+.btn-primary:hover { background: var(--rose-dark); border-color: var(--rose-dark); }
+.btn-secondary { background: var(--vanilla); color: var(--dark); border: 2px solid var(--vanilla); }
+.btn-secondary:hover { background: var(--rose-light); border-color: var(--rose-light); }
+.btn-outline { background: transparent; border: 2px solid var(--rose); color: var(--rose); }
+.btn-outline:hover { background: var(--rose); color: var(--white); }
+.btn-sm { padding: 8px 20px; font-size: 0.85rem; }
+.btn-info { background: #17a2b8; color: white; border: 2px solid #17a2b8; }
+.btn-info:hover { background: #138496; border-color: #138496; }
+.btn-danger { background: #dc3545; color: white; border: 2px solid #dc3545; }
+.btn-danger:hover { background: #c82333; border-color: #c82333; }
+.btn-success { background: #28a745; color: white; border: 2px solid #28a745; }
+.btn-success:hover { background: #218838; border-color: #218838; }
+.btn-warning { background: #ffc107; color: #212529; border: 2px solid #ffc107; }
+.btn-warning:hover { background: #e0a800; border-color: #e0a800; }
+
+/* ===== CARDS ===== */
+.card { background: var(--card-bg); border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; transition: all var(--transition); }
+.card:hover { box-shadow: var(--shadow-hover); }
+.card-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; background: var(--vanilla); }
+.card-header h2 { font-size: 1.3rem; margin: 0; font-family: 'Playfair Display', Georgia, serif; color: var(--dark); display: flex; align-items: center; gap: 8px; }
+.count-badge { background: var(--rose); color: white; padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+.card-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.card-body { padding: 24px; }
+
+/* ===== FORM ===== */
+.book-form-container .card-header { background: var(--vanilla); }
+.admin-form .form-group { margin-bottom: 16px; }
+.admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.9rem; }
+.admin-form .required { color: #dc3545; }
+.admin-form input, .admin-form textarea, .admin-form select {
+    width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px;
+    font-size: 0.95rem; background: var(--input-bg); color: var(--text); transition: border-color 0.2s;
+}
+.admin-form input:focus, .admin-form textarea:focus, .admin-form select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
+.admin-form textarea { resize: vertical; min-height: 80px; font-family: 'Inter', sans-serif; }
+.admin-form input[type="file"] { padding: 10px; border: 2px dashed var(--border); border-radius: 12px; background: var(--vanilla); cursor: pointer; }
+.admin-form input[type="file"]:hover { border-color: var(--rose); background: rgba(219,161,162,0.05); }
+.admin-form .current-file { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 0.85rem; color: var(--text-light); padding: 8px 12px; background: var(--fantasy); border-radius: 8px; border: 1px solid var(--border); }
+.admin-form .current-file img { border-radius: 8px; }
+
+.form-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 8px; }
+.form-row .form-group { flex: 1; min-width: 200px; }
+
+.checkbox-group { display: flex; align-items: center; gap: 8px; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; }
+.checkbox-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--rose); }
+
+.form-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.form-actions .btn { min-width: 120px; justify-content: center; }
+
+/* ===== CAMERA ===== */
+.camera-section { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: var(--fantasy); margin-top: 8px; }
+.camera-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
+.camera-preview-container video { width: 100%; height: 100%; object-fit: cover; display: none; }
+.camera-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-light); text-align: center; padding: 24px; }
+.camera-placeholder i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; }
+.camera-placeholder p { margin: 0; font-size: 0.9rem; }
+.camera-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; margin-top: 12px; }
+.camera-controls .btn { padding: 6px 16px; font-size: 0.85rem; border-radius: 50px; }
+.captured-photo-container { text-align: center; margin-top: 12px; }
+.captured-photo-container img { border: 3px solid var(--rose); border-radius: 12px; }
+.status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
+
+/* ===== TABLE ===== */
+.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .admin-table thead { background: var(--vanilla); }
-.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
+.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.9rem; }
 .admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
-.table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
-.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+.admin-table .check-col { width: 40px; }
+.admin-table .cover-col { width: 60px; }
+.admin-table .actions-col { width: 180px; }
+
+.styled-checkbox { width: 18px; height: 18px; accent-color: var(--rose); cursor: pointer; }
+.book-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; }
+.book-thumb-placeholder { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: var(--vanilla); border-radius: 8px; font-size: 1.5rem; color: var(--rose); }
+.book-title-cell { display: flex; flex-direction: column; gap: 2px; }
+.cell-meta { font-size: 0.75rem; color: var(--text-light); }
+.table-responsive { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+
+/* ===== BADGES ===== */
+.badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+.badge.free { background: #28a745; color: white; }
+.badge.sale { background: #dc3545; color: white; }
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+.status-badge.available { background: #28a745; color: white; }
+.status-badge.missing { background: #dc3545; color: white; }
+
+/* ===== ACTIONS ===== */
+.actions-cell { display: flex; gap: 4px; flex-wrap: wrap; }
+.action-btn { padding: 6px 10px; font-size: 0.8rem; border-radius: 8px; min-width: 32px; justify-content: center; }
+.bulk-select { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.85rem; }
 
 /* ===== PAGINATION ===== */
-.pagination { display: flex; justify-content: center; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
+.pagination { display: flex; justify-content: center; gap: 6px; margin-top: 20px; flex-wrap: wrap; }
 .page-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); font-size: 0.9rem; transition: all 0.2s; min-width: 36px; text-decoration: none; }
 .page-link:hover { border-color: var(--rose); }
 .page-link.active { background: var(--rose); color: white; border-color: var(--rose); }
 
-/* ===== BADGES ===== */
-.badge { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 0.8rem; font-weight: 600; }
-.badge.free { background: #2ecc71; color: white; }
-.badge.sale { background: #e67e22; color: white; }
-.status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.available { background: #2ecc71; color: white; }
-.status-badge.missing { background: #e74c3c; color: white; }
+/* ===== EMPTY STATE ===== */
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
+.empty-icon { font-size: 3rem; color: var(--rose); margin-bottom: 16px; opacity: 0.6; }
+.empty-state h3 { font-size: 1.3rem; margin-bottom: 4px; color: var(--text); }
+.empty-state p { margin: 0; font-size: 0.95rem; }
 
-/* ===== BOOK FORM ===== */
-.book-form-container .card { border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-top: 16px; }
-.book-form-container .card-header { background: var(--vanilla); padding: 16px 24px; border-radius: 16px 16px 0 0; border-bottom: 1px solid var(--border); }
-.book-form-container .card-body { padding: 24px; }
-
-.form-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 12px; }
-.form-row .form-group { flex: 1; min-width: 200px; }
-
-.admin-form .form-group { margin-bottom: 16px; }
-.admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); }
-.admin-form input, .admin-form textarea, .admin-form select { width: 100%; padding: 10px 14px; border: 2px solid var(--border); border-radius: 10px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); transition: all 0.3s ease; }
-.admin-form input:focus, .admin-form textarea:focus, .admin-form select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 4px rgba(219,161,162,0.15); }
-.admin-form textarea { resize: vertical; min-height: 80px; }
-
-.admin-form .checkbox-group { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 4px 0; }
-.admin-form .checkbox-group input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; background: var(--input-bg); cursor: pointer; transition: 0.2s; flex-shrink: 0; position: relative; }
-.admin-form .checkbox-group input[type="checkbox"]:checked { background: var(--rose); border-color: var(--rose); }
-.admin-form .checkbox-group input[type="checkbox"]:checked::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 14px; font-weight: 700; }
-
-.admin-form input[type="file"] { padding: 8px 12px; border: 2px dashed var(--border); border-radius: 10px; background: var(--vanilla); width: 100%; cursor: pointer; transition: 0.3s; }
-.admin-form input[type="file"]:hover { border-color: var(--rose); background: rgba(219,161,162,0.05); }
-
-.admin-form .current-file { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 0.85rem; color: var(--text-light); padding: 6px 12px; background: var(--fantasy); border-radius: 6px; border: 1px solid var(--border); }
-
-.admin-form .form-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
-.admin-form .form-actions .btn { min-width: 120px; justify-content: center; padding: 10px 24px; font-weight: 600; border-radius: 30px; }
-
-/* ===== CAMERA SECTION ===== */
-.camera-section { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--fantasy); margin-top: 8px; }
-.camera-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
-.camera-preview-container video { width: 100%; height: 100%; object-fit: cover; display: none; }
-.camera-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-light); text-align: center; padding: 24px; }
-.camera-placeholder i { font-size: 2.5rem; margin-bottom: 8px; color: var(--rose); }
-.camera-placeholder p { margin: 0; font-size: 0.9rem; }
-.camera-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; margin-top: 12px; }
-.camera-controls .btn { padding: 6px 14px; font-size: 0.85rem; }
-.captured-photo-container { text-align: center; margin-top: 12px; }
-.captured-photo-container img { border: 2px solid var(--rose); border-radius: 8px; }
-.status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
-
-.actions { display: flex; gap: 4px; flex-wrap: wrap; }
-.btn-sm { padding: 4px 10px; font-size: 0.8rem; }
-
+/* ===== RESPONSIVE ===== */
+@media (max-width: 992px) {
+    .admin-hero { flex-direction: column; text-align: center; align-items: center; }
+    .admin-hero-actions { justify-content: center; }
+    .admin-hero-content h1 { font-size: 1.6rem; }
+}
 @media (max-width: 768px) {
     .form-row { flex-direction: column; }
-    .admin-table th, .admin-table td { padding: 10px 12px; font-size: 0.85rem; }
+    .admin-table th, .admin-table td { padding: 10px 12px; font-size: 0.8rem; }
+    .actions-cell { flex-wrap: wrap; }
 }
 </style>
 

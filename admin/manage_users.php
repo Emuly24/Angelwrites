@@ -138,18 +138,20 @@ $pageTitle = 'Manage Users';
 
 <div class="admin-page">
     <div class="container">
-        <div class="admin-header">
-            <h1>Manage Users</h1>
-            <div class="admin-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
+        <!-- ===== HERO / HEADER ===== -->
+        <div class="admin-hero">
+            <div class="admin-hero-content">
+                <h1>👥 Manage Users</h1>
+                <p class="admin-hero-sub">View, edit, and manage all user accounts on AngelWrites.</p>
+            </div>
+            <div class="admin-hero-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
         </div>
 
+        <!-- ===== ALERT MESSAGES ===== -->
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
@@ -157,27 +159,27 @@ $pageTitle = 'Manage Users';
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- Search Bar -->
+        <!-- ===== SEARCH BAR ===== -->
         <div class="search-bar">
             <form method="GET" class="search-form">
                 <input type="text" name="search" placeholder="Search users by name, email, or username..." value="<?php echo htmlspecialchars($search); ?>">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
                 <?php if (!empty($search)): ?>
-                    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="btn btn-outline btn-sm">Clear</a>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
                 <?php endif; ?>
             </form>
         </div>
 
-        <!-- Users Table -->
+        <!-- ===== USERS TABLE ===== -->
         <div class="card">
             <div class="card-header">
-                <h2>All Users (<?php echo $total_users; ?>)</h2>
-                <div class="card-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <select id="bulkActionSelect" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);font-size:0.85rem;">
+                <h2>All Users <span class="count-badge"><?php echo $total_users; ?></span></h2>
+                <div class="card-header-actions">
+                    <select id="bulkActionSelect" class="bulk-select">
                         <option value="">Bulk Actions</option>
-                        <option value="make_admin">Promote to Admin</option>
-                        <option value="make_reader">Demote to Reader</option>
-                        <option value="delete">Delete Selected</option>
+                        <option value="make_admin">👑 Promote to Admin</option>
+                        <option value="make_reader">📖 Demote to Reader</option>
+                        <option value="delete">🗑️ Delete Selected</option>
                     </select>
                     <button id="executeBulkAction" class="btn btn-sm btn-primary" disabled>Apply</button>
                 </div>
@@ -191,26 +193,28 @@ $pageTitle = 'Manage Users';
                             <table class="admin-table">
                                 <thead>
                                     <tr>
-                                        <th><input type="checkbox" id="selectAllRows"></th>
+                                        <th class="check-col"><input type="checkbox" id="selectAllRows" class="styled-checkbox"></th>
                                         <th>ID</th>
                                         <th>Name</th>
                                         <th>Username</th>
                                         <th>Email</th>
                                         <th>Role</th>
                                         <th>Joined</th>
-                                        <th>Actions</th>
+                                        <th class="actions-col">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($users as $user): ?>
                                         <tr>
-                                            <td><input type="checkbox" class="row-select" value="<?php echo $user['id']; ?>"></td>
-                                            <td><?php echo $user['id']; ?></td>
+                                            <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $user['id']; ?>"></td>
+                                            <td><span class="user-id"><?php echo $user['id']; ?></span></td>
                                             <td>
-                                                <strong><?php echo htmlspecialchars($user['name']); ?></strong>
-                                                <?php if ($user['id'] === $_SESSION['user_id']): ?>
-                                                    <span class="badge-you">You</span>
-                                                <?php endif; ?>
+                                                <div class="user-name-cell">
+                                                    <strong><?php echo htmlspecialchars($user['name']); ?></strong>
+                                                    <?php if ($user['id'] === $_SESSION['user_id']): ?>
+                                                        <span class="badge-you">You</span>
+                                                    <?php endif; ?>
+                                                </div>
                                             </td>
                                             <td><?php echo htmlspecialchars($user['username']); ?></td>
                                             <td><?php echo htmlspecialchars($user['email']); ?></td>
@@ -229,9 +233,9 @@ $pageTitle = 'Manage Users';
                                                 <?php endif; ?>
                                             </td>
                                             <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
-                                            <td class="actions">
+                                            <td class="actions-cell">
                                                 <?php if ($user['id'] !== $_SESSION['user_id']): ?>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php?delete=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?');">
+                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php?delete=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this user?');" title="Delete">
                                                         <i class="fas fa-trash"></i>
                                                     </a>
                                                 <?php endif; ?>
@@ -243,7 +247,7 @@ $pageTitle = 'Manage Users';
                         </div>
                     </form>
 
-                    <!-- Pagination -->
+                    <!-- ===== PAGINATION ===== -->
                     <?php if ($total_pages > 1): ?>
                         <div class="pagination">
                             <?php if ($page > 1): ?>
@@ -264,7 +268,11 @@ $pageTitle = 'Manage Users';
                         </div>
                     <?php endif; ?>
                 <?php else: ?>
-                    <p class="no-items">No users found.</p>
+                    <div class="empty-state">
+                        <i class="fas fa-users empty-icon"></i>
+                        <h3>No users found</h3>
+                        <p>Try adjusting your search.</p>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -274,28 +282,13 @@ $pageTitle = 'Manage Users';
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== THEME TOGGLE =====
-    const themeToggle = document.getElementById('themeToggle');
-    const currentTheme = localStorage.getItem('usersTheme') || 'light';
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-    }
-
-    window.toggleTheme = function() {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('usersTheme', isDark ? 'dark' : 'light');
-        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-    };
-
     // ===== BULK ACTIONS =====
     const selectAllRows = document.getElementById('selectAllRows');
     const rowCheckboxes = document.querySelectorAll('.row-select');
     const executeBulkBtn = document.getElementById('executeBulkAction');
     const bulkActionSelect = document.getElementById('bulkActionSelect');
 
-    selectAllRows.addEventListener('change', function() {
+    selectAllRows?.addEventListener('change', function() {
         rowCheckboxes.forEach(cb => cb.checked = this.checked);
         updateBulkButton();
     });
@@ -306,7 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
         executeBulkBtn.disabled = (checked === 0);
     }
 
-    executeBulkBtn.addEventListener('click', function() {
+    executeBulkBtn?.addEventListener('click', function() {
         const action = bulkActionSelect.value;
         const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
         if (!action || ids.length === 0) {
@@ -321,73 +314,139 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ===== STYLES ===== -->
 <style>
-/* ===== DARK MODE SUPPORT ===== */
+/* ===== BRAND VARIABLES ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
+.rose-text { color:var(--rose); }
+
+/* ===== BUTTONS ===== */
+.btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
+    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
+    cursor:pointer; text-decoration:none; transition:all var(--transition);
+    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
 }
-body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
+.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
+.btn-outline:hover { background:var(--rose); color:var(--white); }
+.btn-sm { padding:8px 20px; font-size:0.85rem; }
+.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
+.btn-danger:hover { background:#c82333; border-color:#c82333; }
 
-.admin-page { padding: 32px 0 60px; }
-.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.admin-header h1 { font-size: 2rem; margin: 0; }
-.admin-actions { display: flex; gap: 12px; }
+/* ===== PAGE ===== */
+.admin-page { padding:32px 0 60px; }
 
-.search-bar { margin-bottom: 24px; }
-.search-form { display: flex; gap: 8px; flex-wrap: wrap; }
-.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
+/* ===== HERO ===== */
+.admin-hero {
+    background:linear-gradient(135deg, var(--vanilla), var(--fantasy));
+    border-radius:20px; padding:24px 32px; margin-bottom:24px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;
+    border:1px solid var(--rose-light); box-shadow:var(--shadow);
+}
+.admin-hero-content h1 { font-size:2rem; margin:0 0 4px 0; color:var(--dark); }
+.admin-hero-sub { color:var(--text-light); font-size:1.05rem; margin:0; }
+.admin-hero-actions { display:flex; gap:12px; flex-wrap:wrap; }
 
-.admin-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-.admin-table th { background: var(--vanilla); padding: 10px 16px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); }
-.admin-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
+/* ===== ALERTS ===== */
+.alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
+.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
 
-.role-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.role-badge.admin { background: var(--rose); color: white; }
-.role-badge.reader { background: var(--vanilla); color: var(--text); }
+/* ===== SEARCH BAR ===== */
+.search-bar { margin-bottom:24px; }
+.search-form { display:flex; gap:8px; flex-wrap:wrap; }
+.search-form input { flex:1; min-width:200px; padding:12px 16px; border:1px solid var(--border); border-radius:50px; font-size:0.95rem; background:var(--card-bg); color:var(--text); transition:border-color 0.2s; }
+.search-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.search-form .btn { padding:8px 20px; font-size:0.85rem; border-radius:50px; }
 
-.role-select { padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); font-size: 0.85rem; cursor: pointer; background: var(--input-bg); color: var(--text); }
-.role-select.reader { border-left: 4px solid #3498db; }
-.role-select.admin { border-left: 4px solid #e74c3c; }
+/* ===== CARD ===== */
+.card { background:var(--card-bg); border-radius:20px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; margin-bottom:24px; transition:all var(--transition); }
+.card:hover { box-shadow:var(--shadow-hover); }
+.card-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:var(--vanilla); }
+.card-header h2 { font-size:1.3rem; margin:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); display:flex; align-items:center; gap:8px; }
+.count-badge { background:var(--rose); color:white; padding:2px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
+.card-header-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.card-body { padding:24px; }
 
-.badge-you { background: var(--rose); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px; }
+/* ===== TABLE ===== */
+.table-responsive { overflow-x:auto; border-radius:12px; border:1px solid var(--border); }
+.admin-table { width:100%; border-collapse:separate; border-spacing:0; }
+.admin-table thead { background:var(--vanilla); }
+.admin-table th { text-align:left; padding:14px 20px; font-weight:600; color:var(--text); border-bottom:2px solid var(--border); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; }
+.admin-table td { padding:14px 20px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); font-size:0.9rem; }
+.admin-table tbody tr:hover { background:rgba(219,161,162,0.08); }
+.admin-table .check-col { width:40px; }
+.admin-table .actions-col { width:80px; }
 
-.actions { display: flex; gap: 4px; }
-.btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 20px; }
+.styled-checkbox { width:18px; height:18px; accent-color:var(--rose); cursor:pointer; }
+.user-id { font-weight:500; color:var(--text-light); }
+.user-name-cell { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.badge-you { background:var(--rose); color:white; padding:2px 10px; border-radius:20px; font-size:0.7rem; font-weight:600; }
 
-.pagination { display: flex; justify-content: center; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
-.page-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); font-size: 0.9rem; transition: all 0.2s; min-width: 36px; text-decoration: none; }
-.page-link:hover { border-color: var(--rose); }
-.page-link.active { background: var(--rose); color: white; border-color: var(--rose); }
+/* ===== ROLE ===== */
+.role-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
+.role-badge.admin { background:var(--rose); color:white; }
+.role-badge.reader { background:var(--vanilla); color:var(--text); }
+.role-select { padding:6px 10px; border-radius:8px; border:1px solid var(--border); font-size:0.85rem; cursor:pointer; background:var(--input-bg); color:var(--text); transition:border-color 0.2s; }
+.role-select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.role-select.reader { border-left:4px solid #3498db; }
+.role-select.admin { border-left:4px solid #e74c3c; }
 
-.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+/* ===== BULK ===== */
+.bulk-select { padding:6px 12px; border-radius:8px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); font-size:0.85rem; }
 
-@media (max-width: 480px) {
-    .search-form { flex-direction: column; }
-    .search-form input { width: 100%; }
-    .admin-table th, .admin-table td { padding: 8px 10px; font-size: 0.85rem; }
+/* ===== ACTIONS ===== */
+.actions-cell { display:flex; gap:4px; }
+.action-btn { padding:6px 10px; font-size:0.8rem; border-radius:8px; min-width:32px; justify-content:center; }
+
+/* ===== PAGINATION ===== */
+.pagination { display:flex; justify-content:center; gap:6px; margin-top:20px; flex-wrap:wrap; }
+.page-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 14px; border-radius:8px; background:var(--card-bg); border:1px solid var(--border); color:var(--text); font-size:0.9rem; transition:all 0.2s; min-width:36px; text-decoration:none; }
+.page-link:hover { border-color:var(--rose); }
+.page-link.active { background:var(--rose); color:white; border-color:var(--rose); }
+
+/* ===== EMPTY STATE ===== */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text-light); }
+.empty-icon { font-size:3rem; color:var(--rose); margin-bottom:16px; opacity:0.6; }
+.empty-state h3 { font-size:1.3rem; margin-bottom:4px; color:var(--text); }
+.empty-state p { margin:0; font-size:0.95rem; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:992px) {
+    .admin-hero { flex-direction:column; text-align:center; align-items:center; }
+    .admin-hero-actions { justify-content:center; }
+    .admin-hero-content h1 { font-size:1.6rem; }
+}
+@media (max-width:768px) {
+    .admin-table th, .admin-table td { padding:10px 12px; font-size:0.8rem; }
+    .actions-cell { flex-wrap:wrap; }
 }
 </style>
 

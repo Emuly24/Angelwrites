@@ -90,18 +90,20 @@ $pageTitle = 'Site Settings';
 
 <div class="admin-page">
     <div class="container">
-        <div class="admin-header">
-            <h1>Site Settings</h1>
-            <div class="admin-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
+        <!-- ===== HERO / HEADER ===== -->
+        <div class="admin-hero">
+            <div class="admin-hero-content">
+                <h1>⚙️ Site Settings</h1>
+                <p class="admin-hero-sub">Manage your site's general settings and branding.</p>
+            </div>
+            <div class="admin-hero-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
         </div>
 
+        <!-- ===== ALERT MESSAGES ===== -->
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
@@ -109,20 +111,20 @@ $pageTitle = 'Site Settings';
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- Settings Tabs -->
+        <!-- ===== SETTINGS TABS ===== -->
         <div class="settings-tabs">
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
         </div>
 
-        <!-- General Settings Tab -->
+        <!-- ===== GENERAL TAB ===== -->
         <div class="tab-content active" id="tab-general">
             <div class="card">
                 <div class="card-header">
                     <h2>General Settings</h2>
                 </div>
                 <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" class="admin-form" id="settingsForm">
+                    <form method="POST" class="admin-form" id="settingsForm">
                         <div class="form-group">
                             <label for="site_name">Site Name <span class="required">*</span></label>
                             <input type="text" id="site_name" name="site_name" value="<?php echo htmlspecialchars($site_name); ?>" required>
@@ -145,7 +147,7 @@ $pageTitle = 'Site Settings';
             </div>
         </div>
 
-        <!-- Branding Tab -->
+        <!-- ===== BRANDING TAB ===== -->
         <div class="tab-content" id="tab-branding">
             <div class="card">
                 <div class="card-header">
@@ -192,7 +194,7 @@ $pageTitle = 'Site Settings';
                             <input type="file" id="logo" name="logo" accept="image/*">
                             <?php if ($logo_path): ?>
                                 <div class="current-file">
-                                    <img src="<?php echo SITE_URL . '/' . $logo_path; ?>" alt="Current logo" style="max-width:150px; max-height:150px; border-radius:8px;">
+                                    <img src="<?php echo SITE_URL . '/' . $logo_path; ?>" alt="Current logo" style="max-width:150px; max-height:150px; border-radius:12px;">
                                     <small>Current logo. Upload new to replace.</small>
                                 </div>
                             <?php endif; ?>
@@ -241,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
         themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
     };
 
-    // ===== CAMERA (LIVE PHOTO) =====
+    // ===== CAMERA =====
     const cameraPreview = document.getElementById('cameraPreview');
     const cameraPlaceholder = document.getElementById('cameraPlaceholder');
     const startCameraBtn = document.getElementById('startCameraBtn');
@@ -331,91 +333,128 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ===== STYLES ===== -->
 <style>
-/* ===== DARK MODE SUPPORT ===== */
+/* ===== BRAND VARIABLES ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
-}
-body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 
-.admin-page { padding: 32px 0 60px; }
-.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.admin-header h1 { font-size: 2rem; margin: 0; }
-.admin-actions { display: flex; gap: 12px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
+.rose-text { color:var(--rose); }
+
+/* ===== BUTTONS ===== */
+.btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
+    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
+    cursor:pointer; text-decoration:none; transition:all var(--transition);
+    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
+}
+.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
+.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
+.btn-outline:hover { background:var(--rose); color:var(--white); }
+.btn-sm { padding:8px 20px; font-size:0.85rem; }
+.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
+.btn-success:hover { background:#218838; border-color:#218838; }
+.btn-warning { background:#ffc107; color:#212529; border:2px solid #ffc107; }
+.btn-warning:hover { background:#e0a800; border-color:#e0a800; }
+
+/* ===== PAGE ===== */
+.admin-page { padding:32px 0 60px; }
+
+/* ===== HERO ===== */
+.admin-hero {
+    background:linear-gradient(135deg, var(--vanilla), var(--fantasy));
+    border-radius:20px; padding:24px 32px; margin-bottom:24px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;
+    border:1px solid var(--rose-light); box-shadow:var(--shadow);
+}
+.admin-hero-content h1 { font-size:2rem; margin:0 0 4px 0; color:var(--dark); }
+.admin-hero-sub { color:var(--text-light); font-size:1.05rem; margin:0; }
+.admin-hero-actions { display:flex; gap:12px; flex-wrap:wrap; }
+
+/* ===== ALERTS ===== */
+.alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
+.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
 
 /* ===== TABS ===== */
-.settings-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
-.tab-btn { padding: 8px 20px; border: none; background: none; cursor: pointer; font-size: 0.95rem; border-radius: 6px 6px 0 0; transition: all 0.2s; }
-.tab-btn:hover { background: var(--vanilla); }
-.tab-btn.active { background: var(--rose); color: white; }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
+.settings-tabs { display:flex; gap:4px; margin-bottom:24px; border-bottom:2px solid var(--border); flex-wrap:wrap; }
+.tab-btn { padding:10px 24px; border:none; background:transparent; cursor:pointer; font-size:0.95rem; border-radius:8px 8px 0 0; transition:all var(--transition); font-weight:600; color:var(--text); }
+.tab-btn:hover { background:var(--vanilla); }
+.tab-btn.active { background:var(--rose); color:white; }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
 
 /* ===== CARD ===== */
-.card { margin-bottom: 24px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); }
-.card-header { background: var(--vanilla); padding: 14px 20px; border-bottom: 1px solid var(--border); }
-.card-header h2 { font-size: 1.15rem; margin: 0; display: flex; align-items: center; gap: 8px; }
-.card-body { padding: 20px; }
+.card { background:var(--card-bg); border-radius:20px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; margin-bottom:24px; transition:all var(--transition); }
+.card:hover { box-shadow:var(--shadow-hover); }
+.card-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:var(--vanilla); }
+.card-header h2 { font-size:1.3rem; margin:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
+.card-body { padding:24px; }
 
 /* ===== FORM ===== */
-.admin-form .form-group { margin-bottom: 16px; }
-.admin-form label { display: block; font-weight: 600; margin-bottom: 4px; color: var(--text); font-size: 0.95rem; }
+.admin-form .form-group { margin-bottom:16px; }
+.admin-form label { display:block; font-weight:600; margin-bottom:6px; color:var(--text); font-size:0.9rem; }
+.admin-form .required { color:#dc3545; }
 .admin-form input[type="text"], .admin-form input[type="email"], .admin-form textarea {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.95rem;
-    background: var(--input-bg);
-    color: var(--text);
-    transition: border-color 0.3s;
+    width:100%; padding:12px 16px; border:1px solid var(--border); border-radius:12px;
+    font-size:0.95rem; background:var(--input-bg); color:var(--text); transition:border-color 0.2s;
 }
-.admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.admin-form textarea { resize: vertical; min-height: 60px; }
-.required { color: #e74c3c; }
-.admin-form .form-actions { display: flex; gap: 12px; margin-top: 16px; }
-.admin-form .form-actions .btn { min-width: 120px; justify-content: center; padding: 10px 24px; font-weight: 600; border-radius: 30px; }
-.admin-form input[type="file"] { padding: 8px 12px; border: 2px dashed var(--border); border-radius: 10px; background: var(--vanilla); width: 100%; cursor: pointer; transition: 0.3s; }
-.admin-form input[type="file"]:hover { border-color: var(--rose); background: rgba(219,161,162,0.05); }
-.current-file { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 0.85rem; color: var(--text-light); padding: 6px 12px; background: var(--fantasy); border-radius: 6px; border: 1px solid var(--border); }
+.admin-form input:focus, .admin-form textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.admin-form textarea { resize:vertical; min-height:80px; font-family:'Inter',sans-serif; }
+.admin-form input[type="file"] { padding:10px; border:2px dashed var(--border); border-radius:12px; background:var(--vanilla); cursor:pointer; }
+.admin-form input[type="file"]:hover { border-color:var(--rose); background:rgba(219,161,162,0.05); }
+.admin-form .current-file { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:0.85rem; color:var(--text-light); padding:8px 12px; background:var(--fantasy); border-radius:8px; border:1px solid var(--border); }
+.admin-form .current-file img { border-radius:12px; }
+.admin-form .form-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; padding-top:20px; border-top:1px solid var(--border); }
+.admin-form .form-actions .btn { min-width:120px; justify-content:center; }
 
-/* ===== CAMERA SECTION ===== */
-.camera-section { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--fantasy); margin-top: 8px; }
-.camera-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
-.camera-preview-container video { width: 100%; height: 100%; object-fit: cover; display: none; }
-.camera-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-light); text-align: center; padding: 24px; }
-.camera-placeholder i { font-size: 2.5rem; margin-bottom: 8px; color: var(--rose); }
-.camera-placeholder p { margin: 0; font-size: 0.9rem; }
-.camera-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; margin-top: 12px; }
-.camera-controls .btn { padding: 6px 14px; font-size: 0.85rem; }
-.captured-photo-container { text-align: center; margin-top: 12px; }
-.captured-photo-container img { border: 2px solid var(--rose); border-radius: 8px; }
-.status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
+/* ===== CAMERA ===== */
+.camera-section { border:1px solid var(--border); border-radius:16px; padding:16px; background:var(--fantasy); margin-top:8px; }
+.camera-preview-container { width:100%; max-width:400px; height:220px; background:var(--vanilla); border-radius:12px; overflow:hidden; display:flex; align-items:center; justify-content:center; position:relative; margin:0 auto; }
+.camera-preview-container video { width:100%; height:100%; object-fit:cover; display:none; }
+.camera-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text-light); text-align:center; padding:24px; }
+.camera-placeholder i { font-size:2.5rem; color:var(--rose); margin-bottom:8px; }
+.camera-placeholder p { margin:0; font-size:0.9rem; }
+.camera-controls { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; align-items:center; margin-top:12px; }
+.camera-controls .btn { padding:6px 16px; font-size:0.85rem; border-radius:50px; }
+.captured-photo-container { text-align:center; margin-top:12px; }
+.captured-photo-container img { border:3px solid var(--rose); border-radius:12px; }
+.status-indicator { font-size:0.85rem; color:var(--text-light); margin-left:8px; font-weight:500; }
 
-@media (max-width: 480px) {
-    .settings-tabs { flex-direction: column; border-bottom: none; }
-    .tab-btn { border-radius: 8px; border: 1px solid var(--border); text-align: center; }
-    .tab-btn.active { border-color: var(--rose); }
+/* ===== RESPONSIVE ===== */
+@media (max-width:992px) {
+    .admin-hero { flex-direction:column; text-align:center; align-items:center; }
+    .admin-hero-content h1 { font-size:1.6rem; }
+    .admin-hero-actions { justify-content:center; }
+}
+@media (max-width:480px) {
+    .settings-tabs { flex-direction:column; border-bottom:none; }
+    .tab-btn { border-radius:12px; border:1px solid var(--border); text-align:center; }
+    .tab-btn.active { border-color:var(--rose); background:var(--rose); color:white; }
 }
 </style>
 
