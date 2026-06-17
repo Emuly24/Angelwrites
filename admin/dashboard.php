@@ -452,6 +452,59 @@ $pageTitle = 'Admin Dashboard';
                         </div>
                     </div>
 
+                    <!-- RECENT QUESTIONS (Horizontal Scroll!) -->  
+                    <div class="dashboard-section compact-section">
+                        <div class="section-header">
+                            <h2><i class="fas fa-question-circle section-icon"></i> Questions</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php" class="btn btn-sm btn-outline">Manage</a>
+                        </div>
+                        <div class="dashboard-section-body">
+                            <?php if (count($recent_questions) > 0): ?>
+                                <div class="horizontal-scroll">
+                                    <?php foreach ($recent_questions as $question): ?>
+                                        <div class="scroll-item question-scroll-item">
+                                            <div class="question-content">
+                                                <h4><?php echo htmlspecialchars($question['title']); ?></h4>
+                                                <p class="question-excerpt"><?php echo htmlspecialchars(substr($question['content'], 0, 60)); ?>...</p>
+                                                <span class="status-badge <?php echo $question['is_answered'] ? 'status-available' : 'status-pending'; ?>">
+                                                    <?php echo $question['is_answered'] ? 'Answered' : 'Pending'; ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <p>No recent questions.</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <!-- MANAGE MESSAGES -->
+                    <div class="dashboard-section compact-section">
+                        <div class="section-header">
+                            <h2><i class="fas fa-envelope section-icon"></i> Messages</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="btn btn-sm btn-outline">Manage</a>
+                        </div>
+                        <div class="dashboard-section-body">
+                            <?php if (count($recent_messages) > 0): ?>
+                                <div class="horizontal-scroll">
+                                    <?php foreach ($recent_messages as $message): ?>
+                                        <div class="scroll-item message-scroll-item">
+                                            <div class="message-content">
+                                                <h4><?php echo htmlspecialchars($message['subject']); ?></h4>
+                                                <p class="message-excerpt"><?php echo htmlspecialchars(substr($message['content'], 0, 60)); ?>...</p>
+                                                <span class="status-badge <?php echo $message['is_read'] ? 'status-available' : 'status-pending'; ?>">
+                                                    <?php echo $message['is_read'] ? 'Read' : 'Unread'; ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <p>No recent messages.</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
                     <!-- RECENT BLOG POSTS (Horizontal Scroll!) -->
                     <div class="dashboard-section compact-section">
                         <div class="section-header">
@@ -479,6 +532,12 @@ $pageTitle = 'Admin Dashboard';
                                 </div>
                             <?php endif; ?>
                         </div>
+                    </div>
+                </div>
+                <div class="dashboard-section compact-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-newspaper section-icon"></i> Manage Newsletter</h2>
+                        <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php" class="btn btn-sm btn-outline">Manage</a>
                     </div>
                 </div>
 
