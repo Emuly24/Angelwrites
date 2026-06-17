@@ -30,6 +30,8 @@ $stmt->execute([$book_id]);
 $processed = $stmt->fetch(PDO::FETCH_ASSOC);
 $has_processed = !empty($processed) && $processed['is_processed'] == 1;
 
+$toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
+
 $pages = [];
 if ($has_processed && !empty($processed['content_html'])) {
     preg_match_all('/<div class="page-content" data-page="(\d+)">(.*?)<\/div>/s', $processed['content_html'], $matches, PREG_SET_ORDER);
@@ -192,7 +194,7 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; width:100%; overflow:hidden; }
 #reader-app { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; transition:background var(--transition), color var(--transition); }
-#overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(30,20,20,0.65); z-index:99998; display:none; pointer-events:auto; }
+#overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(30,20,20,0.65); z-index:99999 !important; display:none; pointer-events:auto; }
 #overlay.active { display:block; }
 #toolbar { flex-shrink:0; height:var(--toolbar-height); min-height:var(--toolbar-height); display:flex; justify-content:space-between; align-items:center; padding:0 20px; background:var(--card-bg); border-bottom:1px solid var(--border); box-shadow:var(--shadow); z-index:20; }
 .toolbar-left { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
@@ -331,8 +333,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
 #exitFocusBtn { position:fixed; bottom:24px; right:24px; z-index:100001!important; display:none; align-items:center; gap:8px; background:var(--rose); color:white; border:none; padding:10px 16px; border-radius:30px; font-weight:600; box-shadow:var(--shadow-hover); cursor:pointer; transition:all 0.3s; }
 #exitFocusBtn:hover { transform:scale(1.05); background:var(--rose-dark); }
 .focus-mode #exitFocusBtn { display:flex!important; }
-.modal-wrapper { position:fixed!important; top:50%!important; left:50%!important; transform:translate(-50%,-50%)!important; z-index:100002!important; width:90%; max-width:520px; max-height:85vh; overflow-y:auto; background:var(--card-bg); border-radius:24px; padding:30px 28px 28px; box-shadow:0 24px 80px rgba(0,0,0,0.35); border:1px solid var(--rose-light); display:none!important; flex-direction:column; pointer-events:auto; transition:opacity 0.25s ease,transform 0.25s ease; backdrop-filter:blur(4px); }
-.modal-wrapper.visible { display:flex!important; z-index:100002!important; }
+.modal-wrapper { position:fixed!important; top:50%!important; left:50%!important; transform:translate(-50%,-50%)!important; z-index:999999 !important; width:90%; max-width:520px; max-height:85vh; overflow-y:auto; background:var(--card-bg); border-radius:24px; padding:30px 28px 28px; box-shadow:0 24px 80px rgba(0,0,0,0.35); border:1px solid var(--rose-light); display:none!important; flex-direction:column; pointer-events:auto; transition:opacity 0.25s ease,transform 0.25s ease; backdrop-filter:blur(4px); }
+.modal-wrapper.visible { display:flex!important; z-index:999999 !important; }
+#share-modal.modal-wrapper { z-index:999999 !important; }
 .modal-close { position:absolute!important; top:14px!important; right:18px!important; background:transparent!important; border:none!important; font-size:1.5rem!important; cursor:pointer!important; color:var(--text-light)!important; transition:transform 0.3s ease,color 0.3s ease!important; padding:4px 8px!important; border-radius:8px!important; }
 .modal-close:hover { color:var(--rose)!important; transform:rotate(90deg) scale(1.1)!important; background:rgba(219,161,162,0.1)!important; }
 .modal-wrapper h3 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); margin-top:0; margin-bottom:16px; font-size:1.3rem; }
@@ -389,7 +392,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
 </head>
 <body>
 <div id="reader-app">
-    <div id="overlay"></div>
     <div id="toolbar">
         <div class="toolbar-left">
             <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
@@ -577,6 +579,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
     </div>
 
     <button id="exitFocusBtn" onclick="toggleFocus()"><i class="fas fa-compress"></i> Exit Focus</button>
+
+    <!-- OVERLAY PLACED LAST TO BE BEHIND ALL MODALS -->
+    <div id="overlay"></div>
 </div>
 
 <script>
