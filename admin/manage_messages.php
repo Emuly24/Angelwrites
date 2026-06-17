@@ -2,7 +2,6 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
-require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
 
@@ -13,9 +12,9 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 10;
 $offset = ($page - 1) * $limit;
 
-// ===== MARK AS READ =====
-if (isset($_GET['read'])) {
-    $id = (int)$_GET['read'];
+// ===== HANDLE MARK AS READ =====
+if (isset($_GET['mark_read'])) {
+    $id = (int)$_GET['mark_read'];
     $stmt = $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id = ?");
     $stmt->execute([$id]);
     $success = 'Message marked as read.';
@@ -23,22 +22,12 @@ if (isset($_GET['read'])) {
     exit;
 }
 
-// ===== MARK AS UNREAD =====
-if (isset($_GET['unread'])) {
-    $id = (int)$_GET['unread'];
-    $stmt = $db->prepare("UPDATE contact_messages SET is_read = 0 WHERE id = ?");
-    $stmt->execute([$id]);
-    $success = 'Message marked as unread.';
-    header('Location: ' . SITE_URL . '/admin/manage_messages.php');
-    exit;
-}
-
-// ===== DELETE =====
+// ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     $stmt = $db->prepare("DELETE FROM contact_messages WHERE id = ?");
     $stmt->execute([$id]);
-    $success = 'Message deleted.';
+    $success = 'Message deleted successfully.';
     header('Location: ' . SITE_URL . '/admin/manage_messages.php');
     exit;
 }
@@ -48,57 +37,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
     $ids = isset($_POST['selected_ids']) ? explode(',', $_POST['selected_ids']) : [];
     $action = $_POST['bulk_action'];
 
-    if (!empty($ids) && $action === 'delete') {
+    if (!empty($ids)) {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("DELETE FROM contact_messages WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' messages deleted.';
-    } elseif (!empty($ids) && $action === 'mark_read') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' messages marked as read.';
-    } elseif (!empty($ids) && $action === 'mark_unread') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE contact_messages SET is_read = 0 WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' messages marked as unread.';
+        if ($action === 'mark_read') {
+            $stmt = $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            $success = count($ids) . ' messages marked as read.';
+        } elseif ($action === 'delete') {
+            $stmt = $db->prepare("DELETE FROM contact_messages WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            $success = count($ids) . ' messages deleted.';
+        }
     }
     header('Location: ' . SITE_URL . '/admin/manage_messages.php');
     exit;
-}
-
-// ===== REPLY =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_reply'])) {
-    $to = trim($_POST['to_email']);
-    $subject = trim($_POST['reply_subject']);
-    $reply_message = trim($_POST['reply_message']);
-
-    if (empty($to) || empty($subject) || empty($reply_message)) {
-        $error = 'All fields are required.';
-    } elseif (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Invalid email address.';
-    } else {
-        $html_body = "<div style='font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;'>";
-        $html_body .= "<h2 style='color: #DBA1A2;'>Reply from AngelWrites</h2>";
-        $html_body .= "<p>" . nl2br(htmlspecialchars($reply_message)) . "</p>";
-        $html_body .= "<hr style='border: 1px solid #eee;'>";
-        $html_body .= "<p style='font-size: 0.9rem; color: #999;'>— Sent via AngelWrites Admin</p>";
-        $html_body .= "</div>";
-
-        if (sendEmail($to, $subject, $html_body, 'angelwrites@zohomail.com', 'AngelWrites Admin')) {
-            $success = 'Reply sent successfully!';
-        } else {
-            $error = 'Failed to send reply. Please check your email settings.';
-        }
-    }
 }
 
 // ===== FETCH TOTAL MESSAGES =====
 $count_sql = "SELECT COUNT(*) FROM contact_messages";
 $count_params = [];
 if ($search) {
-    $count_sql .= " WHERE name LIKE ? OR email LIKE ? OR subject LIKE ? OR message LIKE ?";
+    $count_sql .= " WHERE name LIKE ? OR email LIKE ? OR message LIKE ? OR subject LIKE ?";
     $count_params[] = "%$search%";
     $count_params[] = "%$search%";
     $count_params[] = "%$search%";
@@ -113,7 +72,7 @@ $total_pages = ceil($total_messages / $limit);
 $sql = "SELECT * FROM contact_messages";
 $params = [];
 if ($search) {
-    $sql .= " WHERE name LIKE ? OR email LIKE ? OR subject LIKE ? OR message LIKE ?";
+    $sql .= " WHERE name LIKE ? OR email LIKE ? OR message LIKE ? OR subject LIKE ?";
     $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";
@@ -127,24 +86,26 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$pageTitle = 'Contact Messages';
+$pageTitle = 'Manage Messages';
 ?>
 <?php require_once '../includes/header.php'; ?>
 
 <div class="admin-page">
     <div class="container">
-        <div class="admin-header">
-            <h1>Contact Messages</h1>
-            <div class="admin-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
+        <!-- ===== HERO ===== -->
+        <div class="admin-hero">
+            <div class="admin-hero-content">
+                <h1>📩 Manage Messages</h1>
+                <p class="admin-hero-sub">View, search, and manage all contact form submissions.</p>
+            </div>
+            <div class="admin-hero-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
-                    <i class="fas fa-arrow-left"></i> Back
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
         </div>
 
+        <!-- ===== ALERTS ===== -->
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
@@ -152,27 +113,26 @@ $pageTitle = 'Contact Messages';
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
 
-        <!-- Search Bar -->
+        <!-- ===== SEARCH BAR ===== -->
         <div class="search-bar">
             <form method="GET" class="search-form">
-                <input type="text" name="search" placeholder="Search messages by name, email, subject, or content..." value="<?php echo htmlspecialchars($search); ?>">
+                <input type="text" name="search" placeholder="Search messages by name, email, or content..." value="<?php echo htmlspecialchars($search); ?>">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
                 <?php if (!empty($search)): ?>
-                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="btn btn-outline btn-sm">Clear</a>
+                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
                 <?php endif; ?>
             </form>
         </div>
 
-        <!-- Messages List -->
+        <!-- ===== MESSAGES TABLE ===== -->
         <div class="card">
             <div class="card-header">
-                <h2>All Messages (<?php echo $total_messages; ?>)</h2>
-                <div class="card-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <select id="bulkActionSelect" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);font-size:0.85rem;">
+                <h2>All Messages <span class="count-badge"><?php echo $total_messages; ?></span></h2>
+                <div class="card-header-actions">
+                    <select id="bulkActionSelect" class="bulk-select">
                         <option value="">Bulk Actions</option>
-                        <option value="delete">Delete Selected</option>
                         <option value="mark_read">Mark as Read</option>
-                        <option value="mark_unread">Mark as Unread</option>
+                        <option value="delete">Delete Selected</option>
                     </select>
                     <button id="executeBulkAction" class="btn btn-sm btn-primary" disabled>Apply</button>
                 </div>
@@ -186,45 +146,37 @@ $pageTitle = 'Contact Messages';
                             <table class="admin-table">
                                 <thead>
                                     <tr>
-                                        <th><input type="checkbox" id="selectAllRows"></th>
-                                        <th>Sender</th>
+                                        <th class="check-col"><input type="checkbox" id="selectAllRows" class="styled-checkbox"></th>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
                                         <th>Subject</th>
+                                        <th>Message</th>
+                                        <th>Date</th>
                                         <th>Status</th>
-                                        <th>Received</th>
-                                        <th>Actions</th>
+                                        <th class="actions-col">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($messages as $msg): ?>
-                                        <tr class="<?php echo $msg['is_read'] ? 'read' : 'unread'; ?>">
-                                            <td><input type="checkbox" class="row-select" value="<?php echo $msg['id']; ?>"></td>
+                                    <?php foreach ($messages as $message): ?>
+                                        <tr>
+                                            <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $message['id']; ?>"></td>
+                                            <td><span class="user-id"><?php echo $message['id']; ?></span></td>
+                                            <td><strong><?php echo htmlspecialchars($message['name']); ?></strong></td>
+                                            <td><?php echo htmlspecialchars($message['email']); ?></td>
+                                            <td><?php echo htmlspecialchars($message['subject'] ?: 'No Subject'); ?></td>
+                                            <td><div class="msg-preview"><?php echo htmlspecialchars(substr($message['message'], 0, 60)); ?>...</div></td>
+                                            <td><?php echo date('M j, Y', strtotime($message['created_at'])); ?></td>
                                             <td>
-                                                <strong><?php echo htmlspecialchars($msg['name']); ?></strong>
-                                                <br><small><?php echo htmlspecialchars($msg['email']); ?></small>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($msg['subject'] ?? 'No subject'); ?></td>
-                                            <td>
-                                                <span class="status-badge <?php echo $msg['is_read'] ? 'read' : 'unread'; ?>">
-                                                    <?php echo $msg['is_read'] ? 'Read' : 'Unread'; ?>
+                                                <span class="status-badge <?php echo $message['is_read'] ? 'status-read' : 'status-unread'; ?>">
+                                                    <?php echo $message['is_read'] ? 'Read' : 'Unread'; ?>
                                                 </span>
                                             </td>
-                                            <td><?php echo date('M j, Y, g:i a', strtotime($msg['created_at'])); ?></td>
-                                            <td class="actions">
-                                                <button class="btn btn-sm btn-primary reply-btn" 
-                                                        data-email="<?php echo htmlspecialchars($msg['email']); ?>" 
-                                                        data-name="<?php echo htmlspecialchars($msg['name']); ?>">
-                                                    <i class="fas fa-reply"></i>
-                                                </button>
-                                                <?php if (!$msg['is_read']): ?>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?read=<?php echo $msg['id']; ?>" class="btn btn-sm btn-secondary">
-                                                        <i class="fas fa-check"></i>
-                                                    </a>
-                                                <?php else: ?>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?unread=<?php echo $msg['id']; ?>" class="btn btn-sm btn-secondary">
-                                                        <i class="fas fa-undo"></i>
-                                                    </a>
-                                                <?php endif; ?>
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?delete=<?php echo $msg['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this message?');">
+                                            <td class="actions-cell">
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?mark_read=<?php echo $message['id']; ?>" class="btn btn-sm btn-secondary action-btn" title="Mark as read">
+                                                    <i class="fas fa-check"></i>
+                                                </a>
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?delete=<?php echo $message['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this message?');" title="Delete">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             </td>
@@ -235,7 +187,7 @@ $pageTitle = 'Contact Messages';
                         </div>
                     </form>
 
-                    <!-- Pagination -->
+                    <!-- ===== PAGINATION ===== -->
                     <?php if ($total_pages > 1): ?>
                         <div class="pagination">
                             <?php if ($page > 1): ?>
@@ -256,86 +208,27 @@ $pageTitle = 'Contact Messages';
                         </div>
                     <?php endif; ?>
                 <?php else: ?>
-                    <p class="no-items">No messages found.</p>
+                    <div class="empty-state">
+                        <i class="fas fa-inbox empty-icon"></i>
+                        <h3>No messages found</h3>
+                        <p><?php echo $search ? 'Try adjusting your search.' : 'No contact messages have been submitted yet.'; ?></p>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ===== REPLY MODAL ===== -->
-<div id="replyModal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width: 600px;">
-        <div class="modal-header">
-            <h3>Reply to Message</h3>
-            <button class="modal-close">&times;</button>
-        </div>
-        <form method="POST" class="reply-form">
-            <div class="form-group">
-                <label for="to_email">To</label>
-                <input type="email" id="to_email" name="to_email" readonly required>
-            </div>
-            <div class="form-group">
-                <label for="reply_subject">Subject</label>
-                <input type="text" id="reply_subject" name="reply_subject" placeholder="Reply subject" required>
-            </div>
-            <div class="form-group">
-                <label for="reply_message">Message</label>
-                <textarea id="reply_message" name="reply_message" rows="6" placeholder="Write your reply here..." required></textarea>
-            </div>
-            <div class="form-actions">
-                <button type="submit" name="send_reply" class="btn btn-primary btn-block">
-                    <i class="fas fa-paper-plane"></i> Send Reply
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== THEME TOGGLE =====
-    const themeToggle = document.getElementById('themeToggle');
-    const currentTheme = localStorage.getItem('messagesTheme') || 'light';
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-    }
-
-    window.toggleTheme = function() {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('messagesTheme', isDark ? 'dark' : 'light');
-        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-    };
-
-    // ===== MODAL =====
-    const modal = document.getElementById('replyModal');
-    const closeBtn = document.querySelector('.modal-close');
-    const toEmail = document.getElementById('to_email');
-    const replySubject = document.getElementById('reply_subject');
-
-    document.querySelectorAll('.reply-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            toEmail.value = this.dataset.email;
-            replySubject.value = 'Re: Your message to AngelWrites';
-            modal.style.display = 'flex';
-        });
-    });
-
-    closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) modal.style.display = 'none';
-    });
-
     // ===== BULK ACTIONS =====
     const selectAllRows = document.getElementById('selectAllRows');
     const rowCheckboxes = document.querySelectorAll('.row-select');
     const executeBulkBtn = document.getElementById('executeBulkAction');
     const bulkActionSelect = document.getElementById('bulkActionSelect');
 
-    selectAllRows.addEventListener('change', function() {
+    selectAllRows?.addEventListener('change', function() {
         rowCheckboxes.forEach(cb => cb.checked = this.checked);
         updateBulkButton();
     });
@@ -346,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
         executeBulkBtn.disabled = (checked === 0);
     }
 
-    executeBulkBtn.addEventListener('click', function() {
+    executeBulkBtn?.addEventListener('click', function() {
         const action = bulkActionSelect.value;
         const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
         if (!action || ids.length === 0) {
@@ -361,82 +254,131 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ===== STYLES ===== -->
 <style>
-/* ===== DARK MODE SUPPORT ===== */
+/* ===== BRAND VARIABLES ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
+.rose-text { color:var(--rose); }
+
+/* ===== BUTTONS ===== */
+.btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
+    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
+    cursor:pointer; text-decoration:none; transition:all var(--transition);
+    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
 }
-body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
+.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
+.btn-outline:hover { background:var(--rose); color:var(--white); }
+.btn-sm { padding:8px 20px; font-size:0.85rem; }
+.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
+.btn-danger:hover { background:#c82333; border-color:#c82333; }
 
-.admin-page { padding: 32px 0 60px; }
-.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.admin-header h1 { font-size: 2rem; margin: 0; }
-.admin-actions { display: flex; gap: 12px; }
+/* ===== PAGE ===== */
+.admin-page { padding:32px 0 60px; }
+.admin-hero {
+    background:linear-gradient(135deg, var(--vanilla), var(--fantasy));
+    border-radius:20px; padding:24px 32px; margin-bottom:24px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;
+    border:1px solid var(--rose-light); box-shadow:var(--shadow);
+}
+.admin-hero-content h1 { font-size:2rem; margin:0 0 4px 0; color:var(--dark); }
+.admin-hero-sub { color:var(--text-light); font-size:1.05rem; margin:0; }
+.admin-hero-actions { display:flex; gap:12px; flex-wrap:wrap; }
 
-.search-bar { margin-bottom: 24px; }
-.search-form { display: flex; gap: 8px; flex-wrap: wrap; }
-.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
+/* ===== ALERTS ===== */
+.alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
+.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
 
-.admin-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-.admin-table th { background: var(--vanilla); padding: 10px 16px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); }
-.admin-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.admin-table tr.read { opacity: 0.7; }
-.admin-table tr.unread { font-weight: 600; background: rgba(219,161,162,0.05); }
-.admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
+/* ===== SEARCH BAR ===== */
+.search-bar { margin-bottom:24px; }
+.search-form { display:flex; gap:8px; flex-wrap:wrap; }
+.search-form input { flex:1; min-width:200px; padding:12px 16px; border:1px solid var(--border); border-radius:50px; font-size:0.95rem; background:var(--card-bg); color:var(--text); transition:border-color 0.2s; }
+.search-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.search-form .btn { padding:8px 20px; font-size:0.85rem; border-radius:50px; }
 
-.status-badge { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-.status-badge.read { background: #95a5a6; color: white; }
-.status-badge.unread { background: var(--rose); color: white; }
+/* ===== CARD ===== */
+.card { background:var(--card-bg); border-radius:20px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; margin-bottom:24px; transition:all var(--transition); }
+.card:hover { box-shadow:var(--shadow-hover); }
+.card-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:var(--vanilla); }
+.card-header h2 { font-size:1.3rem; margin:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); display:flex; align-items:center; gap:8px; }
+.count-badge { background:var(--rose); color:white; padding:2px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
+.card-header-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.card-body { padding:24px; }
 
-.actions { display: flex; gap: 4px; flex-wrap: wrap; }
-.btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 20px; }
+/* ===== TABLE ===== */
+.table-responsive { overflow-x:auto; border-radius:12px; border:1px solid var(--border); }
+.admin-table { width:100%; border-collapse:separate; border-spacing:0; }
+.admin-table thead { background:var(--vanilla); }
+.admin-table th { text-align:left; padding:14px 20px; font-weight:600; color:var(--text); border-bottom:2px solid var(--border); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; }
+.admin-table td { padding:14px 20px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); font-size:0.9rem; }
+.admin-table tbody tr:hover { background:rgba(219,161,162,0.08); }
+.admin-table .check-col { width:40px; }
+.admin-table .actions-col { width:100px; }
+.styled-checkbox { width:18px; height:18px; accent-color:var(--rose); cursor:pointer; }
+.user-id { font-weight:500; color:var(--text-light); }
+.msg-preview { max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-.pagination { display: flex; justify-content: center; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
-.page-link { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); font-size: 0.9rem; transition: all 0.2s; min-width: 36px; text-decoration: none; }
-.page-link:hover { border-color: var(--rose); }
-.page-link.active { background: var(--rose); color: white; border-color: var(--rose); }
+/* ===== BULK ===== */
+.bulk-select { padding:6px 12px; border-radius:8px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); font-size:0.85rem; }
 
-.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+/* ===== STATUS BADGES ===== */
+.status-badge { padding:2px 12px; border-radius:20px; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+.status-unread { background:var(--rose); color:white; }
+.status-read { background:#2ecc71; color:white; }
 
-/* ===== MODAL ===== */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-.modal-content { background: var(--card-bg); border-radius: 16px; padding: 32px; width: 90%; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
-.modal-close:hover { color: var(--rose); }
-.reply-form .form-group { margin-bottom: 16px; }
-.reply-form label { display: block; font-weight: 600; margin-bottom: 4px; }
-.reply-form input, .reply-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-.reply-form input:focus, .reply-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.reply-form textarea { resize: vertical; min-height: 100px; }
-.reply-form .btn-block { width: 100%; padding: 12px; font-size: 1rem; }
+/* ===== ACTIONS ===== */
+.actions-cell { display:flex; gap:4px; }
+.action-btn { padding:6px 10px; font-size:0.8rem; border-radius:8px; min-width:32px; justify-content:center; }
 
-@media (max-width: 480px) {
-    .search-form { flex-direction: column; }
-    .search-form input { width: 100%; }
-    .admin-table th, .admin-table td { padding: 8px 10px; font-size: 0.85rem; }
+/* ===== PAGINATION ===== */
+.pagination { display:flex; justify-content:center; gap:6px; margin-top:20px; flex-wrap:wrap; }
+.page-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 14px; border-radius:8px; background:var(--card-bg); border:1px solid var(--border); color:var(--text); font-size:0.9rem; transition:all 0.2s; min-width:36px; text-decoration:none; }
+.page-link:hover { border-color:var(--rose); }
+.page-link.active { background:var(--rose); color:white; border-color:var(--rose); }
+
+/* ===== EMPTY STATE ===== */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text-light); }
+.empty-icon { font-size:3rem; color:var(--rose); margin-bottom:16px; opacity:0.6; }
+.empty-state h3 { font-size:1.3rem; margin-bottom:4px; color:var(--text); }
+.empty-state p { margin:0; font-size:0.95rem; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:992px) {
+    .admin-hero { flex-direction:column; text-align:center; align-items:center; }
+    .admin-hero-actions { justify-content:center; }
+    .admin-hero-content h1 { font-size:1.6rem; }
+}
+@media (max-width:768px) {
+    .admin-table th, .admin-table td { padding:10px 12px; font-size:0.8rem; }
+    .msg-preview { max-width:100px; }
 }
 </style>
 
