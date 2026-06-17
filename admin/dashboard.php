@@ -7,7 +7,7 @@ redirectIfNotAdmin();
 
 // ===== PAGINATION SETUP (EXAMPLE FOR BOOKS) =====
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 5;
+$limit = 4;
 $offset = ($page - 1) * $limit;
 
 // ===== FETCH STATISTICS =====
@@ -131,7 +131,7 @@ $total_pages = ceil($total_books / $limit);
 $stmt = $db->prepare("
     SELECT * FROM poems 
     ORDER BY created_at DESC 
-    LIMIT 5
+    LIMIT 4
 ");
 $stmt->execute();
 $recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -140,7 +140,7 @@ $recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt = $db->prepare("
     SELECT * FROM blog_posts 
     ORDER BY created_at DESC 
-    LIMIT 5
+    LIMIT 4
 ");
 $stmt->execute();
 $recent_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -177,7 +177,7 @@ $recent_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt = $db->prepare("
     SELECT * FROM videos 
     ORDER BY created_at DESC 
-    LIMIT 5
+    LIMIT 4
 ");
 $stmt->execute();
 $recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -313,76 +313,71 @@ $pageTitle = 'Admin Dashboard';
         <!-- ===== MAIN GRID ===== -->
         <div class="dashboard-grid">
             <div class="main-content">
-                <!-- ===== PENDING SESSIONS ===== -->
-                <section class="dashboard-section" id="pending-sessions">
-                    <div class="section-header">
-                        <h2><i class="fas fa-clock section-icon"></i> Pending Sessions</h2>
-                        <div class="section-actions">
+                <!-- Compact Alert Row (2 columns) -->
+                <div class="alert-row">
+                    <!-- PENDING SESSIONS -->
+                    <section class="dashboard-section compact-section" id="pending-sessions">
+                        <div class="section-header">
+                            <h2><i class="fas fa-clock section-icon"></i> Pending</h2>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="btn btn-sm btn-outline">View All</a>
                         </div>
-                    </div>
-                    <div class="dashboard-section-body">
-                        <?php if (count($recent_sessions) > 0): ?>
-                            <div class="session-list">
-                                <?php foreach ($recent_sessions as $session): ?>
-                                    <div class="session-item">
-                                        <div class="session-info">
-                                            <div class="session-date"><?php echo date('M j, Y', strtotime($session['date'])); ?></div>
-                                            <div class="session-time"><?php echo date('g:i a', strtotime($session['time'])); ?></div>
-                                            <span class="status-badge status-pending">Pending</span>
-                                            <small> – <?php echo htmlspecialchars($session['user_name']); ?></small>
+                        <div class="dashboard-section-body">
+                            <?php if (count($recent_sessions) > 0): ?>
+                                <div class="session-list compact-list">
+                                    <?php foreach ($recent_sessions as $session): ?>
+                                        <div class="session-item">
+                                            <div class="session-info">
+                                                <div class="session-date"><?php echo date('M j', strtotime($session['date'])); ?></div>
+                                                <div class="session-time"><?php echo date('g:i a', strtotime($session['time'])); ?></div>
+                                                <span class="status-badge status-pending">Pending</span>
+                                                <small> – <?php echo htmlspecialchars($session['user_name']); ?></small>
+                                            </div>
                                         </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="empty-state">
-                                <div class="empty-state-icon"><i class="fas fa-clock"></i></div>
-                                <p>No pending sessions</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </section>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-check-circle"></i> No pending sessions
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </section>
 
-                <!-- ===== UNREAD MESSAGES ===== -->
-                <section class="dashboard-section" id="unread-messages">
-                    <div class="section-header">
-                        <h2><i class="fas fa-envelope section-icon"></i> Unread Messages</h2>
-                        <div class="section-actions">
+                    <!-- UNREAD MESSAGES -->
+                    <section class="dashboard-section compact-section" id="unread-messages">
+                        <div class="section-header">
+                            <h2><i class="fas fa-envelope section-icon"></i> Unread</h2>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="btn btn-sm btn-outline">View All</a>
                         </div>
-                    </div>
-                    <div class="dashboard-section-body">
-                        <?php if (count($recent_messages) > 0): ?>
-                            <div class="session-list">
-                                <?php foreach ($recent_messages as $message): ?>
-                                    <div class="session-item">
-                                        <div class="session-info">
-                                            <strong><?php echo htmlspecialchars($message['name']); ?></strong>
-                                            <small><?php echo htmlspecialchars(substr($message['message'], 0, 40)); ?>...</small>
-                                            <span class="status-badge status-unread">Unread</span>
+                        <div class="dashboard-section-body">
+                            <?php if (count($recent_messages) > 0): ?>
+                                <div class="session-list compact-list">
+                                    <?php foreach ($recent_messages as $message): ?>
+                                        <div class="session-item">
+                                            <div class="session-info">
+                                                <strong><?php echo htmlspecialchars($message['name']); ?></strong>
+                                                <small><?php echo htmlspecialchars(substr($message['message'], 0, 35)); ?>...</small>
+                                                <span class="status-badge status-unread">Unread</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="empty-state">
-                                <div class="empty-state-icon"><i class="fas fa-inbox"></i></div>
-                                <p>No unread messages</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </section>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-inbox"></i> No unread messages
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </section>
+                </div>
 
-                <!-- ===== RECENT CONTENT GRID ===== -->
+                <!-- RECENT CONTENT GRID (3 Columns) -->
                 <div class="recent-content-grid">
                     <!-- RECENT BOOKS (WITH PAGINATION) -->
-                    <div class="dashboard-section">
+                    <div class="dashboard-section compact-section">
                         <div class="section-header">
-                            <h2><i class="fas fa-book section-icon"></i> Recent Books</h2>
-                            <div class="section-actions">
-                                <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-sm btn-outline">Manage All</a>
-                            </div>
+                            <h2><i class="fas fa-book section-icon"></i> Books</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="btn btn-sm btn-outline">Manage</a>
                         </div>
                         <div class="dashboard-section-body">
                             <?php if (count($recent_books) > 0): ?>
@@ -403,9 +398,8 @@ $pageTitle = 'Admin Dashboard';
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                                <!-- PAGINATION -->
                                 <?php if ($total_pages > 1): ?>
-                                    <div class="pagination">
+                                    <div class="pagination mini-pagination">
                                         <?php if ($page > 1): ?>
                                             <a href="?page=<?php echo $page - 1; ?>" class="page-link"><i class="fas fa-chevron-left"></i></a>
                                         <?php endif; ?>
@@ -418,20 +412,18 @@ $pageTitle = 'Admin Dashboard';
                                     </div>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <div class="empty-state">
-                                    <p>No books added yet.</p>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-book-open"></i> No books yet
                                 </div>
                             <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- RECENT POEMS -->
-                    <div class="dashboard-section">
+                    <div class="dashboard-section compact-section">
                         <div class="section-header">
-                            <h2><i class="fas fa-pen section-icon"></i> Recent Poems</h2>
-                            <div class="section-actions">
-                                <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-sm btn-outline">View All</a>
-                            </div>
+                            <h2><i class="fas fa-pen section-icon"></i> Poems</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-sm btn-outline">Manage</a>
                         </div>
                         <div class="dashboard-section-body">
                             <?php if (count($recent_poems) > 0): ?>
@@ -452,20 +444,18 @@ $pageTitle = 'Admin Dashboard';
                                     <?php endforeach; ?>
                                 </div>
                             <?php else: ?>
-                                <div class="empty-state">
-                                    <p>No poems added yet.</p>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-feather-alt"></i> No poems yet
                                 </div>
                             <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- RECENT BLOG POSTS -->
-                    <div class="dashboard-section">
+                    <div class="dashboard-section compact-section">
                         <div class="section-header">
-                            <h2><i class="fas fa-blog section-icon"></i> Recent Blog Posts</h2>
-                            <div class="section-actions">
-                                <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="btn btn-sm btn-outline">View All</a>
-                            </div>
+                            <h2><i class="fas fa-blog section-icon"></i> Blog</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="btn btn-sm btn-outline">Manage</a>
                         </div>
                         <div class="dashboard-section-body">
                             <?php if (count($recent_posts) > 0): ?>
@@ -483,107 +473,107 @@ $pageTitle = 'Admin Dashboard';
                                     <?php endforeach; ?>
                                 </div>
                             <?php else: ?>
-                                <div class="empty-state">
-                                    <p>No blog posts yet.</p>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-blog"></i> No blog posts yet
                                 </div>
                             <?php endif; ?>
                         </div>
                     </div>
                 </div>
 
-                <!-- ===== RECENT REFLECTIONS ===== -->
-                <section class="dashboard-section" id="recent-reflections">
-                    <div class="section-header">
-                        <h2><i class="fas fa-church section-icon"></i> Recent Reflections</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/admin/manage_reflections.php" class="btn btn-sm btn-outline">View All</a>
-                        </div>
-                    </div>
-                    <div class="dashboard-section-body">
-                        <?php if (count($recent_reflections) > 0): ?>
-                            <div class="reflection-grid mini-grid">
-                                <?php foreach ($recent_reflections as $reflection): ?>
-                                    <div class="reflection-card">
-                                        <div class="reflection-body">
-                                            <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
-                                            <span class="status-badge status-available">Published</span>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="empty-state">
-                                <p>No reflections yet.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </section>
-
-                <!-- ===== NEWEST USERS ===== -->
-                <section class="dashboard-section" id="newest-users">
+                <!-- ===== RECENT USERS (Compact List) ===== -->
+                <section class="dashboard-section compact-section" id="newest-users">
                     <div class="section-header">
                         <h2><i class="fas fa-users section-icon"></i> Newest Users</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="btn btn-sm btn-outline">View All</a>
-                        </div>
+                        <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="btn btn-sm btn-outline">Manage</a>
                     </div>
                     <div class="dashboard-section-body">
                         <?php if (count($recent_users) > 0): ?>
-                            <div class="session-list">
+                            <div class="user-table">
                                 <?php foreach ($recent_users as $user): ?>
-                                    <div class="session-item">
-                                        <div class="session-info">
-                                            <strong><?php echo htmlspecialchars($user['name']); ?></strong>
-                                            <small><?php echo htmlspecialchars($user['email']); ?></small>
+                                    <div class="user-row">
+                                        <div class="user-name"><strong><?php echo htmlspecialchars($user['name']); ?></strong> <small><?php echo htmlspecialchars($user['email']); ?></small></div>
+                                        <div class="user-role">
                                             <span class="status-badge <?php echo $user['role'] === 'admin' ? 'status-unread' : 'status-available'; ?>">
                                                 <?php echo ucfirst($user['role'] ?? 'User'); ?>
                                             </span>
                                         </div>
+                                        <?php if ($user['id'] !== $_SESSION['user_id']): ?>
+                                            <a href="<?php echo SITE_URL; ?>/admin/manage_users.php?delete=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?');">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
                         <?php else: ?>
-                            <div class="empty-state">
-                                <p>No users yet.</p>
+                            <div class="empty-state compact-empty">
+                                <i class="fas fa-users"></i> No users yet
                             </div>
                         <?php endif; ?>
                     </div>
                 </section>
 
-                <!-- ===== RECENT VIDEOS ===== -->
-                <section class="dashboard-section" id="recent-videos">
-                    <div class="section-header">
-                        <h2><i class="fas fa-video section-icon"></i> Recent Videos</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/admin/manage_videos.php" class="btn btn-sm btn-outline">View All</a>
+                <!-- ===== RECENT VIDEOS & REFLECTIONS (2 Columns) ===== -->
+                <div class="video-reflection-row">
+                    <!-- RECENT VIDEOS -->
+                    <section class="dashboard-section compact-section" id="recent-videos">
+                        <div class="section-header">
+                            <h2><i class="fas fa-video section-icon"></i> Videos</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_videos.php" class="btn btn-sm btn-outline">Manage</a>
                         </div>
-                    </div>
-                    <div class="dashboard-section-body">
-                        <?php if (count($recent_videos) > 0): ?>
-                            <div class="video-grid mini-grid">
-                                <?php foreach ($recent_videos as $video): ?>
-                                    <div class="video-card">
-                                        <div class="video-thumb" style="height:100px;">
-                                            <?php if ($video['thumbnail']): ?>
-                                                <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
-                                            <?php else: ?>
-                                                <div class="video-thumb-placeholder"><i class="fas fa-video"></i></div>
-                                            <?php endif; ?>
+                        <div class="dashboard-section-body">
+                            <?php if (count($recent_videos) > 0): ?>
+                                <div class="video-grid mini-grid">
+                                    <?php foreach ($recent_videos as $video): ?>
+                                        <div class="video-card">
+                                            <div class="video-thumb" style="height:80px;">
+                                                <?php if ($video['thumbnail']): ?>
+                                                    <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>">
+                                                <?php else: ?>
+                                                    <div class="video-thumb-placeholder"><i class="fas fa-video"></i></div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="video-info">
+                                                <h3><?php echo htmlspecialchars($video['title']); ?></h3>
+                                            </div>
                                         </div>
-                                        <div class="video-info">
-                                            <h3><?php echo htmlspecialchars($video['title']); ?></h3>
-                                            <span class="status-badge status-available">Added</span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-video"></i> No videos yet
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </section>
+
+                    <!-- RECENT REFLECTIONS -->
+                    <section class="dashboard-section compact-section" id="recent-reflections">
+                        <div class="section-header">
+                            <h2><i class="fas fa-church section-icon"></i> Reflections</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_reflections.php" class="btn btn-sm btn-outline">Manage</a>
+                        </div>
+                        <div class="dashboard-section-body">
+                            <?php if (count($recent_reflections) > 0): ?>
+                                <div class="reflection-grid mini-grid">
+                                    <?php foreach ($recent_reflections as $reflection): ?>
+                                        <div class="reflection-card">
+                                            <div class="reflection-body">
+                                                <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
+                                                <span class="status-badge status-available">Published</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="empty-state">
-                                <p>No videos yet.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </section>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-church"></i> No reflections yet
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </section>
+                </div>
             </div>
 
             <!-- ===== SIDEBAR ===== -->
@@ -597,51 +587,35 @@ $pageTitle = 'Admin Dashboard';
                         <div class="quick-actions-grid">
                             <a href="<?php echo SITE_URL; ?>/admin/manage_books.php" class="quick-action-btn">
                                 <i class="fas fa-book"></i>
-                                <span>Manage Books</span>
+                                <span>Books</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="quick-action-btn">
                                 <i class="fas fa-pen"></i>
-                                <span>Manage Poems</span>
+                                <span>Poems</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" class="quick-action-btn">
                                 <i class="fas fa-calendar-check"></i>
-                                <span>Manage Sessions</span>
+                                <span>Sessions</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="quick-action-btn">
                                 <i class="fas fa-users-cog"></i>
-                                <span>Manage Users</span>
+                                <span>Users</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php" class="quick-action-btn">
                                 <i class="fas fa-edit"></i>
-                                <span>Manage Blog</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/admin/manage_reflections.php" class="quick-action-btn">
-                                <i class="fas fa-church"></i>
-                                <span>Manage Reflections</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php" class="quick-action-btn">
-                                <i class="fas fa-question"></i>
-                                <span>Manage Q&A</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php" class="quick-action-btn">
-                                <i class="fas fa-envelope"></i>
-                                <span>Manage Messages</span>
+                                <span>Blog</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_videos.php" class="quick-action-btn">
                                 <i class="fas fa-video"></i>
-                                <span>Manage Videos</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/admin/manage_newsletter.php" class="quick-action-btn">
-                                <i class="fas fa-newspaper"></i>
-                                <span>Manage Newsletter</span>
+                                <span>Videos</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/admin/settings.php" class="quick-action-btn">
                                 <i class="fas fa-cog"></i>
-                                <span>Site Settings</span>
+                                <span>Settings</span>
                             </a>
                             <a href="<?php echo SITE_URL; ?>/admin/manage_groups.php" class="quick-action-btn">
                                 <i class="fas fa-users"></i>
-                                <span>Manage Groups</span>
+                                <span>Groups</span>
                             </a>
                         </div>
                     </div>
@@ -650,8 +624,7 @@ $pageTitle = 'Admin Dashboard';
                 <!-- ===== MOST ACTIVE READERS ===== -->
                 <div class="sidebar-card">
                     <div class="card-header">
-                        <h4><i class="fas fa-fire" style="color: var(--rose);"></i> Most Active Readers</h4>
-                        <a href="<?php echo SITE_URL; ?>/admin/reader_analytics.php" class="view-all-link">View All</a>
+                        <h4><i class="fas fa-fire" style="color: var(--rose);"></i> Active Readers</h4>
                     </div>
                     <div class="card-body">
                         <?php if (count($stats['most_active_readers']) > 0): ?>
@@ -673,8 +646,7 @@ $pageTitle = 'Admin Dashboard';
                 <!-- ===== RECENT READING ACTIVITY ===== -->
                 <div class="sidebar-card">
                     <div class="card-header">
-                        <h4><i class="fas fa-book-reader" style="color: var(--rose);"></i> Recent Reading Activity</h4>
-                        <a href="<?php echo SITE_URL; ?>/admin/reader_analytics.php" class="view-all-link">View All</a>
+                        <h4><i class="fas fa-book-reader" style="color: var(--rose);"></i> Recent Reading</h4>
                     </div>
                     <div class="card-body">
                         <?php if (count($recent_reading_activity) > 0): ?>
@@ -870,6 +842,50 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .page-link:hover { border-color:var(--rose); }
 .page-link.active { background:var(--rose); color:white; border-color:var(--rose); }
 
+
+/* ===== ADDITIONAL STYLES FOR COMPACT LAYOUT ===== */
+.dashboard-page { padding: 32px 0 60px; }
+.alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.recent-content-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.video-reflection-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+/* ===== COMPACT SECTION ===== */
+.compact-section { padding: 16px; }
+.compact-section .section-header { margin-bottom: 10px; }
+.compact-section .section-header h2 { font-size: 1rem; }
+.compact-section .section-actions .btn { padding: 4px 12px; font-size: 0.75rem; }
+
+/* ===== COMPACT LIST ===== */
+.compact-list { display: flex; flex-direction: column; gap: 6px; }
+.session-item { padding: 8px 10px; border-radius: 6px; font-size: 0.85rem; }
+
+/* ===== USER TABLE ===== */
+.user-table { display: flex; flex-direction: column; gap: 6px; }
+.user-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); }
+.user-row .user-name { font-size: 0.85rem; flex: 1; }
+.user-row .user-name small { color: var(--text-light); }
+.user-row .user-role { margin-right: 10px; }
+
+/* ===== COMPACT EMPTY STATE ===== */
+.compact-empty { display: flex; align-items: center; gap: 8px; padding: 16px 0; color: var(--text-light); font-size: 0.9rem; }
+.compact-empty i { font-size: 1rem; color: var(--rose-light); opacity: 0.8; }
+
+/* ===== MINI PAGINATION ===== */
+.mini-pagination { margin-top: 12px; gap: 4px; }
+.mini-pagination .page-link { padding: 4px 10px; font-size: 0.75rem; min-width: 28px; }
+
+/* ===== RESPONSIVE ADJUSTMENTS ===== */
+@media (max-width: 1024px) {
+    .recent-content-grid { grid-template-columns: 1fr 1fr; }
+    .video-reflection-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    .alert-row { grid-template-columns: 1fr; }
+    .recent-content-grid { grid-template-columns: 1fr; }
+    .video-reflection-row { grid-template-columns: 1fr; }
+    .user-row { flex-direction: column; align-items: stretch; gap: 4px; }
+    .user-row .user-role { margin-right: 0; display: flex; justify-content: space-between; align-items: center; }
+}
 /* ===== RESPONSIVE ===== */
 @media (max-width:1024px) { .dashboard-grid { grid-template-columns:1fr; } .recent-content-grid { grid-template-columns:1fr; } }
 @media (max-width:768px) {
