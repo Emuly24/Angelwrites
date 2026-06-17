@@ -620,7 +620,16 @@ html, body { height:100%; width:100%; overflow:hidden; }
 </div>
 
     <div id="challenge-widget"></div>
-    <div id="overlay" onclick="closeAll()"></div>
+    <div id="overlay"></div>
+
+     <div id="commentsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeComments()">&times;</span>
+            <h3><i class="fas fa-comments" style="color:var(--rose);"></i> Comments</h3>
+            <div id="commentList" style="margin:16px 0;max-height:300px;overflow-y:auto;"></div>
+            <textarea id="commentInput" rows="3" placeholder="Write a comment..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;margin-bottom:8px;"></textarea>
+            <button onclick="submitComment()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;font-weight:600;">Post Comment</button>
+        </div>
 </div>
 <script>
 (function() {
@@ -1593,21 +1602,20 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     // ===== CLOSE ALL =====
     function closeAll() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.style.display = 'none';
-        document.getElementById('share-modal').style.display = 'none';
-        overlay.classList.remove('active');
-        if (focusMode) {
-            focusMode = false;
-            document.getElementById('reader-app').classList.remove('focus-mode');
-            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
-        }
-        if (commentsModal.style.display === 'block') { commentsModal.style.display = 'none'; }
-        if (errorModal.style.display === 'block') { errorModal.style.display = 'none'; }
-        if (prayerModal.style.display === 'block') { prayerModal.style.display = 'none'; }
+    settingsPanel.classList.remove('open');
+    tocDrawer.classList.remove('open');
+    notesPanel.style.display = 'none';
+    document.getElementById('share-modal').style.display = 'none';
+    overlay.classList.remove('active');
+    if (focusMode) {
+        focusMode = false;
+        document.getElementById('reader-app').classList.remove('focus-mode');
+        document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
     }
-    overlay.addEventListener('click', closeAll);
+    if (commentsModal.style.display === 'block') { commentsModal.style.display = 'none'; }
+    if (errorModal.style.display === 'block') { errorModal.style.display = 'none'; }
+    if (prayerModal.style.display === 'block') { prayerModal.style.display = 'none'; }
+}
 
     // ===== BACK BUTTON =====
     backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
