@@ -688,9 +688,22 @@ html, body { height:100%; width:100%; overflow:hidden; }
     pointer-events: auto;
 }
 
+/* Ensure modal-wrapper is always on top of overlay */
 .modal-wrapper.visible {
+    z-index: 100001 !important;
     display: flex !important;
 }
+
+/* Fix Settings Panel and TOC Drawer – raise z-index */
+#settings-panel.open {
+    z-index: 100001 !important;
+    transform: translateY(0) !important;
+}
+#toc-drawer.open {
+    z-index: 100001 !important;
+    right: 0 !important;
+}
+
 
 /* --- UNIFIED MODAL CLOSE BUTTON --- */
 .modal-close {
@@ -866,6 +879,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
             <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option></select></div></div>
             <div class="settings-group"><label>Line Height</label><div class="slider-group"><button onclick="adjustLineHeight(-10)">-</button><input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10"><button onclick="adjustLineHeight(10)">+</button><span id="lineHeightLabel">1.8</span></div></div>
             <div class="settings-group"><label>Reading Speed</label><div class="slider-group"><input type="range" id="readingSpeedSlider" min="100" max="500" value="<?php echo $reading_speed_wpm; ?>" step="10"><span id="readingSpeedLabel"><?php echo $reading_speed_wpm; ?> wpm</span></div></div>
+            <div class="settings-group"><label>Close All</label><button onclick="closeAll()">Close All</button></div>
         </div>
     </div>
 
@@ -1592,10 +1606,25 @@ prayerBtn.addEventListener('click', function() {
     openModal('prayerModal');
 });
 
-function closeShare() { closeModal('share-modal'); }
-function closeComments() { closeModal('commentsModal'); }
-function closeErrorModal() { closeModal('errorModal'); }
-function closePrayerModal() { closeModal('prayerModal'); }
+// Use closeModal for all working modals
+function closeComments() {
+    closeModal('commentsModal');
+}
+function closePrayerModal() {
+    closeModal('prayerModal');
+}
+function closeSearch() {
+    closeModal('search-bar');
+}
+
+function closeShare() {
+    closeModal('share-modal');
+}
+function closeErrorModal() {
+    closeModal('errorModal');
+}
+function closeSettings() {
+    settingsPanel.classList.remove('open'); 
 
     // ===== CHALLENGE =====
 function loadChallenge() {
