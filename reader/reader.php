@@ -673,7 +673,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     top: 50% !important;
     left: 50% !important;
     transform: translate(-50%, -50%) !important;
-    z-index: 100000 !important;
+    z-index: 100001 !important;   
     width: 90%;
     max-width: 520px;
     max-height: 85vh;
@@ -683,7 +683,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     padding: 30px 28px 28px;
     box-shadow: 0 24px 80px rgba(0,0,0,0.35);
     border: 1px solid var(--rose-light);
-    display: none !important; /* Hidden by default */
+    display: none !important;
     flex-direction: column;
     pointer-events: auto;
 }
@@ -758,9 +758,8 @@ html, body { height:100%; width:100%; overflow:hidden; }
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    background: rgba(30, 20, 20, 0.65) !important;
+    background: rgba(30, 20, 20, 0.55) !important; 
     backdrop-filter: blur(6px) !important;
-    -webkit-backdrop-filter: blur(6px) !important;
     z-index: 99999 !important;
     display: none !important;
     pointer-events: auto !important;
@@ -1566,38 +1565,37 @@ html, body { height:100%; width:100%; overflow:hidden; }
             overlay.classList.remove('active');
         }
     });
-        // Replace the shareBtn listener
-    shareBtn.addEventListener('click', function() {
-        openModal('share-modal');
-    });
+        // SHARE BUTTON
+shareBtn.addEventListener('click', function() {
+    openModal('share-modal');
+});
 
-    // Replace the commentsBtn listener
-    commentsBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to view comments.'); return; }
-        loadComments();
-        openModal('commentsModal');
-    });
+// COMMENTS BUTTON
+commentsBtn.addEventListener('click', function() {
+    if (userId === 0) { alert('Please log in to view comments.'); return; }
+    loadComments();
+    openModal('commentsModal');
+});
 
-    // Replace the errorReportBtn listener
-    errorReportBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to report errors.'); return; }
-        errorPageInput.value = currentPage;
-        errorPageNumSpan.textContent = '(current: ' + currentPage + ')';
-        openModal('errorModal');
-    });
+// ERROR REPORT BUTTON
+errorReportBtn.addEventListener('click', function() {
+    if (userId === 0) { alert('Please log in to report errors.'); return; }
+    errorPageInput.value = currentPage;
+    errorPageNumSpan.textContent = '(current: ' + currentPage + ')';
+    openModal('errorModal');
+});
 
-    // Replace the prayerBtn listener
-    prayerBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to submit prayer requests.'); return; }
-        prayerText.value = '';
-        openModal('prayerModal');
-    });
+// PRAYER BUTTON
+prayerBtn.addEventListener('click', function() {
+    if (userId === 0) { alert('Please log in to submit prayer requests.'); return; }
+    prayerText.value = '';
+    openModal('prayerModal');
+});
 
-    // Update the specific close functions
-    function closeShare() { closeModal('share-modal'); }
-    function closeComments() { closeModal('commentsModal'); }
-    function closeErrorModal() { closeModal('errorModal'); }
-    function closePrayerModal() { closeModal('prayerModal'); }
+function closeShare() { closeModal('share-modal'); }
+function closeComments() { closeModal('commentsModal'); }
+function closeErrorModal() { closeModal('errorModal'); }
+function closePrayerModal() { closeModal('prayerModal'); }
 
     // ===== CHALLENGE =====
 function loadChallenge() {
@@ -2079,11 +2077,12 @@ function showReactionPicker(noteId, event) {
         overlay.classList.remove('active');
     }
 
-    // ===== CLOSE ALL =====
-    // ===== UNIFIED MODAL SYSTEM =====
+   // ===== UNIFIED MODAL SYSTEM – FIXES OVERLAY ISSUE =====
 function openModal(id) {
     const modal = document.getElementById(id);
     if (modal) {
+        // Remove any inline style that could break layout
+        modal.style.display = '';
         modal.classList.add('visible');
         overlay.classList.add('active');
     }
@@ -2097,7 +2096,7 @@ function closeModal(id) {
     }
 }
 
-// Close all modals (called by Escape key)
+// CloseAll 
 function closeAll() {
     settingsPanel.classList.remove('open');
     tocDrawer.classList.remove('open');
@@ -2116,6 +2115,7 @@ function closeAll() {
         document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
     }
 }
+    
     // ===== BACK BUTTON =====
     backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
 
