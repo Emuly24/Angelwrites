@@ -12,8 +12,9 @@ $success = '';
 // ===== ENSURE SETTINGS TABLE HAS LOGO COLUMN =====
 $db->exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)");
 $stmt = $db->query("PRAGMA table_info(settings)");
-$columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-if (!in_array('logo_path', $columns)) {
+$columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$column_names = array_column($columns, 'name');
+if (!in_array('logo_path', $column_names)) {
     $db->exec("ALTER TABLE settings ADD COLUMN logo_path TEXT");
 }
 
