@@ -391,7 +391,52 @@ $pageTitle = 'My Dashboard';
                     <?php endif; ?>
                 </section>
 
-                <!-- ===== RECENT VIDEOS ===== -->
+                //create group
+                <!-- ===== CREATE A READING GROUP ===== -->
+                <section class="dashboard-section" id="create-group">
+                    <div class="section-header">
+                        <h2><i class="fas fa-users section-icon"></i> Create a Reading Group</h2>
+                        <div class="section-actions">
+                            <a href="<?php echo SITE_URL; ?>/groups.php" class="btn btn-sm btn-outline">View Groups</a>
+                        </div>
+                    </div>
+                    <div class="create-group-card">
+                        <form method="POST" action="<?php echo SITE_URL; ?>/create_group.php" class="create-group-form">
+                            <div class="form-group">
+                                <label for="group_name">Group Name <span class="required">*</span></label>
+                                <input type="text" id="group_name" name="name" placeholder="Enter group name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="book_id">Select Book <span class="required">*</span></label>
+                                <select id="book_id" name="book_id" required>
+                                    <option value="">Select a book…</option>
+                                    <?php
+                                    $stmt = $db->query("SELECT id, title FROM books ORDER BY title ASC");
+                                    $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                                    foreach ($books as $book): ?>
+                                        <option value="<?php echo $book['id']; ?>"><?php echo htmlspecialchars($book['title']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group  ">
+                                <label for="description">Description</label>
+                                <textarea id="description" name="description" placeholder="Enter group description (optional)"></textarea>  
+                            </div>
+                            <div class="form-group  ">
+                                <label for="is_private">
+                                    <input type="checkbox" id="is_private" name="is_private">
+                                    Private Group
+                                </label>
+                                <small class="field-hint">Private groups are not listed publicly. Members can only join via invite code.</small>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" name="create_group" class="btn btn-primary btn-large">
+                                    <i class="fas fa-plus"></i> Create Group
+                                </button>
+                            </div>
+                        </form>       
+
+                <!-- ===== RECENT VIDEOS ===== -->  
                 <section class="dashboard-section" id="recent-videos">
                     <div class="section-header">
                         <h2><i class="fas fa-video section-icon"></i> Recent Videos</h2>

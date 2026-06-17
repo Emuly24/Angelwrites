@@ -576,6 +576,60 @@ $pageTitle = 'Admin Dashboard';
                         </div>
                     </section>
 
+                    <!-- MANAGE GROUPS -->
+                    <section class="dashboard-section compact-section" id="manage-groups">
+                        <div class="section-header">
+                            <h2><i class="fas fa-users-cog section-icon"></i> Reading Groups</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_groups.php" class="btn btn-sm btn-outline">Manage</a>
+                        </div>
+                        <div class="dashboard-section-body">
+                            <?php if (count($stats['total_groups']) > 0): ?>
+                                <p>Total Groups: <?php echo $stats['total_groups']; ?></p>
+                                <!-- You can expand this section to list recent groups or group activity -->
+                            <?php else: ?>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-users-cog"></i> No reading groups yet
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </section>
+
+                    <!-- MANAGE COMMUNITY QUESTIONS -->
+                    <section class="dashboard-section compact-section" id="manage-questions">
+                        <div class="section-header">
+                            <h2><i class="fas fa-question-circle section-icon"></i> Community Questions</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php" class="btn btn-sm btn-outline">Manage</a>
+                        </div>
+                        <div class="dashboard-section-body">
+                            <?php if (count($stats['total_questions']) > 0): ?>
+                                <p>Total Questions: <?php echo $stats['total_questions']; ?></p>
+                                <!-- You can expand this section to list recent questions or question activity -->
+                            <?php else: ?>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-question-circle"></i> No community questions yet
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </section>
+
+                    <!-- MANAGE REFLECTIONS -->
+                    <section class="dashboard-section compact-section" id="manage-reflections">
+                        <div class="section-header">
+                            <h2><i class="fas fa-church section-icon"></i> Christian Reflections</h2>
+                            <a href="<?php echo SITE_URL; ?>/admin/manage_blog.php?category=Christian+Reflections" class="btn btn-sm btn-outline">Manage</a>
+                        </div>
+                        <div class="dashboard-section-body">
+                            <?php if (count($stats['total_reflections']) > 0): ?>
+                                <p>Total Reflections: <?php echo $stats['total_reflections']; ?></p>
+                                <!-- You can expand this section to list recent reflections or reflection activity -->
+                            <?php else: ?>
+                                <div class="empty-state compact-empty">
+                                    <i class="fas fa-church"></i> No reflections yet
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </section>
+
                     <!-- RECENT VIDEOS (Horizontal Scroll!) -->
                     <section class="dashboard-section compact-section" id="recent-videos">
                         <div class="section-header">
