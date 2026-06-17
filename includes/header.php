@@ -109,7 +109,7 @@ if ($isLoggedIn) {
             border: none;
             cursor: pointer;
             padding: 0;
-            z-index: 1001;
+            z-index: 10001; /* Above everything */
         }
         .hamburger span {
             display: block;
@@ -187,57 +187,63 @@ if ($isLoggedIn) {
             .nav-links {
                 display: flex !important;
                 flex-direction: column;
-                position: fixed; /* FIX: Removed from document flow */
-                top: 0;
-                right: -100%; /* Hidden off-screen initially */
-                width: 320px;
-                height: 100vh;
-                background: var(--card-bg);
-                border-left: 1px solid var(--border);
-                padding: 80px 24px 24px;
-                box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
-                z-index: 1000;
-                overflow-y: auto;
-                transition: right 0.3s ease;
-                justify-content: flex-start;
-                flex: none;
-                margin: 0;
+                position: fixed !important; /* Absolutely fixed, removes from document flow */
+                top: 0 !important;
+                right: -100% !important; /* Hidden off-screen by default */
+                width: 320px !important;
+                height: 100vh !important;
+                background: var(--card-bg) !important;
+                border-left: 1px solid var(--border) !important;
+                padding: 80px 24px 24px !important;
+                box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
+                z-index: 10000 !important; /* Above header, overlay, etc. */
+                overflow-y: auto !important;
+                transition: right 0.3s ease !important;
+                justify-content: flex-start !important;
+                flex: none !important;
+                margin: 0 !important;
+                pointer-events: auto !important;
             }
 
             .nav-links.open {
-                right: 0; /* Slides into view */
+                right: 0 !important; /* Slides into view */
             }
 
             .nav-links li {
-                margin: 4px 0;
-                padding: 8px 0;
-                border-bottom: 1px solid var(--border);
-                width: 100%;
+                margin: 4px 0 !important;
+                padding: 8px 0 !important;
+                border-bottom: 1px solid var(--border) !important;
+                width: 100% !important;
             }
             .nav-links li:last-child {
-                border-bottom: none;
+                border-bottom: none !important;
             }
             .nav-links a {
-                padding: 4px 0;
-                width: 100%;
-                font-size: 1rem;
+                padding: 4px 0 !important;
+                width: 100% !important;
+                font-size: 1rem !important;
+                color: var(--text) !important;
+                display: block !important;
+            }
+            .nav-links a:hover {
+                color: var(--rose) !important;
             }
             .nav-links .nav-separator {
-                display: none;
+                display: none !important;
             }
 
             .menu-overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.5);
-                z-index: 999;
+                display: none !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                background: rgba(0, 0, 0, 0.5) !important;
+                z-index: 9999 !important; /* Just below nav-links */
             }
             .menu-overlay.open {
-                display: block;
+                display: block !important;
             }
         }
 
@@ -452,50 +458,54 @@ if ($isLoggedIn) {
         }
 
         /* ===== MOBILE MENU – FIXED, NO PUSH, LINKS VISIBLE ===== */
-@media (max-width: 992px) {
-    .hamburger { display: flex !important; flex-direction: column; justify-content: space-between; width: 28px; height: 20px; background: none; border: none; cursor: pointer; padding: 0; z-index: 1001; }
-    .hamburger span { display: block; width: 100%; height: 2px; background: var(--text); border-radius: 2px; transition: all 0.3s ease; }
-    .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(6px, 6px); }
-    .hamburger.active span:nth-child(2) { opacity: 0; }
-    .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(6px, -6px); }
+        @media (max-width: 992px) {
+            .hamburger {
+                display: flex !important;
+            }
+            .nav-links {
+                display: flex !important;
+                flex-direction: column !important;
+                position: fixed !important;
+                top: 0 !important;
+                right: -100% !important;
+                width: 320px !important;
+                height: 100vh !important;
+                background: var(--card-bg) !important;
+                border-left: 1px solid var(--border) !important;
+                padding: 80px 24px 24px !important;
+                box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
+                z-index: 10000 !important;
+                overflow-y: auto !important;
+                transition: right 0.3s ease !important;
+                justify-content: flex-start !important;
+                flex: none !important;
+                margin: 0 !important;
+                pointer-events: auto !important;
+            }
+            .nav-links.open { right: 0 !important; }
+            .nav-links li { width: 100% !important; padding: 6px 0 !important; border-bottom: 1px solid var(--border) !important; }
+            .nav-links li:last-child { border-bottom: none !important; }
+            .nav-links a { display: block !important; width: 100% !important; padding: 4px 0 !important; font-size: 1rem !important; color: var(--text) !important; text-decoration: none !important; transition: color 0.2s !important; }
+            .nav-links a:hover { color: var(--rose) !important; }
+            .nav-links .nav-separator { display: none !important; }
 
-    .nav-links {
-        position: fixed !important; /* CRITICAL: Removes from flow, no push */
-        top: 0 !important;
-        right: -100% !important;
-        width: 320px !important;
-        height: 100vh !important;
-        background: var(--card-bg) !important;
-        border-left: 1px solid var(--border) !important;
-        padding: 80px 24px 24px !important;
-        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
-        z-index: 1000 !important;
-        overflow-y: auto !important;
-        transition: right 0.3s ease !important;
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-        margin: 0 !important;
-    }
-    .nav-links.open { right: 0 !important; }
-    .nav-links li { width: 100%; padding: 6px 0; border-bottom: 1px solid var(--border); }
-    .nav-links li:last-child { border-bottom: none; }
-    .nav-links a { display: block; width: 100%; padding: 4px 0; font-size: 1rem; color: var(--text); text-decoration: none; transition: color 0.2s; }
-    .nav-links a:hover { color: var(--rose); }
-    .nav-links .nav-separator { display: none; }
+            .menu-overlay {
+                display: none !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                background: rgba(0, 0, 0, 0.5) !important;
+                z-index: 9999 !important;
+            }
+            .menu-overlay.open { display: block !important; }
 
-    .menu-overlay {
-        display: none !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        background: rgba(0, 0, 0, 0.5) !important;
-        z-index: 999 !important;
-    }
-    .menu-overlay.open { display: block !important; }
-}
+            /* Prevent page scroll when menu is open */
+            body.no-scroll {
+                overflow: hidden !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -616,7 +626,7 @@ if ($isLoggedIn) {
                     <?php endif; ?>
 
                     <!-- ===== HAMBURGER (Only visible on mobile) ===== -->
-                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" onclick="toggleMobileMenu()">
+                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu">
                         <span></span>
                         <span></span>
                         <span></span>
@@ -626,7 +636,7 @@ if ($isLoggedIn) {
         </nav>
 
         <!-- Overlay -->
-        <div class="menu-overlay" id="menuOverlay" onclick="closeMobileMenu()"></div>
+        <div class="menu-overlay" id="menuOverlay"></div>
     </header>
 
     <main class="site-main" id="mainContent">
@@ -654,133 +664,123 @@ if ($isLoggedIn) {
 
     <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
-// ===== SIMPLE TOGGLE – Works every time =====
-function toggleMobileMenu() {
-    const navLinks = document.getElementById('navLinks');
-    const overlay = document.getElementById('menuOverlay');
-    const hamburger = document.getElementById('hamburger');
-    const body = document.body;
+        // ===== MOBILE MENU – SIMPLE & RELIABLE =====
+        (function() {
+            'use strict';
 
-    if (!navLinks) return;
-    const isOpen = navLinks.classList.contains('open');
+            const hamburger = document.getElementById('hamburger');
+            const navLinks = document.getElementById('navLinks');
+            const overlay = document.getElementById('menuOverlay');
+            const body = document.body;
 
-    if (isOpen) {
-        closeMobileMenu();
-    } else {
-        navLinks.classList.add('open');
-        if (overlay) overlay.classList.add('open');
-        if (hamburger) hamburger.classList.add('active');
-        body.style.overflow = 'hidden';
-    }
-}
+            // Only proceed if all elements exist
+            if (!hamburger || !navLinks || !overlay) return;
 
-function closeMobileMenu() {
-    const navLinks = document.getElementById('navLinks');
-    const overlay = document.getElementById('menuOverlay');
-    const hamburger = document.getElementById('hamburger');
-    const body = document.body;
-
-    if (!navLinks) return;
-    navLinks.classList.remove('open');
-    if (overlay) overlay.classList.remove('open');
-    if (hamburger) hamburger.classList.remove('active');
-    body.style.overflow = '';
-}
-
-// Attach click listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Close menu when a link is clicked
-    document.querySelectorAll('#navLinks a').forEach(link => {
-        link.addEventListener('click', closeMobileMenu);
-    });
-
-    // Close on Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeMobileMenu();
-    });
-});
-
-    // ===== DOM READY =====
-    document.addEventListener('DOMContentLoaded', function() {
-        // Scroll shadow
-        const header = document.getElementById('siteHeader');
-        if (header) {
-            window.addEventListener('scroll', function() {
-                header.classList.toggle('scrolled', window.scrollY > 10);
-            });
-        }
-
-        // Theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        const html = document.documentElement;
-        const themes = ['light', 'dark', 'system'];
-        let currentThemeIndex = 0;
-        const storedTheme = localStorage.getItem('angelwrites_theme');
-        if (storedTheme && themes.includes(storedTheme)) {
-            currentThemeIndex = themes.indexOf(storedTheme);
-        }
-
-        function applyTheme(theme) {
-            if (theme === 'system') {
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-            } else {
-                html.setAttribute('data-theme', theme);
+            function openMenu() {
+                navLinks.classList.add('open');
+                overlay.classList.add('open');
+                hamburger.classList.add('active');
+                body.classList.add('no-scroll');
             }
-            document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-            updateIcon(theme);
-            localStorage.setItem('angelwrites_theme', theme);
-        }
 
-        function updateIcon(theme) {
+            function closeMenu() {
+                navLinks.classList.remove('open');
+                overlay.classList.remove('open');
+                hamburger.classList.remove('active');
+                body.classList.remove('no-scroll');
+            }
+
+            function toggleMenu() {
+                if (navLinks.classList.contains('open')) {
+                    closeMenu();
+                } else {
+                    openMenu();
+                }
+            }
+
+            // Hamburger click
+            hamburger.addEventListener('click', toggleMenu);
+
+            // Overlay click
+            overlay.addEventListener('click', closeMenu);
+
+            // Click on any nav link closes menu
+            document.querySelectorAll('#navLinks a').forEach(function(link) {
+                link.addEventListener('click', closeMenu);
+            });
+
+            // Escape key closes menu
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeMenu();
+            });
+
+            // ===== SCROLL SHADOW =====
+            const header = document.getElementById('siteHeader');
+            if (header) {
+                window.addEventListener('scroll', function() {
+                    header.classList.toggle('scrolled', window.scrollY > 10);
+                });
+            }
+
+            // ===== THEME TOGGLE =====
+            const themeToggle = document.getElementById('themeToggle');
+            const html = document.documentElement;
+            const themes = ['light', 'dark', 'system'];
+            let currentThemeIndex = 0;
+            const storedTheme = localStorage.getItem('angelwrites_theme');
+            if (storedTheme && themes.includes(storedTheme)) {
+                currentThemeIndex = themes.indexOf(storedTheme);
+            }
+
+            function applyTheme(theme) {
+                if (theme === 'system') {
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+                } else {
+                    html.setAttribute('data-theme', theme);
+                }
+                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+                updateIcon(theme);
+                localStorage.setItem('angelwrites_theme', theme);
+            }
+
+            function updateIcon(theme) {
+                if (themeToggle) {
+                    const icon = themeToggle.querySelector('i');
+                    if (theme === 'dark') icon.className = 'fas fa-sun';
+                    else if (theme === 'light') icon.className = 'fas fa-moon';
+                    else icon.className = 'fas fa-circle-half-stroke';
+                }
+            }
+
+            applyTheme(themes[currentThemeIndex]);
+
             if (themeToggle) {
-                const icon = themeToggle.querySelector('i');
-                if (theme === 'dark') icon.className = 'fas fa-sun';
-                else if (theme === 'light') icon.className = 'fas fa-moon';
-                else icon.className = 'fas fa-circle-half-stroke';
+                themeToggle.addEventListener('click', function() {
+                    currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+                    applyTheme(themes[currentThemeIndex]);
+                });
             }
-        }
 
-        applyTheme(themes[currentThemeIndex]);
-
-        if (themeToggle) {
-            themeToggle.addEventListener('click', function() {
-                currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-                applyTheme(themes[currentThemeIndex]);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (localStorage.getItem('angelwrites_theme') === 'system') {
+                    html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+                }
             });
-        }
 
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-            if (localStorage.getItem('angelwrites_theme') === 'system') {
-                html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-            }
-        });
-
-        // Close mobile menu when a link is clicked
-        document.querySelectorAll('#navLinks a').forEach(function(link) {
-            link.addEventListener('click', function() {
-                closeMobileMenu();
+            // ===== CLOSE DROPDOWNS ON OUTSIDE CLICK =====
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.search-wrapper')) {
+                    document.getElementById('searchDropdown')?.classList.remove('open');
+                }
+                if (!e.target.closest('.notification-wrapper')) {
+                    document.getElementById('notificationDropdown')?.classList.remove('open');
+                }
+                if (!e.target.closest('.user-wrapper')) {
+                    document.getElementById('userDropdown')?.classList.remove('open');
+                }
             });
-        });
-
-        // Close mobile menu on Escape
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeMobileMenu();
-        });
-
-        // Close all dropdowns on outside click
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.search-wrapper')) {
-                document.getElementById('searchDropdown').classList.remove('open');
-            }
-            if (!e.target.closest('.notification-wrapper')) {
-                document.getElementById('notificationDropdown').classList.remove('open');
-            }
-            if (!e.target.closest('.user-wrapper')) {
-                document.getElementById('userDropdown').classList.remove('open');
-            }
-        });
-    });
+        })();
     </script>
 </body>
 </html>
