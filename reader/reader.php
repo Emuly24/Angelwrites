@@ -565,64 +565,71 @@ html, body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
-   <div id="toc-drawer" style="display: none;">
-    <div class="toc-header">
-        <h3>Table of Contents</h3>
-        <button class="toc-close" id="tocClose">&times;</button>
+    <!-- TOC DRAWER (no inline display:none – CSS handles hiding) -->
+    <div id="toc-drawer">
+        <div class="toc-header">
+            <h3>Table of Contents</h3>
+            <button class="toc-close" id="tocClose">&times;</button>
+        </div>
+        <div class="toc-body" id="tocBody">
+            <?php if (is_array($toc) && count($toc) > 0): ?>
+            <ul class="toc-list">
+                <?php foreach ($toc as $entry): ?>
+                <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
+                <?php endforeach; ?>
+            </ul>
+            <?php else: ?>
+            <p class="toc-empty">No table of contents available.</p>
+            <?php endif; ?>
+        </div>
     </div>
-    <div class="toc-body" id="tocBody">
-        <?php if (is_array($toc) && count($toc) > 0): ?>
-        <ul class="toc-list">
-            <?php foreach ($toc as $entry): ?>
-            <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
-            <?php endforeach; ?>
-        </ul>
-        <?php else: ?>
-        <p class="toc-empty">No table of contents available.</p>
-        <?php endif; ?>
-    </div>
-</div>
 
     <div id="notes-panel" style="display: none;">
-    <div class="notes-header">
-        <h3>📝 Group Notes</h3>
-        <div>
-            <button class="note-submit" id="addNoteBtn">+ Add</button>
-            <button class="note-cancel" id="notesClose">&times;</button>
-        </div>
-    </div>
-    <div class="notes-body" id="notesBody">
-        <div id="notesList">
-            <p class="empty-notes">No notes for this chapter.</p>
-        </div>
-        <div id="noteForm">
-            <textarea id="noteText" rows="2" placeholder="Write a note..."></textarea>
+        <div class="notes-header">
+            <h3>📝 Group Notes</h3>
             <div>
-                <label><input type="checkbox" id="notePrivate"> Private</label>
+                <button class="note-submit" id="addNoteBtn">+ Add</button>
+                <button class="note-cancel" id="notesClose">&times;</button>
             </div>
-            <button class="note-submit" onclick="submitNote()">Post</button>
-            <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
+        </div>
+        <div class="notes-body" id="notesBody">
+            <div id="notesList">
+                <p class="empty-notes">No notes for this chapter.</p>
+            </div>
+            <div id="noteForm">
+                <textarea id="noteText" rows="2" placeholder="Write a note..."></textarea>
+                <div>
+                    <label><input type="checkbox" id="notePrivate"> Private</label>
+                </div>
+                <button class="note-submit" onclick="submitNote()">Post</button>
+                <button class="note-cancel" onclick="toggleNoteForm()">Cancel</button>
+            </div>
         </div>
     </div>
-</div>
-   <div id="share-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeShare()">&times;</span>
-        <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
-        <div style="margin:16px 0;display:flex;flex-direction:column;gap:8px;">
-            <button onclick="share('facebook')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-facebook-f" style="color:var(--rose);"></i> Facebook</button>
-            <button onclick="share('twitter')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-twitter" style="color:var(--rose);"></i> Twitter</button>
-            <button onclick="share('whatsapp')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-whatsapp" style="color:var(--rose);"></i> WhatsApp</button>
-            <button onclick="share('copy')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fas fa-link" style="color:var(--rose);"></i> Copy Link</button>
-        </div>
-        <button class="share-close" onclick="closeShare()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;width:100%;font-weight:600;">Close</button>
-    </div>
-</div>
 
+    <!-- SHARE MODAL -->
+    <div id="share-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeShare()">&times;</span>
+            <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
+            <div style="margin:16px 0;display:flex;flex-direction:column;gap:8px;">
+                <button onclick="share('facebook')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-facebook-f" style="color:var(--rose);"></i> Facebook</button>
+                <button onclick="share('twitter')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-twitter" style="color:var(--rose);"></i> Twitter</button>
+                <button onclick="share('whatsapp')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fab fa-whatsapp" style="color:var(--rose);"></i> WhatsApp</button>
+                <button onclick="share('copy')" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);cursor:pointer;color:var(--text);"><i class="fas fa-link" style="color:var(--rose);"></i> Copy Link</button>
+            </div>
+            <button class="share-close" onclick="closeShare()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;width:100%;font-weight:600;">Close</button>
+        </div>
+    </div>
+
+    <!-- CHALLENGE WIDGET -->
     <div id="challenge-widget"></div>
+
+    <!-- OVERLAY -->
     <div id="overlay"></div>
 
-     <div id="commentsModal" class="modal" style="display: none;">
+    <!-- COMMENTS MODAL -->
+    <div id="commentsModal" style="display: none;">
         <div class="modal-content">
             <span class="modal-close" onclick="closeComments()">&times;</span>
             <h3><i class="fas fa-comments" style="color:var(--rose);"></i> Comments</h3>
@@ -630,7 +637,52 @@ html, body { height:100%; width:100%; overflow:hidden; }
             <textarea id="commentInput" rows="3" placeholder="Write a comment..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;margin-bottom:8px;"></textarea>
             <button onclick="submitComment()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;font-weight:600;">Post Comment</button>
         </div>
-</div>
+    </div>
+
+    <!-- ERROR REPORT MODAL -->
+    <div id="errorModal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeErrorModal()">&times;</span>
+            <h3><i class="fas fa-exclamation-triangle" style="color:var(--rose);"></i> Report Error</h3>
+            <div style="margin:12px 0;">
+                <label style="display:block;font-weight:600;font-size:0.9rem;">Page number:</label>
+                <input type="number" id="errorPageInput" min="1" max="<?php echo $total_pages; ?>" value="<?php echo $last_page; ?>" style="width:80px;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);">
+                <span id="errorPageNum" style="font-size:0.9rem;color:var(--text-light);margin-left:8px;">(current: <?php echo $last_page; ?>)</span>
+            </div>
+            <div style="margin:12px 0;">
+                <label style="display:block;font-weight:600;font-size:0.9rem;">Error description:</label>
+                <textarea id="errorText" rows="3" placeholder="Describe the error..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
+            </div>
+            <div style="margin:12px 0;">
+                <label style="display:block;font-weight:600;font-size:0.9rem;">Suggested correction (optional):</label>
+                <textarea id="errorCorrection" rows="2" placeholder="What should be written instead?" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
+            </div>
+            <button onclick="submitError()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;font-weight:600;">Submit Error Report</button>
+        </div>
+    </div>
+
+    <!-- PRAYER REQUEST MODAL -->
+    <div id="prayerModal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePrayerModal()">&times;</span>
+            <h3><i class="fas fa-hands-praying" style="color:var(--rose);"></i> Prayer Request</h3>
+            <div style="margin:12px 0;">
+                <label style="display:block;font-weight:600;font-size:0.9rem;">Your prayer request:</label>
+                <textarea id="prayerText" rows="4" placeholder="Write your prayer request here..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
+            </div>
+            <button onclick="submitPrayer()" style="background:var(--rose);color:var(--white);border:none;padding:8px 24px;border-radius:30px;cursor:pointer;font-weight:600;">Submit Prayer Request</button>
+        </div>
+    </div>
+
+    <!-- SEARCH BAR -->
+    <div id="search-bar">
+        <div class="search-header">
+            <input type="text" id="searchInput" placeholder="Search in book...">
+            <button onclick="closeSearch()">×</button>
+        </div>
+        <div id="searchResults"></div>
+    </div>
+
 <script>
 (function() {
     // ===== DATA =====
@@ -698,6 +750,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     const searchBtn = document.getElementById('searchBtn');
     const searchInput = document.getElementById('searchInput');
     const searchResults = document.getElementById('searchResults');
+    const searchBar = document.getElementById('search-bar');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
     let readingMode = localStorage.getItem('reader_mode') || 'scroll';
@@ -1171,7 +1224,6 @@ html, body { height:100%; width:100%; overflow:hidden; }
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active',settingsPanel.classList.contains('open'));
     });
-    // FIXED: TOC now uses class 'open' for CSS transition
     tocBtn.addEventListener('click', function() {
         tocDrawer.classList.toggle('open');
         overlay.classList.toggle('active', tocDrawer.classList.contains('open'));
@@ -1206,6 +1258,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
             try {
                 const data = JSON.parse(this.responseText);
                 if (data.success) {
+                    const challengeWidget = document.getElementById('challenge-widget');
                     challengeWidget.style.display = 'block';
                     const percent = Math.min(100,Math.round((data.progress/data.target)*100));
                     challengeWidget.innerHTML = `
@@ -1546,7 +1599,6 @@ html, body { height:100%; width:100%; overflow:hidden; }
     // ===== COMMENT FUNCTIONS =====
     function loadComments() {
         if (userId === 0) return;
-        document.getElementById('currentCommentPage').textContent = currentPage;
         const formData = new FormData();
         formData.append('action','get_book_comments');
         formData.append('book_id',bookId);
@@ -1595,30 +1647,200 @@ html, body { height:100%; width:100%; overflow:hidden; }
             }
         });
     }
-    function closeCommentsModal() {
+    function closeComments() {
         document.getElementById('commentsModal').style.display = 'none';
         overlay.classList.remove('active');
     }
 
     // ===== CLOSE ALL =====
     function closeAll() {
-    settingsPanel.classList.remove('open');
-    tocDrawer.classList.remove('open');
-    notesPanel.style.display = 'none';
-    document.getElementById('share-modal').style.display = 'none';
-    overlay.classList.remove('active');
-    if (focusMode) {
-        focusMode = false;
-        document.getElementById('reader-app').classList.remove('focus-mode');
-        document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
+        settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open');
+        notesPanel.style.display = 'none';
+        document.getElementById('share-modal').style.display = 'none';
+        overlay.classList.remove('active');
+        if (focusMode) {
+            focusMode = false;
+            document.getElementById('reader-app').classList.remove('focus-mode');
+            document.getElementById('focusBtn').querySelector('i').className = 'fas fa-expand';
+        }
+        if (commentsModal.style.display === 'block') { commentsModal.style.display = 'none'; }
+        if (errorModal.style.display === 'block') { errorModal.style.display = 'none'; }
+        if (prayerModal.style.display === 'block') { prayerModal.style.display = 'none'; }
     }
-    if (commentsModal.style.display === 'block') { commentsModal.style.display = 'none'; }
-    if (errorModal.style.display === 'block') { errorModal.style.display = 'none'; }
-    if (prayerModal.style.display === 'block') { prayerModal.style.display = 'none'; }
-}
 
     // ===== BACK BUTTON =====
     backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
+
+    // ===== ERROR REPORT =====
+    errorReportBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to report errors.'); return; }
+        errorPageInput.value = currentPage;
+        errorPageNumSpan.textContent = '(current: ' + currentPage + ')';
+        errorModal.style.display = 'block';
+        overlay.classList.add('active');
+    });
+    function openErrorModal() { errorReportBtn.click(); }
+    function closeErrorModal() {
+        errorModal.style.display = 'none';
+        overlay.classList.remove('active');
+        errorText.value = '';
+        errorCorrection.value = '';
+    }
+    function submitError() {
+        const page = parseInt(errorPageInput.value) || currentPage;
+        const desc = errorText.value.trim();
+        const correction = errorCorrection.value.trim();
+        if (!desc) { alert('Please describe the error.'); return; }
+        const data = new FormData();
+        data.append('action','submit_error_report');
+        data.append('book_id', bookId);
+        data.append('page_num', page);
+        data.append('description', desc);
+        data.append('correction', correction);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.onload = function() {
+            try {
+                const res = JSON.parse(this.responseText);
+                if (res.success) {
+                    alert('✅ Error report submitted. Thank you!');
+                    closeErrorModal();
+                } else {
+                    alert('Error: ' + (res.error || 'Could not submit report.'));
+                }
+            } catch(e) {
+                alert('Server error. Please try again.');
+            }
+        };
+        xhr.send(data);
+    }
+
+    // ===== PRAYER REQUEST =====
+    prayerBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to submit prayer requests.'); return; }
+        prayerText.value = '';
+        prayerModal.style.display = 'block';
+        overlay.classList.add('active');
+    });
+    function openPrayerModal() { prayerBtn.click(); }
+    function closePrayerModal() {
+        prayerModal.style.display = 'none';
+        overlay.classList.remove('active');
+    }
+    function submitPrayer() {
+        const text = prayerText.value.trim();
+        if (!text) { alert('Please write your prayer request.'); return; }
+        const data = new FormData();
+        data.append('action','submit_prayer_request');
+        data.append('book_id', bookId);
+        data.append('text', text);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.onload = function() {
+            try {
+                const res = JSON.parse(this.responseText);
+                if (res.success) {
+                    alert('✅ Prayer request submitted. We will pray for you.');
+                    closePrayerModal();
+                } else {
+                    alert('Error: ' + (res.error || 'Could not submit prayer request.'));
+                }
+            } catch(e) {
+                alert('Server error. Please try again.');
+            }
+        };
+        xhr.send(data);
+    }
+
+    // ===== EXPORT HIGHLIGHTS =====
+    exportHighlightsBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to export your highlights.'); return; }
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET','/reader/reader_ajax.php?action=get_highlights&book_id=' + bookId, true);
+        xhr.onload = function() {
+            try {
+                const data = JSON.parse(this.responseText);
+                if (data.success && data.highlights.length > 0) {
+                    // Build JSON content
+                    const exportData = {
+                        book: '<?php echo addslashes($book['title']); ?>',
+                        highlights: data.highlights.map(h => ({
+                            chapter: h.chapter_index,
+                            text: h.text,
+                            color: h.color,
+                            note: h.note || '',
+                            created_at: h.created_at
+                        }))
+                    };
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'highlights_' + bookId + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    alert('✅ Highlights exported!');
+                } else {
+                    alert('No highlights to export.');
+                }
+            } catch(e) {
+                alert('Error exporting highlights: ' + e.message);
+            }
+        };
+        xhr.send();
+    });
+
+    // ===== SEARCH =====
+    searchBtn.addEventListener('click', toggleSearch);
+    function toggleSearch() {
+        searchBar.classList.toggle('visible');
+        if (searchBar.classList.contains('visible')) {
+            searchInput.focus();
+            searchInput.value = '';
+            searchResults.innerHTML = '';
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
+    }
+    function closeSearch() {
+        searchBar.classList.remove('visible');
+        overlay.classList.remove('active');
+        searchInput.value = '';
+        searchResults.innerHTML = '';
+    }
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        if (query.length < 2) { searchResults.innerHTML = ''; return; }
+        let results = [];
+        pages.forEach((html, idx) => {
+            const stripped = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+            if (stripped.includes(query)) {
+                // Find context snippet
+                const pageNum = idx + 1;
+                const snippet = stripped.substring(Math.max(0, stripped.indexOf(query) - 60), Math.min(stripped.length, stripped.indexOf(query) + 120));
+                results.push({ page: pageNum, snippet: snippet.replace(query, '<strong>' + query + '</strong>') });
+            }
+        });
+        if (results.length === 0) {
+            searchResults.innerHTML = '<p style="padding:8px;color:var(--text-light);">No results found.</p>';
+        } else {
+            let html = '<div style="font-weight:600;font-size:0.8rem;padding:4px 8px;">' + results.length + ' result(s)</div>';
+            results.forEach(r => {
+                html += `<div class="search-result" onclick="goToPage(${r.page}); closeSearch();">Page ${r.page} … ${r.snippet}</div>`;
+            });
+            searchResults.innerHTML = html;
+        }
+    });
+
+    // ===== SHARE BUTTON (sidebar) =====
+    shareBtn.addEventListener('click', function() {
+        document.getElementById('share-modal').style.display = 'block';
+        overlay.classList.add('active');
+    });
 
     // ===== EXPOSE ALL FUNCTIONS TO GLOBAL SCOPE =====
     window.adjustFontSize = adjustFontSize;
@@ -1637,16 +1859,13 @@ html, body { height:100%; width:100%; overflow:hidden; }
     window.showReactionPicker = showReactionPicker;
     window.loadComments = loadComments;
     window.submitComment = submitComment;
-    window.closeCommentsModal = closeCommentsModal;
-    // FIXED: Expose Error Report functions
+    window.closeComments = closeComments;
     window.openErrorModal = openErrorModal;
     window.closeErrorModal = closeErrorModal;
     window.submitError = submitError;
-    // FIXED: Expose Prayer Request functions
     window.openPrayerModal = openPrayerModal;
     window.closePrayerModal = closePrayerModal;
     window.submitPrayer = submitPrayer;
-    // FIXED: Expose Search functions
     window.toggleSearch = toggleSearch;
     window.closeSearch = closeSearch;
 

@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 //  READER_AJAX.PHP – Complete SQLite Version
-//  All endpoints required by reader.php
+//  All endpoints required by reader.php (fixed for compatibility)
 // ============================================================
 
 require_once '../includes/config.php';
@@ -158,7 +158,7 @@ if ($action === 'list_highlights') {
 
 if ($action === 'get_highlights') {
     $book_id = (int)$_POST['book_id'];
-    $chapter = (int)$_POST['chapter'];
+    $chapter = isset($_POST['chapter']) ? (int)$_POST['chapter'] : 0;
     $stmt = $db->prepare("SELECT paragraph_index, text, color, note FROM highlights WHERE user_id = ? AND book_id = ? AND chapter_index = ?");
     $stmt->execute([$user_id, $book_id, $chapter]);
     $highlights = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -167,7 +167,7 @@ if ($action === 'get_highlights') {
 }
 
 // ================================================================
-// 5. EXPORT HIGHLIGHTS
+// 5. EXPORT HIGHLIGHTS (used by reader.php export button)
 // ================================================================
 if ($action === 'export_highlights') {
     $book_id = (int)$_POST['book_id'];
@@ -330,7 +330,8 @@ if ($action === 'get_stats') {
 // 9. MONTHLY CHALLENGE
 // ================================================================
 if ($action === 'get_monthly_challenge') {
-    $user_id = (int)$_POST['user_id'];
+    // Support both POST and GET (reader.php uses GET)
+    $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : (isset($_GET['user_id']) ? (int)$_GET['user_id'] : $user_id);
     $month = date('m');
     $year = date('Y');
 
@@ -617,19 +618,19 @@ if ($action === 'add_book_comment') {
 }
 
 // ================================================================
-// 14. PRAYER REQUEST
+// 14. PRAYER REQUEST (fixed: accepts 'text' not 'request_text')
 // ================================================================
 if ($action === 'submit_prayer_request') {
     $book_id = (int)$_POST['book_id'];
-    $request_text = trim($_POST['request_text']);
+    $text = trim($_POST['text']); // reader.php sends 'text'
 
-    if (empty($request_text)) {
+    if (empty($text)) {
         echo json_encode(['success' => false, 'error' => 'Prayer request cannot be empty.']);
         exit;
     }
 
     $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, book_id, request_text) VALUES (?, ?, ?)");
-    $stmt->execute([$user_id, $book_id, $request_text]);
+    $stmt->execute([$user_id, $book_id, $text]);
 
     $stmt = $db->prepare("SELECT email FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
@@ -644,7 +645,7 @@ if ($action === 'submit_prayer_request') {
     $body = "<h2>New Prayer Request</h2>";
     $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";
     $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
-    $body .= "<p><strong>Request:</strong><br>" . nl2br(htmlspecialchars($request_text)) . "</p>";
+    $body .= "<p><strong>Request:</strong><br>" . nl2br(htmlspecialchars($text)) . "</p>";
     sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
 
     echo json_encode(['success' => true]);
@@ -652,8 +653,42 @@ if ($action === 'submit_prayer_request') {
 }
 
 // ================================================================
-// 15. BOOK ERROR REPORT
+// 15. BOOK ERROR REPORT (new endpoint: matches reader.php)
 // ================================================================
+if ($action === 'submit_error_report') {
+    $book_id = (int)$_POST['book_id'];
+    $page_num = (int)$_POST['page_num'];
+    $description = trim($_POST['description']);   // reader.php sends 'description'
+    $correction = isset($_POST['correction']) ? trim($_POST['correction']) : '';
+
+    if (empty($description)) {
+        echo json_encode(['success' => false, 'error' => 'Error description cannot be empty.']);
+        exit;
+    }
+
+    $stmt = $db->prepare("INSERT INTO book_error_reports (user_id, book_id, page_num, error_text, correction) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$user_id, $book_id, $page_num, $description, $correction]);
+
+    $stmt = $db->prepare("SELECT title FROM books WHERE id = ?");
+    $stmt->execute([$book_id]);
+    $book = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $admin_email = 'angelwrites@zohomail.com';
+    $subject = '⚠️ Book Error Report: ' . $book['title'];
+    $body = "<h2>New Error Report</h2>";
+    $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
+    $body .= "<p><strong>Page:</strong> " . $page_num . "</p>";
+    $body .= "<p><strong>Error:</strong><br>" . nl2br(htmlspecialchars($description)) . "</p>";
+    if (!empty($correction)) {
+        $body .= "<p><strong>Suggested Correction:</strong><br>" . nl2br(htmlspecialchars($correction)) . "</p>";
+    }
+    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// Keep old endpoint for backward compatibility (if any)
 if ($action === 'report_book_error') {
     $book_id = (int)$_POST['book_id'];
     $page_num = (int)$_POST['page_num'];
@@ -667,21 +702,6 @@ if ($action === 'report_book_error') {
 
     $stmt = $db->prepare("INSERT INTO book_error_reports (user_id, book_id, page_num, error_text, correction) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$user_id, $book_id, $page_num, $error_text, $correction]);
-
-    $stmt = $db->prepare("SELECT title FROM books WHERE id = ?");
-    $stmt->execute([$book_id]);
-    $book = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    $admin_email = 'angelwrites@zohomail.com';
-    $subject = '⚠️ Book Error Report: ' . $book['title'];
-    $body = "<h2>New Error Report</h2>";
-    $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
-    $body .= "<p><strong>Page:</strong> " . $page_num . "</p>";
-    $body .= "<p><strong>Error:</strong><br>" . nl2br(htmlspecialchars($error_text)) . "</p>";
-    if (!empty($correction)) {
-        $body .= "<p><strong>Suggested Correction:</strong><br>" . nl2br(htmlspecialchars($correction)) . "</p>";
-    }
-    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
 
     echo json_encode(['success' => true]);
     exit;
