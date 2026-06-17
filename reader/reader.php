@@ -425,7 +425,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 .annotation-save:hover{background:var(--rose-dark)}
 .annotation-cancel{background:var(--border);color:var(--text)}
 .annotation-cancel:hover{background:var(--text-light);color:var(--white)}
-#search-bar{display:none;width:300px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:var(--shadow-hover);pointer-events:auto;top:70px !important;left:50px !important}
+#search-bar{display:none;width:300px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:var(--shadow-hover);pointer-events:auto;top:70px !important;left:50px !important;z-index:100001 !important} /* FIXED Z-INDEX */
 #search-bar.visible{display:block}
 #search-bar input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif}
 #search-bar input:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
@@ -436,7 +436,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 .search-result{padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--transition)}
 .search-result:hover{background:rgba(219,161,162,0.1)}
 .search-result strong{color:var(--rose)}
-#settings-panel{bottom:0;left:0;right:0;background:var(--card-bg);border-top:1px solid var(--border);padding:16px 20px;transform:translateY(100%);transition:transform 0.25s ease;max-height:50vh;overflow-y:auto;pointer-events:auto}
+#settings-panel{bottom:0;left:0;right:0;background:var(--card-bg);border-top:1px solid var(--border);padding:16px 20px;transform:translateY(100%);transition:transform 0.25s ease;max-height:50vh;overflow-y:auto;pointer-events:auto;z-index:100001 !important}
 #settings-panel.open{transform:translateY(0)}
 .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 .settings-group label{font-size:0.7rem;font-weight:600;text-transform:uppercase;color:var(--text-light);display:block;margin-bottom:4px}
@@ -448,9 +448,9 @@ html, body { height:100%; width:100%; overflow:hidden; }
 .slider-group input[type="range"]{width:80px;accent-color:var(--rose)}
 .font-select-wrapper select{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:0.85rem;appearance:none;background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
 .font-select-wrapper select:focus{outline:none;border-color:var(--rose);box-shadow:0 0 0 3px rgba(219,161,162,0.15)}
-#overlay{top:0;left:0;width:100%;height:100%;background:rgba(44,30,30,0.4);display:none;z-index:9998 !important}
+#overlay{top:0;left:0;width:100%;height:100%;background:rgba(44,30,30,0.4);display:none;z-index:99999 !important;pointer-events:auto !important}
 #overlay.active{display:block}
-#toc-drawer{top:0;right:-340px;width:340px;height:100vh;background:var(--card-bg);box-shadow:-4px 0 20px rgba(44,30,30,0.1);transition:right 0.25s ease;display:flex;flex-direction:column;pointer-events:auto}
+#toc-drawer{top:0;right:-340px;width:340px;height:100vh;background:var(--card-bg);box-shadow:-4px 0 20px rgba(44,30,30,0.1);transition:right 0.25s ease;display:flex;flex-direction:column;pointer-events:auto;z-index:100001 !important}
 #toc-drawer.open{right:0}
 .toc-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--vanilla)}
 .toc-header h3{margin:0;font-size:1.1rem;font-family:'Playfair Display',Georgia,serif;color:var(--dark)}
@@ -462,7 +462,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 .toc-list a{color:var(--text);text-decoration:none;display:block;padding:6px 8px;border-radius:6px;transition:all var(--transition)}
 .toc-list a:hover{background:rgba(219,161,162,0.1);color:var(--rose)}
 .toc-empty{text-align:center;color:var(--text-light);padding:40px 0}
-#challenge-widget{display:none;margin:8px 16px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow)}
+#challenge-widget{display:none;margin:8px 16px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);z-index:100001 !important}
 #challenge-widget h4{margin:0 0 4px;font-size:1rem}
 .challenge-progress{position:relative;height:12px;background:var(--border);border-radius:6px;overflow:hidden}
 .challenge-progress .bar{height:100%;background:var(--rose);transition:width 0.3s}
@@ -476,7 +476,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     top: 50% !important;
     left: 50% !important;
     transform: translate(-50%, -50%) !important;
-    z-index: 100000 !important;
+    z-index: 100001 !important; /* Ensure above overlay */
     width: 90%;
     max-width: 500px;
     max-height: 85vh;
@@ -589,6 +589,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 #search-bar {
     max-width: 600px !important;
     width: 90% !important;
+    z-index: 100001 !important; /* fixed */
 }
 #search-bar input {
     width: 100% !important;
@@ -604,6 +605,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 #challenge-widget {
     text-align: center !important;
     gap: 12px !important;
+    z-index: 100001 !important;
 }
 .challenge-progress {
     height: 14px !important;
@@ -623,6 +625,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     max-width: 550px !important;
     background: var(--card-bg) !important;
     border-radius: 24px !important;
+    z-index: 100001 !important;
 }
 .notes-header {
     border-bottom: 1px solid var(--border) !important;
@@ -926,7 +929,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     <!-- SHARE MODAL -->
     <div id="share-modal" class="modal-wrapper">
-    <button class="modal-close" onclick="closeShare()">&times;</button>
+    <button class="modal-close" onclick="closeModal('share-modal')">&times;</button>
     <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
     <div style="display:flex;flex-direction:column;margin-top:8px;">
         <button class="share-btn" onclick="share('facebook')"><i class="fab fa-facebook-f"></i> Facebook</button>
@@ -975,7 +978,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     <!-- COMMENTS MODAL -->
     <div id="commentsModal" class="modal-wrapper">
-    <button class="modal-close" onclick="closeComments()">&times;</button>
+    <button class="modal-close" onclick="closeModal('commentsModal')">&times;</button>
     <h3><i class="fas fa-comments" style="color:var(--rose);"></i> Comments</h3>
     <div id="commentList" style="margin:12px 0;max-height:200px;overflow-y:auto;"></div>
     <textarea id="commentInput" rows="3" placeholder="Write a comment..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);margin-bottom:8px;"></textarea>
@@ -985,7 +988,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     <!-- ERROR REPORT MODAL -->
     <div id="errorModal" class="modal-wrapper">
-    <button class="modal-close" onclick="closeErrorModal()">&times;</button>
+    <button class="modal-close" onclick="closeModal('errorModal')">&times;</button>
     <h3><i class="fas fa-exclamation-triangle" style="color:var(--rose);"></i> Report Error</h3>
     <div style="margin:12px 0;">
         <label style="font-weight:600;font-size:0.9rem;">Page number:</label>
@@ -1000,7 +1003,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     <!-- PRAYER REQUEST MODAL -->
     <div id="prayerModal" class="modal-wrapper">
-    <button class="modal-close" onclick="closePrayerModal()">&times;</button>
+    <button class="modal-close" onclick="closeModal('prayerModal')">&times;</button>
     <h3><i class="fas fa-hands-praying" style="color:var(--rose);"></i> Prayer Request</h3>
     <div style="margin:12px 0;">
         <label style="font-weight:600;font-size:0.9rem;">Your prayer request:</label>
@@ -1605,6 +1608,36 @@ prayerBtn.addEventListener('click', function() {
     openModal('prayerModal');
 });
 
+// ===== RESET PROGRESS BUTTON (FIXED) =====
+resetProgressBtn.addEventListener('click', function() {
+    if (userId === 0) {
+        alert('Please log in to reset progress.');
+        return;
+    }
+    if (confirm('Are you sure you want to reset your reading progress for this book? This cannot be undone.')) {
+        const data = new FormData();
+        data.append('action', 'reset_progress');
+        data.append('book_id', bookId);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/reader/reader_ajax.php', true);
+        xhr.onload = function() {
+            try {
+                const res = JSON.parse(this.responseText);
+                if (res.success) {
+                    alert('✅ Progress has been reset.');
+                    // Reload page to reflect changes
+                    location.reload();
+                } else {
+                    alert('Error: ' + (res.error || 'Could not reset progress.'));
+                }
+            } catch(e) {
+                alert('Server error. Please try again.');
+            }
+        };
+        xhr.send(data);
+    }
+});
+
 // Use closeModal for all working modals
 function closeComments() {
     closeModal('commentsModal');
@@ -1624,6 +1657,8 @@ function closeErrorModal() {
 }
 function closeSettings() {
     settingsPanel.classList.remove('open'); 
+    overlay.classList.remove('active');
+}
 
     // ===== CHALLENGE =====
 function loadChallenge() {
@@ -1903,8 +1938,7 @@ function showSelectionTooltip(e) {
         closeShare();
     }
     function closeShare() {
-        document.getElementById('share-modal').style.display = 'none';
-        overlay.classList.remove('active');
+        closeModal('share-modal');
     }
 
     // ===== NOTES PANEL TOGGLE =====
@@ -2101,8 +2135,7 @@ function showReactionPicker(noteId, event) {
         });
     }
     function closeComments() {
-        document.getElementById('commentsModal').style.display = 'none';
-        overlay.classList.remove('active');
+        closeModal('commentsModal');
     }
 
    // ===== UNIFIED MODAL SYSTEM – FIXES OVERLAY ISSUE =====
@@ -2152,13 +2185,11 @@ function closeAll() {
         if (userId === 0) { alert('Please log in to report errors.'); return; }
         errorPageInput.value = currentPage;
         errorPageNumSpan.textContent = '(current: ' + currentPage + ')';
-        errorModal.style.display = 'block';
-        overlay.classList.add('active');
+        openModal('errorModal');
     });
     function openErrorModal() { errorReportBtn.click(); }
     function closeErrorModal() {
-        errorModal.style.display = 'none';
-        overlay.classList.remove('active');
+        closeModal('errorModal');
         errorText.value = '';
         errorCorrection.value = '';
     }
@@ -2195,13 +2226,11 @@ function closeAll() {
     prayerBtn.addEventListener('click', function() {
         if (userId === 0) { alert('Please log in to submit prayer requests.'); return; }
         prayerText.value = '';
-        prayerModal.style.display = 'block';
-        overlay.classList.add('active');
+        openModal('prayerModal');
     });
     function openPrayerModal() { prayerBtn.click(); }
     function closePrayerModal() {
-        prayerModal.style.display = 'none';
-        overlay.classList.remove('active');
+        closeModal('prayerModal');
     }
     function submitPrayer() {
         const text = prayerText.value.trim();
@@ -2313,9 +2342,11 @@ function closeAll() {
 
     // ===== SHARE BUTTON (sidebar) =====
     shareBtn.addEventListener('click', function() {
-        document.getElementById('share-modal').style.display = 'block';
-        overlay.classList.add('active');
+        openModal('share-modal');
     });
+
+    // ===== OVERLAY CLICK TO CLOSE =====
+    overlay.addEventListener('click', closeAll);
 
     // ===== EXPOSE ALL FUNCTIONS TO GLOBAL SCOPE =====
     window.adjustFontSize = adjustFontSize;
@@ -2343,6 +2374,8 @@ function closeAll() {
     window.submitPrayer = submitPrayer;
     window.toggleSearch = toggleSearch;
     window.closeSearch = closeSearch;
+    window.openModal = openModal;
+    window.closeModal = closeModal;
 
     // ===== INIT =====
     totalPagesEl.textContent = totalPages;
