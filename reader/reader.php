@@ -737,7 +737,6 @@ html, body { height:100%; width:100%; overflow:hidden; }
 
     // ===== SPLITTER =====
     function splitByFit(originalPageNum, html) {
-        // (same as before)
         if (originalPageNum === 1 && html.trim() === 'COVER') {
             let coverHTML = '';
             if (cover_path && cover_path.length > 0) {
@@ -1063,7 +1062,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
             const page = parseInt(this.dataset.chapter);
             if (page >= 1 && page <= totalPages) {
                 goToPage(page);
-                tocDrawer.style.display = 'none';
+                tocDrawer.classList.remove('open');
                 overlay.classList.remove('active');
             }
         });
@@ -1163,25 +1162,20 @@ html, body { height:100%; width:100%; overflow:hidden; }
         settingsPanel.classList.toggle('open');
         overlay.classList.toggle('active',settingsPanel.classList.contains('open'));
     });
+    // FIXED: TOC now uses class 'open' for CSS transition
     tocBtn.addEventListener('click', function() {
-        const drawer = document.getElementById('toc-drawer');
-        if (drawer.style.display === 'none' || drawer.style.display === '') {
-            drawer.style.display = 'block';
-            overlay.classList.add('active');
-        } else {
-            drawer.style.display = 'none';
-            overlay.classList.remove('active');
-        }
+        tocDrawer.classList.toggle('open');
+        overlay.classList.toggle('active', tocDrawer.classList.contains('open'));
+    });
+    tocClose.addEventListener('click', function() {
+        tocDrawer.classList.remove('open');
+        overlay.classList.remove('active');
     });
     commentsBtn.addEventListener('click',function() {
         if (userId === 0) { alert('Please log in to view comments.'); return; }
         loadComments();
         commentsModal.style.display = 'block';
         overlay.classList.add('active');
-    });
-    tocClose.addEventListener('click',function() {
-        tocDrawer.style.display = 'none';
-        overlay.classList.remove('active');
     });
     focusBtn.addEventListener('click',function() {
         focusMode = !focusMode;
@@ -1600,7 +1594,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
     // ===== CLOSE ALL =====
     function closeAll() {
         settingsPanel.classList.remove('open');
-        tocDrawer.style.display = 'none';
+        tocDrawer.classList.remove('open');
         notesPanel.style.display = 'none';
         document.getElementById('share-modal').style.display = 'none';
         overlay.classList.remove('active');
@@ -1636,6 +1630,17 @@ html, body { height:100%; width:100%; overflow:hidden; }
     window.loadComments = loadComments;
     window.submitComment = submitComment;
     window.closeCommentsModal = closeCommentsModal;
+    // FIXED: Expose Error Report functions
+    window.openErrorModal = openErrorModal;
+    window.closeErrorModal = closeErrorModal;
+    window.submitError = submitError;
+    // FIXED: Expose Prayer Request functions
+    window.openPrayerModal = openPrayerModal;
+    window.closePrayerModal = closePrayerModal;
+    window.submitPrayer = submitPrayer;
+    // FIXED: Expose Search functions
+    window.toggleSearch = toggleSearch;
+    window.closeSearch = closeSearch;
 
     // ===== INIT =====
     totalPagesEl.textContent = totalPages;
