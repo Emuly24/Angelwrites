@@ -12,136 +12,34 @@ $userId = $isLoggedIn ? $_SESSION['user_id'] : 0;
 $stmt = $db->prepare("SELECT * FROM books ORDER BY created_at DESC LIMIT 3");
 $stmt->execute();
 $featured_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
-if (empty($featured_books)) {
-    $featured_books = [
-        [
-            'id' => 1,
-            'title' => 'The Beautiful Broken Vessel',
-            'description' => 'A powerful story of healing, faith, and discovering that brokenness is not the end — it is the beginning of a beautiful journey.',
-            'is_free' => 1,
-            'is_sale' => 0,
-            'price' => 0.00,
-            'cover_path' => 'assets/images/placeholder-book.jpg'
-        ],
-        [
-            'id' => 2,
-            'title' => 'Grace in the Ordinary',
-            'description' => 'Daily reflections on finding God in the small moments — a devotional for every woman who needs to remember she is loved.',
-            'is_free' => 1,
-            'is_sale' => 0,
-            'price' => 0.00,
-            'cover_path' => 'assets/images/placeholder-book.jpg'
-        ],
-        [
-            'id' => 3,
-            'title' => 'When Silence Speaks',
-            'description' => 'A poetic collection of prayers, laments, and declarations for seasons when words feel impossible.',
-            'is_free' => 1,
-            'is_sale' => 0,
-            'price' => 0.00,
-            'cover_path' => 'assets/images/placeholder-book.jpg'
-        ]
-    ];
-}
 
 // Latest Poems (latest 3)
 $stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 3");
 $stmt->execute();
 $latest_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
-if (empty($latest_poems)) {
-    $latest_poems = [
-        [
-            'id' => 1,
-            'title' => 'You Are Not Forgotten',
-            'intro' => "You are not forgotten.\nThe God who names the stars knows your name.\nHe saw you before you were formed,\nand He holds you now.",
-            'image_path' => 'assets/images/placeholder-poem.jpg',
-            'audio_path' => ''
-        ],
-        [
-            'id' => 2,
-            'title' => 'Let the Healing Begin',
-            'intro' => "Let the healing begin.\nNot with loud prayers,\nbut with the quiet decision\nto still believe.\nTo trust that the One who broke the chains\ncan break yours too.",
-            'image_path' => 'assets/images/placeholder-poem.jpg',
-            'audio_path' => ''
-        ],
-        [
-            'id' => 3,
-            'title' => 'A Woman Called Beautiful',
-            'intro' => "She walked through fire,\nand the flames could not consume her.\nShe cried in the dark,\nbut the dawn always came.\nThis is her story — and yours.",
-            'image_path' => 'assets/images/placeholder-poem.jpg',
-            'audio_path' => ''
-        ]
-    ];
-}
 
 // Latest Blog Posts (published, latest 3)
 $stmt = $db->prepare("SELECT * FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 3");
 $stmt->execute();
 $latest_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-if (empty($latest_posts)) {
-    $latest_posts = [
-        [
-            'id' => 1,
-            'title' => 'You Don\'t Have to Have It All Together',
-            'slug' => 'you-dont-have-to-have-it-all-together',
-            'category' => 'Faith',
-            'excerpt' => 'Society tells us we need to be perfect. But God says: bring me your broken pieces. This reflection is an invitation to let go of the pressure and just show up.',
-            'featured_image' => 'assets/images/placeholder-blog.jpg',
-            'published_at' => date('Y-m-d H:i:s')
-        ],
-        [
-            'id' => 2,
-            'title' => 'Healing Is Not Linear — And That\'s Okay',
-            'slug' => 'healing-is-not-linear-and-thats-okay',
-            'category' => 'Encouragement',
-            'excerpt' => 'Some days you feel strong. Other days you feel like you\'re back at square one. Here\'s why that\'s normal — and how to keep moving forward.',
-            'featured_image' => 'assets/images/placeholder-blog.jpg',
-            'published_at' => date('Y-m-d H:i:s')
-        ],
-        [
-            'id' => 3,
-            'title' => 'Prayer for the Weary Soul',
-            'slug' => 'prayer-for-the-weary-soul',
-            'category' => 'Prayer',
-            'excerpt' => 'When you don\'t have the words, this prayer is for you. A gentle reminder that God hears even the silence.',
-            'featured_image' => 'assets/images/placeholder-blog.jpg',
-            'published_at' => date('Y-m-d H:i:s')
-        ]
-    ];
-}
 
 // ===== FETCH TESTIMONIALS (real, approved) =====
 $stmt = $db->prepare("SELECT * FROM testimonials WHERE approved = 1 ORDER BY created_at DESC LIMIT 8");
 $stmt->execute();
 $testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
-if (empty($testimonials)) {
-    $testimonials = [
-        ['user_id' => 1, 'testimony' => 'AngelWrites became my daily anchor. I came here broken, and I found a community that held my hand without judgment.'],
-        ['user_id' => 1, 'testimony' => 'The books touched places in my heart I thought were dead. I am healing, slowly but surely.'],
-        ['user_id' => 1, 'testimony' => 'I feel seen, heard, and loved here. That is rare. That is sacred.'],
-        ['user_id' => 1, 'testimony' => 'I joined the community expecting to just read. I found sisters, prayers, and a God who still moves.'],
-        ['user_id' => 1, 'testimony' => 'Angella writes like she knows my story. Because she knows God does.'],
-        ['user_id' => 1, 'testimony' => 'I cried. I laughed. I prayed. I came back the next day. That is the AngelWrites effect.'],
-        ['user_id' => 1, 'testimony' => 'This is not just a website. It is a sanctuary.'],
-        ['user_id' => 1, 'testimony' => 'For the first time in years, I feel like I belong somewhere. Thank you.']
-    ];
-}
 
 // ===== FETCH LIVE STATS =====
 $stmt = $db->prepare("SELECT COUNT(*) FROM users");
 $stmt->execute();
 $total_users = $stmt->fetchColumn();
-if (!$total_users) $total_users = 1240;
 
 $stmt = $db->prepare("SELECT COUNT(*) FROM books WHERE is_free = 1");
 $stmt->execute();
 $free_books = $stmt->fetchColumn();
-if (!$free_books) $free_books = 12;
 
 $stmt = $db->prepare("SELECT COUNT(*) FROM prayer_requests");
 $stmt->execute();
 $total_prayers = $stmt->fetchColumn();
-if (!$total_prayers) $total_prayers = 312;
 
 // ===== PERSONALIZED RECOMMENDATIONS =====
 $recommended_books = [];
@@ -155,28 +53,6 @@ if ($isLoggedIn) {
     ");
     $stmt->execute([$userId]);
     $recommended_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-if (empty($recommended_books) && $isLoggedIn) {
-    $recommended_books = [
-        [
-            'id' => 4,
-            'title' => 'The Deepest Waters',
-            'description' => 'A novel about a woman who loses everything and discovers that God\'s love is the only thing that never leaves.',
-            'is_free' => 1,
-            'is_sale' => 1,
-            'price' => 4.99,
-            'cover_path' => 'assets/images/placeholder-book.jpg'
-        ],
-        [
-            'id' => 5,
-            'title' => 'Be Still My Soul',
-            'description' => 'A devotional for anxious hearts — 30 days of quiet prayers and gentle hope.',
-            'is_free' => 1,
-            'is_sale' => 0,
-            'price' => 0.00,
-            'cover_path' => 'assets/images/placeholder-book.jpg'
-        ]
-    ];
 }
 
 $greeting = $isLoggedIn ? "Welcome back, " . htmlspecialchars($_SESSION['name'] ?? 'Friend') . "!" : "Welcome Home.";
@@ -294,9 +170,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             <div class="hero-image-container">
                 <img src="<?php echo SITE_URL; ?>/assets/images/hero-logo.png" alt="AngelWrites - Your Story Lives Here">
             </div>
-            <div class="hero-quote">
-                "You don't have to be fixed before you walk in. Just come as you are."
-            </div>
+            <p class="hero-quote">"You don't have to be fixed before you walk in. Just come as you are."</p>
         </div>
     </div>
 </section>
@@ -370,29 +244,33 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
         </div>
         <?php endif; ?>
         <div class="testimonial-carousel" id="testimonialCarousel">
-            <?php foreach ($testimonials as $index => $testimonial): ?>
-                <?php 
-                $colors = ['#DBA1A2', '#F7B7A3', '#A8D5BA', '#F3D8C7', '#C4A5C9', '#E8C9A0', '#A3C6D4', '#F0D4D4'];
-                $color = $colors[$index % count($colors)];
-                $stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
-                $stmt->execute([$testimonial['user_id']]);
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-                $name = $user ? $user['name'] : 'Anonymous';
-                ?>
-                <div class="testimonial-card" style="--card-color: <?php echo $color; ?>;">
-                    <div class="card-inner">
-                        <div class="card-front">
-                            <div class="testimonial-avatar"><i class="fas fa-user-circle"></i></div>
-                            <p class="testimonial-quote">"<?php echo htmlspecialchars($testimonial['testimony']); ?>"</p>
-                            <span class="testimonial-author">– <?php echo htmlspecialchars($name); ?></span>
-                        </div>
-                        <div class="card-back">
-                            <i class="fas fa-pray"></i>
-                            <p class="testimonial-prayer">Praying for you, <?php echo htmlspecialchars($name); ?>. May God's peace fill your heart.</p>
+            <?php if (count($testimonials) > 0): ?>
+                <?php foreach ($testimonials as $index => $testimonial): ?>
+                    <?php 
+                    $colors = ['#DBA1A2', '#F7B7A3', '#A8D5BA', '#F3D8C7', '#C4A5C9', '#E8C9A0', '#A3C6D4', '#F0D4D4'];
+                    $color = $colors[$index % count($colors)];
+                    $stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+                    $stmt->execute([$testimonial['user_id']]);
+                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $name = $user ? $user['name'] : 'Anonymous';
+                    ?>
+                    <div class="testimonial-card" style="--card-color: <?php echo $color; ?>;">
+                        <div class="card-inner">
+                            <div class="card-front">
+                                <div class="testimonial-avatar"><i class="fas fa-user-circle"></i></div>
+                                <p class="testimonial-quote">"<?php echo htmlspecialchars($testimonial['testimony']); ?>"</p>
+                                <span class="testimonial-author">– <?php echo htmlspecialchars($name); ?></span>
+                            </div>
+                            <div class="card-back">
+                                <i class="fas fa-pray"></i>
+                                <p class="testimonial-prayer">Praying for you, <?php echo htmlspecialchars($name); ?>. May God's peace fill your heart.</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            <?php endforeach; ?>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p class="no-content">No stories yet. Be the first to share yours.</p>
+            <?php endif; ?>
         </div>
     </div>
 </section>
@@ -451,6 +329,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 <?php else: ?>
 
     <!-- ===== RECOMMENDED ===== -->
+    <?php if (!empty($recommended_books)): ?>
     <section class="recommended-section section-padding" style="background-color: var(--vanilla);">
         <div class="container">
             <div class="section-header">
@@ -500,8 +379,10 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             </div>
         </div>
     </section>
+    <?php endif; ?>
 
     <!-- ===== FEATURED BOOKS ===== -->
+    <?php if (!empty($featured_books)): ?>
     <section class="featured-books section-padding">
         <div class="container">
             <div class="section-header">
@@ -554,8 +435,10 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             </div>
         </div>
     </section>
+    <?php endif; ?>
 
     <!-- ===== LATEST POEMS ===== -->
+    <?php if (!empty($latest_poems)): ?>
     <section class="latest-poems section-padding" style="background-color: var(--vanilla);">
         <div class="container">
             <div class="section-header">
@@ -603,6 +486,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             </div>
         </div>
     </section>
+    <?php endif; ?>
 
     <!-- ===== CTA ===== -->
     <section class="cta-section section-padding" style="background: linear-gradient(135deg, #DBA1A2 0%, #EFD8D6 100%);">
@@ -622,6 +506,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     </section>
 
     <!-- ===== BLOG ===== -->
+    <?php if (!empty($latest_posts)): ?>
     <section class="latest-blog section-padding">
         <div class="container">
             <div class="section-header">
@@ -657,6 +542,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
             </div>
         </div>
     </section>
+    <?php endif; ?>
 
 <?php endif; ?>
 
@@ -677,6 +563,8 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
         </div>
     </div>
 </section>
+
+<!-- ===== BETTER BUTTON VISIBILITY ===== -->
 <style>
     /* ===== ROOT & BASE ===== */
     :root {
@@ -710,22 +598,23 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     .rose-text { color:var(--rose); }
     .text-center { text-align:center; }
 
-    /* ===== BUTTONS ===== */
+    /* ===== ENHANCED BUTTONS ===== */
     .btn {
         display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
-        border-radius:50px; font-weight:600; font-size:0.95rem; border:none;
+        border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
         cursor:pointer; text-decoration:none; transition:all var(--transition);
-        box-shadow:0 2px 8px rgba(44,30,30,0.08);
+        box-shadow:0 3px 10px rgba(44,30,30,0.12);
+        letter-spacing:0.3px;
     }
     .btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-    .btn-primary { background:var(--rose); color:var(--white); }
-    .btn-primary:hover { background:var(--rose-dark); }
-    .btn-secondary { background:var(--vanilla); color:var(--dark); }
-    .btn-secondary:hover { background:var(--rose-light); }
+    .btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+    .btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+    .btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+    .btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
     .btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
     .btn-outline:hover { background:var(--rose); color:var(--white); }
-    .btn-white { background:var(--white); color:var(--dark); }
-    .btn-white:hover { background:var(--vanilla); }
+    .btn-white { background:var(--white); color:var(--dark); border:2px solid var(--white); }
+    .btn-white:hover { background:var(--vanilla); border-color:var(--vanilla); }
     .btn-white-outline { background:transparent; border:2px solid var(--white); color:var(--white); }
     .btn-white-outline:hover { background:var(--white); color:var(--dark); }
     .btn-sm { padding:8px 20px; font-size:0.85rem; }
@@ -746,9 +635,28 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     .hero-search .search-form { display:flex; gap:8px; }
     .hero-search .search-form input { flex:1; padding:10px 16px; border:1px solid var(--border); border-radius:50px; font-size:0.95rem; background:var(--input-bg); color:var(--text); }
     .hero-search .search-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+
+    /* ===== HERO IMAGE & QUOTE (no container) ===== */
+    .hero-image {
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:12px;
+    }
     .hero-image-container { width:420px; height:420px; display:flex; justify-content:center; align-items:center; }
     .hero-image-container img { width:100%; height:100%; object-fit:contain; }
-    .hero-quote { font-family:'Playfair Display',Georgia,serif; font-size:1.2rem; color:var(--rose-dark); font-style:italic; text-align:center; max-width:450px; margin:20px auto 0; padding:16px 24px; background:rgba(255,255,255,0.7); backdrop-filter:blur(4px); border-radius:50px; border:1px solid rgba(219,161,162,0.3); line-height:1.6; }
+    .hero-quote {
+        font-family:'Playfair Display',Georgia,serif;
+        font-size:1.2rem;
+        color:var(--rose-dark);
+        font-style:italic;
+        text-align:center;
+        max-width:460px;
+        line-height:1.6;
+        margin:0 auto;
+        padding:0 10px;
+    }
 
     /* ===== ABOUT ===== */
     .about-section { text-align:center; }
@@ -863,6 +771,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
         .hero-search { margin:0 auto; }
         .hero-search .search-form { flex-direction:column; }
         .hero-image-container { width:280px; height:280px; margin:0 auto; }
+        .hero-quote { max-width:300px; }
         .about-features-grid { grid-template-columns:1fr 1fr; }
         .books-grid { grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
         .book-cover-wrapper { height:200px; }
