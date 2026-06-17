@@ -30,8 +30,6 @@ $stmt->execute([$book_id]);
 $processed = $stmt->fetch(PDO::FETCH_ASSOC);
 $has_processed = !empty($processed) && $processed['is_processed'] == 1;
 
-$toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
-
 $pages = [];
 if ($has_processed && !empty($processed['content_html'])) {
     preg_match_all('/<div class="page-content" data-page="(\d+)">(.*?)<\/div>/s', $processed['content_html'], $matches, PREG_SET_ORDER);
@@ -69,6 +67,33 @@ if (empty($chapterMap)) {
     foreach (range(1, $total_pages) as $p) {
         $pageToChapter[$p] = 1;
     }
+}
+
+// ------- BUILD COMPREHENSIVE TOC -------
+$tocEntries = [];
+
+// 1. Cover (page 1)
+$tocEntries[] = ['title' => 'Cover', 'page' => 1];
+
+// 2. Special pages (case‑insensitive detection)
+$specialTitles = ['Copyright', 'Dedication', 'Acknowledgements', 'Author\'s Note', 'About the Author'];
+foreach ($pages as $idx => $html) {
+    $pageNum = $idx + 1;
+    // Skip if already a chapter start
+    if (in_array($pageNum, array_column($chapterMap, 0) ?: [])) continue;
+    foreach ($specialTitles as $special) {
+        // Look for an <h2> or <h3> containing the special title
+        if (preg_match('/<h[2-3][^>]*>\s*' . preg_quote($special, '/') . '\s*<\/h[2-3]>/i', $html)) {
+            $tocEntries[] = ['title' => $special, 'page' => $pageNum];
+            break;
+        }
+    }
+}
+
+// 3. Regular chapters
+foreach ($chapterTitles as $chIndex => $title) {
+    $startPage = $chapterMap[$chIndex][0] ?? 1;
+    $tocEntries[] = ['title' => $title, 'page' => $startPage];
 }
 
 // ------- USER PROGRESS -------
@@ -167,6 +192,8 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; width:100%; overflow:hidden; }
 #reader-app { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; transition:background var(--transition), color var(--transition); }
+#overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(30,20,20,0.65); z-index:99998; display:none; pointer-events:auto; }
+#overlay.active { display:block; }
 #toolbar { flex-shrink:0; height:var(--toolbar-height); min-height:var(--toolbar-height); display:flex; justify-content:space-between; align-items:center; padding:0 20px; background:var(--card-bg); border-bottom:1px solid var(--border); box-shadow:var(--shadow); z-index:20; }
 .toolbar-left { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
 .toolbar-left .title { font-family:'Playfair Display',Georgia,serif; font-weight:700; font-size:1.15rem; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dark); }
@@ -278,8 +305,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .slider-group input[type="range"] { width:80px; accent-color:var(--rose); }
 .font-select-wrapper select { width:100%; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--input-bg); color:var(--text); font-size:0.85rem; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 10px center;background-size:14px; }
 .font-select-wrapper select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-#overlay { top:0; left:0; width:100%; height:100%; background:rgba(30,20,20,0.6); display:none; z-index:99999!important; pointer-events:auto!important; }
-#overlay.active { display:block; }
 #toc-drawer { top:0; right:-340px; width:340px; height:100vh; background:var(--card-bg); box-shadow:-4px 0 20px rgba(44,30,30,0.1); transition:right 0.25s ease; display:flex; flex-direction:column; pointer-events:auto; z-index:100001!important; }
 #toc-drawer.open { right:0; }
 .toc-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--vanilla); }
@@ -306,8 +331,8 @@ html,body { height:100%; width:100%; overflow:hidden; }
 #exitFocusBtn { position:fixed; bottom:24px; right:24px; z-index:100001!important; display:none; align-items:center; gap:8px; background:var(--rose); color:white; border:none; padding:10px 16px; border-radius:30px; font-weight:600; box-shadow:var(--shadow-hover); cursor:pointer; transition:all 0.3s; }
 #exitFocusBtn:hover { transform:scale(1.05); background:var(--rose-dark); }
 .focus-mode #exitFocusBtn { display:flex!important; }
-.modal-wrapper { position:fixed!important; top:50%!important; left:50%!important; transform:translate(-50%,-50%)!important; z-index:100001!important; width:90%; max-width:520px; max-height:85vh; overflow-y:auto; background:var(--card-bg); border-radius:24px; padding:30px 28px 28px; box-shadow:0 24px 80px rgba(0,0,0,0.35); border:1px solid var(--rose-light); display:none!important; flex-direction:column; pointer-events:auto; transition:opacity 0.25s ease,transform 0.25s ease; backdrop-filter:blur(4px); }
-.modal-wrapper.visible { display:flex!important; z-index:100001!important; }
+.modal-wrapper { position:fixed!important; top:50%!important; left:50%!important; transform:translate(-50%,-50%)!important; z-index:100002!important; width:90%; max-width:520px; max-height:85vh; overflow-y:auto; background:var(--card-bg); border-radius:24px; padding:30px 28px 28px; box-shadow:0 24px 80px rgba(0,0,0,0.35); border:1px solid var(--rose-light); display:none!important; flex-direction:column; pointer-events:auto; transition:opacity 0.25s ease,transform 0.25s ease; backdrop-filter:blur(4px); }
+.modal-wrapper.visible { display:flex!important; z-index:100002!important; }
 .modal-close { position:absolute!important; top:14px!important; right:18px!important; background:transparent!important; border:none!important; font-size:1.5rem!important; cursor:pointer!important; color:var(--text-light)!important; transition:transform 0.3s ease,color 0.3s ease!important; padding:4px 8px!important; border-radius:8px!important; }
 .modal-close:hover { color:var(--rose)!important; transform:rotate(90deg) scale(1.1)!important; background:rgba(219,161,162,0.1)!important; }
 .modal-wrapper h3 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); margin-top:0; margin-bottom:16px; font-size:1.3rem; }
@@ -364,6 +389,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 </head>
 <body>
 <div id="reader-app">
+    <div id="overlay"></div>
     <div id="toolbar">
         <div class="toolbar-left">
             <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
@@ -457,9 +483,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <button class="toc-close" id="tocClose">&times;</button>
         </div>
         <div class="toc-body" id="tocBody">
-            <?php if (is_array($toc) && count($toc) > 0): ?>
+            <?php if (count($tocEntries) > 0): ?>
             <ul class="toc-list">
-                <?php foreach ($toc as $entry): ?>
+                <?php foreach ($tocEntries as $entry): ?>
                 <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
                 <?php endforeach; ?>
             </ul>
@@ -509,7 +535,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
     </div>
 
     <div id="challenge-widget"></div>
-    <div id="overlay"></div>
 
     <div id="commentsModal" class="modal-wrapper">
         <button class="modal-close" onclick="closeModal('commentsModal')">&times;</button>
@@ -817,7 +842,15 @@ html,body { height:100%; width:100%; overflow:hidden; }
     }
 
     document.querySelectorAll('.toc-link').forEach(link => {
-        link.addEventListener('click',function(e) { e.preventDefault(); const page = parseInt(this.dataset.chapter); if (page >= 1 && page <= totalPages) { goToPage(page); tocDrawer.classList.remove('open'); overlay.classList.remove('active'); } });
+        link.addEventListener('click',function(e) {
+            e.preventDefault();
+            const page = parseInt(this.dataset.chapter);
+            if (page >= 1 && page <= totalPages) {
+                goToPage(page);
+                tocDrawer.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+        });
     });
 
     document.querySelectorAll('#modeGroup button').forEach(btn => {
