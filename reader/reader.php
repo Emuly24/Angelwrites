@@ -427,7 +427,7 @@ html,body{height:100%;width:100%;overflow:hidden}
 
     <div id="settings-panel">
         <div class="settings-grid">
-            <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll" class="active">Scroll</button><button data-mode="flip">Page Flip</button></div></div>
+            <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll">Scroll</button><button data-mode="flip" class="active">Page Flip</button></div></div>
             <div class="settings-group"><label>Theme</label><div class="btn-group" id="themeGroup"><button data-theme="paper">Paper</button><button data-theme="light" class="active">Light</button><button data-theme="dark">Dark</button><button data-theme="sepia">Sepia</button></div></div>
             <div class="settings-group"><label>Font Size</label><div class="slider-group"><button onclick="adjustFontSize(-5)">A-</button><input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5"><button onclick="adjustFontSize(5)">A+</button><span id="fontSizeLabel">100%</span></div></div>
             <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option></select></div></div>
@@ -643,7 +643,7 @@ html,body{height:100%;width:100%;overflow:hidden}
     const searchBar = document.getElementById('search-bar');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
-    let readingMode = localStorage.getItem('reader_mode') || 'scroll';
+    let readingMode = localStorage.getItem('reader_mode') || 'flip';
     let focusMode = false;
     let isBookmarked = false;
     let touchStartX = 0;
@@ -1928,17 +1928,29 @@ function closeAll() {
     window.openModal = openModal;
     window.closeModal = closeModal;
 
-    // ===== INIT =====
+        // ===== INIT =====
     totalPagesEl.textContent = totalPages;
     const savedMode = localStorage.getItem('reader_mode');
+
     if (savedMode === 'flip') {
         readingMode = 'flip';
         document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active');
         document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active');
         switchMode('flip');
-    } else {
+    } else if (savedMode === 'scroll') {
+        readingMode = 'scroll';
+        document.querySelector('#modeGroup [data-mode="flip"]').classList.remove('active');
+        document.querySelector('#modeGroup [data-mode="scroll"]').classList.add('active');
         switchMode('scroll');
+    } else {
+        // First time visitor or no preference saved -> Default to 'flip'
+        readingMode = 'flip';
+        localStorage.setItem('reader_mode', 'flip');
+        document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active');
+        document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active');
+        switchMode('flip');
     }
+
     goToPage(currentPage);
     loadBookmarkStatus();
     if (userId > 0) {
