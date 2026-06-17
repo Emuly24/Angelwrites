@@ -697,12 +697,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     .gate-buttons { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:16px; }
 
     /* ===== STICKY CTA ===== */
-    .sticky-cta { position:fixed; bottom:0; left:0; width:100%; background:var(--rose); color:white; padding:12px 0; z-index:999; box-shadow:0 -4px 20px rgba(0,0,0,0.1); }
-    .sticky-cta .container { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
-    .sticky-cta p { margin:0; font-size:0.95rem; }
-    .sticky-cta-buttons { display:flex; gap:8px; }
-    .sticky-cta-close { background:none; border:none; color:white; font-size:1.2rem; cursor:pointer; padding:0 4px; }
-
+   .sticky-cta{position:fixed;bottom:0;left:0;width:100%;background:var(--rose);color:#fff;padding:12px 0;z-index:999;box-shadow:0 -4px 20px rgba(0,0,0,.1)}.sticky-cta .container{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}.sticky-cta p{margin:0;font-size:.95rem;font-weight:600}.sticky-cta-buttons{display:flex!important;gap:10px}.sticky-cta .btn-primary,.sticky-cta .btn-outline{border:2px solid #fff!important}.sticky-cta .btn-primary{background:#fff!important;color:var(--rose)!important}.sticky-cta .btn-primary:hover{background:transparent!important;color:#fff!important}.sticky-cta .btn-outline{background:var(--rose)!important;color:#fff!important}.sticky-cta .btn-outline:hover{background:#fff!important;color:var(--rose)!important}.sticky-cta-close{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;padding:0 4px}
     /* ===== MODAL ===== */
     .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:2000; display:none; align-items:center; justify-content:center; }
     .modal-content { background:var(--card-bg); border-radius:20px; padding:32px; max-width:500px; width:90%; box-shadow:var(--shadow-hover); border:1px solid var(--rose-light); }
