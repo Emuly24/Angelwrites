@@ -869,7 +869,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
         localStorage.setItem('reader_theme',theme);
     }
 
-    // ===== SPLITTER =====
+    // ===== SPLITTER (FIXED FOR MOBILE PADDING DYNAMICS) =====
     function splitByFit(originalPageNum, html) {
         if (originalPageNum === 1 && html.trim() === 'COVER') {
             let coverHTML = '';
@@ -883,11 +883,29 @@ html, body { height:100%; width:100%; overflow:hidden; }
         const temp = document.createElement('div');
         temp.innerHTML = html;
         const children = Array.from(temp.children);
+        
+        // FIX: Get the exact computed styles from the real flip page container
+        const flipInner = document.getElementById('flipLeftContent');
+        const styles = window.getComputedStyle(flipInner);
+        
         const measureContainer = document.createElement('div');
-        measureContainer.style.cssText = `visibility:hidden;position:absolute;width:100%;padding:30px 40px;font-size:1.05rem;line-height:1.8;font-family:'Inter',sans-serif;color:var(--text);box-sizing:border-box;`;
+        measureContainer.style.cssText = `
+            visibility:hidden;
+            position:absolute;
+            width:100%;
+            padding:${styles.paddingTop} ${styles.paddingRight} ${styles.paddingBottom} ${styles.paddingLeft};
+            font-size:${styles.fontSize};
+            line-height:${styles.lineHeight};
+            font-family:${styles.fontFamily};
+            color:var(--text);
+            box-sizing:border-box;
+        `;
         document.body.appendChild(measureContainer);
+        
         const flipContainerEl = document.getElementById('flip-container');
+        // Calculate maxHeight accurately based on actual container limits
         const maxHeight = flipContainerEl.clientHeight * 0.92 - 60;
+
         const chunks = [];
         const mapping = [];
         let currentChunk = document.createElement('div');
