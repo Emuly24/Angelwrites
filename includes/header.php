@@ -109,7 +109,7 @@ if ($isLoggedIn) {
             border: none;
             cursor: pointer;
             padding: 0;
-            z-index: 10001; /* Above everything */
+            z-index: 1001;
         }
         .hamburger span {
             display: block;
@@ -139,7 +139,7 @@ if ($isLoggedIn) {
             padding: 0;
             flex: 1;
             justify-content: center;
-            position: static; /* Part of the document flow on desktop */
+            position: static;
             width: auto;
             height: auto;
             background: transparent;
@@ -185,45 +185,45 @@ if ($isLoggedIn) {
             }
 
             .nav-links {
-                display: flex !important;
-                flex-direction: column;
-                position: fixed !important; /* Absolutely fixed, removes from document flow */
+                position: fixed !important;
                 top: 0 !important;
-                right: -100% !important; /* Hidden off-screen by default */
+                right: -320px !important; /* Hidden off-screen initially */
                 width: 320px !important;
+                max-width: 85vw !important;
                 height: 100vh !important;
                 background: var(--card-bg) !important;
                 border-left: 1px solid var(--border) !important;
                 padding: 80px 24px 24px !important;
                 box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
-                z-index: 10000 !important; /* Above header, overlay, etc. */
+                z-index: 1000 !important;
                 overflow-y: auto !important;
                 transition: right 0.3s ease !important;
-                justify-content: flex-start !important;
-                flex: none !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 4px !important;
                 margin: 0 !important;
-                pointer-events: auto !important;
             }
 
             .nav-links.open {
-                right: 0 !important; /* Slides into view */
+                right: 0 !important;
             }
 
             .nav-links li {
-                margin: 4px 0 !important;
-                padding: 8px 0 !important;
-                border-bottom: 1px solid var(--border) !important;
                 width: 100% !important;
+                padding: 6px 0 !important;
+                border-bottom: 1px solid var(--border) !important;
             }
             .nav-links li:last-child {
                 border-bottom: none !important;
             }
             .nav-links a {
-                padding: 4px 0 !important;
+                display: block !important;
                 width: 100% !important;
+                padding: 4px 0 !important;
                 font-size: 1rem !important;
                 color: var(--text) !important;
-                display: block !important;
+                text-decoration: none !important;
+                transition: color 0.2s !important;
             }
             .nav-links a:hover {
                 color: var(--rose) !important;
@@ -233,14 +233,14 @@ if ($isLoggedIn) {
             }
 
             .menu-overlay {
-                display: none !important;
                 position: fixed !important;
                 top: 0 !important;
                 left: 0 !important;
                 width: 100% !important;
                 height: 100% !important;
                 background: rgba(0, 0, 0, 0.5) !important;
-                z-index: 9999 !important; /* Just below nav-links */
+                z-index: 999 !important;
+                display: none !important;
             }
             .menu-overlay.open {
                 display: block !important;
@@ -456,56 +456,6 @@ if ($isLoggedIn) {
         .site-header.scrolled {
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
-
-        /* ===== MOBILE MENU – FIXED, NO PUSH, LINKS VISIBLE ===== */
-        @media (max-width: 992px) {
-            .hamburger {
-                display: flex !important;
-            }
-            .nav-links {
-                display: flex !important;
-                flex-direction: column !important;
-                position: fixed !important;
-                top: 0 !important;
-                right: -100% !important;
-                width: 320px !important;
-                height: 100vh !important;
-                background: var(--card-bg) !important;
-                border-left: 1px solid var(--border) !important;
-                padding: 80px 24px 24px !important;
-                box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
-                z-index: 10000 !important;
-                overflow-y: auto !important;
-                transition: right 0.3s ease !important;
-                justify-content: flex-start !important;
-                flex: none !important;
-                margin: 0 !important;
-                pointer-events: auto !important;
-            }
-            .nav-links.open { right: 0 !important; }
-            .nav-links li { width: 100% !important; padding: 6px 0 !important; border-bottom: 1px solid var(--border) !important; }
-            .nav-links li:last-child { border-bottom: none !important; }
-            .nav-links a { display: block !important; width: 100% !important; padding: 4px 0 !important; font-size: 1rem !important; color: var(--text) !important; text-decoration: none !important; transition: color 0.2s !important; }
-            .nav-links a:hover { color: var(--rose) !important; }
-            .nav-links .nav-separator { display: none !important; }
-
-            .menu-overlay {
-                display: none !important;
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                background: rgba(0, 0, 0, 0.5) !important;
-                z-index: 9999 !important;
-            }
-            .menu-overlay.open { display: block !important; }
-
-            /* Prevent page scroll when menu is open */
-            body.no-scroll {
-                overflow: hidden !important;
-            }
-        }
     </style>
 </head>
 <body>
@@ -626,7 +576,7 @@ if ($isLoggedIn) {
                     <?php endif; ?>
 
                     <!-- ===== HAMBURGER (Only visible on mobile) ===== -->
-                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu">
+                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" onclick="toggleMobileMenu()">
                         <span></span>
                         <span></span>
                         <span></span>
@@ -636,7 +586,7 @@ if ($isLoggedIn) {
         </nav>
 
         <!-- Overlay -->
-        <div class="menu-overlay" id="menuOverlay"></div>
+        <div class="menu-overlay" id="menuOverlay" onclick="closeMobileMenu()"></div>
     </header>
 
     <main class="site-main" id="mainContent">
@@ -664,57 +614,44 @@ if ($isLoggedIn) {
 
     <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
-        // ===== MOBILE MENU – SIMPLE & RELIABLE =====
-        (function() {
-            'use strict';
-
-            const hamburger = document.getElementById('hamburger');
+        // ===== MOBILE MENU – TOGGLE & CLOSE =====
+        function toggleMobileMenu() {
             const navLinks = document.getElementById('navLinks');
             const overlay = document.getElementById('menuOverlay');
+            const hamburger = document.getElementById('hamburger');
             const body = document.body;
 
-            // Only proceed if all elements exist
-            if (!hamburger || !navLinks || !overlay) return;
+            if (!navLinks) return;
 
-            function openMenu() {
+            const isOpen = navLinks.classList.contains('open');
+
+            if (isOpen) {
+                closeMobileMenu();
+            } else {
                 navLinks.classList.add('open');
-                overlay.classList.add('open');
-                hamburger.classList.add('active');
-                body.classList.add('no-scroll');
+                if (overlay) overlay.classList.add('open');
+                if (hamburger) hamburger.classList.add('active');
+                body.style.overflow = 'hidden';
             }
+        }
 
-            function closeMenu() {
-                navLinks.classList.remove('open');
-                overlay.classList.remove('open');
-                hamburger.classList.remove('active');
-                body.classList.remove('no-scroll');
-            }
+        function closeMobileMenu() {
+            const navLinks = document.getElementById('navLinks');
+            const overlay = document.getElementById('menuOverlay');
+            const hamburger = document.getElementById('hamburger');
+            const body = document.body;
 
-            function toggleMenu() {
-                if (navLinks.classList.contains('open')) {
-                    closeMenu();
-                } else {
-                    openMenu();
-                }
-            }
+            if (!navLinks) return;
 
-            // Hamburger click
-            hamburger.addEventListener('click', toggleMenu);
+            navLinks.classList.remove('open');
+            if (overlay) overlay.classList.remove('open');
+            if (hamburger) hamburger.classList.remove('active');
+            body.style.overflow = '';
+        }
 
-            // Overlay click
-            overlay.addEventListener('click', closeMenu);
-
-            // Click on any nav link closes menu
-            document.querySelectorAll('#navLinks a').forEach(function(link) {
-                link.addEventListener('click', closeMenu);
-            });
-
-            // Escape key closes menu
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') closeMenu();
-            });
-
-            // ===== SCROLL SHADOW =====
+        // ===== DOM READY =====
+        document.addEventListener('DOMContentLoaded', function() {
+            // Scroll shadow
             const header = document.getElementById('siteHeader');
             if (header) {
                 window.addEventListener('scroll', function() {
@@ -722,7 +659,7 @@ if ($isLoggedIn) {
                 });
             }
 
-            // ===== THEME TOGGLE =====
+            // Theme toggle
             const themeToggle = document.getElementById('themeToggle');
             const html = document.documentElement;
             const themes = ['light', 'dark', 'system'];
@@ -768,19 +705,31 @@ if ($isLoggedIn) {
                 }
             });
 
-            // ===== CLOSE DROPDOWNS ON OUTSIDE CLICK =====
+            // Close mobile menu when a link is clicked
+            document.querySelectorAll('#navLinks a').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    closeMobileMenu();
+                });
+            });
+
+            // Close mobile menu on Escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeMobileMenu();
+            });
+
+            // Close all dropdowns on outside click
             document.addEventListener('click', function(e) {
                 if (!e.target.closest('.search-wrapper')) {
-                    document.getElementById('searchDropdown')?.classList.remove('open');
+                    document.getElementById('searchDropdown').classList.remove('open');
                 }
                 if (!e.target.closest('.notification-wrapper')) {
-                    document.getElementById('notificationDropdown')?.classList.remove('open');
+                    document.getElementById('notificationDropdown').classList.remove('open');
                 }
                 if (!e.target.closest('.user-wrapper')) {
-                    document.getElementById('userDropdown')?.classList.remove('open');
+                    document.getElementById('userDropdown').classList.remove('open');
                 }
             });
-        })();
+        });
     </script>
 </body>
 </html>

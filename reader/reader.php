@@ -2343,13 +2343,7 @@ function closeAll() {
     // ===== SHARE BUTTON (sidebar) =====
     shareBtn.addEventListener('click', function() {
         openModal('share-modal');
-        shareModal.classList.toggle('visible');
-        overlay.classList.remove('active');
     });
-    function closeShare() {
-        closeModal('share-modal');visible');
-        overlay.classList.remove('active');
-    }
 
     // ===== OVERLAY CLICK TO CLOSE =====
     overlay.addEventListener('click', closeAll);
