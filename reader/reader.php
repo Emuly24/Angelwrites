@@ -667,6 +667,108 @@ html, body { height:100%; width:100%; overflow:hidden; }
     cursor: pointer !important;
     transition: 0.2s !important;
 }
+/* --- ROBUST MODAL SYSTEM --- */
+.modal-wrapper {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 100000 !important;
+    width: 90%;
+    max-width: 520px;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 30px 28px 28px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+    border: 1px solid var(--rose-light);
+    display: none !important; /* Hidden by default */
+    flex-direction: column;
+    pointer-events: auto;
+}
+
+.modal-wrapper.visible {
+    display: flex !important;
+}
+
+/* --- UNIFIED MODAL CLOSE BUTTON --- */
+.modal-close {
+    position: absolute !important;
+    top: 14px !important;
+    right: 18px !important;
+    background: transparent !important;
+    border: none !important;
+    font-size: 1.5rem !important;
+    cursor: pointer !important;
+    color: var(--text-light) !important;
+    transition: transform 0.3s ease, color 0.3s ease !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+}
+.modal-close:hover {
+    color: var(--rose) !important;
+    transform: rotate(90deg) scale(1.1) !important;
+    background: rgba(219, 161, 162, 0.1) !important;
+}
+
+/* --- MODAL HEADINGS --- */
+.modal-wrapper h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    color: var(--dark);
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 1.3rem;
+}
+
+/* --- SHARE MODAL SPECIFIC STYLING --- */
+#share-modal .share-btn {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    padding: 12px 16px !important;
+    margin-bottom: 8px !important;
+    border-radius: 14px !important;
+    border: 1px solid var(--border) !important;
+    background: var(--input-bg) !important;
+    color: var(--text) !important;
+    cursor: pointer !important;
+    font-size: 0.95rem !important;
+    transition: all 0.2s ease !important;
+}
+#share-modal .share-btn:last-child {
+    margin-bottom: 0 !important;
+}
+#share-modal .share-btn:hover {
+    border-color: var(--rose) !important;
+    background: rgba(219, 161, 162, 0.08) !important;
+    transform: translateX(4px) !important;
+}
+#share-modal .share-btn i {
+    width: 24px !important;
+    text-align: center !important;
+    font-size: 1.2rem !important;
+}
+
+/* --- OVERLAY (Semi-transparent backdrop) --- */
+#overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(30, 20, 20, 0.65) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    z-index: 99999 !important;
+    display: none !important;
+    pointer-events: auto !important;
+}
+#overlay.active {
+    display: block !important;
+}
+
 
 /* Share & Comment Buttons inside modals */
 .modal-content { background: var(--card-bg); border-radius: 24px; padding: 12px; }
@@ -814,11 +916,11 @@ html, body { height:100%; width:100%; overflow:hidden; }
     <div id="share-modal" class="modal-wrapper">
     <button class="modal-close" onclick="closeShare()">&times;</button>
     <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
-        <button onclick="share('facebook')"><i class="fab fa-facebook-f"></i> Facebook</button>
-        <button onclick="share('twitter')"><i class="fab fa-twitter"></i> Twitter</button>
-        <button onclick="share('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
-        <button onclick="share('copy')"><i class="fas fa-link"></i> Copy Link</button>
+    <div style="display:flex;flex-direction:column;margin-top:8px;">
+        <button class="share-btn" onclick="share('facebook')"><i class="fab fa-facebook-f"></i> Facebook</button>
+        <button class="share-btn" onclick="share('twitter')"><i class="fab fa-twitter"></i> Twitter</button>
+        <button class="share-btn" onclick="share('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+        <button class="share-btn" onclick="share('copy')"><i class="fas fa-link"></i> Copy Link</button>
     </div>
 </div>
 <!-- ===== NOTES PANEL (Replaces the old #notes-panel) ===== -->
@@ -1454,12 +1556,7 @@ html, body { height:100%; width:100%; overflow:hidden; }
         tocDrawer.classList.remove('open');
         overlay.classList.remove('active');
     });
-    commentsBtn.addEventListener('click',function() {
-        if (userId === 0) { alert('Please log in to view comments.'); return; }
-        loadComments();
-        commentsModal.style.display = 'block';
-        overlay.classList.add('active');
-    });
+    
     focusBtn.addEventListener('click',function() {
         focusMode = !focusMode;
         document.getElementById('reader-app').classList.toggle('focus-mode',focusMode);
@@ -1469,9 +1566,40 @@ html, body { height:100%; width:100%; overflow:hidden; }
             overlay.classList.remove('active');
         }
     });
+        // Replace the shareBtn listener
+    shareBtn.addEventListener('click', function() {
+        openModal('share-modal');
+    });
+
+    // Replace the commentsBtn listener
+    commentsBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to view comments.'); return; }
+        loadComments();
+        openModal('commentsModal');
+    });
+
+    // Replace the errorReportBtn listener
+    errorReportBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to report errors.'); return; }
+        errorPageInput.value = currentPage;
+        errorPageNumSpan.textContent = '(current: ' + currentPage + ')';
+        openModal('errorModal');
+    });
+
+    // Replace the prayerBtn listener
+    prayerBtn.addEventListener('click', function() {
+        if (userId === 0) { alert('Please log in to submit prayer requests.'); return; }
+        prayerText.value = '';
+        openModal('prayerModal');
+    });
+
+    // Update the specific close functions
+    function closeShare() { closeModal('share-modal'); }
+    function closeComments() { closeModal('commentsModal'); }
+    function closeErrorModal() { closeModal('errorModal'); }
+    function closePrayerModal() { closeModal('prayerModal'); }
 
     // ===== CHALLENGE =====
-    // REPLACE loadChallenge function with this:
 function loadChallenge() {
     if (userId === 0) { alert('Please log in to view challenges.'); return; }
     
@@ -1952,19 +2080,36 @@ function showReactionPicker(noteId, event) {
     }
 
     // ===== CLOSE ALL =====
-    function closeAll() {
+    // ===== UNIFIED MODAL SYSTEM =====
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.add('visible');
+        overlay.classList.add('active');
+    }
+}
+
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove('visible');
+        overlay.classList.remove('active');
+    }
+}
+
+// Close all modals (called by Escape key)
+function closeAll() {
     settingsPanel.classList.remove('open');
     tocDrawer.classList.remove('open');
-    notesPanel.classList.remove('visible');
-    document.getElementById('share-modal').classList.remove('visible');
-    document.getElementById('prayerModal').classList.remove('visible');
-    document.getElementById('errorModal').classList.remove('visible');
-    document.getElementById('commentsModal').classList.remove('visible');
+    closeModal('share-modal');
+    closeModal('commentsModal');
+    closeModal('errorModal');
+    closeModal('prayerModal');
+    closeModal('notes-panel');
     document.getElementById('challenge-widget').classList.remove('visible');
     document.getElementById('search-bar').classList.remove('visible');
-    document.getElementById('notes-panel').classList.remove('visible');
     document.getElementById('reaction-picker').style.display = 'none';
-    overlay.classList.remove('active');
+    
     if (focusMode) {
         focusMode = false;
         document.getElementById('reader-app').classList.remove('focus-mode');
