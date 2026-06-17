@@ -83,6 +83,17 @@ $reading_speed_wpm = 250; // default: words per minute
 
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
+
+    // --- FIX: Verify user actually exists in the database before any queries ---
+    $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    if (!$stmt->fetch()) {
+        session_destroy();
+        header('Location: ' . SITE_URL . '/login.php');
+        exit;
+    }
+    // --- END FIX ---
+
     $stmt = $db->prepare("SELECT * FROM reading_progress WHERE user_id = ? AND book_id = ?");
     $stmt->execute([$user_id, $book_id]);
     $user_progress = $stmt->fetch(PDO::FETCH_ASSOC);
