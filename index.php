@@ -567,6 +567,8 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     </div>
 </section>
 
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+
 <!-- ===== BETTER BUTTON VISIBILITY ===== -->
 <style>
     /* ===== ROOT & BASE ===== */
@@ -640,22 +642,47 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
 .about-lead-wrapper {
     margin: 20px 0 24px;
 }
+/* ===== CORMORANT GARAMOND – ELEGANT & VISIBLE ===== */
 .about-lead {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 1.35rem;
-    line-height: 1.7;
-    color: var(--rose-dark);
-    font-weight: 500;
-    font-style: italic;
-    padding: 20px 28px;
-    background: rgba(219, 161, 162, 0.08);
-    border-left: 4px solid var(--rose);
-    border-radius: 0 12px 12px 0;
-    text-align: left;
-    max-width: 720px;
-    margin: 0 auto;
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 1.6rem !important;
+    font-weight: 600 !important;
+    font-style: italic !important;
+    line-height: 1.6 !important;
+    color: var(--dark) !important; /* Much darker for visibility */
+    padding: 24px 32px !important;
+    background: rgba(219, 161, 162, 0.15) !important;
+    border-left: 6px solid var(--rose) !important;
+    border-radius: 0 16px 16px 0 !important;
+    text-align: left !important;
+    max-width: 740px !important;
+    margin: 0 auto !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04) !important;
 }
 
+.hero-quote {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    font-style: italic !important;
+    color: var(--dark) !important; /* Darker for visibility */
+    text-align: center !important;
+    max-width: 480px !important;
+    margin: 8px auto 0 !important;
+    line-height: 1.5 !important;
+    letter-spacing: 0.3px !important;
+    padding: 0 12px !important;
+}
+
+.hero-quote::after {
+    content: '';
+    display: block;
+    width: 50px;
+    height: 2px;
+    background: var(--rose);
+    margin: 8px auto 0;
+    border-radius: 4px;
+}
 /* ---- Body paragraphs ---- */
 .about-body {
     font-size: 1.05rem;
@@ -749,18 +776,7 @@ $pageTitle = 'AngelWrites — Christian Writing & Community';
     }
     .hero-image-container { width:420px; height:420px; display:flex; justify-content:center; align-items:center; }
     .hero-image-container img { width:100%; height:100%; object-fit:contain; }
-    .hero-quote {
-        font-family:'Playfair Display',Georgia,serif;
-        font-size:1.2rem;
-        color:var(--rose-dark);
-        font-style:italic;
-        text-align:center;
-        max-width:460px;
-        line-height:1.6;
-        margin:0 auto;
-        padding:0 10px;
-    }
-
+    
     /* ===== ABOUT ===== */
     .about-section { text-align:center; }
     .about-text { max-width:800px; margin:0 auto; }
