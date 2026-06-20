@@ -830,57 +830,72 @@ h1, h2, h3, h4, h5, h6 {
         --dash-stat-fsize: 0.9rem;
     }
 
-    /* --- STATS ROW (Kept in 2 columns, but tight) --- */
+    /* --- STATS ROW (Keeps 2 short columns) --- */
     .stats-row { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
     .stat-icon { width: 24px; height: 24px; font-size: 0.7rem; }
     .stat-label { font-size: 0.45rem; letter-spacing: 0; }
     .hero-stats { gap: 6px; }
     .hero-stat { font-size: 0.7rem; padding: 4px 8px; }
 
-    /* --- STACK EVERY GRID INTO A SINGLE FULL-WIDTH COLUMN --- */
-    .mini-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
-    .quick-actions-grid { grid-template-columns: 1fr !important; gap: 6px !important; }
+    /* --- STACK EVERYTHING VERTICALLY AND SHORTEN HORIZONTAL LENGTH --- */
+    .mini-grid { 
+        grid-template-columns: 1fr !important; 
+        gap: 8px !important; 
+        justify-items: center !important; 
+    }
     .recent-content-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
 
-    /* --- DISABLE HORIZONTAL SCROLLS AND STACK THEM VERTICALLY --- */
+    /* --- APPLY MAX-WIDTH TO SHORTEN CARDS --- */
+    .book-card, .poem-card, .blog-card, .reflection-card, .video-card {
+        width: 100% !important;
+        max-width: 160px !important; /* SHORTENED LIKE STATS */
+        margin: 0 auto !important;
+        padding: 8px !important;
+        box-sizing: border-box !important;
+        border-radius: 10px !important;
+    }
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 70px !important; width: 70px !important; flex-shrink: 0 !important; border-radius: 6px !important; }
+    .book-info, .poem-body { text-align: left !important; padding: 0 0 0 10px !important; flex: 1 !important; }
+    .book-info h3, .poem-body h3, .blog-content h4 { font-size: 0.7rem !important; margin: 0 !important; }
+    .book-author, .blog-excerpt { font-size: 0.6rem !important; margin: 0 !important; }
+
+    /* --- STACK & SHORTEN QUICK ACTIONS --- */
+    .quick-actions-grid { 
+        grid-template-columns: 1fr !important; 
+        gap: 6px !important; 
+        justify-items: center !important; 
+    }
+    .quick-action-btn { 
+        padding: 8px 4px !important; 
+        width: 100% !important; 
+        max-width: 160px !important; /* SHORTENED LIKE STATS */
+        border-radius: 8px !important;
+        margin: 0 auto !important;
+    }
+    .quick-action-btn i { font-size: 1rem !important; }
+    .quick-action-btn span { font-size: 0.6rem !important; }
+
+    /* --- CONVERT HORIZONTAL SCROLLS INTO VERTICAL SHORT CARDS --- */
     .horizontal-scroll { 
         display: grid !important; 
         grid-template-columns: 1fr !important; 
         gap: 8px !important; 
+        justify-items: center !important;
         overflow: visible !important; 
         padding: 0 !important; 
     }
     .poem-scroll-item, .blog-scroll-item, .video-scroll-item {
-        width: 100% !important; /* Full width vertical cards */
+        width: 100% !important;
+        max-width: 160px !important; /* SHORTENED LIKE STATS */
         padding: 8px !important;
         box-sizing: border-box !important;
         display: flex !important;
         align-items: center !important;
-        gap: 12px !important;
+        gap: 10px !important;
+        border-radius: 8px !important;
     }
-    .poem-scroll-item .poem-thumbnail, .video-scroll-item .video-thumb { 
-        height: 60px !important; 
-        width: 60px !important; 
-        flex-shrink: 0 !important; 
-        border-radius: 6px !important;
-        margin: 0 !important;
-    }
-    .poem-scroll-item .scroll-item-body, .blog-scroll-item .blog-content {
-        flex: 1 !important;
-        text-align: left !important;
-        padding: 0 !important;
-    }
-
-    /* --- YOUR REQUESTED CARD SIZING (Applied to new stacked cards) --- */
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 70px !important; width: 70px !important; flex-shrink: 0 !important; }
-    .book-card, .poem-card, .blog-card, .reflection-card, .video-card { display: flex !important; align-items: center !important; width: 100% !important; padding: 8px !important; box-sizing: border-box !important; }
-    .book-info, .poem-body { text-align: left !important; padding: 0 0 0 10px !important; flex: 1 !important; }
-    .book-info h3, .poem-body h3, .blog-content h4 { font-size: 0.7rem !important; margin: 0 !important; }
-    .book-author, .blog-excerpt { font-size: 0.6rem !important; margin: 0 !important; }
-    
-    .quick-action-btn { padding: 8px 4px !important; width: 100% !important; }
-    .quick-action-btn i { font-size: 1rem !important; }
-    .quick-action-btn span { font-size: 0.6rem !important; }
+    .poem-scroll-item .poem-thumbnail, .video-scroll-item .video-thumb { height: 50px !important; width: 50px !important; flex-shrink: 0 !important; }
+    .poem-scroll-item .scroll-item-body, .blog-scroll-item .blog-content { text-align: left !important; flex: 1 !important; padding: 0 !important; }
 
     /* --- YOUR EXACT USER ROW WRAPPING --- */
     .user-row {
@@ -916,7 +931,7 @@ h1, h2, h3, h4, h5, h6 {
         font-size: 0.5rem !important;
     }
 
-    /* --- COMPRESS HEADERS & EMPTY STATE ROWS --- */
+    /* --- COMPRESS HEADERS & EMPTY STATE --- */
     .section-header { flex-wrap: nowrap !important; gap: 2px !important; }
     .section-header h2 { font-size: 0.75rem !important; gap: 2px !important; flex-shrink: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
     .section-header h2 .section-icon { font-size: 0.7rem !important; }
