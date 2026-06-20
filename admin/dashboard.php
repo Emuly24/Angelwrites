@@ -820,7 +820,6 @@ h1, h2, h3, h4, h5, h6 {
 .video-scroll-item .scroll-item-body h4 { font-size: 0.75rem; margin: 0; line-height: 1.2; }
 
 @media (max-width: 480px) {
-    /* --- Further proportional shrink --- */
     :root {
         --dash-hero-pad: 12px 16px;
         --dash-card-pad: 12px;
@@ -831,80 +830,46 @@ h1, h2, h3, h4, h5, h6 {
         --dash-stat-fsize: 0.9rem;
     }
 
-    .stats-row { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
+    /* --- STATS ROW (Keep 2 columns) --- */
+    .stats-row { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
     .stat-icon { width: 24px; height: 24px; font-size: 0.7rem; }
     .stat-label { font-size: 0.45rem; letter-spacing: 0; }
     
     .hero-stats { gap: 6px; }
     .hero-stat { font-size: 0.7rem; padding: 4px 8px; }
-    
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 70px; }
-    .book-info h3, .poem-body h3, .blog-content h3 { font-size: 0.7rem; }
-    .book-author, .blog-excerpt { font-size: 0.6rem; }
-    
-    .quick-action-btn { padding: 8px 4px; }
-    .quick-action-btn i { font-size: 1rem; }
-    .quick-action-btn span { font-size: 0.6rem; }
-    
-    /* --- SHRINK HORIZONTAL BUTTONS & COMPRESS HEADERS --- */
-    .section-header {
-        flex-wrap: nowrap !important;
-        gap: 2px !important;
-    }
-    .section-header h2 {
-        font-size: 0.75rem !important;
-        gap: 2px !important;
-        flex-shrink: 1 !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        min-width: 0 !important;
-    }
-    .section-header h2 .section-icon {
-        font-size: 0.7rem !important;
-    }
-    .section-header .btn,
-    .section-header .btn-outline,
-    .section-header .btn-sm {
-        padding: 1px 6px !important;
-        font-size: 0.5rem !important;
-        border-radius: 8px !important;
-        white-space: nowrap !important;
-        flex-shrink: 0 !important;
-        min-width: auto !important;
-    }
 
-    /* --- COMPRESS EMPTY STATE ROWS --- */
-    .session-item,
-    .compact-empty {
-        padding: 4px 6px !important;
-        font-size: 0.65rem !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        gap: 2px !important;
+    /* --- STACK MINI-GRID BUT SHORTEN THE HORIZONTAL LENGTH --- */
+    .mini-grid { 
+        grid-template-columns: 1fr !important; 
+        justify-items: center !important; /* Centers them horizontally */
+        gap: 8px !important; 
+    }
+    .book-card, .poem-card, .blog-card, .reflection-card, .video-card {
         width: 100% !important;
-        box-sizing: border-box !important;
+        max-width: 140px !important; /* PHYSICALLY SHORTEN THE WIDTH */
+        margin: 0 auto !important;    /* Center inside the column */
+        border-radius: 10px !important;
     }
-    .compact-empty i {
-        font-size: 0.7rem !important;
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 70px !important; }
+    .book-info h3, .poem-body h3, .blog-content h3 { font-size: 0.7rem !important; }
+    .book-author, .blog-excerpt { font-size: 0.6rem !important; }
+    
+    /* --- STACK & SHORTEN QUICK ACTIONS --- */
+    .quick-actions-grid { 
+        grid-template-columns: 1fr 1fr !important; /* Keep 2 columns side-by-side */
+        gap: 6px !important; 
     }
-    .session-item .session-info,
-    .compact-empty {
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        flex: 1 1 0 !important;
-        min-width: 0 !important;
-        display: block !important;
+    .quick-action-btn { 
+        padding: 8px 4px !important; 
+        max-width: 130px !important; /* Shorten the horizontal length */
+        margin: 0 auto !important;   /* Center it */
+        width: 100% !important;
+        border-radius: 8px !important;
     }
-    .session-item .status-badge {
-        font-size: 0.45rem !important;
-        padding: 1px 4px !important;
-        flex-shrink: 0 !important;
-    }
+    .quick-action-btn i { font-size: 1rem !important; }
+    .quick-action-btn span { font-size: 0.6rem !important; }
 
-    /* --- COMPRESS USER ROWS --- */
+    /* --- YOUR REQUESTED USER ROWS (Exactly as you asked) --- */
     .user-row {
         flex-wrap: wrap !important;
         padding: 4px 6px !important;
@@ -938,18 +903,25 @@ h1, h2, h3, h4, h5, h6 {
         font-size: 0.5rem !important;
     }
 
-    /* --- PAGINATION & MINI GRID --- */
-    .mini-grid { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
+    /* --- COMPRESS HEADERS & EMPTY STATE ROWS --- */
+    .section-header { flex-wrap: nowrap !important; gap: 2px !important; }
+    .section-header h2 { font-size: 0.75rem !important; gap: 2px !important; flex-shrink: 1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+    .section-header h2 .section-icon { font-size: 0.7rem !important; }
+    .section-header .btn, .section-header .btn-outline, .section-header .btn-sm { padding: 1px 6px !important; font-size: 0.5rem !important; border-radius: 8px !important; white-space: nowrap !important; flex-shrink: 0 !important; min-width: auto !important; }
+
+    .session-item, .compact-empty { padding: 4px 6px !important; font-size: 0.65rem !important; display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 2px !important; width: 100% !important; box-sizing: border-box !important; }
+    .compact-empty i { font-size: 0.7rem !important; }
+    .session-item .session-info, .compact-empty { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; flex: 1 1 0 !important; min-width: 0 !important; display: block !important; }
+    .session-item .status-badge { font-size: 0.45rem !important; padding: 1px 4px !important; flex-shrink: 0 !important; }
+
+    /* --- PAGINATION & HORIZONTAL SCROLL --- */
     .pagination .page-link { padding: 2px 6px; font-size: 0.6rem; min-width: 20px; }
     .mini-pagination .page-link { padding: 2px 4px; font-size: 0.5rem; min-width: 14px; }
-    
-    /* --- FORCE HORIZONTAL SCROLLS TO SHORTEN WIDTHS --- */
     .horizontal-scroll { gap: 4px !important; }
     .poem-scroll-item { width: 60px !important; }
     .poem-scroll-item .poem-thumbnail { width: 40px !important; height: 40px !important; }
     .poem-scroll-item .scroll-item-body h4 { font-size: 0.5rem !important; }
     .blog-scroll-item { width: 100px !important; padding: 2px !important; }
-    .blog-scroll-item .blog-content h4 { font-size: 0.5rem !important; }
     .video-scroll-item { width: 60px !important; }
     .video-scroll-item .video-thumb { height: 30px !important; }
 }
