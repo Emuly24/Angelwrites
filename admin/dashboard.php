@@ -830,79 +830,59 @@ h1, h2, h3, h4, h5, h6 {
         --dash-stat-fsize: 0.9rem;
     }
 
-    /* --- STATS (Keeps 2 short columns - works perfect) --- */
+    /* --- STATS (Keeps 2 short columns - fits perfectly) --- */
     .stats-row { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
     .stat-icon { width: 24px; height: 24px; font-size: 0.7rem; }
     .stat-label { font-size: 0.45rem; letter-spacing: 0; }
     .hero-stats { gap: 6px; }
     .hero-stat { font-size: 0.7rem; padding: 4px 8px; }
 
-    /* --- FORCE ALL CARDS INTO 2 COLUMNS WITH SHORT LENGTH --- */
-    .mini-grid, .quick-actions-grid, .recent-content-grid {
+    /* --- SINGLE COLUMN WRAPPER FOR ALL CARDS AFTER STATS --- */
+    .recent-content-grid, .bottom-row, .alert-row,
+    .quick-actions-grid, .mini-grid, .horizontal-scroll,
+    .dashboard-sidebar {
         display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
-        gap: 6px !important;
+        grid-template-columns: 1fr !important; /* Stacks everything in one column */
+        width: 92% !important; /* Matches the stats aesthetic (slightly shorter than screen) */
+        max-width: 420px !important; /* Prevents stretching on larger phones */
+        margin: 0 auto !important; /* Centers the whole column beautifully */
+        gap: 8px !important;
     }
 
-    /* --- CONVERT HORIZONTAL SCROLLS INTO THE SAME 2-COLUMN GRID --- */
+    /* --- CONVERT HORIZONTAL SCROLLS TO VERTICAL STACK --- */
     .horizontal-scroll {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
-        gap: 6px !important;
-        overflow: visible !important; /* Stops it from scrolling horizontally */
+        overflow: visible !important;
         padding: 0 !important;
     }
 
-    /* --- SHORTEN THE WIDTH OF EVERY CARD TO MATCH STATS LENGTH --- */
+    /* --- FILL THE COLUMN WITH NEAT, SHORTENED CARDS --- */
     .book-card, .poem-card, .blog-card, .reflection-card, .video-card,
-    .scroll-item, .quick-action-btn {
+    .scroll-item, .quick-action-btn, .session-item, .user-row, 
+    .compact-empty, .achievement-item {
         width: 100% !important;
-        max-width: 140px !important; /* Matches the length of the stats */
-        margin: 0 auto !important;   /* Centers the shortened card */
-        padding: 6px !important;
         box-sizing: border-box !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        text-align: center !important;
+        margin: 0 !important;
+        padding: 8px !important;
         border-radius: 8px !important;
     }
 
-    /* --- CONTENT INSIDE THE SHORTENED CARDS --- */
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb {
-        height: 70px !important;
-        width: 70px !important;
-        flex-shrink: 0 !important;
-        margin-bottom: 4px !important;
-    }
-    .book-info h3, .poem-body h3, .blog-content h4, .scroll-item-body h4 {
-        font-size: 0.65rem !important;
-        margin: 0 !important;
-        width: 100% !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
-    .book-author, .blog-excerpt {
-        font-size: 0.55rem !important;
-        margin: 0 !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        width: 100% !important;
-    }
+    /* --- YOUR EXACT HEIGHTS AND FONTS --- */
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 70px !important; width: 70px !important; flex-shrink: 0 !important; }
+    .book-info h3, .poem-body h3, .blog-content h4 { font-size: 0.7rem !important; margin: 0 !important; }
+    .book-author, .blog-excerpt { font-size: 0.6rem !important; margin: 0 !important; }
+    
+    .quick-action-btn { padding: 8px 4px !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
+    .quick-action-btn i { font-size: 1rem !important; }
+    .quick-action-btn span { font-size: 0.6rem !important; }
 
-    /* --- USER ROWS (Exactly as you requested) --- */
+    /* --- YOUR EXACT USER ROW WRAPPING --- */
     .user-row {
         flex-wrap: wrap !important;
         padding: 4px 6px !important;
         gap: 2px !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
     }
     .user-row .user-name {
         flex: 1 1 100% !important;
-        width: 100% !important;
         font-size: 0.7rem !important;
         word-break: break-word !important;
         overflow: hidden !important;
@@ -926,7 +906,7 @@ h1, h2, h3, h4, h5, h6 {
     .section-header h2 .section-icon { font-size: 0.7rem !important; }
     .section-header .btn, .section-header .btn-outline, .section-header .btn-sm { padding: 1px 6px !important; font-size: 0.5rem !important; border-radius: 8px !important; white-space: nowrap !important; flex-shrink: 0 !important; min-width: auto !important; }
 
-    .session-item, .compact-empty { padding: 4px 6px !important; font-size: 0.65rem !important; display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 2px !important; width: 100% !important; box-sizing: border-box !important; }
+    .compact-empty { padding: 4px 6px !important; font-size: 0.65rem !important; display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 2px !important; }
     .compact-empty i { font-size: 0.7rem !important; }
     .session-item .session-info, .compact-empty { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; flex: 1 1 0 !important; min-width: 0 !important; display: block !important; }
     .session-item .status-badge { font-size: 0.45rem !important; padding: 1px 4px !important; flex-shrink: 0 !important; }
