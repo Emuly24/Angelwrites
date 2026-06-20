@@ -47,6 +47,107 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
+// ===== HANDLE SAVE (ADD / EDIT) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
+    $id = isset($_POST['poem_id']) ? (int)$_POST['poem_id'] : 0;
+    $title = trim($_POST['title']);
+    $intro = trim($_POST['intro']);
+    $content = trim($_POST['content']);
+
+    if (empty($title)) {
+        $error = 'Please enter a title.';
+    } elseif (empty($content)) {
+        $error = 'Please enter the poem content.';
+    } else {
+        // Handle image upload (live photo or drag & drop)
+        $image_path = null;
+        if (!empty($_FILES['image']['name'])) {
+            $upload_dir = '../assets/uploads/poems/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $filename)) {
+                $image_path = 'assets/uploads/poems/' . $filename;
+            } else {
+                $error = 'Failed to upload image.';
+            }
+        }
+        // Fallback: drag & drop (image_fallback)
+        if (empty($image_path) && !empty($_FILES['image_fallback']['name'])) {
+            $upload_dir = '../assets/uploads/poems/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($_FILES['image_fallback']['name'], PATHINFO_EXTENSION);
+            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
+            if (move_uploaded_file($_FILES['image_fallback']['tmp_name'], $upload_dir . $filename)) {
+                $image_path = 'assets/uploads/poems/' . $filename;
+            } else {
+                $error = 'Failed to upload image.';
+            }
+        }
+
+        // Handle audio upload (regular input)
+        $audio_path = null;
+        if (!empty($_FILES['audio']['name'])) {
+            $upload_dir = '../assets/uploads/poems/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($_FILES['audio']['name'], PATHINFO_EXTENSION);
+            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
+            if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $filename)) {
+                $audio_path = 'assets/uploads/poems/' . $filename;
+            } else {
+                $error = 'Failed to upload audio.';
+            }
+        }
+        // Handle audio recording (audio_recording)
+        if (empty($audio_path) && !empty($_FILES['audio_recording']['name'])) {
+            $upload_dir = '../assets/uploads/poems/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $ext = pathinfo($_FILES['audio_recording']['name'], PATHINFO_EXTENSION);
+            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
+            if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $filename)) {
+                $audio_path = 'assets/uploads/poems/' . $filename;
+            } else {
+                $error = 'Failed to upload recording.';
+            }
+        }
+
+        if (empty($error)) {
+            try {
+                if ($id > 0) {
+                    // Update existing poem
+                    $stmt = $db->prepare("
+                        UPDATE poems SET 
+                            title = ?, intro = ?, content = ?, 
+                            image_path = COALESCE(?, image_path), 
+                            audio_path = COALESCE(?, audio_path),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([$title, $intro, $content, $image_path, $audio_path, $id]);
+                    $success = 'Poem updated successfully.';
+                } else {
+                    // Insert new poem
+                    $stmt = $db->prepare("
+                        INSERT INTO poems (title, intro, content, image_path, audio_path, view_count, created_at, updated_at) 
+                        VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ");
+                    $stmt->execute([$title, $intro, $content, $image_path, $audio_path]);
+                    $new_id = $db->lastInsertId();
+                    // Insert default status
+                    $stmt = $db->prepare("INSERT INTO poem_status (poem_id, status) VALUES (?, 'published')");
+                    $stmt->execute([$new_id]);
+                    $success = 'Poem added successfully.';
+                }
+                // Redirect to clear POST
+                header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+                exit;
+            } catch (PDOException $e) {
+                $error = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+}
+
 // ===== FETCH POEMS WITH SEARCH =====
 $sql = "SELECT * FROM poems";
 $params = [];
@@ -797,272 +898,189 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-/* ===== ADMIN LAYOUT ===== */
-.admin-page { padding: 32px 0 60px; }
-.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.admin-header h1 { font-size: 2rem; margin: 0; }
-.admin-actions { display: flex; gap: 12px; }
+/* ===== BRAND VARIABLES (AngelWrites) ===== */
+:root {
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
+    --card-bg: #ffffff;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
 
-.search-bar { margin-bottom: 24px; }
-.search-form { display: flex; gap: 8px; flex-wrap: wrap; }
-.search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-.search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-.search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
+.rose-text { color:var(--rose); }
 
-.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-.admin-table thead { background: var(--vanilla); }
-.admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-.admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.95rem; }
-.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
-.table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
-.no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
+/* ===== BUTTONS ===== */
+.btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
+    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
+    cursor:pointer; text-decoration:none; transition:all var(--transition);
+    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
+}
+.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
+.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
+.btn-outline:hover { background:var(--rose); color:var(--white); }
+.btn-sm { padding:8px 20px; font-size:0.85rem; }
+.btn-block { width:100%; justify-content:center; }
+.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
+.btn-danger:hover { background:#c82333; border-color:#c82333; }
+.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
+.btn-success:hover { background:#218838; border-color:#218838; }
+.btn-info { background:#17a2b8; color:white; border:2px solid #17a2b8; }
+.btn-info:hover { background:#138496; border-color:#138496; }
+.btn-warning { background:#ffc107; color:#212529; border:2px solid #ffc107; }
+.btn-warning:hover { background:#e0a800; border-color:#e0a800; }
 
-.actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 20px; }
+/* ===== ADMIN PAGE ===== */
+.admin-page { padding:32px 0 60px; }
+.admin-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px; }
+.admin-header h1 { margin:0; font-size:2rem; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
+.admin-actions { display:flex; gap:12px; flex-wrap:wrap; }
+
+/* ===== SEARCH BAR ===== */
+.search-bar { margin-bottom:24px; }
+.search-form { display:flex; gap:8px; flex-wrap:wrap; }
+.search-form input { flex:1; min-width:200px; padding:12px 16px; border:1px solid var(--border); border-radius:50px; font-size:0.95rem; background:var(--card-bg); color:var(--text); transition:border-color 0.2s; }
+.search-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.search-form .btn { padding:8px 20px; font-size:0.85rem; border-radius:50px; }
+
+/* ===== ALERTS ===== */
+.alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
+.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+
+/* ===== CARD ===== */
+.card { background:var(--card-bg); border-radius:20px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; margin-bottom:24px; transition:all var(--transition); }
+.card:hover { box-shadow:var(--shadow-hover); }
+.card-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:var(--vanilla); }
+.card-header h2 { font-size:1.3rem; margin:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); display:flex; align-items:center; gap:8px; }
+.card-header-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.card-body { padding:24px; }
+
+/* ===== TABLE ===== */
+.table-responsive { overflow-x:auto; border-radius:12px; border:1px solid var(--border); }
+.admin-table { width:100%; border-collapse:separate; border-spacing:0; }
+.admin-table thead { background:var(--vanilla); }
+.admin-table th { text-align:left; padding:14px 20px; font-weight:600; color:var(--text); border-bottom:2px solid var(--border); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; }
+.admin-table td { padding:14px 20px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); font-size:0.9rem; }
+.admin-table tbody tr:hover { background:rgba(219,161,162,0.08); }
+.styled-checkbox { width:18px; height:18px; accent-color:var(--rose); cursor:pointer; }
+.actions { display:flex; gap:4px; flex-wrap:wrap; }
+
+/* ===== EMPTY STATE ===== */
+.no-items { text-align:center; padding:40px 20px; color:var(--text-light); font-size:0.95rem; }
 
 /* ===== MODAL ===== */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 2000; }
-.modal-content { background: var(--card-bg); border-radius: 16px; padding: 32px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.modal-close { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text); transition: color 0.2s; }
-.modal-close:hover { color: var(--rose); }
+.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(30,20,20,0.6); backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; z-index:999999; }
+.modal-content { background:var(--card-bg); border-radius:24px; padding:32px; width:90%; max-width:800px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px rgba(0,0,0,0.35); border:1px solid var(--rose-light); }
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.modal-header h2 { margin:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
+.modal-close { background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light); transition:color 0.2s; }
+.modal-close:hover { color:var(--rose); }
+
+/* ===== FORM ===== */
+.poem-form .form-group { margin-bottom:16px; }
+.poem-form label { display:block; font-weight:600; margin-bottom:6px; font-size:0.9rem; color:var(--text); }
+.poem-form .required { color:#dc3545; }
+.poem-form input, .poem-form textarea { width:100%; padding:12px 16px; border:1px solid var(--border); border-radius:12px; font-size:0.95rem; background:var(--input-bg); color:var(--text); transition:border-color 0.2s; }
+.poem-form input:focus, .poem-form textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.poem-form textarea { resize:vertical; min-height:60px; font-family:'Inter',sans-serif; }
+.poem-form .form-actions { display:flex; gap:12px; margin-top:16px; }
+.poem-form .form-actions .btn { min-width:120px; justify-content:center; }
 
 /* ===== CAMERA TRIGGER ===== */
-.camera-trigger-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.status-indicator { font-size: 0.9rem; color: var(--text-light); font-weight: 500; }
+.camera-trigger-group { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.status-indicator { font-size:0.9rem; color:var(--text-light); font-weight:500; }
 
 /* ===== UPLOAD ZONES ===== */
-.upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--fantasy); }
-.upload-zone i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; display: block; }
-.upload-zone p { margin: 0; color: var(--text-light); }
-.upload-zone:hover { border-color: var(--rose); background: rgba(219, 161, 162, 0.05); }
+.upload-zone { border:2px dashed var(--border); border-radius:16px; padding:30px; text-align:center; cursor:pointer; transition:all 0.3s; background:var(--fantasy); }
+.upload-zone i { font-size:2.5rem; color:var(--rose); margin-bottom:8px; display:block; }
+.upload-zone p { margin:0; color:var(--text-light); }
+.upload-zone:hover { border-color:var(--rose); background:rgba(219,161,162,0.05); }
 
 /* ===== RECORDER SECTION ===== */
-.recorder-section { background: var(--fantasy); border-radius: 12px; padding: 16px; margin-top: 12px; border: 1px solid var(--border); }
-.recorder-section h4 { margin-bottom: 8px; }
-.recorder-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.recorder-controls .btn { padding: 8px 16px; }
-#recordingStatus { font-weight: 600; color: #e74c3c; }
-.recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
+.recorder-section { background:var(--fantasy); border-radius:16px; padding:16px; margin-top:12px; border:1px solid var(--border); }
+.recorder-section h4 { margin-bottom:8px; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
+.recorder-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.recorder-controls .btn { padding:8px 16px; border-radius:50px; }
+#recordingStatus { font-weight:600; color:#e74c3c; }
 
 /* ===== FULL-SCREEN CAMERA MODAL ===== */
 .camera-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #000;
-    z-index: 99999;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    position:fixed;
+    top:0; left:0; width:100%; height:100%;
+    background:#000;
+    z-index:999999;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
 }
-
-.camera-modal-inner {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    background: #000;
-}
-
-.camera-preview-wrapper {
-    flex: 1;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #000;
-    overflow: hidden;
-}
-
-.camera-preview-wrapper video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
+.camera-modal-inner { width:100%; height:100%; position:relative; display:flex; flex-direction:column; background:#000; }
+.camera-preview-wrapper { flex:1; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#000; overflow:hidden; }
+.camera-preview-wrapper video { width:100%; height:100%; object-fit:cover; }
 .camera-top-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    padding: 20px;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    z-index: 2;
+    position:absolute; top:0; left:0; right:0; padding:20px;
+    background:linear-gradient(to bottom,rgba(0,0,0,0.6) 0%,transparent 100%);
+    display:flex; justify-content:space-between; align-items:center; z-index:2;
 }
-
-.camera-close-btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: #fff;
-    font-size: 1.5rem;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.camera-close-btn:hover { background: rgba(255,255,255,0.3); }
-
-.camera-mode-switch {
-    display: flex;
-    gap: 4px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 30px;
-    padding: 4px;
-}
-
-.camera-mode-switch .mode-btn {
-    background: transparent;
-    border: none;
-    color: rgba(255,255,255,0.6);
-    padding: 8px 20px;
-    border-radius: 26px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.camera-mode-switch .mode-btn.active {
-    background: rgba(255,255,255,0.9);
-    color: #000;
-}
-
+.camera-close-btn { background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:1.5rem; width:44px; height:44px; border-radius:50%; cursor:pointer; transition:background 0.2s; display:flex; align-items:center; justify-content:center; }
+.camera-close-btn:hover { background:rgba(255,255,255,0.3); }
+.camera-mode-switch { display:flex; gap:4px; background:rgba(255,255,255,0.2); border-radius:30px; padding:4px; }
+.camera-mode-switch .mode-btn { background:transparent; border:none; color:rgba(255,255,255,0.6); padding:8px 20px; border-radius:26px; font-size:0.9rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
+.camera-mode-switch .mode-btn.active { background:rgba(255,255,255,0.9); color:#000; }
 .camera-bottom-controls {
-    position: absolute;
-    bottom: 30px;
-    left: 0;
-    right: 0;
-    padding: 0 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    z-index: 2;
-    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%);
-    padding-top: 30px;
-    padding-bottom: 30px;
+    position:absolute; bottom:30px; left:0; right:0; padding:0 20px;
+    display:flex; justify-content:space-between; align-items:center; z-index:2;
+    background:linear-gradient(to top,rgba(0,0,0,0.6) 0%,transparent 100%);
+    padding-top:30px; padding-bottom:30px;
 }
-
-.camera-controls-left,
-.camera-controls-right {
-    flex: 0 0 80px;
-    display: flex;
-    justify-content: center;
-}
-
-.camera-controls-center {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-}
-
-.camera-shutter-btn {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    border: 4px solid rgba(255,255,255,0.8);
-    background: transparent;
-    cursor: pointer;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-
-.camera-shutter-btn .shutter-ring {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 4px solid rgba(255,255,255,0.3);
-    top: -4px;
-    left: -4px;
-    pointer-events: none;
-}
-
-.camera-shutter-btn .shutter-inner {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: #fff;
-    transition: all 0.2s;
-}
-
-.camera-shutter-btn:hover .shutter-inner { opacity: 0.8; }
-
-.camera-shutter-btn.recording .shutter-inner {
-    background: #ff3b30;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-}
-
-.camera-btn {
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: #fff;
-    padding: 8px 16px;
-    border-radius: 30px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.camera-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-.camera-btn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
-
+.camera-controls-left, .camera-controls-right { flex:0 0 80px; display:flex; justify-content:center; }
+.camera-controls-center { flex:1; display:flex; justify-content:center; }
+.camera-shutter-btn { width:72px; height:72px; border-radius:50%; border:4px solid rgba(255,255,255,0.8); background:transparent; cursor:pointer; position:relative; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+.camera-shutter-btn .shutter-ring { position:absolute; width:100%; height:100%; border-radius:50%; border:4px solid rgba(255,255,255,0.3); top:-4px; left:-4px; pointer-events:none; }
+.camera-shutter-btn .shutter-inner { width:56px; height:56px; border-radius:50%; background:#fff; transition:all 0.2s; }
+.camera-shutter-btn:hover .shutter-inner { opacity:0.8; }
+.camera-shutter-btn.recording .shutter-inner { background:#ff3b30; width:24px; height:24px; border-radius:6px; }
+.camera-btn { background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:#fff; padding:8px 16px; border-radius:30px; font-size:0.85rem; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:6px; }
+.camera-btn:disabled { opacity:0.4; cursor:not-allowed; }
+.camera-btn:hover:not(:disabled) { background:rgba(255,255,255,0.3); }
 .camera-status {
-    position: absolute;
-    bottom: 110px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #fff;
-    font-size: 1rem;
-    font-weight: 500;
-    text-shadow: 0 0 20px rgba(0,0,0,0.5);
-    z-index: 2;
-    background: rgba(0,0,0,0.5);
-    padding: 6px 16px;
-    border-radius: 20px;
-    backdrop-filter: blur(4px);
+    position:absolute; bottom:110px; left:50%; transform:translateX(-50%);
+    color:#fff; font-size:1rem; font-weight:500; text-shadow:0 0 20px rgba(0,0,0,0.5);
+    z-index:2; background:rgba(0,0,0,0.5); padding:6px 16px; border-radius:20px; backdrop-filter:blur(4px);
 }
 
-/* ===== FORM ===== */
-.poem-form .form-group { margin-bottom: 16px; }
-.poem-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); }
-.poem-form input, .poem-form textarea { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
-.poem-form input:focus, .poem-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-.poem-form textarea { resize: vertical; min-height: 60px; }
-.poem-form .form-actions { display: flex; gap: 12px; margin-top: 16px; }
-.poem-form .form-actions .btn { min-width: 120px; justify-content: center; }
-.required { color: #e74c3c; }
-
-@media (max-width: 480px) {
-    .modal-content { padding: 20px; }
-    .search-form { flex-direction: column; }
-    .search-form input { width: 100%; }
-    .camera-bottom-controls { bottom: 16px; padding: 0 12px; padding-bottom: 16px; }
-    .camera-shutter-btn { width: 64px; height: 64px; }
-    .camera-shutter-btn .shutter-inner { width: 48px; height: 48px; }
-    .camera-btn { font-size: 0.75rem; padding: 6px 12px; }
+/* ===== RESPONSIVE ===== */
+@media (max-width:768px) {
+    .admin-header { flex-direction:column; align-items:stretch; text-align:center; }
+    .admin-actions { justify-content:center; }
+    .modal-content { padding:24px; }
+}
+@media (max-width:480px) {
+    .search-form { flex-direction:column; }
+    .search-form input { width:100%; }
+    .camera-bottom-controls { bottom:16px; padding:0 12px; padding-bottom:16px; }
+    .camera-shutter-btn { width:64px; height:64px; }
+    .camera-shutter-btn .shutter-inner { width:48px; height:48px; }
+    .camera-btn { font-size:0.75rem; padding:6px 12px; }
 }
 </style>
 

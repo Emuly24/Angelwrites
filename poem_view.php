@@ -395,23 +395,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ===== THEME TOGGLE (optional for poem page) =====
-    const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-        const currentTheme = localStorage.getItem('poemTheme') || 'light';
-        if (currentTheme === 'dark') {
-            document.body.classList.add('dark-mode');
-            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-        }
-
-        window.toggleTheme = function() {
-            document.body.classList.toggle('dark-mode');
-            const isDark = document.body.classList.contains('dark-mode');
-            localStorage.setItem('poemTheme', isDark ? 'dark' : 'light');
-            themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-        };
-    }
-
     // ============================================================
     // CUSTOM AUDIO PLAYER WITH WAVE VISUALIZER
     // ============================================================

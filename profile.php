@@ -24,7 +24,6 @@ $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $poems_read = $stmt->fetchColumn();
 
-// FIXED: videos table does NOT have user_id — video_watches does
 $stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $videos_watched = $stmt->fetchColumn();
@@ -50,20 +49,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     $bio = trim($_POST['bio']);
     $profile_pic = $user['profile_pic'] ?? '';
 
-    // ===== LIVE PHOTO CAPTURE =====
-    if (!empty($_FILES['live_photo']['name'])) {
+    // ===== CROPPED IMAGE UPLOAD (from Croppie) =====
+    if (!empty($_POST['cropped_image_data'])) {
         $upload_dir = 'assets/uploads/profiles/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $photo_filename = 'user_' . $user_id . '_' . time() . '.jpg';
-        if (move_uploaded_file($_FILES['live_photo']['tmp_name'], $upload_dir . $photo_filename)) {
-            $profile_pic = $upload_dir . $photo_filename;
+        
+        $data = $_POST['cropped_image_data'];
+        list($type, $data) = explode(';', $data);
+        list(, $data) = explode(',', $data);
+        $data = base64_decode($data);
+        
+        $filename = 'user_' . $user_id . '_' . time() . '.jpg';
+        $filepath = $upload_dir . $filename;
+        
+        if (file_put_contents($filepath, $data)) {
+            $profile_pic = $upload_dir . $filename;
         } else {
-            $error = 'Failed to upload profile photo.';
+            $error = 'Failed to save cropped image.';
         }
     }
-
-    // ===== STANDARD PROFILE PICTURE UPLOAD =====
-    if (empty($error) && !empty($_FILES['profile_pic']['name'])) {
+    
+    // ===== STANDARD PROFILE PICTURE UPLOAD (if no crop) =====
+    if (empty($error) && empty($_POST['cropped_image_data']) && !empty($_FILES['profile_pic']['name'])) {
         $upload_dir = 'assets/uploads/profiles/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $ext = pathinfo($_FILES['profile_pic']['name'], PATHINFO_EXTENSION);
@@ -216,6 +223,7 @@ $pageTitle = 'My Profile';
                 <h4>Edit Profile</h4>
                 <form method="POST" enctype="multipart/form-data" class="profile-form" id="profileForm">
                     <input type="hidden" name="update_profile" value="1">
+                    <input type="hidden" id="croppedImageData" name="cropped_image_data" value="">
                     
                     <div class="form-group">
                         <label for="name">Full Name</label>
@@ -260,9 +268,32 @@ $pageTitle = 'My Profile';
                         <textarea id="bio" name="bio" rows="3"><?php echo htmlspecialchars($user['bio'] ?? ''); ?></textarea>
                     </div>
 
-                    <!-- ===== LIVE PHOTO CAPTURE ===== -->
+                    <!-- ===== PROFILE PICTURE UPLOAD WITH CROPPING ===== -->
                     <div class="form-group">
-                        <label>Live Profile Photo (capture with camera)</label>
+                        <label>Profile Picture</label>
+                        <div class="upload-section">
+                            <div class="upload-zone" id="uploadZone">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Click or drag &amp; drop an image</p>
+                                <input type="file" id="fileInput" accept="image/*" style="display:none;">
+                            </div>
+                            <div id="previewContainer" style="display:none; margin-top:12px;">
+                                <img id="previewImage" style="max-width:200px; max-height:200px; border-radius:8px;">
+                                <button type="button" class="btn btn-sm btn-primary" onclick="openCropModal()">✂️ Crop</button>
+                                <button type="button" class="btn btn-sm btn-danger" onclick="clearUpload()">Remove</button>
+                            </div>
+                        </div>
+                        <?php if ($user['profile_pic']): ?>
+                            <div class="current-file">
+                                <img src="<?php echo SITE_URL . '/' . $user['profile_pic']; ?>" alt="Current profile" style="max-width:100px; max-height:100px; border-radius:8px;">
+                                <small>Current profile picture. Upload new to replace.</small>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- ===== LIVE PHOTO CAPTURE (also goes to crop) ===== -->
+                    <div class="form-group">
+                        <label>Or Capture with Camera</label>
                         <div class="camera-section">
                             <div class="camera-preview-container">
                                 <video id="cameraPreview" autoplay muted playsinline></video>
@@ -291,18 +322,6 @@ $pageTitle = 'My Profile';
                             </div>
                             <input type="file" id="livePhotoInput" name="live_photo" accept="image/*" style="display:none;">
                         </div>
-                    </div>
-
-                    <!-- Standard Profile Picture Upload -->
-                    <div class="form-group">
-                        <label for="profile_pic">Or Upload Profile Picture</label>
-                        <input type="file" id="profile_pic" name="profile_pic" accept="image/*">
-                        <?php if ($user['profile_pic']): ?>
-                            <div class="current-file">
-                                <img src="<?php echo SITE_URL . '/' . $user['profile_pic']; ?>" alt="Current profile" style="max-width:100px; max-height:100px; border-radius:8px;">
-                                <small>Current profile picture. Upload new to replace.</small>
-                            </div>
-                        <?php endif; ?>
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-block">Update Profile</button>
@@ -347,6 +366,32 @@ $pageTitle = 'My Profile';
     </div>
 </div>
 
+<!-- ===== CROP MODAL ===== -->
+<div id="cropModal" class="crop-modal" style="display:none;">
+    <div class="crop-modal-content">
+        <div class="crop-modal-header">
+            <h3>✂️ Crop Your Profile Picture</h3>
+            <button class="crop-modal-close" onclick="closeCropModal()">&times;</button>
+        </div>
+        <div class="crop-modal-body">
+            <div class="crop-container">
+                <img id="cropImage" src="" alt="Image to crop">
+            </div>
+            <div class="crop-preview">
+                <div id="cropPreview"></div>
+            </div>
+            <div class="crop-actions">
+                <button type="button" class="btn btn-primary" onclick="applyCrop()">Apply Crop</button>
+                <button type="button" class="btn btn-secondary" onclick="closeCropModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== INCLUDE CROPPIE LIBRARY ===== -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
+
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -373,7 +418,145 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
     });
 
-    // ===== CAMERA =====
+    // ============================================================
+    // CROPPIE SETUP
+    // ============================================================
+    let croppieInstance = null;
+    let currentFileForCrop = null;
+
+    function initCroppie(imageUrl) {
+        const cropImage = document.getElementById('cropImage');
+        cropImage.src = imageUrl;
+        
+        if (croppieInstance) {
+            croppieInstance.destroy();
+            croppieInstance = null;
+        }
+        
+        croppieInstance = new Croppie(cropImage, {
+            viewport: { width: 200, height: 200, type: 'circle' },
+            boundary: { width: 300, height: 300 },
+            showZoomer: true,
+            enableOrientation: true,
+            enforceBoundary: true,
+        });
+        
+        document.getElementById('cropModal').style.display = 'flex';
+    }
+
+    function openCropModal() {
+        if (!currentFileForCrop) {
+            alert('Please select or capture an image first.');
+            return;
+        }
+        const url = URL.createObjectURL(currentFileForCrop);
+        initCroppie(url);
+    }
+
+    function closeCropModal() {
+        document.getElementById('cropModal').style.display = 'none';
+        if (croppieInstance) {
+            croppieInstance.destroy();
+            croppieInstance = null;
+        }
+    }
+
+    function applyCrop() {
+        if (!croppieInstance) return;
+        croppieInstance.result({ type: 'base64', size: 'viewport', format: 'jpeg', quality: 0.9 })
+            .then(function(base64) {
+                // Set the hidden input with cropped data
+                document.getElementById('croppedImageData').value = base64;
+                // Update preview
+                const preview = document.getElementById('previewImage');
+                preview.src = base64;
+                document.getElementById('previewContainer').style.display = 'block';
+                document.getElementById('uploadZone').style.display = 'none';
+                closeCropModal();
+                // Revoke object URL to free memory
+                if (currentFileForCrop) {
+                    URL.revokeObjectURL(currentFileForCrop);
+                    currentFileForCrop = null;
+                }
+            });
+    }
+
+    // ============================================================
+    // UPLOAD ZONE (Drag & Drop + Click)
+    // ============================================================
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImage = document.getElementById('previewImage');
+
+    uploadZone.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    uploadZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadZone.style.borderColor = 'var(--rose)';
+        uploadZone.style.background = 'rgba(219,161,162,0.1)';
+    });
+
+    uploadZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadZone.style.borderColor = 'var(--border)';
+        uploadZone.style.background = 'transparent';
+    });
+
+    uploadZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadZone.style.borderColor = 'var(--border)';
+        uploadZone.style.background = 'transparent';
+        if (e.dataTransfer.files.length > 0) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file.');
+            return;
+        }
+        currentFileForCrop = file;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            previewContainer.style.display = 'block';
+            uploadZone.style.display = 'none';
+            // Automatically open crop modal
+            openCropModal();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearUpload() {
+        previewContainer.style.display = 'none';
+        uploadZone.style.display = 'block';
+        previewImage.src = '';
+        document.getElementById('croppedImageData').value = '';
+        fileInput.value = '';
+        if (currentFileForCrop) {
+            URL.revokeObjectURL(currentFileForCrop);
+            currentFileForCrop = null;
+        }
+    }
+
+    window.openCropModal = openCropModal;
+    window.closeCropModal = closeCropModal;
+    window.applyCrop = applyCrop;
+    window.clearUpload = clearUpload;
+
+    // ============================================================
+    // CAMERA CAPTURE (with crop integration)
+    // ============================================================
     const cameraPreview = document.getElementById('cameraPreview');
     const cameraPlaceholder = document.getElementById('cameraPlaceholder');
     const startCameraBtn = document.getElementById('startCameraBtn');
@@ -446,13 +629,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function confirmPhoto() {
         if (!capturedBlob) return;
+        // Treat as a file and pass to crop
         const file = new File([capturedBlob], 'profile_photo.jpg', { type: 'image/jpeg' });
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        livePhotoInput.files = dt.files;
+        currentFileForCrop = file;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            previewContainer.style.display = 'block';
+            uploadZone.style.display = 'none';
+            openCropModal();
+        };
+        reader.readAsDataURL(file);
+        // Reset camera UI
+        capturedPhotoContainer.style.display = 'none';
+        capturedPhotoPreview.src = '';
         confirmPhotoBtn.disabled = true;
         retakePhotoBtn.disabled = true;
-        cameraStatus.textContent = '✅ Photo confirmed!';
+        capturePhotoBtn.disabled = true;
+        cameraStatus.textContent = 'Photo sent to crop';
         cameraStatus.style.color = '#2ecc71';
     }
 
@@ -461,10 +655,14 @@ document.addEventListener('DOMContentLoaded', function() {
     retakePhotoBtn.addEventListener('click', retakePhoto);
     confirmPhotoBtn.addEventListener('click', confirmPhoto);
 
-    // ===== PASSWORD STRENGTH METER =====
+    // ============================================================
+    // PASSWORD STRENGTH & MATCH (unchanged)
+    // ============================================================
     const newPasswordInput = document.getElementById('new_password');
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
+    const confirmInput = document.getElementById('confirm_password');
+    const matchStatus = document.getElementById('passwordMatchStatus');
 
     function checkPasswordStrength(password) {
         let strength = 0;
@@ -483,15 +681,6 @@ document.addEventListener('DOMContentLoaded', function() {
         strengthText.textContent = 'Strength: ' + levels[strength];
     }
 
-    newPasswordInput.addEventListener('input', function() {
-        checkPasswordStrength(this.value);
-        checkPasswordMatch();
-    });
-
-    // ===== PASSWORD MATCH =====
-    const confirmInput = document.getElementById('confirm_password');
-    const matchStatus = document.getElementById('passwordMatchStatus');
-
     function checkPasswordMatch() {
         const pass = newPasswordInput.value;
         const confirm = confirmInput.value;
@@ -507,9 +696,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    newPasswordInput.addEventListener('input', function() {
+        checkPasswordStrength(this.value);
+        checkPasswordMatch();
+    });
     confirmInput.addEventListener('input', checkPasswordMatch);
 
-    // ===== TOGGLE PASSWORD VISIBILITY =====
     const togglePassword = document.getElementById('togglePassword');
     togglePassword.addEventListener('click', function() {
         const type = newPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -518,9 +710,13 @@ document.addEventListener('DOMContentLoaded', function() {
         this.querySelector('i').classList.toggle('fa-eye-slash');
     });
 
-    // ===== AJAX USERNAME AVAILABILITY =====
+    // ============================================================
+    // AJAX CHECKS (unchanged)
+    // ============================================================
     const usernameInput = document.getElementById('username');
     const usernameStatus = document.getElementById('usernameStatus');
+    const emailInput = document.getElementById('email');
+    const emailStatus = document.getElementById('emailStatus');
 
     let usernameTimer;
     usernameInput.addEventListener('input', function() {
@@ -546,10 +742,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     });
 
-    // ===== AJAX EMAIL AVAILABILITY =====
-    const emailInput = document.getElementById('email');
-    const emailStatus = document.getElementById('emailStatus');
-
     let emailTimer;
     emailInput.addEventListener('input', function() {
         clearTimeout(emailTimer);
@@ -573,23 +765,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         }, 500);
     });
-
-    // ===== FORM VALIDATION =====
-    document.getElementById('profileForm').addEventListener('submit', function(e) {
-        if (document.getElementById('usernameStatus').textContent.includes('not available')) {
-            e.preventDefault();
-            alert('Please choose a different username.');
-        }
-        if (document.getElementById('emailStatus').textContent.includes('already registered')) {
-            e.preventDefault();
-            alert('Please use a different email address.');
-        }
-    });
 });
 </script>
 
 <style>
-/* ===== BRAND VARIABLES (Matches index, dashboard, about, etc.) ===== */
+/* ===== BRAND VARIABLES (AngelWrites) ===== */
 :root {
     --rose: #DBA1A2;
     --rose-dark: #c08a8b;
@@ -607,7 +787,6 @@ document.addEventListener('DOMContentLoaded', function() {
     --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
     --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
 
@@ -615,7 +794,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
 p { line-height:1.6; }
 
-/* ===== DARK MODE SUPPORT ===== */
+/* ===== DARK MODE ===== */
 body.dark-mode {
     --bg: #1a1212;
     --card-bg: #2c1e1e;
@@ -627,7 +806,7 @@ body.dark-mode {
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
 
-/* ===== BUTTONS (Unified with all other AngelWrites pages) ===== */
+/* ===== BUTTONS ===== */
 .btn {
     display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
     border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
@@ -647,6 +826,8 @@ body.dark-mode {
 .btn-success:hover { background:#218838; border-color:#218838; }
 .btn-warning { background:#f39c12; color:white; border:2px solid #f39c12; }
 .btn-warning:hover { background:#e67e22; border-color:#e67e22; }
+.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
+.btn-danger:hover { background:#c82333; border-color:#c82333; }
 
 /* ===== PROFILE PAGE ===== */
 .profile-page { padding:40px 0 80px; }
@@ -684,36 +865,47 @@ body.dark-mode {
 .stat-number { font-size:1.4rem; font-weight:700; color:var(--rose); display:block; }
 .stat-label { font-size:0.7rem; color:var(--text-light); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
 
-/* ===== FORMS ===== */
-.edit-card h4, .password-card h4 { font-size:1.2rem; margin-bottom:16px; color:var(--dark); }
-.profile-form .form-group, .password-form .form-group { margin-bottom:16px; }
-.profile-form label, .password-form label { display:block; font-weight:600; margin-bottom:6px; font-size:0.9rem; color:var(--text); }
-.profile-form input, .password-form input, .profile-form textarea, .profile-form select {
-    width:100%; padding:12px 16px; border:1px solid var(--border); border-radius:12px;
-    font-size:0.95rem; background:var(--input-bg); color:var(--text); transition:border-color 0.2s;
+/* ===== UPLOAD ZONE ===== */
+.upload-section { margin:12px 0; }
+.upload-zone {
+    border:2px dashed var(--border); border-radius:16px; padding:40px 20px;
+    text-align:center; cursor:pointer; transition:all 0.3s; background:var(--fantasy);
 }
-.profile-form input:focus, .password-form input:focus, .profile-form textarea:focus, .profile-form select:focus {
-    outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15);
-}
-.profile-form textarea { resize:vertical; min-height:80px; font-family:'Inter',sans-serif; }
-
-.field-status { font-size:0.8rem; margin-top:4px; }
-.field-status.success { color:#27ae60; }
-.field-status.error { color:#e74c3c; }
-.field-status.info { color:#3498db; }
+.upload-zone i { font-size:2.5rem; color:var(--rose); margin-bottom:8px; display:block; }
+.upload-zone p { margin:0; color:var(--text-light); }
+.upload-zone:hover { border-color:var(--rose); background:rgba(219,161,162,0.05); }
+#previewContainer { display:flex; flex-direction:column; align-items:center; gap:8px; }
+#previewContainer img { border:2px solid var(--rose); border-radius:12px; }
 
 .current-file { display:flex; align-items:center; gap:12px; margin-top:8px; font-size:0.85rem; color:var(--text-light); }
 .current-file img { border:1px solid var(--border); border-radius:8px; }
 
-/* ===== PASSWORD ===== */
-.password-wrapper { position:relative; }
-.password-wrapper input { padding-right:44px; }
-.password-toggle { position:absolute; right:14px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--text-light); transition:color 0.2s; }
-.password-toggle:hover { color:var(--text); }
-
-.password-strength-meter { display:flex; align-items:center; gap:10px; margin-top:6px; }
-.strength-bar { height:4px; width:0%; background:#ddd; border-radius:4px; transition:width 0.3s; }
-#strengthText { font-size:0.8rem; color:var(--text-light); }
+/* ===== CROP MODAL ===== */
+.crop-modal {
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(30,20,20,0.7); backdrop-filter:blur(6px);
+    display:none; align-items:center; justify-content:center; z-index:999999;
+}
+.crop-modal-content {
+    background:var(--card-bg); border-radius:24px; padding:32px;
+    max-width:700px; width:90%; max-height:90vh; overflow-y:auto;
+    border:1px solid var(--rose-light); box-shadow:0 24px 80px rgba(0,0,0,0.35);
+}
+.crop-modal-header {
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;
+}
+.crop-modal-header h3 { margin:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
+.crop-modal-close {
+    background:transparent; border:none; font-size:1.5rem; cursor:pointer;
+    color:var(--text-light); transition:color 0.2s;
+}
+.crop-modal-close:hover { color:var(--rose); }
+.crop-modal-body { display:flex; flex-direction:column; gap:16px; }
+.crop-container { width:100%; text-align:center; }
+.crop-container img { max-width:100%; }
+.crop-preview { text-align:center; }
+#cropPreview { width:100px; height:100px; border-radius:50%; margin:0 auto; border:3px solid var(--rose); overflow:hidden; }
+.crop-actions { display:flex; gap:12px; justify-content:center; margin-top:16px; }
 
 /* ===== CAMERA SECTION ===== */
 .camera-section { border:1px solid var(--border); border-radius:16px; padding:20px; background:var(--fantasy); margin-top:8px; }
@@ -728,13 +920,41 @@ body.dark-mode {
 .captured-photo-container img { border:3px solid var(--rose); border-radius:12px; }
 .status-indicator { font-size:0.85rem; color:var(--text-light); margin-left:8px; font-weight:500; }
 
+/* ===== FORMS ===== */
+.edit-card h4, .password-card h4 { font-size:1.2rem; margin-bottom:16px; color:var(--dark); }
+.form-group { margin-bottom:16px; }
+.form-group label { display:block; font-weight:600; margin-bottom:6px; font-size:0.9rem; color:var(--text); }
+.form-group input, .form-group select, .form-group textarea {
+    width:100%; padding:12px 16px; border:1px solid var(--border); border-radius:12px;
+    font-size:0.95rem; background:var(--input-bg); color:var(--text); transition:border-color 0.2s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15);
+}
+.form-group textarea { resize:vertical; min-height:80px; font-family:'Inter',sans-serif; }
+.field-status { font-size:0.8rem; margin-top:4px; }
+.field-status.success { color:#27ae60; }
+.field-status.error { color:#e74c3c; }
+.field-status.info { color:#3498db; }
+
+/* ===== PASSWORD ===== */
+.password-wrapper { position:relative; }
+.password-wrapper input { padding-right:44px; }
+.password-toggle { position:absolute; right:14px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--text-light); transition:color 0.2s; }
+.password-toggle:hover { color:var(--text); }
+.password-strength-meter { display:flex; align-items:center; gap:10px; margin-top:6px; }
+.strength-bar { height:4px; width:0%; background:#ddd; border-radius:4px; transition:width 0.3s; }
+#strengthText { font-size:0.8rem; color:var(--text-light); }
+
 /* ===== RESPONSIVE ===== */
 @media (max-width:992px) {
     .profile-grid { grid-template-columns:1fr; }
     .profile-header h1 { font-size:2rem; }
+    .crop-modal-content { padding:24px; }
 }
 @media (max-width:768px) {
     .user-stats { grid-template-columns:repeat(3, 1fr); }
+    .crop-modal-content { padding:16px; }
 }
 @media (max-width:480px) {
     .user-stats { grid-template-columns:repeat(2, 1fr); }
