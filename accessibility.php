@@ -11,37 +11,18 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
 <!-- ===== SKIP TO CONTENT LINK ===== -->
 <a href="#mainContent" class="skip-link" style="position:absolute;top:-40px;left:0;background:var(--rose);color:white;padding:8px 16px;z-index:9999;border-radius:0 0 8px 0;transition:top 0.2s;text-decoration:none;font-weight:600;">Skip to main content</a>
 
-<style>
-/* Skip link visibility on focus */
-.skip-link:focus { top: 0; }
-
-/* High contrast mode styles */
-.high-contrast {
-    --rose: #c0392b;
-    --rose-dark: #922b21;
-    --vanilla: #f5f0e8;
-    --fantasy: #faf3ef;
-    --card-bg: #ffffff;
-    --border: #222222;
-    --text: #000000;
-    --text-light: #333333;
-    --dark: #000000;
-    --bg: #fcfcfc;
-    --input-bg: #ffffff;
-    --shadow: 0 2px 8px rgba(0,0,0,0.3);
-    --shadow-hover: 0 6px 20px rgba(0,0,0,0.4);
-}
-.high-contrast .theme-toggle { color: #000; }
-.high-contrast a { text-decoration: underline; }
-.high-contrast .btn { border: 2px solid #000; }
-</style>
+<!-- ===== READING PROGRESS BAR ===== -->
+<div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
 
 <div class="accessibility-page" id="mainContent">
     <div class="container">
-        <!-- Page Header -->
+        <!-- ===== PAGE HEADER ===== -->
         <div class="accessibility-header">
             <h1>Accessibility Statement</h1>
             <p>AngelWrites is committed to making our website accessible to all users, including those with disabilities.</p>
+            <div class="header-decoration">
+                <span class="decoration-line"></span>
+            </div>
         </div>
 
         <!-- ===== THEME TOGGLE ===== -->
@@ -49,7 +30,7 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
             <i class="fas fa-moon"></i>
         </button>
 
-        <!-- Accessibility Controls -->
+        <!-- ===== ACCESSIBILITY CONTROLS ===== -->
         <div class="accessibility-controls">
             <button id="highContrastToggle" class="btn btn-outline">
                 <i class="fas fa-adjust"></i> Toggle High Contrast Mode
@@ -59,7 +40,7 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
             </button>
         </div>
 
-        <!-- Main Content -->
+        <!-- ===== MAIN CONTENT ===== -->
         <div class="accessibility-content">
             <section class="a11y-section">
                 <h2>Our Commitment</h2>
@@ -140,9 +121,17 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
     </div>
 </div>
 
-<!-- ===== JAVASCRIPT FOR ACCESSIBILITY ===== -->
+<!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== READING PROGRESS BAR =====
+    window.addEventListener('scroll', function() {
+        const scrollTop = window.scrollY;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPercent = (scrollTop / docHeight) * 100;
+        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
+    });
+
     // ===== THEME TOGGLE =====
     const themeToggle = document.getElementById('themeToggle');
     const currentTheme = localStorage.getItem('accessibilityTheme') || 'light';
@@ -183,38 +172,150 @@ document.addEventListener('DOMContentLoaded', function() {
         html.classList.add('high-contrast');
         highContrastBtn.innerHTML = '<i class="fas fa-adjust"></i> Disable High Contrast';
     }
+
+    // ===== MAKE toggleTheme GLOBAL =====
+    window.toggleTheme = toggleTheme;
 });
 </script>
 
 <style>
-/* ===== ACCESSIBILITY PAGE STYLES ===== */
-.accessibility-page { padding: 32px 0 60px; }
-.accessibility-header { text-align: center; margin-bottom: 24px; }
-.accessibility-header h1 { font-size: 2.4rem; margin-bottom: 4px; }
-.accessibility-header p { color: var(--text-light); font-size: 1.05rem; }
-.accessibility-controls { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 32px; }
-.accessibility-controls .btn { padding: 10px 20px; border-radius: 30px; font-weight: 500; }
-.a11y-section { background: var(--card-bg); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 24px; }
-.a11y-section h2 { font-size: 1.6rem; margin-bottom: 12px; color: var(--text); }
-.a11y-section p { line-height: 1.7; color: var(--text); margin-bottom: 12px; }
-.a11y-section ul { padding-left: 24px; margin-bottom: 12px; }
-.a11y-section ul li { line-height: 1.7; color: var(--text); margin-bottom: 4px; }
-.features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 12px; }
-.feature-card { background: var(--vanilla); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid var(--border); transition: transform 0.2s, box-shadow 0.2s; }
-.feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
-.feature-icon { font-size: 2.2rem; color: var(--rose); margin-bottom: 8px; }
-.feature-card h3 { font-size: 1.05rem; margin-bottom: 4px; }
-.feature-card p { font-size: 0.9rem; color: var(--text-light); line-height: 1.5; margin: 0; }
-.contact-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
-.contact-actions .btn { padding: 10px 24px; border-radius: 30px; }
-.contact-details { margin-top: 8px; }
-.contact-details a { color: var(--rose); text-decoration: none; }
-.contact-details a:hover { text-decoration: underline; }
-@media (max-width: 480px) {
-    .accessibility-header h1 { font-size: 1.8rem; }
-    .features-grid { grid-template-columns: 1fr; }
-    .accessibility-controls { flex-direction: column; align-items: center; }
-    .accessibility-controls .btn { width: 100%; max-width: 280px; }
+/* ===== BRAND VARIABLES ===== */
+:root {
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
+    --card-bg: #ffffff;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+
+/* ===== DARK MODE ===== */
+body.dark-mode {
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --text: #e8dddd;
+    --text-light: #a08a8a;
+    --border: #4a3a3a;
+    --vanilla: #2c1e1e;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
+}
+
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
+p { line-height:1.6; }
+.rose-text { color:var(--rose); }
+
+/* ===== BUTTONS ===== */
+.btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
+    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
+    cursor:pointer; text-decoration:none; transition:all var(--transition);
+    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
+}
+.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
+.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
+.btn-outline:hover { background:var(--rose); color:var(--white); }
+.btn-sm { padding:8px 20px; font-size:0.85rem; }
+
+/* ===== HIGH CONTRAST MODE ===== */
+.high-contrast {
+    --rose: #c0392b;
+    --rose-dark: #922b21;
+    --vanilla: #f5f0e8;
+    --fantasy: #faf3ef;
+    --card-bg: #ffffff;
+    --border: #222222;
+    --text: #000000;
+    --text-light: #333333;
+    --dark: #000000;
+    --bg: #fcfcfc;
+    --input-bg: #ffffff;
+    --shadow: 0 2px 8px rgba(0,0,0,0.3);
+    --shadow-hover: 0 6px 20px rgba(0,0,0,0.4);
+}
+.high-contrast .theme-toggle { color: #000; }
+.high-contrast a { text-decoration: underline; }
+.high-contrast .btn { border: 2px solid #000; }
+
+/* ===== PAGE LAYOUT ===== */
+.accessibility-page { padding:40px 0 80px; }
+
+/* ===== HEADER ===== */
+.accessibility-header { text-align:center; margin-bottom:32px; }
+.accessibility-header h1 { font-size:2.8rem; margin-bottom:4px; }
+.accessibility-header p { color:var(--text-light); font-size:1.1rem; }
+.header-decoration { display:flex; justify-content:center; margin:8px 0 12px; }
+.decoration-line { width:60px; height:3px; background:var(--rose); border-radius:4px; }
+
+/* ===== ACCESSIBILITY CONTROLS ===== */
+.accessibility-controls {
+    display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-bottom:32px;
+}
+.accessibility-controls .btn { padding:10px 24px; border-radius:50px; font-weight:600; }
+
+/* ===== SECTIONS ===== */
+.a11y-section {
+    background:var(--card-bg); border-radius:20px; padding:28px 32px;
+    border:1px solid var(--border); box-shadow:var(--shadow); margin-bottom:28px;
+    transition:all var(--transition);
+}
+.a11y-section:hover { box-shadow:var(--shadow-hover); }
+.a11y-section h2 { font-size:1.6rem; margin-bottom:12px; color:var(--dark); }
+.a11y-section p { line-height:1.8; color:var(--text); margin-bottom:12px; }
+.a11y-section ul { padding-left:24px; margin-bottom:12px; }
+.a11y-section ul li { line-height:1.8; color:var(--text); margin-bottom:4px; }
+
+/* ===== FEATURES GRID ===== */
+.features-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+    gap:16px; margin-top:12px;
+}
+.feature-card {
+    background:var(--vanilla); border-radius:16px; padding:24px 20px;
+    text-align:center; border:1px solid var(--border);
+    transition:all var(--transition);
+}
+.feature-card:hover {
+    transform:translateY(-4px); box-shadow:var(--shadow-hover); border-color:var(--rose-light);
+}
+.feature-icon { font-size:2.2rem; color:var(--rose); margin-bottom:8px; display:block; }
+.feature-card h3 { font-size:1.05rem; margin-bottom:4px; color:var(--dark); }
+.feature-card p { font-size:0.9rem; color:var(--text-light); line-height:1.5; margin:0; }
+
+/* ===== CONTACT ===== */
+.contact-actions { display:flex; flex-wrap:wrap; gap:12px; margin:16px 0; }
+.contact-actions .btn { padding:10px 28px; border-radius:50px; }
+.contact-details { margin-top:8px; }
+.contact-details a { color:var(--rose); text-decoration:none; transition:color 0.2s; }
+.contact-details a:hover { color:var(--rose-dark); text-decoration:underline; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:768px) {
+    .accessibility-header h1 { font-size:2.2rem; }
+    .accessibility-controls { flex-direction:column; align-items:center; }
+    .accessibility-controls .btn { width:100%; max-width:280px; justify-content:center; }
+}
+@media (max-width:480px) {
+    .accessibility-header h1 { font-size:1.8rem; }
+    .features-grid { grid-template-columns:1fr; }
+    .a11y-section { padding:20px; }
 }
 </style>
 

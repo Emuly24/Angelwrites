@@ -40,10 +40,10 @@ $pageTitle = htmlspecialchars($privacy_content['title'] ?? 'Privacy Policy');
         </button>
 
         <!-- ===== FONT SIZE CONTROLS ===== -->
-        <div class="accessibility-controls">
-            <button id="fontSizeIncrease" class="btn btn-sm btn-outline">A+</button>
-            <button id="fontSizeDecrease" class="btn btn-sm btn-outline">A-</button>
-            <button id="resetFontSize" class="btn btn-sm btn-outline">Reset</button>
+        <div class="font-size-controls">
+            <button id="fontSizeDecrease" class="btn btn-sm btn-outline" aria-label="Decrease font size">A−</button>
+            <button id="resetFontSize" class="btn btn-sm btn-outline" aria-label="Reset font size">Reset</button>
+            <button id="fontSizeIncrease" class="btn btn-sm btn-outline" aria-label="Increase font size">A+</button>
         </div>
 
         <!-- ===== READING PROGRESS BAR ===== -->
@@ -53,6 +53,9 @@ $pageTitle = htmlspecialchars($privacy_content['title'] ?? 'Privacy Policy');
         <div class="privacy-header">
             <h1><?php echo htmlspecialchars($privacy_content['title'] ?? 'Privacy Policy'); ?></h1>
             <p>Your privacy is important to us. This policy explains how we handle your personal information.</p>
+            <div class="header-decoration">
+                <span class="decoration-line"></span>
+            </div>
             <p class="last-updated">Last updated: <?php echo date('F j, Y'); ?></p>
         </div>
 
@@ -129,78 +132,137 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('privacyFontSize', currentFontSize);
     }
 
-    increaseBtn.addEventListener('click', () => applyFontSize(currentFontSize + 10));
-    decreaseBtn.addEventListener('click', () => applyFontSize(currentFontSize - 10));
-    resetBtn.addEventListener('click', () => applyFontSize(100));
+    increaseBtn.addEventListener('click', function() {
+        applyFontSize(currentFontSize + 10);
+    });
+    decreaseBtn.addEventListener('click', function() {
+        applyFontSize(currentFontSize - 10);
+    });
+    resetBtn.addEventListener('click', function() {
+        applyFontSize(100);
+    });
 
+    // Apply saved font size if exists
     const savedFontSize = parseInt(localStorage.getItem('privacyFontSize'));
     if (savedFontSize) applyFontSize(savedFontSize);
 });
 </script>
 
 <style>
-/* ===== DARK MODE SUPPORT ===== */
+/* ===== BRAND VARIABLES (AngelWrites) ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+
+/* ===== DARK MODE ===== */
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --text: #e8dddd;
+    --text-light: #a08a8a;
+    --border: #4a3a3a;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
-body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 
-.privacy-page { padding: 32px 0 60px; }
-.privacy-header { text-align: center; margin-bottom: 40px; }
-.privacy-header h1 { font-size: 2.4rem; margin-bottom: 4px; }
-.privacy-header p { color: var(--text-light); font-size: 1.1rem; }
-.privacy-header .last-updated { font-size: 0.9rem; color: var(--text-light); margin-top: 4px; }
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
+p { line-height:1.6; }
+.rose-text { color:var(--rose); }
 
-.privacy-content { max-width: 800px; margin: 0 auto; }
-.privacy-section { margin-bottom: 32px; }
-.privacy-section h2 { font-size: 1.4rem; margin-bottom: 8px; color: var(--text); }
-.privacy-section p { line-height: 1.8; color: var(--text); margin-bottom: 0; }
-
-.accessibility-controls {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    margin-bottom: 20px;
+/* ===== BUTTONS ===== */
+.btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
+    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
+    cursor:pointer; text-decoration:none; transition:all var(--transition);
+    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
 }
-.accessibility-controls .btn-sm {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-weight: 600;
+.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
+.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
+.btn-outline:hover { background:var(--rose); color:var(--white); }
+.btn-sm { padding:8px 20px; font-size:0.85rem; }
+
+/* ===== PAGE LAYOUT ===== */
+.privacy-page { padding:40px 0 80px; }
+
+/* ===== HEADER ===== */
+.privacy-header { text-align:center; margin-bottom:40px; }
+.privacy-header h1 { font-size:2.8rem; margin-bottom:4px; }
+.privacy-header p { color:var(--text-light); font-size:1.1rem; }
+.privacy-header .last-updated { font-size:0.9rem; color:var(--text-light); margin-top:4px; }
+.header-decoration { display:flex; justify-content:center; margin:8px 0 12px; }
+.decoration-line { width:60px; height:3px; background:var(--rose); border-radius:4px; }
+
+/* ===== FONT SIZE CONTROLS ===== */
+.font-size-controls {
+    display:flex; gap:8px; justify-content:center; margin-bottom:24px;
+}
+.font-size-controls .btn-sm {
+    padding:6px 14px; border-radius:50px; font-weight:600; font-size:0.9rem;
 }
 
-.privacy-newsletter { max-width: 800px; margin: 40px auto 0; text-align: center; background: var(--vanilla); border-radius: 12px; padding: 32px; }
-.privacy-newsletter .newsletter-form { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 12px; }
-.privacy-newsletter .newsletter-form input { padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; min-width: 250px; background: var(--input-bg); color: var(--text); }
-.privacy-newsletter .newsletter-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.privacy-newsletter .btn { padding: 10px 24px; border-radius: 30px; }
+/* ===== CONTENT ===== */
+.privacy-content { max-width:800px; margin:0 auto; }
+.privacy-section { margin-bottom:32px; padding-bottom:24px; border-bottom:1px solid var(--border); }
+.privacy-section:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+.privacy-section h2 { font-size:1.5rem; margin-bottom:8px; color:var(--dark); }
+.privacy-section p { line-height:1.8; color:var(--text); margin:0; }
 
-.privacy-footer { text-align: center; margin-top: 32px; color: var(--text-light); }
-.privacy-footer a { color: var(--rose); text-decoration: none; }
-.privacy-footer a:hover { text-decoration: underline; }
+/* ===== NEWSLETTER ===== */
+.privacy-newsletter {
+    max-width:800px; margin:48px auto 0; text-align:center;
+    background:var(--vanilla); border-radius:20px; padding:36px 32px;
+    border:1px solid var(--rose-light); box-shadow:var(--shadow);
+}
+.privacy-newsletter h3 { font-size:1.4rem; margin-bottom:4px; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
+.privacy-newsletter p { color:var(--text-light); margin-bottom:12px; }
+.privacy-newsletter .newsletter-form { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-top:12px; }
+.privacy-newsletter .newsletter-form input {
+    padding:10px 16px; border:1px solid var(--border); border-radius:50px;
+    min-width:220px; background:var(--card-bg); color:var(--text); transition:border-color 0.2s;
+}
+.privacy-newsletter .newsletter-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.privacy-newsletter .btn { padding:10px 24px; border-radius:50px; }
 
-@media (max-width: 480px) {
-    .privacy-newsletter .newsletter-form { flex-direction: column; align-items: center; }
-    .privacy-newsletter .newsletter-form input { width: 100%; max-width: 300px; }
+/* ===== FOOTER ===== */
+.privacy-footer { text-align:center; margin-top:32px; color:var(--text-light); font-size:0.95rem; }
+.privacy-footer a { color:var(--rose); text-decoration:none; transition:color 0.2s; }
+.privacy-footer a:hover { color:var(--rose-dark); text-decoration:underline; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:768px) {
+    .privacy-header h1 { font-size:2.2rem; }
+    .privacy-newsletter { padding:24px; }
+    .privacy-newsletter .newsletter-form input { min-width:150px; }
+}
+@media (max-width:480px) {
+    .privacy-header h1 { font-size:1.8rem; }
+    .font-size-controls { gap:4px; }
+    .font-size-controls .btn-sm { padding:4px 10px; font-size:0.8rem; }
+    .privacy-newsletter .newsletter-form { flex-direction:column; align-items:center; }
+    .privacy-newsletter .newsletter-form input { width:100%; min-width:auto; }
 }
 </style>
 

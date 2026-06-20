@@ -73,22 +73,11 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
     $rating = (int)$_POST['rating'];
     $comment = trim($_POST['comment']);
-    $photo_path = null;
-    
-    // Live photo capture
-    if (!empty($_FILES['live_review_photo']['name'])) {
-        $upload_dir = 'assets/uploads/reviews/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $photo_filename = 'review_' . time() . '.jpg';
-        if (move_uploaded_file($_FILES['live_review_photo']['tmp_name'], $upload_dir . $photo_filename)) {
-            $photo_path = 'assets/uploads/reviews/' . $photo_filename;
-        }
-    }
     
     if ($rating >= 1 && $rating <= 5 && !empty($comment)) {
         try {
-            $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, photo_path) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute(['book', $book_id, $_SESSION['user_id'], $rating, $comment, $photo_path]);
+            $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute(['book', $book_id, $_SESSION['user_id'], $rating, $comment]);
             
             // Award reputation points (if function exists)
             if (function_exists('awardReputation')) {
@@ -102,9 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
             $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
             $body .= "<p><strong>Rating:</strong> " . $rating . " stars</p>";
             $body .= "<p><strong>Comment:</strong><br>" . nl2br(htmlspecialchars($comment)) . "</p>";
-            if ($photo_path) {
-                $body .= "<p><strong>Photo:</strong><br><img src='" . SITE_URL . "/" . $photo_path . "' style='max-width:200px;'></p>";
-            }
             sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
             
             header('Location: ' . SITE_URL . '/book.php?id=' . $book_id . '&review_added=1');
@@ -289,38 +275,7 @@ $pageTitle = htmlspecialchars($book['title']);
                                     <textarea name="comment" rows="3" placeholder="Share your thoughts about this book..." required></textarea>
                                 </div>
                                 
-                                <!-- Live Photo Capture -->
-                                <div class="form-group">
-                                    <label>Add a photo (optional)</label>
-                                    <div class="camera-section">
-                                        <div class="camera-preview-container">
-                                            <video id="cameraPreview" autoplay muted playsinline></video>
-                                            <div class="camera-placeholder" id="cameraPlaceholder">
-                                                <i class="fas fa-camera"></i>
-                                                <p>Camera preview will appear here.</p>
-                                            </div>
-                                        </div>
-                                        <div class="camera-controls">
-                                            <button type="button" id="startCameraBtn" class="btn btn-secondary btn-sm">
-                                                <i class="fas fa-camera"></i> Start Camera
-                                            </button>
-                                            <button type="button" id="capturePhotoBtn" class="btn btn-primary btn-sm" disabled>
-                                                <i class="fas fa-camera-retro"></i> Capture
-                                            </button>
-                                            <button type="button" id="retakePhotoBtn" class="btn btn-warning btn-sm" disabled>
-                                                <i class="fas fa-redo"></i> Retake
-                                            </button>
-                                            <button type="button" id="confirmPhotoBtn" class="btn btn-success btn-sm" disabled>
-                                                <i class="fas fa-check"></i> Use This Photo
-                                            </button>
-                                            <span id="cameraStatus" class="status-indicator">Camera ready</span>
-                                        </div>
-                                        <div class="captured-photo-container" id="capturedPhotoContainer" style="display:none;">
-                                            <img id="capturedPhotoPreview" style="max-width:200px; max-height:200px; border-radius:8px;">
-                                        </div>
-                                        <input type="file" id="livePhotoInput" name="live_review_photo" accept="image/*" style="display:none;">
-                                    </div>
-                                </div>
+                                <!-- Live Photo Capture REMOVED -->
                                 
                                 <button type="submit" name="submit_review" class="btn btn-primary btn-block">Submit Review</button>
                             </form>
@@ -351,11 +306,6 @@ $pageTitle = htmlspecialchars($book['title']);
                                     </div>
                                     <div class="review-comment">
                                         <?php echo nl2br(htmlspecialchars($review['comment'])); ?>
-                                        <?php if ($review['photo_path']): ?>
-                                            <div class="review-photo">
-                                                <img src="<?php echo SITE_URL . '/' . $review['photo_path']; ?>" alt="Review photo">
-                                            </div>
-                                        <?php endif; ?>
                                     </div>
                                     <div class="review-footer">
                                         <div class="reactions">
@@ -436,73 +386,209 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ===== CAMERA =====
-    const cameraPreview = document.getElementById('cameraPreview');
-    const cameraPlaceholder = document.getElementById('cameraPlaceholder');
-    const startCameraBtn = document.getElementById('startCameraBtn');
-    const capturePhotoBtn = document.getElementById('capturePhotoBtn');
-    const retakePhotoBtn = document.getElementById('retakePhotoBtn');
-    const confirmPhotoBtn = document.getElementById('confirmPhotoBtn');
-    const cameraStatus = document.getElementById('cameraStatus');
-    const capturedPhotoContainer = document.getElementById('capturedPhotoContainer');
-    const capturedPhotoPreview = document.getElementById('capturedPhotoPreview');
-    const livePhotoInput = document.getElementById('livePhotoInput');
-
-    let cameraStream = null;
-    let capturedBlob = null;
-
-    async function startCamera() {
-        try {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Your browser does not support camera access.');
-                return;
+    // ===== REACT TO REVIEW =====
+    window.reactToReview = function(reviewId, reaction) {
+        const formData = new FormData();
+        formData.append('react_to_review', '1');
+        formData.append('review_id', reviewId);
+        formData.append('reaction_type', reaction);
+        fetch('<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const countSpan = document.getElementById(reaction + 's-' + reviewId);
+                if (countSpan) {
+                    countSpan.textContent = parseInt(countSpan.textContent) + 1;
+                }
             }
-            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            cameraPreview.srcObject = cameraStream;
-            cameraPreview.style.display = 'block';
-            cameraPlaceholder.style.display = 'none';
-            startCameraBtn.disabled = true;
-            capturePhotoBtn.disabled = false;
-            cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#27ae60';
-        } catch (error) {
-            alert('Camera access denied: ' + error.message);
-        }
-    }
+        })
+        .catch(error => console.error('Error:', error));
+    };
+});
+</script>
 
-    function capturePhoto() {
-        if (!cameraStream) return;
-        const canvas = document.createElement('canvas');
-        canvas.width = cameraPreview.videoWidth;
-        canvas.height = cameraPreview.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => {
-            capturedBlob = blob;
-            const url = URL.createObjectURL(blob);
-            capturedPhotoPreview.src = url;
-            capturedPhotoContainer.style.display = 'block';
-            capturePhotoBtn.disabled = true;
-            retakePhotoBtn.disabled = false;
-            confirmPhotoBtn.disabled = false;
-            cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#3498db';
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraPreview.srcObject = null;
-            cameraPreview.style.display = 'none';
-            cameraPlaceholder.style.display = 'flex';
-            startCameraBtn.disabled = false;
-        }, 'image/jpeg');
-    }
+<style>
+/* ===== BRAND VARIABLES (AngelWrites) ===== */
+:root {
+    --rose: #DBA1A2;
+    --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6;
+    --fantasy: #F7F3ED;
+    --white: #ffffff;
+    --dark: #2c1e1e;
+    --text: #3d2e2e;
+    --text-light: #6b5a5a;
+    --bg: #F7F3ED;
+    --card-bg: #ffffff;
+    --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
 
-    function retakePhoto() {
-        capturedBlob = null;
-        capturedPhotoContainer.style.display = 'none';
-        capturedPhotoPreview.src = '';
-        capturePhotoBtn.disabled = true;
-        retakePhotoBtn.disabled = true;
-        confirmPhotoBtn.disabled = true;
-        cameraStatus.textContent = 'Camera ready';
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
+p { line-height:1.6; }
+.rose-text { color:var(--rose); }
+
+/* ===== BUTTONS ===== */
+.btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
+    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
+    cursor:pointer; text-decoration:none; transition:all var(--transition);
+    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
+}
+.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
+.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
+.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
+.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
+.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
+.btn-outline:hover { background:var(--rose); color:var(--white); }
+.btn-sm { padding:8px 20px; font-size:0.85rem; }
+.btn-lg { padding:16px 32px; font-size:1.1rem; }
+
+/* ===== PAGE LAYOUT ===== */
+.book-page { padding:40px 0 80px; }
+
+/* ===== BACK LINK ===== */
+.book-back-link { margin-bottom:24px; }
+.back-link { color:var(--text-light); font-size:0.95rem; transition:color 0.2s; }
+.back-link:hover { color:var(--rose); }
+.back-link i { margin-right:6px; }
+
+/* ===== REPUTATION BAR ===== */
+.user-reputation-bar {
+    display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+    padding:12px 20px; background:var(--vanilla); border-radius:20px;
+    margin-bottom:32px; border:1px solid var(--rose-light); box-shadow:var(--shadow);
+}
+.rep-item { font-size:0.9rem; color:var(--text); display:flex; align-items:center; gap:4px; }
+.achievement-badges { display:flex; gap:4px; }
+.achievement-badge { background:var(--rose); color:white; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem; }
+
+/* ===== BOOK CONTENT WRAPPER ===== */
+.book-content-wrapper {
+    display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start;
+}
+@media (max-width:992px) {
+    .book-content-wrapper { grid-template-columns:1fr; }
+}
+
+/* ===== COVER SECTION ===== */
+.book-cover-section {
+    display:flex; flex-direction:column; gap:16px; position:sticky; top:20px;
+}
+.book-cover-card {
+    background:var(--card-bg); border-radius:20px; padding:20px;
+    border:1px solid var(--border); box-shadow:var(--shadow);
+    display:flex; align-items:center; justify-content:center;
+    transition:all var(--transition);
+}
+.book-cover-card:hover { box-shadow:var(--shadow-hover); border-color:var(--rose-light); }
+.cover-image { width:100%; height:auto; border-radius:12px; }
+.placeholder-cover {
+    width:100%; height:300px; display:flex; align-items:center; justify-content:center;
+    background:var(--vanilla); border-radius:12px; font-size:4rem; color:var(--rose);
+}
+
+/* ===== ACTIONS ===== */
+.book-action-row { display:flex; flex-direction:column; gap:12px; }
+.price-display { display:flex; justify-content:center; }
+.free-badge { background:#27ae60; color:white; padding:4px 16px; border-radius:20px; font-weight:700; font-size:1rem; }
+.sale-price { color:#e74c3c; font-weight:700; font-size:1.1rem; }
+.regular-price { font-weight:700; font-size:1.1rem; color:var(--text); }
+.action-buttons { display:flex; justify-content:center; }
+.book-meta { text-align:center; color:var(--text-light); font-size:0.9rem; }
+.meta-author { display:block; }
+.meta-format { display:inline-block; background:var(--vanilla); padding:2px 12px; border-radius:12px; margin-top:4px; }
+
+/* ===== DETAILS SECTION ===== */
+.book-details-section { display:flex; flex-direction:column; gap:24px; }
+.book-title { font-size:2.4rem; margin:0 0 4px; line-height:1.2; }
+.book-description { border-top:1px solid var(--border); padding-top:16px; }
+.description-content { line-height:1.8; color:var(--text); }
+.read-more-btn { margin-top:8px; }
+
+/* ===== REVIEWS ===== */
+.reviews-header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.reviews-header h3 { font-size:1.4rem; margin:0; }
+.rating-summary { display:flex; align-items:center; gap:8px; }
+.rating-summary .stars { display:flex; gap:2px; }
+.rating-summary .stars .filled { color:#f1c40f; }
+.rating-summary .stars .empty { color:#ddd; }
+.rating-value { font-weight:700; font-size:1.1rem; }
+.rating-count { color:var(--text-light); font-size:0.9rem; }
+
+.review-form-container { background:var(--vanilla); border-radius:20px; padding:20px 24px; margin-bottom:24px; }
+.review-form-container h4 { margin-bottom:12px; }
+.review-form .star-rating { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.review-form .stars { display:flex; flex-direction:row-reverse; gap:2px; }
+.review-form .stars input { display:none; }
+.review-form .stars label { font-size:1.4rem; color:#ddd; cursor:pointer; transition:color 0.2s; }
+.review-form .stars label:hover, .review-form .stars label:hover ~ label { color:#f1c40f; }
+.review-form .stars input:checked ~ label { color:#f1c40f; }
+.review-form .form-group textarea { width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; resize:vertical; min-height:80px; background:var(--input-bg); color:var(--text); }
+.review-form .form-group textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
+.review-form .btn-block { width:100%; justify-content:center; margin-top:8px; }
+
+.login-prompt { text-align:center; padding:20px; background:var(--fantasy); border-radius:20px; color:var(--text-light); }
+.login-prompt a { color:var(--rose); font-weight:600; text-decoration:none; }
+.login-prompt a:hover { text-decoration:underline; }
+
+.reviews-list { display:flex; flex-direction:column; gap:12px; }
+.review-item { background:var(--card-bg); border-radius:16px; padding:20px; border:1px solid var(--border); box-shadow:var(--shadow); }
+.review-item:hover { box-shadow:var(--shadow-hover); }
+.review-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.review-author { display:flex; align-items:center; gap:10px; }
+.review-avatar { width:32px; height:32px; border-radius:50%; background:var(--rose); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; }
+.author-name { font-weight:600; }
+.review-date { font-size:0.8rem; color:var(--text-light); }
+.review-rating { margin-bottom:6px; }
+.review-rating .filled { color:#f1c40f; }
+.review-rating .empty { color:#ddd; }
+.rating-label { font-size:0.8rem; color:var(--text-light); margin-left:4px; }
+.review-comment { line-height:1.6; color:var(--text); }
+.review-footer { margin-top:10px; border-top:1px solid var(--border); padding-top:8px; }
+.reactions { display:flex; gap:8px; }
+.reaction-btn { background:transparent; border:none; cursor:pointer; color:var(--text-light); font-size:0.9rem; display:flex; align-items:center; gap:4px; transition:color 0.2s; }
+.reaction-btn:hover { color:var(--rose); }
+.reaction-btn span { font-weight:600; }
+
+.no-reviews { text-align:center; padding:40px; color:var(--text-light); }
+.no-reviews i { font-size:2.5rem; color:var(--rose); opacity:0.5; margin-bottom:8px; }
+
+/* ===== SHARE ===== */
+.share-section { display:flex; align-items:center; gap:12px; padding-top:16px; border-top:1px solid var(--border); }
+.share-label { font-size:0.9rem; color:var(--text-light); font-weight:500; }
+.share-icons { display:flex; gap:8px; }
+.share-btn { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; color:white; transition:transform 0.2s; font-size:0.9rem; }
+.share-btn:hover { transform:scale(1.05); }
+.share-btn.facebook { background:#1877f2; }
+.share-btn.twitter { background:#1da1f2; }
+.share-btn.whatsapp { background:#25d366; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:768px) {
+    .book-title { font-size:2rem; }
+    .reviews-header { flex-direction:column; align-items:flex-start; gap:8px; }
+    .book-cover-section { position:relative; top:0; }
+    .book-cover-card { padding:12px; }
+}
+@media (max-width:480px) {
+    .book-title { font-size:1.6rem; }
+    .book-content-wrapper { gap:20px; }
+}
+</style>
+
+<?php require_once 'includes/footer.php'; ?>
         cameraStatus.style.color = 'var(--text-light)';
         startCameraBtn.disabled = false;
     }
