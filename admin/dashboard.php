@@ -819,62 +819,8 @@ h1, h2, h3, h4, h5, h6 {
 .video-scroll-item .scroll-item-body { padding: 6px; text-align: center; }
 .video-scroll-item .scroll-item-body h4 { font-size: 0.75rem; margin: 0; line-height: 1.2; }
 
-/* ================================================================
-   RESPONSIVE – MIRRORING THE READER'S METHODOLOGY
-   ================================================================ */
-
-@media (max-width: 1024px) {
-    .dashboard-grid { grid-template-columns: 1fr; }
-    .recent-content-grid { grid-template-columns: 1fr 1fr; }
-    .bottom-row { grid-template-columns: 1fr; }
-    .dashboard-sidebar { width: 100%; min-width: 0; }
-}
-
-@media (max-width: 768px) {
-    /* Adaptive resizing like the Reader */
-    :root {
-        --dash-hero-pad: 16px 20px;
-        --dash-card-pad: 16px;
-        --dash-stat-pad: 8px 10px;
-        --dash-stat-height: 45px;
-        --dash-heading-size: 1.8rem;
-        --dash-sub-size: 0.95rem;
-        --dash-stat-fsize: 1rem;
-    }
-
-    .alert-row { grid-template-columns: 1fr; }
-    .recent-content-grid { grid-template-columns: 1fr; }
-    .bottom-row { grid-template-columns: 1fr; }
-    .profile-pic-large { width: 60px; height: 60px; }
-    .profile-pic-large i { font-size: 2.5rem; }
-    .hero-profile { gap: 12px; }
-    .stats-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    
-    .quick-actions-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
-    .mini-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-    
-    /* Prevent long cards from being cut off */
-    .user-row { flex-wrap: wrap; gap: 4px; }
-    .user-row .user-name { flex: 1 1 100%; font-size: 0.8rem; word-break: break-word; }
-    .user-row .user-role { width: 100%; margin-right: 0; justify-content: flex-end; gap: 4px; }
-    
-    .achievement-item { flex-wrap: nowrap; }
-    .achievement-item .achievement-name, .achievement-item .achievement-date { 
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; 
-    }
-    .achievement-item .achievement-name { flex: 1 1 0; font-size: 0.8rem; }
-    .achievement-item .achievement-date { flex: 0 0 auto; max-width: 40%; font-size: 0.7rem; margin-left: 4px; }
-    
-    .horizontal-scroll { gap: 8px; }
-    .poem-scroll-item { width: 90px; }
-    .poem-scroll-item .poem-thumbnail { width: 70px; height: 70px; }
-    .blog-scroll-item { width: 160px; }
-    .video-scroll-item { width: 110px; }
-    .video-scroll-item .video-thumb { height: 60px; }
-}
-
 @media (max-width: 480px) {
-    /* Further proportional shrink for tiny screens */
+    /* --- Further proportional shrink --- */
     :root {
         --dash-hero-pad: 12px 16px;
         --dash-card-pad: 12px;
@@ -885,7 +831,7 @@ h1, h2, h3, h4, h5, h6 {
         --dash-stat-fsize: 0.9rem;
     }
 
-    .stats-row { grid-template-columns: 1fr 1fr; gap: 4px; }
+    .stats-row { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
     .stat-icon { width: 24px; height: 24px; font-size: 0.7rem; }
     .stat-label { font-size: 0.45rem; letter-spacing: 0; }
     
@@ -900,60 +846,112 @@ h1, h2, h3, h4, h5, h6 {
     .quick-action-btn i { font-size: 1rem; }
     .quick-action-btn span { font-size: 0.6rem; }
     
-    /* --- SHRINK HORIZONTAL BUTTONS & HEADERS --- */
+    /* --- SHRINK HORIZONTAL BUTTONS & COMPRESS HEADERS --- */
     .section-header {
         flex-wrap: nowrap !important;
-        gap: 4px !important;
+        gap: 2px !important;
     }
     .section-header h2 {
-        font-size: 0.85rem !important;
-        gap: 4px !important;
+        font-size: 0.75rem !important;
+        gap: 2px !important;
         flex-shrink: 1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        min-width: 0 !important;
     }
     .section-header h2 .section-icon {
-        font-size: 0.8rem !important;
+        font-size: 0.7rem !important;
     }
-    .section-actions .btn,
+    .section-header .btn,
     .section-header .btn-outline,
     .section-header .btn-sm {
-        padding: 2px 10px !important;
-        font-size: 0.6rem !important;
-        border-radius: 12px !important;
+        padding: 1px 6px !important;
+        font-size: 0.5rem !important;
+        border-radius: 8px !important;
         white-space: nowrap !important;
         flex-shrink: 0 !important;
+        min-width: auto !important;
     }
 
-    /* --- SHRINK HORIZONTAL EMPTY STATE ROWS --- */
+    /* --- COMPRESS EMPTY STATE ROWS --- */
     .session-item,
     .compact-empty {
-        padding: 6px 8px !important;
-        font-size: 0.7rem !important;
+        padding: 4px 6px !important;
+        font-size: 0.65rem !important;
         display: flex !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 4px !important;
+        gap: 2px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     .compact-empty i {
-        font-size: 0.8rem !important;
-    }
-    .session-item .session-info {
         font-size: 0.7rem !important;
     }
+    .session-item .session-info,
+    .compact-empty {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        display: block !important;
+    }
     .session-item .status-badge {
-        font-size: 0.5rem !important;
+        font-size: 0.45rem !important;
+        padding: 1px 4px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* --- COMPRESS USER ROWS --- */
+    .user-row {
+        flex-wrap: wrap !important;
+        padding: 4px 6px !important;
+        gap: 2px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .user-row .user-name {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        font-size: 0.7rem !important;
+        word-break: break-word !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+    .user-row .user-role {
+        width: 100% !important;
+        margin-right: 0 !important;
+        justify-content: flex-end !important;
+        gap: 2px !important;
+        padding-top: 2px !important;
+        border-top: 1px dashed var(--border) !important;
+    }
+    .user-row .user-role .status-badge {
+        font-size: 0.45rem !important;
         padding: 1px 6px !important;
     }
+    .user-row .user-role .btn-sm {
+        padding: 2px 6px !important;
+        font-size: 0.5rem !important;
+    }
+
+    /* --- PAGINATION & MINI GRID --- */
+    .mini-grid { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
+    .pagination .page-link { padding: 2px 6px; font-size: 0.6rem; min-width: 20px; }
+    .mini-pagination .page-link { padding: 2px 4px; font-size: 0.5rem; min-width: 14px; }
     
-    .pagination .page-link { padding: 4px 8px; font-size: 0.7rem; min-width: 24px; }
-    .mini-pagination .page-link { padding: 2px 6px; font-size: 0.65rem; min-width: 18px; }
-    
-    .horizontal-scroll { gap: 4px; }
-    .poem-scroll-item { width: 70px; }
-    .poem-scroll-item .poem-thumbnail { width: 50px; height: 50px; }
-    .poem-scroll-item .scroll-item-body h4 { font-size: 0.6rem; }
-    .blog-scroll-item { width: 130px; padding: 4px; }
-    .video-scroll-item { width: 80px; }
-    .video-scroll-item .video-thumb { height: 40px; }
+    /* --- FORCE HORIZONTAL SCROLLS TO SHORTEN WIDTHS --- */
+    .horizontal-scroll { gap: 4px !important; }
+    .poem-scroll-item { width: 60px !important; }
+    .poem-scroll-item .poem-thumbnail { width: 40px !important; height: 40px !important; }
+    .poem-scroll-item .scroll-item-body h4 { font-size: 0.5rem !important; }
+    .blog-scroll-item { width: 100px !important; padding: 2px !important; }
+    .blog-scroll-item .blog-content h4 { font-size: 0.5rem !important; }
+    .video-scroll-item { width: 60px !important; }
+    .video-scroll-item .video-thumb { height: 30px !important; }
 }
 </style>
 
