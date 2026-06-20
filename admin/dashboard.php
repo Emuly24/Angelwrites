@@ -703,7 +703,7 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
 .compact-empty i{font-size:1rem;color:var(--rose-light);opacity:0.8}
 
 /* ================================================================
-   MOBILE OVERRIDES – Fix cutting off and overflow
+   MOBILE OVERRIDES – ensures EVERYTHING fits without cutting
    ================================================================ */
 @media (max-width: 1024px) {
     .dashboard-grid { grid-template-columns: 1fr; }
@@ -724,38 +724,64 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
     .profile-pic-large { width: 60px; height: 60px; }
     .hero-content h1 { font-size: 1.8rem; }
     .quick-actions-grid { grid-template-columns: 1fr 1fr; }
-    .stats-row { grid-template-columns: repeat(3,1fr); gap: 6px; }
+    .stats-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .dashboard-section { padding: 16px; }
 }
 @media (max-width: 480px) {
+    /* Force all stat cards into 2 columns */
     .stats-row { grid-template-columns: 1fr 1fr; gap: 6px; }
-    .stat-card { padding: 6px 8px; min-height: 45px; }
-    .stat-number { font-size: 0.9rem; }
-    .stat-label { font-size: 0.5rem; }
-    .stat-icon { width: 24px; height: 24px; font-size: 0.7rem; }
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 80px; }
-    .mini-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
-    .book-card, .poem-card, .blog-card, .reflection-card, .video-card { border-radius: 8px; }
-    .book-info h3, .poem-body h3, .blog-content h3, .reflection-body h3, .video-info h3 { font-size: 0.75rem; }
-    .book-author { font-size: 0.65rem; }
-    .blog-excerpt { font-size: 0.65rem; }
-    .dashboard-section { padding: 16px; }
-    .section-header h2 { font-size: 1rem; }
-    .quick-action-btn { padding: 8px 4px; }
-    .quick-action-btn i { font-size: 1rem; }
-    .quick-action-btn span { font-size: 0.6rem; }
+    .stat-card { padding: 6px 8px; min-height: 40px; border-radius: 6px; }
+    .stat-icon { width: 20px; height: 20px; font-size: 0.6rem; }
+    .stat-number { font-size: 0.85rem; }
+    .stat-label { font-size: 0.45rem; letter-spacing: 0; }
+
+    /* Hero section */
+    .dashboard-hero { flex-direction: column; align-items: stretch; padding: 16px; }
     .hero-content h1 { font-size: 1.4rem; }
-    .hero-profile { flex-direction: column; align-items: flex-start; }
-    .hero-stat { font-size: 0.7rem; padding: 4px 10px; }
-    .pagination .page-link { padding: 4px 8px; font-size: 0.7rem; min-width: 24px; }
-    .mini-pagination .page-link { padding: 2px 6px; font-size: 0.65rem; min-width: 20px; }
-    .horizontal-scroll { gap: 6px; }
+    .hero-profile { flex-direction: row; justify-content: flex-start; gap: 12px; }
+    .profile-pic-large { width: 50px; height: 50px; }
+    .profile-pic-large i { font-size: 2rem; }
+    .profile-details h3 { font-size: 1rem; }
+    .profile-details .user-email { font-size: 0.75rem; }
+    .hero-stat { font-size: 0.65rem; padding: 4px 8px; }
+
+    /* Sections */
+    .dashboard-section { padding: 12px; }
+    .section-header h2 { font-size: 0.95rem; }
+    .section-header .btn { font-size: 0.7rem; padding: 4px 12px; }
+
+    /* Mini grid for books/poems */
+    .mini-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 80px; }
+    .book-info h3, .poem-body h3, .blog-content h3, .reflection-body h3, .video-info h3 { font-size: 0.7rem; }
+    .book-author, .blog-excerpt { font-size: 0.6rem; }
+
+    /* Horizontal scroll items */
     .poem-scroll-item { width: 80px; }
     .poem-scroll-item .poem-thumbnail { width: 60px; height: 60px; }
     .poem-scroll-item .scroll-item-body h4 { font-size: 0.6rem; }
-    .blog-scroll-item { width: 140px; }
+    .blog-scroll-item { width: 140px; padding: 6px; }
     .video-scroll-item { width: 100px; }
     .video-scroll-item .video-thumb { height: 50px; }
+
+    /* Quick actions */
+    .quick-actions-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
+    .quick-action-btn { padding: 6px 4px; }
+    .quick-action-btn i { font-size: 0.9rem; }
+    .quick-action-btn span { font-size: 0.5rem; }
+
+    /* Pagination */
+    .pagination .page-link { padding: 4px 6px; font-size: 0.65rem; min-width: 20px; }
+    .mini-pagination .page-link { padding: 2px 4px; font-size: 0.6rem; min-width: 16px; }
+
+    /* Sidebar */
+    .sidebar-card { padding: 12px; }
+    .sidebar-card .card-header h4 { font-size: 0.9rem; }
+
+    /* Misc */
+    .horizontal-scroll { gap: 6px; }
+    .user-row .user-name { font-size: 0.75rem; }
+    .user-row .user-name small { font-size: 0.65rem; }
+    .status-badge { font-size: 0.55rem; padding: 1px 6px; }
 }
 </style>
-
-<?php require_once '../includes/footer.php'; ?>
