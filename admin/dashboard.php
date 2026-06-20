@@ -830,74 +830,69 @@ h1, h2, h3, h4, h5, h6 {
         --dash-stat-fsize: 0.9rem;
     }
 
-    /* --- STATS ROW (Keeps 2 short columns) --- */
+    /* --- STATS (Keeps 2 short columns - works perfect) --- */
     .stats-row { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
     .stat-icon { width: 24px; height: 24px; font-size: 0.7rem; }
     .stat-label { font-size: 0.45rem; letter-spacing: 0; }
     .hero-stats { gap: 6px; }
     .hero-stat { font-size: 0.7rem; padding: 4px 8px; }
 
-    /* --- STACK EVERYTHING VERTICALLY AND SHORTEN HORIZONTAL LENGTH --- */
-    .mini-grid { 
-        grid-template-columns: 1fr !important; 
-        gap: 8px !important; 
-        justify-items: center !important; 
+    /* --- FORCE ALL CARDS INTO 2 COLUMNS WITH SHORT LENGTH --- */
+    .mini-grid, .quick-actions-grid, .recent-content-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
     }
-    .recent-content-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
 
-    /* --- APPLY MAX-WIDTH TO SHORTEN CARDS --- */
-    .book-card, .poem-card, .blog-card, .reflection-card, .video-card {
+    /* --- CONVERT HORIZONTAL SCROLLS INTO THE SAME 2-COLUMN GRID --- */
+    .horizontal-scroll {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+        overflow: visible !important; /* Stops it from scrolling horizontally */
+        padding: 0 !important;
+    }
+
+    /* --- SHORTEN THE WIDTH OF EVERY CARD TO MATCH STATS LENGTH --- */
+    .book-card, .poem-card, .blog-card, .reflection-card, .video-card,
+    .scroll-item, .quick-action-btn {
         width: 100% !important;
-        max-width: 160px !important; /* SHORTENED LIKE STATS */
-        margin: 0 auto !important;
-        padding: 8px !important;
-        box-sizing: border-box !important;
-        border-radius: 10px !important;
-    }
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 70px !important; width: 70px !important; flex-shrink: 0 !important; border-radius: 6px !important; }
-    .book-info, .poem-body { text-align: left !important; padding: 0 0 0 10px !important; flex: 1 !important; }
-    .book-info h3, .poem-body h3, .blog-content h4 { font-size: 0.7rem !important; margin: 0 !important; }
-    .book-author, .blog-excerpt { font-size: 0.6rem !important; margin: 0 !important; }
-
-    /* --- STACK & SHORTEN QUICK ACTIONS --- */
-    .quick-actions-grid { 
-        grid-template-columns: 1fr !important; 
-        gap: 6px !important; 
-        justify-items: center !important; 
-    }
-    .quick-action-btn { 
-        padding: 8px 4px !important; 
-        width: 100% !important; 
-        max-width: 160px !important; /* SHORTENED LIKE STATS */
-        border-radius: 8px !important;
-        margin: 0 auto !important;
-    }
-    .quick-action-btn i { font-size: 1rem !important; }
-    .quick-action-btn span { font-size: 0.6rem !important; }
-
-    /* --- CONVERT HORIZONTAL SCROLLS INTO VERTICAL SHORT CARDS --- */
-    .horizontal-scroll { 
-        display: grid !important; 
-        grid-template-columns: 1fr !important; 
-        gap: 8px !important; 
-        justify-items: center !important;
-        overflow: visible !important; 
-        padding: 0 !important; 
-    }
-    .poem-scroll-item, .blog-scroll-item, .video-scroll-item {
-        width: 100% !important;
-        max-width: 160px !important; /* SHORTENED LIKE STATS */
-        padding: 8px !important;
+        max-width: 140px !important; /* Matches the length of the stats */
+        margin: 0 auto !important;   /* Centers the shortened card */
+        padding: 6px !important;
         box-sizing: border-box !important;
         display: flex !important;
+        flex-direction: column !important;
         align-items: center !important;
-        gap: 10px !important;
+        text-align: center !important;
         border-radius: 8px !important;
     }
-    .poem-scroll-item .poem-thumbnail, .video-scroll-item .video-thumb { height: 50px !important; width: 50px !important; flex-shrink: 0 !important; }
-    .poem-scroll-item .scroll-item-body, .blog-scroll-item .blog-content { text-align: left !important; flex: 1 !important; padding: 0 !important; }
 
-    /* --- YOUR EXACT USER ROW WRAPPING --- */
+    /* --- CONTENT INSIDE THE SHORTENED CARDS --- */
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb {
+        height: 70px !important;
+        width: 70px !important;
+        flex-shrink: 0 !important;
+        margin-bottom: 4px !important;
+    }
+    .book-info h3, .poem-body h3, .blog-content h4, .scroll-item-body h4 {
+        font-size: 0.65rem !important;
+        margin: 0 !important;
+        width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .book-author, .blog-excerpt {
+        font-size: 0.55rem !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        width: 100% !important;
+    }
+
+    /* --- USER ROWS (Exactly as you requested) --- */
     .user-row {
         flex-wrap: wrap !important;
         padding: 4px 6px !important;
@@ -922,14 +917,8 @@ h1, h2, h3, h4, h5, h6 {
         padding-top: 2px !important;
         border-top: 1px dashed var(--border) !important;
     }
-    .user-row .user-role .status-badge {
-        font-size: 0.45rem !important;
-        padding: 1px 6px !important;
-    }
-    .user-row .user-role .btn-sm {
-        padding: 2px 6px !important;
-        font-size: 0.5rem !important;
-    }
+    .user-row .user-role .status-badge { font-size: 0.45rem !important; padding: 1px 6px !important; }
+    .user-row .user-role .btn-sm { padding: 2px 6px !important; font-size: 0.5rem !important; }
 
     /* --- COMPRESS HEADERS & EMPTY STATE --- */
     .section-header { flex-wrap: nowrap !important; gap: 2px !important; }
@@ -944,7 +933,6 @@ h1, h2, h3, h4, h5, h6 {
 
     /* --- PAGINATION --- */
     .pagination .page-link { padding: 2px 6px; font-size: 0.6rem; min-width: 20px; }
-    .mini-pagination .page-link { padding: 2px 4px; font-size: 0.5rem; min-width: 14px; }
 }
 </style>
 
