@@ -182,29 +182,24 @@ if ($isLoggedIn) {
 
         /* ===== DROPDOWNS ===== */
         .notification-wrapper, .search-wrapper, .user-wrapper { position: relative; }
-        .notification-dropdown, .search-dropdown, .user-dropdown {
+        .notification-dropdown, .user-dropdown {
             position: absolute; top: 130%; right: 0; background: var(--card-bg);
             border: 1px solid var(--border); border-radius: 12px; padding: 12px;
             box-shadow: var(--shadow-hover); display: none; z-index: 1002;
         }
-        .notification-dropdown.open, .search-dropdown.open, .user-dropdown.open { display: block; }
+        .notification-dropdown.open, .user-dropdown.open { display: block; }
         .notification-dropdown { width: 280px; }
-        .search-dropdown { width: 300px; display: flex; gap: 8px; }
         .user-dropdown { width: 160px; padding: 8px 0; }
         .notification-dropdown .notif-item { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
         .notification-dropdown .notif-title { font-weight: 600; }
         .notification-dropdown .notif-date { color: var(--text-light); font-size: 0.75rem; }
         .notification-dropdown .view-all { display: block; text-align: center; margin-top: 8px; color: var(--rose); font-weight: 500; }
-        .search-dropdown input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
-        .search-dropdown input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-        .search-dropdown button { background: var(--rose); color: #fff; border: none; border-radius: 8px; padding: 0 12px; cursor: pointer; transition: background 0.2s; }
-        .search-dropdown button:hover { background: var(--rose-dark); }
         .user-dropdown a { display: block; padding: 8px 16px; color: var(--text); text-decoration: none; transition: background 0.2s; font-size: 0.9rem; }
         .user-dropdown a:hover { background: rgba(219,161,162,0.1); }
         .user-dropdown hr { margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
         .user-wrapper {
             display: flex; align-items: center; gap: 4px; cursor: pointer;
-            padding: 4px 8px; border-radius: 8px; transition: background 0.2s;
+            padding: 4px 8px; border-radius: 8px; transition: background 0.2s; flex-shrink: 0;
         }
         .user-wrapper:hover { background: rgba(219,161,162,0.1); }
 
@@ -226,14 +221,13 @@ if ($isLoggedIn) {
         @media (max-width: 768px) {
             .nav-actions { gap: 4px; }
             .nav-action-icon { width: 32px; height: 32px; font-size: 0.9rem; }
-            .user-wrapper span { display: none; } /* hide username on small screens */
-            .search-dropdown { width: 260px; }
             .notification-dropdown { width: 240px; }
         }
         @media (max-width: 480px) {
-            .nav-actions { gap: 2px; }
+            .nav-actions { gap: 4px; }
             .nav-action-icon { width: 28px; height: 28px; font-size: 0.8rem; }
             .hamburger { width: 24px; height: 18px; }
+            .user-wrapper span { display: none; } /* hide username on tiny screens to prevent overflow */
         }
     </style>
 </head>
@@ -284,16 +278,11 @@ if ($isLoggedIn) {
 
                 <!-- ===== NAV ACTIONS ===== -->
                 <div class="nav-actions">
-                    <!-- Search -->
-                    <div class="search-wrapper">
-                        <button class="search-trigger nav-action-icon" aria-label="Search" onclick="document.getElementById('searchDropdown').classList.toggle('open'); document.getElementById('searchInput').focus();">
-                            <i class="fas fa-search"></i>
-                        </button>
-                        <form action="<?php echo SITE_URL; ?>/search_results.php" method="GET" class="search-dropdown" id="searchDropdown">
-                            <input type="text" name="q" placeholder="Search books, poems, blog..." autocomplete="off" id="searchInput">
-                            <button type="submit" aria-label="Submit search"><i class="fas fa-arrow-right"></i></button>
-                        </form>
-                    </div>
+                    <!-- Search (Direct link, no dropdown) -->
+                    <a href="<?php echo SITE_URL; ?>/search_results.php" class="nav-action-icon" aria-label="Search">
+                        <i class="fas fa-search"></i>
+                    </a>
+
                     <!-- Bible Reader -->
                     <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
                         <i class="fas fa-book-bible"></i>
@@ -497,9 +486,6 @@ if ($isLoggedIn) {
 
             // Close all dropdowns on outside click
             document.addEventListener('click', function(e) {
-                if (!e.target.closest('.search-wrapper')) {
-                    document.getElementById('searchDropdown').classList.remove('open');
-                }
                 if (!e.target.closest('.notification-wrapper')) {
                     document.getElementById('notificationDropdown').classList.remove('open');
                 }

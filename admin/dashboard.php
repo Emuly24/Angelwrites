@@ -550,6 +550,7 @@ $pageTitle = 'Admin Dashboard';
 </div>
 
 <style>
+<style>
 /* ================================================================
    EXISTING COMPACT CSS (Kept as is)
    ================================================================ */
@@ -703,7 +704,7 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
 .compact-empty i{font-size:1rem;color:var(--rose-light);opacity:0.8}
 
 /* ================================================================
-   ULTRA-COMPRESSED MOBILE OVERRIDES – AGGRESSIVE SHRINK
+   MOBILE OVERRIDES – REDUCE HORIZONTAL SIZE OF LONG CARDS ONLY
    ================================================================ */
 @media (max-width: 1024px) {
     .dashboard-grid { grid-template-columns: 1fr; }
@@ -721,91 +722,117 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
     .dashboard-section { padding: 16px; }
 }
 @media (max-width: 480px) {
-    /* --- FORCE NO HORIZONTAL SCROLL --- */
+    /* Prevent the whole page from scrolling sideways */
     html, body, .dashboard-page, .container {
         max-width: 100vw !important;
         overflow-x: hidden !important;
     }
-    .container { padding-left: 8px !important; padding-right: 8px !important; }
 
-    /* --- GLOBAL SHRINK --- */
-    .dashboard-page { padding: 10px 0 !important; }
-    .dashboard-section { padding: 6px 8px !important; border-radius: 6px !important; }
-    .section-header { flex-direction: column !important; align-items: stretch !important; gap: 4px !important; }
-    .section-header h2 { font-size: 0.8rem !important; }
-    .section-actions .btn { padding: 2px 8px !important; font-size: 0.6rem !important; }
-
-    /* --- GRIDS (FORCE 1 COLUMN) --- */
-    .dashboard-grid, .recent-content-grid, .bottom-row, .alert-row {
-        grid-template-columns: 1fr !important;
-        gap: 8px !important;
+    /* --- QUICK ACTIONS (Force 50% width and prevent overflow) --- */
+    .quick-actions-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+        width: 100% !important;
     }
-    .stats-row { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
+    .quick-action-btn {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 10px 4px !important;
+    }
+    .quick-action-btn i {
+        font-size: 1.2rem !important;
+    }
+    .quick-action-btn span {
+        font-size: 0.7rem !important;
+    }
 
-    /* --- HERO --- */
-    .dashboard-hero { padding: 10px !important; flex-direction: column !important; gap: 8px !important; }
-    .hero-content h1 { font-size: 1.1rem !important; }
-    .hero-content .hero-sub { font-size: 0.75rem !important; }
-    .hero-stats { justify-content: center !important; gap: 4px !important; }
-    .hero-stat { font-size: 0.6rem !important; padding: 2px 6px !important; }
-    .hero-profile { width: 100% !important; justify-content: flex-start !important; }
-    .profile-pic-large { width: 40px !important; height: 40px !important; }
-    .profile-pic-large i { font-size: 1.2rem !important; }
-    .profile-details h3 { font-size: 0.8rem !important; }
-    .profile-details .user-email { font-size: 0.6rem !important; }
+    /* --- NEWEST USERS (Force email to wrap/truncate and keep delete button inside) --- */
+    .user-row {
+        flex-wrap: wrap !important;
+        padding: 8px 10px !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+    .user-row .user-name {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        word-break: break-word !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        font-size: 0.85rem !important;
+    }
+    .user-row .user-role {
+        width: 100% !important;
+        justify-content: flex-end !important;
+        display: flex !important;
+        gap: 6px !important;
+        margin-top: 2px !important;
+    }
+    .user-row .btn-sm {
+        flex-shrink: 0 !important;
+        padding: 4px 10px !important;
+        font-size: 0.7rem !important;
+    }
+    .user-row .status-badge {
+        font-size: 0.6rem !important;
+        padding: 2px 8px !important;
+    }
 
-    /* --- STATS --- */
-    .stat-card { padding: 2px 4px !important; min-height: 24px !important; border-radius: 3px !important; }
-    .stat-icon { width: 12px !important; height: 12px !important; font-size: 0.35rem !important; }
-    .stat-number { font-size: 0.6rem !important; }
-    .stat-label { font-size: 0.3rem !important; letter-spacing: 0 !important; }
+    /* --- RECENT READING (Stop long titles from pushing off-screen) --- */
+    .achievement-item {
+        flex-wrap: nowrap !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 8px 10px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .achievement-item .achievement-name,
+    .achievement-item .achievement-date {
+        min-width: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+    }
+    .achievement-item .achievement-name {
+        flex: 1 1 0 !important;
+        font-size: 0.85rem !important;
+    }
+    .achievement-item .achievement-date {
+        flex: 0 0 auto !important;
+        margin-left: 6px !important;
+        max-width: 40% !important;
+        font-size: 0.7rem !important;
+    }
 
-    /* --- BOOKS & MINI GRID --- */
-    .mini-grid { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 50px !important; }
-    .book-info, .poem-body, .blog-content, .reflection-body, .video-info { padding: 2px !important; }
-    .book-info h3, .poem-body h3, .blog-content h3 { font-size: 0.5rem !important; }
-    .book-author, .blog-excerpt { font-size: 0.4rem !important; }
+    /* --- HORIZONTAL SCROLLS (Poems, Blog, Videos) --- */
+    .horizontal-scroll {
+        width: 100% !important;
+        padding: 2px 0 !important;
+        gap: 8px !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    .poem-scroll-item { width: 80px !important; flex-shrink: 0 !important; }
+    .poem-scroll-item .poem-thumbnail { width: 60px !important; height: 60px !important; }
+    .poem-scroll-item .scroll-item-body h4 { font-size: 0.7rem !important; }
+    
+    .blog-scroll-item { width: 140px !important; padding: 6px !important; flex-shrink: 0 !important; }
+    .blog-scroll-item .blog-content h4 { font-size: 0.8rem !important; }
+    
+    .video-scroll-item { width: 90px !important; flex-shrink: 0 !important; }
+    .video-scroll-item .video-thumb { height: 45px !important; }
 
-    /* --- QUICK ACTIONS --- */
-    .quick-actions-grid { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
-    .quick-action-btn { padding: 4px 2px !important; border-radius: 4px !important; }
-    .quick-action-btn i { font-size: 0.7rem !important; }
-    .quick-action-btn span { font-size: 0.4rem !important; }
-
-    /* --- USER ROWS --- */
-    .user-row { flex-direction: row !important; flex-wrap: wrap !important; padding: 2px 4px !important; gap: 2px !important; }
-    .user-row .user-name { flex: 1 1 100% !important; font-size: 0.55rem !important; word-break: break-word !important; }
-    .user-row .user-role { width: 100% !important; margin-right: 0 !important; justify-content: flex-end !important; gap: 2px !important; }
-    .user-row .status-badge { font-size: 0.4rem !important; padding: 1px 4px !important; }
-    .user-row .btn-sm { padding: 1px 4px !important; font-size: 0.4rem !important; min-width: 12px !important; }
-    .user-row .btn-sm i { font-size: 0.4rem !important; }
-
-    /* --- SIDEBAR --- */
-    .dashboard-sidebar { gap: 8px !important; }
-    .sidebar-card { padding: 6px 8px !important; }
-    .sidebar-card .card-header h4 { font-size: 0.7rem !important; }
-    .achievement-item { padding: 2px 4px !important; flex-wrap: nowrap !important; gap: 2px !important; }
-    .achievement-item .achievement-name { max-width: 50% !important; font-size: 0.55rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-    .achievement-item .achievement-date { max-width: 45% !important; font-size: 0.45rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-    .achievement-icon { font-size: 0.6rem !important; }
-
-    /* --- HORIZONTAL SCROLL --- */
-    .horizontal-scroll { gap: 4px !important; padding-bottom: 2px !important; }
-    .poem-scroll-item { width: 60px !important; }
-    .poem-scroll-item .poem-thumbnail { width: 40px !important; height: 40px !important; }
-    .poem-scroll-item .scroll-item-body h4 { font-size: 0.4rem !important; }
-    .blog-scroll-item { width: 100px !important; padding: 2px !important; }
-    .video-scroll-item { width: 70px !important; }
-    .video-scroll-item .video-thumb { height: 35px !important; }
-
-    /* --- PAGINATION --- */
-    .pagination .page-link { padding: 2px 4px !important; font-size: 0.5rem !important; min-width: 14px !important; }
-    .mini-pagination .page-link { padding: 1px 3px !important; font-size: 0.4rem !important; min-width: 10px !important; }
-
-    /* --- EMPTY STATES --- */
-    .compact-empty { font-size: 0.6rem !important; padding: 4px 0 !important; }
-    .empty-state-icon { font-size: 1.2rem !important; }
+    /* --- STATS ROW (Tighten gap to fit 2 columns perfectly) --- */
+    .stats-row {
+        gap: 6px !important;
+    }
+    .stat-card {
+        min-width: 0 !important;
+        width: 100% !important;
+        padding: 6px 8px !important;
+    }
 }
 </style>
 
