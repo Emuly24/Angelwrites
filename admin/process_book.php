@@ -990,7 +990,7 @@ if (!file_exists($file_path)) {
     exit;
 }
     $raw_text = extractRawText($file_path);
-    if ($raw_text && !str_starts_with($raw_text, '⚠️')) {
+    if ($raw_text && strpos($raw_text, '⚠️') !== 0) {
         $raw_text = fixEncoding($raw_text);
         $pages = splitPagesByNumbers($raw_text);
         $toc = generateTOC($pages);
