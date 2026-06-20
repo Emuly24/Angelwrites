@@ -837,16 +837,43 @@ h1, h2, h3, h4, h5, h6 {
     .hero-stats { gap: 6px; }
     .hero-stat { font-size: 0.7rem; padding: 4px 8px; }
 
-    /* --- SINGLE COLUMN WRAPPER FOR ALL CARDS AFTER STATS --- */
-    .recent-content-grid, .bottom-row, .alert-row,
-    .quick-actions-grid, .mini-grid, .horizontal-scroll,
-    .dashboard-sidebar {
+    /* --- SINGLE COLUMN WRAPPER FOR THE ENTIRE PAGE --- */
+    .dashboard-grid {
         display: grid !important;
-        grid-template-columns: 1fr !important; /* Stacks everything in one column */
-        width: 92% !important; /* Matches the stats aesthetic (slightly shorter than screen) */
+        grid-template-columns: 1fr !important;
+        width: 92% !important; /* Stat-like centered width */
         max-width: 420px !important; /* Prevents stretching on larger phones */
-        margin: 0 auto !important; /* Centers the whole column beautifully */
+        margin: 0 auto !important; /* Centers the column beautifully */
+        gap: 12px !important;
+    }
+
+    /* --- SIDEBAR MOVED TO THE TOP OF THE SINGLE COLUMN --- */
+    .dashboard-sidebar {
+        order: -1 !important; /* Forces Quick Actions & Active Readers to the absolute top */
+        width: 100% !important;
+        min-width: 0 !important;
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* --- MAIN CONTENT FLOWS BELOW --- */
+    .main-content {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+
+    /* --- STACK ALL SUB-GRIDS INSIDE MAIN CONTENT --- */
+    .recent-content-grid, .bottom-row, .alert-row,
+    .quick-actions-grid, .mini-grid, .horizontal-scroll {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
         gap: 8px !important;
+        width: 100% !important;
+        margin: 0 !important;
     }
 
     /* --- CONVERT HORIZONTAL SCROLLS TO VERTICAL STACK --- */
