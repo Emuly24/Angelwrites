@@ -900,7 +900,49 @@ h1, h2, h3, h4, h5, h6 {
     .quick-action-btn i { font-size: 1rem; }
     .quick-action-btn span { font-size: 0.6rem; }
     
-    .section-header h2 { font-size: 1rem; }
+    /* --- SHRINK HORIZONTAL BUTTONS & HEADERS --- */
+    .section-header {
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+    }
+    .section-header h2 {
+        font-size: 0.85rem !important;
+        gap: 4px !important;
+        flex-shrink: 1 !important;
+    }
+    .section-header h2 .section-icon {
+        font-size: 0.8rem !important;
+    }
+    .section-actions .btn,
+    .section-header .btn-outline,
+    .section-header .btn-sm {
+        padding: 2px 10px !important;
+        font-size: 0.6rem !important;
+        border-radius: 12px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* --- SHRINK HORIZONTAL EMPTY STATE ROWS --- */
+    .session-item,
+    .compact-empty {
+        padding: 6px 8px !important;
+        font-size: 0.7rem !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+    .compact-empty i {
+        font-size: 0.8rem !important;
+    }
+    .session-item .session-info {
+        font-size: 0.7rem !important;
+    }
+    .session-item .status-badge {
+        font-size: 0.5rem !important;
+        padding: 1px 6px !important;
+    }
     
     .pagination .page-link { padding: 4px 8px; font-size: 0.7rem; min-width: 24px; }
     .mini-pagination .page-link { padding: 2px 6px; font-size: 0.65rem; min-width: 18px; }
