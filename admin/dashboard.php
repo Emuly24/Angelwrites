@@ -703,7 +703,7 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
 .compact-empty i{font-size:1rem;color:var(--rose-light);opacity:0.8}
 
 /* ================================================================
-   COMPRESSED MOBILE OVERRIDES – SHRIEK THE PAGE TO FIT
+   ULTRA-COMPRESSED MOBILE OVERRIDES – AGGRESSIVE SHRINK
    ================================================================ */
 @media (max-width: 1024px) {
     .dashboard-grid { grid-template-columns: 1fr; }
@@ -721,83 +721,91 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
     .dashboard-section { padding: 16px; }
 }
 @media (max-width: 480px) {
+    /* --- FORCE NO HORIZONTAL SCROLL --- */
+    html, body, .dashboard-page, .container {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+    .container { padding-left: 8px !important; padding-right: 8px !important; }
+
     /* --- GLOBAL SHRINK --- */
-    .dashboard-page { padding: 15px 0; }
-    .container { padding-left: 10px; padding-right: 10px; }
-    .dashboard-section { padding: 10px !important; border-radius: 8px !important; }
-    .section-header { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
-    .section-header h2 { font-size: 0.9rem !important; }
-    .section-actions .btn { padding: 4px 10px !important; font-size: 0.7rem !important; }
+    .dashboard-page { padding: 10px 0 !important; }
+    .dashboard-section { padding: 6px 8px !important; border-radius: 6px !important; }
+    .section-header { flex-direction: column !important; align-items: stretch !important; gap: 4px !important; }
+    .section-header h2 { font-size: 0.8rem !important; }
+    .section-actions .btn { padding: 2px 8px !important; font-size: 0.6rem !important; }
 
     /* --- GRIDS (FORCE 1 COLUMN) --- */
     .dashboard-grid, .recent-content-grid, .bottom-row, .alert-row {
         grid-template-columns: 1fr !important;
-        gap: 12px !important;
+        gap: 8px !important;
     }
-    .stats-row { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
+    .stats-row { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
 
     /* --- HERO --- */
-    .dashboard-hero { padding: 16px !important; flex-direction: column !important; gap: 12px !important; }
-    .hero-content h1 { font-size: 1.3rem !important; }
-    .hero-content .hero-sub { font-size: 0.9rem !important; }
-    .hero-stats { justify-content: center !important; gap: 6px !important; }
-    .hero-stat { font-size: 0.7rem !important; padding: 2px 8px !important; }
-    .hero-profile { width: 100% !important; justify-content: space-between !important; }
-    .profile-pic-large { width: 48px !important; height: 48px !important; }
-    .profile-pic-large i { font-size: 1.6rem !important; }
-    .profile-details h3 { font-size: 0.9rem !important; }
-    .profile-details .user-email { font-size: 0.7rem !important; }
+    .dashboard-hero { padding: 10px !important; flex-direction: column !important; gap: 8px !important; }
+    .hero-content h1 { font-size: 1.1rem !important; }
+    .hero-content .hero-sub { font-size: 0.75rem !important; }
+    .hero-stats { justify-content: center !important; gap: 4px !important; }
+    .hero-stat { font-size: 0.6rem !important; padding: 2px 6px !important; }
+    .hero-profile { width: 100% !important; justify-content: flex-start !important; }
+    .profile-pic-large { width: 40px !important; height: 40px !important; }
+    .profile-pic-large i { font-size: 1.2rem !important; }
+    .profile-details h3 { font-size: 0.8rem !important; }
+    .profile-details .user-email { font-size: 0.6rem !important; }
 
     /* --- STATS --- */
-    .stat-card { padding: 4px 6px !important; min-height: 32px !important; border-radius: 4px !important; }
-    .stat-icon { width: 14px !important; height: 14px !important; font-size: 0.4rem !important; }
-    .stat-number { font-size: 0.65rem !important; }
-    .stat-label { font-size: 0.35rem !important; letter-spacing: 0 !important; }
+    .stat-card { padding: 2px 4px !important; min-height: 24px !important; border-radius: 3px !important; }
+    .stat-icon { width: 12px !important; height: 12px !important; font-size: 0.35rem !important; }
+    .stat-number { font-size: 0.6rem !important; }
+    .stat-label { font-size: 0.3rem !important; letter-spacing: 0 !important; }
 
     /* --- BOOKS & MINI GRID --- */
-    .mini-grid { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 60px !important; }
-    .book-info, .poem-body, .blog-content, .reflection-body, .video-info { padding: 4px !important; }
-    .book-info h3, .poem-body h3, .blog-content h3 { font-size: 0.6rem !important; }
-    .book-author, .blog-excerpt { font-size: 0.5rem !important; }
+    .mini-grid { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 50px !important; }
+    .book-info, .poem-body, .blog-content, .reflection-body, .video-info { padding: 2px !important; }
+    .book-info h3, .poem-body h3, .blog-content h3 { font-size: 0.5rem !important; }
+    .book-author, .blog-excerpt { font-size: 0.4rem !important; }
 
-    /* --- QUICK ACTIONS (FORCE 1fr 1fr, no gaps) --- */
-    .quick-actions-grid { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
-    .quick-action-btn { padding: 6px 4px !important; border-radius: 6px !important; }
-    .quick-action-btn i { font-size: 0.8rem !important; }
-    .quick-action-btn span { font-size: 0.5rem !important; }
+    /* --- QUICK ACTIONS --- */
+    .quick-actions-grid { grid-template-columns: 1fr 1fr !important; gap: 2px !important; }
+    .quick-action-btn { padding: 4px 2px !important; border-radius: 4px !important; }
+    .quick-action-btn i { font-size: 0.7rem !important; }
+    .quick-action-btn span { font-size: 0.4rem !important; }
 
-    /* --- USER ROWS (Fix the cut off delete button) --- */
-    .user-row { flex-direction: row !important; flex-wrap: wrap !important; padding: 4px 6px !important; gap: 2px !important; }
-    .user-row .user-name { flex: 1 1 100% !important; font-size: 0.65rem !important; word-break: break-word !important; }
-    .user-row .user-role { width: 100% !important; margin-right: 0 !important; justify-content: flex-end !important; gap: 4px !important; }
-    .user-row .status-badge { font-size: 0.5rem !important; padding: 1px 6px !important; }
-    .user-row .btn-sm { padding: 2px 6px !important; font-size: 0.5rem !important; min-width: 16px !important; }
-    .user-row .btn-sm i { font-size: 0.5rem !important; }
+    /* --- USER ROWS --- */
+    .user-row { flex-direction: row !important; flex-wrap: wrap !important; padding: 2px 4px !important; gap: 2px !important; }
+    .user-row .user-name { flex: 1 1 100% !important; font-size: 0.55rem !important; word-break: break-word !important; }
+    .user-row .user-role { width: 100% !important; margin-right: 0 !important; justify-content: flex-end !important; gap: 2px !important; }
+    .user-row .status-badge { font-size: 0.4rem !important; padding: 1px 4px !important; }
+    .user-row .btn-sm { padding: 1px 4px !important; font-size: 0.4rem !important; min-width: 12px !important; }
+    .user-row .btn-sm i { font-size: 0.4rem !important; }
 
-    /* --- SIDEBAR & ACHIEVEMENTS (Fix long text overflow) --- */
-    .dashboard-sidebar { gap: 12px !important; }
-    .sidebar-card { padding: 8px 10px !important; }
-    .sidebar-card .card-header h4 { font-size: 0.8rem !important; }
-    .achievement-item { padding: 4px 6px !important; flex-wrap: nowrap !important; gap: 4px !important; }
-    .achievement-item .achievement-name { max-width: 55% !important; font-size: 0.65rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-    .achievement-item .achievement-date { max-width: 40% !important; font-size: 0.55rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-    .achievement-icon { font-size: 0.8rem !important; }
+    /* --- SIDEBAR --- */
+    .dashboard-sidebar { gap: 8px !important; }
+    .sidebar-card { padding: 6px 8px !important; }
+    .sidebar-card .card-header h4 { font-size: 0.7rem !important; }
+    .achievement-item { padding: 2px 4px !important; flex-wrap: nowrap !important; gap: 2px !important; }
+    .achievement-item .achievement-name { max-width: 50% !important; font-size: 0.55rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    .achievement-item .achievement-date { max-width: 45% !important; font-size: 0.45rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    .achievement-icon { font-size: 0.6rem !important; }
 
-    /* --- HORIZONTAL SCROLL ITEMS --- */
-    .horizontal-scroll { gap: 6px !important; }
-    .poem-scroll-item { width: 70px !important; }
-    .poem-scroll-item .poem-thumbnail { width: 50px !important; height: 50px !important; }
-    .poem-scroll-item .scroll-item-body h4 { font-size: 0.5rem !important; }
-    .blog-scroll-item { width: 120px !important; padding: 4px !important; }
-    .video-scroll-item { width: 80px !important; }
-    .video-scroll-item .video-thumb { height: 40px !important; }
+    /* --- HORIZONTAL SCROLL --- */
+    .horizontal-scroll { gap: 4px !important; padding-bottom: 2px !important; }
+    .poem-scroll-item { width: 60px !important; }
+    .poem-scroll-item .poem-thumbnail { width: 40px !important; height: 40px !important; }
+    .poem-scroll-item .scroll-item-body h4 { font-size: 0.4rem !important; }
+    .blog-scroll-item { width: 100px !important; padding: 2px !important; }
+    .video-scroll-item { width: 70px !important; }
+    .video-scroll-item .video-thumb { height: 35px !important; }
 
-    /* --- MISC --- */
-    .pagination .page-link { padding: 2px 6px !important; font-size: 0.6rem !important; min-width: 18px !important; }
-    .mini-pagination .page-link { padding: 2px 4px !important; font-size: 0.5rem !important; min-width: 14px !important; }
-    .compact-empty { font-size: 0.7rem !important; padding: 8px 0 !important; }
-    .empty-state-icon { font-size: 1.5rem !important; }
+    /* --- PAGINATION --- */
+    .pagination .page-link { padding: 2px 4px !important; font-size: 0.5rem !important; min-width: 14px !important; }
+    .mini-pagination .page-link { padding: 1px 3px !important; font-size: 0.4rem !important; min-width: 10px !important; }
+
+    /* --- EMPTY STATES --- */
+    .compact-empty { font-size: 0.6rem !important; padding: 4px 0 !important; }
+    .empty-state-icon { font-size: 1.2rem !important; }
 }
 </style>
 

@@ -285,9 +285,15 @@ if ($isLoggedIn) {
                 <!-- ===== NAV ACTIONS ===== -->
                 <div class="nav-actions">
                     <!-- Search -->
-                    <a href="<?php echo SITE_URL; ?>/search_results.php" class="nav-action-icon" aria-label="Search">
-                        <i class="fas fa-search"></i>
-                    </a>
+                    <div class="search-wrapper">
+                        <button class="search-trigger nav-action-icon" aria-label="Search" onclick="document.getElementById('searchDropdown').classList.toggle('open'); document.getElementById('searchInput').focus();">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <form action="<?php echo SITE_URL; ?>/search_results.php" method="GET" class="search-dropdown" id="searchDropdown">
+                            <input type="text" name="q" placeholder="Search books, poems, blog..." autocomplete="off" id="searchInput">
+                            <button type="submit" aria-label="Submit search"><i class="fas fa-arrow-right"></i></button>
+                        </form>
+                    </div>
                     <!-- Bible Reader -->
                     <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
                         <i class="fas fa-book-bible"></i>
