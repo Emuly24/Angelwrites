@@ -983,12 +983,11 @@ function generateFullHistoryReport($history_content, $book_id) {
 if (isset($_POST['extract'])) {
     header('Content-Type: application/json');
     ob_clean();
-   $base = realpath(__DIR__ . '/../');  
-$file_path = $base . '/' . $book['file_path'];
-if (!file_exists($file_path)) {
-    echo json_encode(['success' => false, 'error' => 'Book file not found at: ' . $file_path]);
-    exit;
-}
+    $file_path = '../' . $book['file_path'];
+    if (!file_exists($file_path)) {
+        echo json_encode(['success' => false, 'error' => 'Book file not found.']);
+        exit;
+    }
     $raw_text = extractRawText($file_path);
     if ($raw_text && strpos($raw_text, '⚠️') !== 0) {
         $raw_text = fixEncoding($raw_text);
