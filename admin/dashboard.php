@@ -701,10 +701,61 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
 .empty-state p{margin:0;font-size:0.95rem}
 .compact-empty{display:flex;align-items:center;gap:8px;padding:16px 0;color:var(--text-light);font-size:0.9rem}
 .compact-empty i{font-size:1rem;color:var(--rose-light);opacity:0.8}
-@media(max-width:1024px){.dashboard-grid{grid-template-columns:1fr}.recent-content-grid{grid-template-columns:1fr 1fr}.bottom-row{grid-template-columns:1fr}}
-@media(max-width:992px){.hero-content h1{font-size:2rem}.hero-content .hero-sub{font-size:1rem}.hero-stats{justify-content:center}}
-@media(max-width:768px){.alert-row{grid-template-columns:1fr}.recent-content-grid{grid-template-columns:1fr}.bottom-row{grid-template-columns:1fr}.user-row{flex-direction:column;align-items:stretch;gap:4px}.user-row .user-role{margin-right:0;display:flex;justify-content:space-between;align-items:center}.profile-pic-large{width:60px;height:60px}.hero-content h1{font-size:1.8rem}.quick-actions-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:480px){.stats-row{grid-template-columns:1fr 1fr;gap:8px}.book-cover-wrapper,.poem-thumbnail,.video-thumb{height:100px}.mini-grid{grid-template-columns:1fr 1fr;gap:8px}}
+
+/* ================================================================
+   MOBILE OVERRIDES – Fix cutting off and overflow
+   ================================================================ */
+@media (max-width: 1024px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .recent-content-grid { grid-template-columns: 1fr 1fr; }
+    .bottom-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 992px) {
+    .hero-content h1 { font-size: 2rem; }
+    .hero-content .hero-sub { font-size: 1rem; }
+    .hero-stats { justify-content: center; }
+}
+@media (max-width: 768px) {
+    .alert-row { grid-template-columns: 1fr; }
+    .recent-content-grid { grid-template-columns: 1fr; }
+    .bottom-row { grid-template-columns: 1fr; }
+    .user-row { flex-direction: column; align-items: stretch; gap: 4px; }
+    .user-row .user-role { margin-right: 0; display: flex; justify-content: space-between; align-items: center; }
+    .profile-pic-large { width: 60px; height: 60px; }
+    .hero-content h1 { font-size: 1.8rem; }
+    .quick-actions-grid { grid-template-columns: 1fr 1fr; }
+    .stats-row { grid-template-columns: repeat(3,1fr); gap: 6px; }
+}
+@media (max-width: 480px) {
+    .stats-row { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stat-card { padding: 6px 8px; min-height: 45px; }
+    .stat-number { font-size: 0.9rem; }
+    .stat-label { font-size: 0.5rem; }
+    .stat-icon { width: 24px; height: 24px; font-size: 0.7rem; }
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 80px; }
+    .mini-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .book-card, .poem-card, .blog-card, .reflection-card, .video-card { border-radius: 8px; }
+    .book-info h3, .poem-body h3, .blog-content h3, .reflection-body h3, .video-info h3 { font-size: 0.75rem; }
+    .book-author { font-size: 0.65rem; }
+    .blog-excerpt { font-size: 0.65rem; }
+    .dashboard-section { padding: 16px; }
+    .section-header h2 { font-size: 1rem; }
+    .quick-action-btn { padding: 8px 4px; }
+    .quick-action-btn i { font-size: 1rem; }
+    .quick-action-btn span { font-size: 0.6rem; }
+    .hero-content h1 { font-size: 1.4rem; }
+    .hero-profile { flex-direction: column; align-items: flex-start; }
+    .hero-stat { font-size: 0.7rem; padding: 4px 10px; }
+    .pagination .page-link { padding: 4px 8px; font-size: 0.7rem; min-width: 24px; }
+    .mini-pagination .page-link { padding: 2px 6px; font-size: 0.65rem; min-width: 20px; }
+    .horizontal-scroll { gap: 6px; }
+    .poem-scroll-item { width: 80px; }
+    .poem-scroll-item .poem-thumbnail { width: 60px; height: 60px; }
+    .poem-scroll-item .scroll-item-body h4 { font-size: 0.6rem; }
+    .blog-scroll-item { width: 140px; }
+    .video-scroll-item { width: 100px; }
+    .video-scroll-item .video-thumb { height: 50px; }
+}
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
