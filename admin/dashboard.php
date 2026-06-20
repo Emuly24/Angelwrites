@@ -551,7 +551,7 @@ $pageTitle = 'Admin Dashboard';
 
 <style>
 /* ================================================================
-   COMPACT CSS (Full dashboard styling)
+   EXISTING COMPACT CSS (Kept as is)
    ================================================================ */
 :root{--rose:#DBA1A2;--rose-dark:#c08a8b;--rose-light:#e8c0c0;--vanilla:#EFD8D6;--fantasy:#F7F3ED;--white:#fff;--dark:#2c1e1e;--text:#3d2e2e;--text-light:#6b5a5a;--bg:#F7F3ED;--card-bg:#fff;--border:#e5d5d5;--shadow:0 4px 16px rgba(44,30,30,0.06);--shadow-hover:0 8px 30px rgba(44,30,30,0.10);--shadow-lg:0 16px 48px rgba(44,30,30,0.10);--transition:0.3s cubic-bezier(0.4,0,0.2,1)}
 [data-theme="dark"]{--bg:#1a1212;--card-bg:#2c1e1e;--text:#e8dddd;--text-light:#a08a8a;--border:#4a3a3a;--vanilla:#2c1e1e;--fantasy:#2c1e1e;--shadow:0 4px 16px rgba(0,0,0,0.5);--shadow-hover:0 8px 30px rgba(0,0,0,0.7)}
@@ -703,85 +703,102 @@ h1,h2,h3,h4,h5,h6{font-family:'Playfair Display',Georgia,serif;color:var(--dark)
 .compact-empty i{font-size:1rem;color:var(--rose-light);opacity:0.8}
 
 /* ================================================================
-   MOBILE OVERRIDES – ensures EVERYTHING fits without cutting
+   COMPRESSED MOBILE OVERRIDES – SHRIEK THE PAGE TO FIT
    ================================================================ */
 @media (max-width: 1024px) {
     .dashboard-grid { grid-template-columns: 1fr; }
     .recent-content-grid { grid-template-columns: 1fr 1fr; }
     .bottom-row { grid-template-columns: 1fr; }
-}
-@media (max-width: 992px) {
-    .hero-content h1 { font-size: 2rem; }
-    .hero-content .hero-sub { font-size: 1rem; }
-    .hero-stats { justify-content: center; }
+    .dashboard-sidebar { width: 100%; min-width: 0; }
 }
 @media (max-width: 768px) {
     .alert-row { grid-template-columns: 1fr; }
     .recent-content-grid { grid-template-columns: 1fr; }
     .bottom-row { grid-template-columns: 1fr; }
-    .user-row { flex-direction: column; align-items: stretch; gap: 4px; }
-    .user-row .user-role { margin-right: 0; display: flex; justify-content: space-between; align-items: center; }
     .profile-pic-large { width: 60px; height: 60px; }
     .hero-content h1 { font-size: 1.8rem; }
-    .quick-actions-grid { grid-template-columns: 1fr 1fr; }
     .stats-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .dashboard-section { padding: 16px; }
 }
 @media (max-width: 480px) {
-    /* Force all stat cards into 2 columns */
-    .stats-row { grid-template-columns: 1fr 1fr; gap: 6px; }
-    .stat-card { padding: 6px 8px; min-height: 40px; border-radius: 6px; }
-    .stat-icon { width: 20px; height: 20px; font-size: 0.6rem; }
-    .stat-number { font-size: 0.85rem; }
-    .stat-label { font-size: 0.45rem; letter-spacing: 0; }
+    /* --- GLOBAL SHRINK --- */
+    .dashboard-page { padding: 15px 0; }
+    .container { padding-left: 10px; padding-right: 10px; }
+    .dashboard-section { padding: 10px !important; border-radius: 8px !important; }
+    .section-header { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+    .section-header h2 { font-size: 0.9rem !important; }
+    .section-actions .btn { padding: 4px 10px !important; font-size: 0.7rem !important; }
 
-    /* Hero section */
-    .dashboard-hero { flex-direction: column; align-items: stretch; padding: 16px; }
-    .hero-content h1 { font-size: 1.4rem; }
-    .hero-profile { flex-direction: row; justify-content: flex-start; gap: 12px; }
-    .profile-pic-large { width: 50px; height: 50px; }
-    .profile-pic-large i { font-size: 2rem; }
-    .profile-details h3 { font-size: 1rem; }
-    .profile-details .user-email { font-size: 0.75rem; }
-    .hero-stat { font-size: 0.65rem; padding: 4px 8px; }
+    /* --- GRIDS (FORCE 1 COLUMN) --- */
+    .dashboard-grid, .recent-content-grid, .bottom-row, .alert-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+    .stats-row { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
 
-    /* Sections */
-    .dashboard-section { padding: 12px; }
-    .section-header h2 { font-size: 0.95rem; }
-    .section-header .btn { font-size: 0.7rem; padding: 4px 12px; }
+    /* --- HERO --- */
+    .dashboard-hero { padding: 16px !important; flex-direction: column !important; gap: 12px !important; }
+    .hero-content h1 { font-size: 1.3rem !important; }
+    .hero-content .hero-sub { font-size: 0.9rem !important; }
+    .hero-stats { justify-content: center !important; gap: 6px !important; }
+    .hero-stat { font-size: 0.7rem !important; padding: 2px 8px !important; }
+    .hero-profile { width: 100% !important; justify-content: space-between !important; }
+    .profile-pic-large { width: 48px !important; height: 48px !important; }
+    .profile-pic-large i { font-size: 1.6rem !important; }
+    .profile-details h3 { font-size: 0.9rem !important; }
+    .profile-details .user-email { font-size: 0.7rem !important; }
 
-    /* Mini grid for books/poems */
-    .mini-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
-    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 80px; }
-    .book-info h3, .poem-body h3, .blog-content h3, .reflection-body h3, .video-info h3 { font-size: 0.7rem; }
-    .book-author, .blog-excerpt { font-size: 0.6rem; }
+    /* --- STATS --- */
+    .stat-card { padding: 4px 6px !important; min-height: 32px !important; border-radius: 4px !important; }
+    .stat-icon { width: 14px !important; height: 14px !important; font-size: 0.4rem !important; }
+    .stat-number { font-size: 0.65rem !important; }
+    .stat-label { font-size: 0.35rem !important; letter-spacing: 0 !important; }
 
-    /* Horizontal scroll items */
-    .poem-scroll-item { width: 80px; }
-    .poem-scroll-item .poem-thumbnail { width: 60px; height: 60px; }
-    .poem-scroll-item .scroll-item-body h4 { font-size: 0.6rem; }
-    .blog-scroll-item { width: 140px; padding: 6px; }
-    .video-scroll-item { width: 100px; }
-    .video-scroll-item .video-thumb { height: 50px; }
+    /* --- BOOKS & MINI GRID --- */
+    .mini-grid { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
+    .book-cover-wrapper, .poem-thumbnail, .video-thumb { height: 60px !important; }
+    .book-info, .poem-body, .blog-content, .reflection-body, .video-info { padding: 4px !important; }
+    .book-info h3, .poem-body h3, .blog-content h3 { font-size: 0.6rem !important; }
+    .book-author, .blog-excerpt { font-size: 0.5rem !important; }
 
-    /* Quick actions */
-    .quick-actions-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
-    .quick-action-btn { padding: 6px 4px; }
-    .quick-action-btn i { font-size: 0.9rem; }
-    .quick-action-btn span { font-size: 0.5rem; }
+    /* --- QUICK ACTIONS (FORCE 1fr 1fr, no gaps) --- */
+    .quick-actions-grid { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
+    .quick-action-btn { padding: 6px 4px !important; border-radius: 6px !important; }
+    .quick-action-btn i { font-size: 0.8rem !important; }
+    .quick-action-btn span { font-size: 0.5rem !important; }
 
-    /* Pagination */
-    .pagination .page-link { padding: 4px 6px; font-size: 0.65rem; min-width: 20px; }
-    .mini-pagination .page-link { padding: 2px 4px; font-size: 0.6rem; min-width: 16px; }
+    /* --- USER ROWS (Fix the cut off delete button) --- */
+    .user-row { flex-direction: row !important; flex-wrap: wrap !important; padding: 4px 6px !important; gap: 2px !important; }
+    .user-row .user-name { flex: 1 1 100% !important; font-size: 0.65rem !important; word-break: break-word !important; }
+    .user-row .user-role { width: 100% !important; margin-right: 0 !important; justify-content: flex-end !important; gap: 4px !important; }
+    .user-row .status-badge { font-size: 0.5rem !important; padding: 1px 6px !important; }
+    .user-row .btn-sm { padding: 2px 6px !important; font-size: 0.5rem !important; min-width: 16px !important; }
+    .user-row .btn-sm i { font-size: 0.5rem !important; }
 
-    /* Sidebar */
-    .sidebar-card { padding: 12px; }
-    .sidebar-card .card-header h4 { font-size: 0.9rem; }
+    /* --- SIDEBAR & ACHIEVEMENTS (Fix long text overflow) --- */
+    .dashboard-sidebar { gap: 12px !important; }
+    .sidebar-card { padding: 8px 10px !important; }
+    .sidebar-card .card-header h4 { font-size: 0.8rem !important; }
+    .achievement-item { padding: 4px 6px !important; flex-wrap: nowrap !important; gap: 4px !important; }
+    .achievement-item .achievement-name { max-width: 55% !important; font-size: 0.65rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    .achievement-item .achievement-date { max-width: 40% !important; font-size: 0.55rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    .achievement-icon { font-size: 0.8rem !important; }
 
-    /* Misc */
-    .horizontal-scroll { gap: 6px; }
-    .user-row .user-name { font-size: 0.75rem; }
-    .user-row .user-name small { font-size: 0.65rem; }
-    .status-badge { font-size: 0.55rem; padding: 1px 6px; }
+    /* --- HORIZONTAL SCROLL ITEMS --- */
+    .horizontal-scroll { gap: 6px !important; }
+    .poem-scroll-item { width: 70px !important; }
+    .poem-scroll-item .poem-thumbnail { width: 50px !important; height: 50px !important; }
+    .poem-scroll-item .scroll-item-body h4 { font-size: 0.5rem !important; }
+    .blog-scroll-item { width: 120px !important; padding: 4px !important; }
+    .video-scroll-item { width: 80px !important; }
+    .video-scroll-item .video-thumb { height: 40px !important; }
+
+    /* --- MISC --- */
+    .pagination .page-link { padding: 2px 6px !important; font-size: 0.6rem !important; min-width: 18px !important; }
+    .mini-pagination .page-link { padding: 2px 4px !important; font-size: 0.5rem !important; min-width: 14px !important; }
+    .compact-empty { font-size: 0.7rem !important; padding: 8px 0 !important; }
+    .empty-state-icon { font-size: 1.5rem !important; }
 }
 </style>
+
+<?php require_once '../includes/footer.php'; ?>

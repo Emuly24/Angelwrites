@@ -1,8 +1,7 @@
 <?php
 // ============================================================
 //  GROUP.PHP – Single Reading Group Page
-//  Fully enhanced with all features: discussions, notes,
-//  members, progress, schedule, and activity feed.
+//  Supports Books, Poems, and Newsletters.
 // ============================================================
 
 require_once 'includes/config.php';
@@ -19,6 +18,7 @@ if (!$group_id) {
     exit;
 }
 
+// ===== FETCH GROUP DETAILS (with content_type and content_id) =====
 $group = getGroupDetails($group_id, $user_id);
 if (!$group) {
     header('Location: groups.php');
@@ -33,7 +33,7 @@ if (!$group['user_role']) {
 
 $is_admin = in_array($group['user_role'], ['admin', 'creator']);
 
-// ===== FETCH GROUP DATA =====
+// ===== FETCH RELATED DATA =====
 $members = getGroupMembers($group_id);
 $discussions = getGroupDiscussions($group_id);
 $progress = getGroupReadingProgress($group_id);
@@ -41,12 +41,50 @@ $schedule = getGroupSchedule($group_id);
 $notes = getGroupNotes($group_id);
 $activity = getGroupActivity($group_id);
 
-// ===== GET TOTAL CHAPTERS FOR THE BOOK =====
-$stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
-$stmt->execute([$group['book_id']]);
-$content = $stmt->fetchColumn();
-preg_match_all('/<div class="chapter-container"/', $content, $matches);
-$total_chapters = count($matches[0]) ?: 1;
+// ===== DETERMINE CONTENT TYPE AND CHAPTERS =====
+$content_type = $group['content_type']; // 'book', 'poem', 'newsletter'
+$content_id = $group['content_id'];
+
+$total_chapters = 1; // default for poems/newsletters
+$content_title = '';
+$content_author = '';
+
+switch ($content_type) {
+    case 'book':
+        $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
+        $stmt->execute([$content_id]);
+        $content = $stmt->fetchColumn();
+        if ($content) {
+            preg_match_all('/<div class="chapter-container"/', $content, $matches);
+            $total_chapters = count($matches[0]) ?: 1;
+        }
+        // Fetch book title/author (already in group array as book_title/book_author)
+        $content_title = $group['book_title'];
+        $content_author = $group['book_author'];
+        break;
+    case 'poem':
+        // Poem has no chapters; treat as one "chapter"
+        $total_chapters = 1;
+        $content_title = $group['poem_title'];
+        $content_author = $group['poem_author'];
+        break;
+    case 'newsletter':
+        $total_chapters = 1;
+        $content_title = $group['newsletter_title'];
+        $content_author = $group['newsletter_author'];
+        break;
+    default:
+        $content_title = 'Unknown';
+        $content_author = '';
+}
+
+// Helper for displaying content type badge
+$type_icon = [
+    'book' => '📖',
+    'poem' => '✍️',
+    'newsletter' => '📰'
+][$content_type] ?? '📄';
+$type_label = ucfirst($content_type);
 
 $pageTitle = htmlspecialchars($group['name']);
 ?>
@@ -54,13 +92,16 @@ $pageTitle = htmlspecialchars($group['name']);
 
 <div class="group-page">
     <div class="container">
+        <!-- ===== GROUP HEADER ===== -->
         <div class="group-header">
             <div class="group-title">
                 <h1><?php echo htmlspecialchars($group['name']); ?></h1>
                 <p class="book-info">
-                    <i class="fas fa-book"></i>
-                    <?php echo htmlspecialchars($group['book_title']); ?>
-                    <small>by <?php echo htmlspecialchars($group['book_author']); ?></small>
+                    <span class="content-type-badge badge-<?php echo $content_type; ?>">
+                        <?php echo $type_icon . ' ' . $type_label; ?>
+                    </span>
+                    <?php echo htmlspecialchars($content_title); ?>
+                    <small>by <?php echo htmlspecialchars($content_author); ?></small>
                 </p>
                 <?php if ($group['description']): ?>
                     <p class="group-description"><?php echo htmlspecialchars($group['description']); ?></p>
@@ -79,6 +120,7 @@ $pageTitle = htmlspecialchars($group['name']);
             </div>
         </div>
 
+        <!-- ===== TABS ===== -->
         <div class="group-tabs">
             <button class="tab-btn active" data-tab="discussions">💬 Discussions</button>
             <button class="tab-btn" data-tab="notes">📝 Notes</button>
@@ -151,7 +193,7 @@ $pageTitle = htmlspecialchars($group['name']);
                                 <?php endif; ?>
                             </div>
                             <p class="note-text"><?php echo htmlspecialchars($note['text']); ?></p>
-                            <?php if ($note['chapter_index'] !== null): ?>
+                            <?php if ($note['chapter_index'] !== null && $content_type === 'book'): ?>
                                 <div class="note-location">
                                     <span>Chapter <?php echo $note['chapter_index'] + 1; ?></span>
                                 </div>
@@ -181,7 +223,7 @@ $pageTitle = htmlspecialchars($group['name']);
                 <table class="progress-table">
                     <thead>
                         <tr>
-                            <th>Chapter</th>
+                            <th><?php echo $content_type === 'book' ? 'Chapter' : 'Section'; ?></th>
                             <?php foreach ($members as $member): ?>
                                 <th><?php echo htmlspecialchars($member['display_name'] ?: $member['username']); ?></th>
                             <?php endforeach; ?>
@@ -190,7 +232,9 @@ $pageTitle = htmlspecialchars($group['name']);
                     <tbody>
                         <?php for ($i = 0; $i < $total_chapters; $i++): ?>
                             <tr>
-                                <td>Chapter <?php echo $i + 1; ?></td>
+                                <td>
+                                    <?php echo $content_type === 'book' ? 'Chapter ' . ($i + 1) : 'Section ' . ($i + 1); ?>
+                                </td>
                                 <?php foreach ($members as $member): ?>
                                     <td>
                                         <?php
@@ -270,7 +314,9 @@ $pageTitle = htmlspecialchars($group['name']);
                     <ul>
                         <?php foreach ($schedule as $item): ?>
                             <li>
-                                <strong>Chapter <?php echo $item['chapter_index'] + 1; ?></strong>
+                                <strong>
+                                    <?php echo $content_type === 'book' ? 'Chapter ' . ($item['chapter_index'] + 1) : 'Section ' . ($item['chapter_index'] + 1); ?>
+                                </strong>
                                 – Due: <?php echo date('F j, Y', strtotime($item['due_date'])); ?>
                                 <?php if ($is_admin): ?>
                                     <button onclick="deleteSchedule(<?php echo $item['id']; ?>)" class="btn btn-sm btn-danger">🗑️</button>
@@ -335,7 +381,7 @@ $pageTitle = htmlspecialchars($group['name']);
                     <select id="discussion_chapter" name="chapter_index">
                         <option value="">No specific chapter</option>
                         <?php for ($i = 0; $i < $total_chapters; $i++): ?>
-                            <option value="<?php echo $i; ?>">Chapter <?php echo $i + 1; ?></option>
+                            <option value="<?php echo $i; ?>"><?php echo $content_type === 'book' ? 'Chapter ' . ($i + 1) : 'Section ' . ($i + 1); ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -363,7 +409,7 @@ $pageTitle = htmlspecialchars($group['name']);
                     <select id="note_chapter" name="chapter_index">
                         <option value="">No specific chapter</option>
                         <?php for ($i = 0; $i < $total_chapters; $i++): ?>
-                            <option value="<?php echo $i; ?>">Chapter <?php echo $i + 1; ?></option>
+                            <option value="<?php echo $i; ?>"><?php echo $content_type === 'book' ? 'Chapter ' . ($i + 1) : 'Section ' . ($i + 1); ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -392,7 +438,7 @@ $pageTitle = htmlspecialchars($group['name']);
                     <label for="schedule_chapter">Chapter</label>
                     <select id="schedule_chapter" name="chapter_index" required>
                         <?php for ($i = 0; $i < $total_chapters; $i++): ?>
-                            <option value="<?php echo $i; ?>">Chapter <?php echo $i + 1; ?></option>
+                            <option value="<?php echo $i; ?>"><?php echo $content_type === 'book' ? 'Chapter ' . ($i + 1) : 'Section ' . ($i + 1); ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -488,7 +534,8 @@ function submitNote(e) {
     const formData = new FormData(form);
     formData.append('action', 'add_note');
     formData.append('group_id', <?php echo $group_id; ?>);
-    formData.append('book_id', <?php echo $group['book_id']; ?>);
+    // Note: we no longer need book_id, but we keep it for backward compatibility if needed
+    // The backend can infer content from group_id
     fetch('group_ajax.php', {
         method: 'POST',
         body: formData
@@ -650,106 +697,223 @@ document.querySelectorAll('.modal').forEach(modal => {
         }
     });
 });
-
-// ===== TIME AGO HELPER =====
-function time_ago(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = Math.floor((now - date) / 1000);
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
-    return date.toLocaleDateString();
-}
 </script>
 
 <style>
-/* ===== GROUP PAGE ===== */
-.group-page { padding: 32px 0 60px; }
-.group-header { margin-bottom: 24px; }
-.group-title h1 { margin: 0 0 4px; }
-.book-info { color: var(--text-light); margin: 0 0 8px; }
-.group-description { color: var(--text-light); margin: 0 0 12px; }
-.invite-code { background: var(--vanilla); padding: 8px 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; }
-.invite-code code { background: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+/* ============================================================
+   GROUP PAGE STYLES – Enhanced & Professional
+   ============================================================ */
+.group-page { padding: 32px 0 60px; background: var(--bg); }
+.group-header { margin-bottom: 28px; }
+.group-title h1 { margin: 0 0 6px; font-size: 2.2rem; color: var(--dark); }
+
+.book-info {
+    color: var(--text-light);
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.book-info small { color: var(--text-light); }
+.content-type-badge {
+    display: inline-block;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.badge-book { background: #e3f2fd; color: #0d47a1; }
+.badge-poem { background: #f3e5f5; color: #4a148c; }
+.badge-newsletter { background: #e8f5e9; color: #1b5e20; }
+
+.group-description { color: var(--text-light); margin: 0 0 12px; font-size: 1rem; }
+
+.invite-code {
+    background: var(--vanilla); padding: 8px 14px; border-radius: 8px;
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 0.9rem; border: 1px solid var(--border);
+}
+.invite-code code {
+    background: white; padding: 2px 8px; border-radius: 4px;
+    font-weight: bold; font-size: 0.85rem;
+}
 .group-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-.group-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
-.tab-btn { padding: 8px 16px; border: none; background: none; cursor: pointer; font-size: 0.95rem; border-radius: 6px 6px 0 0; }
-.tab-btn:hover { background: var(--vanilla); }
-.tab-btn.active { background: var(--rose); color: white; }
-.tab-content { display: none; min-height: 200px; }
+/* Tabs */
+.group-tabs {
+    display: flex; gap: 4px; margin-bottom: 28px;
+    border-bottom: 2px solid var(--border); flex-wrap: wrap;
+}
+.tab-btn {
+    padding: 10px 20px; border: none; background: none; cursor: pointer;
+    font-size: 0.95rem; font-weight: 500; color: var(--text-light);
+    border-radius: 8px 8px 0 0; transition: all 0.2s;
+}
+.tab-btn:hover { background: var(--vanilla); color: var(--text); }
+.tab-btn.active { background: var(--rose); color: white; font-weight: 600; }
+.tab-content { display: none; min-height: 200px; padding-top: 8px; }
 .tab-content.active { display: block; }
 
-/* ===== DISCUSSIONS ===== */
-.discussions-header, .notes-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.discussion-item { border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+/* Discussions */
+.discussions-header, .notes-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+}
+.discussion-item {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 14px; background: var(--card-bg);
+    transition: box-shadow 0.2s;
+}
+.discussion-item:hover { box-shadow: var(--shadow); }
 .discussion-item.pinned { border-left: 4px solid var(--rose); }
-.discussion-header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.discussion-header h4 { margin: 0; }
+.discussion-header {
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+}
+.discussion-header h4 { margin: 0; font-size: 1.05rem; color: var(--dark); }
 .discussion-meta { font-size: 0.85rem; color: var(--text-light); }
-.discussion-preview { color: var(--text-light); margin: 8px 0; }
-.discussion-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.discussion-preview {
+    color: var(--text-light); margin: 8px 0; font-size: 0.95rem;
+}
+.discussion-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px; margin-top: 6px;
+}
+.reaction-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.reaction {
+    background: var(--vanilla); padding: 0 8px; border-radius: 4px;
+    font-size: 0.85rem; color: var(--text);
+}
 
-.reaction-badges { display: flex; gap: 4px; }
-.reaction { background: var(--vanilla); padding: 0 6px; border-radius: 4px; font-size: 0.85rem; }
-
-/* ===== NOTES ===== */
-.note-item { border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
-.note-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.note-author { font-weight: bold; }
-.badge-private { background: #6c757d; color: white; padding: 0 8px; border-radius: 4px; font-size: 0.75rem; }
-.note-text { margin: 8px 0; }
+/* Notes */
+.note-item {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 14px; background: var(--card-bg);
+}
+.note-meta {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.note-author { font-weight: 600; color: var(--dark); }
+.badge-private {
+    background: #6c757d; color: white; padding: 0 10px;
+    border-radius: 4px; font-size: 0.7rem; font-weight: 600;
+}
+.note-text { margin: 8px 0; font-size: 0.95rem; line-height: 1.6; }
 .note-location { font-size: 0.85rem; color: var(--text-light); }
-.note-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.note-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px; margin-top: 6px;
+}
 
-/* ===== PROGRESS ===== */
-.progress-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-.progress-table th, .progress-table td { padding: 6px 8px; border: 1px solid var(--border); text-align: center; }
-.progress-table th { background: var(--vanilla); }
-.my-progress { margin-top: 12px; }
+/* Progress */
+.progress-container { overflow-x: auto; margin-bottom: 24px; }
+.progress-table {
+    width: 100%; border-collapse: collapse; font-size: 0.9rem;
+}
+.progress-table th, .progress-table td {
+    padding: 8px 10px; border: 1px solid var(--border); text-align: center;
+}
+.progress-table th { background: var(--vanilla); font-weight: 600; color: var(--text); }
+.progress-table td { min-width: 30px; }
+.my-progress { margin-top: 16px; }
+.my-progress h4 { margin-bottom: 8px; font-size: 1rem; }
+.my-progress .btn { margin-bottom: 4px; }
 
-/* ===== MEMBERS ===== */
-.members-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
-.member-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
-.member-avatar { width: 48px; height: 48px; margin: 0 auto 8px; border-radius: 50%; overflow: hidden; }
+/* Members */
+.members-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+.member-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+    text-align: center; background: var(--card-bg); transition: box-shadow 0.2s;
+}
+.member-card:hover { box-shadow: var(--shadow); }
+.member-avatar {
+    width: 56px; height: 56px; margin: 0 auto 10px; border-radius: 50%;
+    overflow: hidden; background: var(--vanilla);
+}
 .member-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.avatar-placeholder { width: 100%; height: 100%; background: var(--rose); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; }
-.member-info h4 { margin: 0; font-size: 0.95rem; }
+.avatar-placeholder {
+    width: 100%; height: 100%; background: var(--rose); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 1.4rem;
+}
+.member-info h4 { margin: 0; font-size: 0.95rem; color: var(--dark); }
 .member-role { font-size: 0.8rem; color: var(--text-light); }
+.member-card .btn { margin-top: 6px; }
 
-/* ===== SCHEDULE ===== */
+/* Schedule */
 .schedule-list ul { list-style: none; padding: 0; }
-.schedule-list li { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.schedule-list li {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px;
+}
+.schedule-list li:last-child { border-bottom: none; }
 
-/* ===== ACTIVITY ===== */
-.activity-feed { display: flex; flex-direction: column; gap: 8px; }
-.activity-item { display: flex; gap: 12px; padding: 8px 12px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border); }
+/* Activity */
+.activity-feed { display: flex; flex-direction: column; gap: 10px; }
+.activity-item {
+    display: flex; gap: 14px; padding: 10px 14px;
+    background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border);
+}
 .activity-avatar { flex-shrink: 0; }
-.activity-avatar img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-.activity-content p { margin: 0; font-size: 0.9rem; }
+.activity-avatar img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.activity-content p { margin: 0; font-size: 0.9rem; color: var(--text); }
 
-.empty-message { color: var(--text-light); text-align: center; padding: 40px 20px; }
+/* Empty message */
+.empty-message {
+    color: var(--text-light); text-align: center; padding: 40px 20px;
+    font-size: 1rem;
+}
 
-/* ===== MODAL ===== */
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; }
-.modal-content { background: white; max-width: 520px; width: 90%; border-radius: 12px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.modal-header h2 { margin: 0; }
-.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
-.close-btn:hover { color: #333; }
+/* Modals */
+.modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+}
+.modal-content {
+    background: var(--card-bg); max-width: 520px; width: 90%; border-radius: 14px;
+    padding: 28px; box-shadow: var(--shadow-hover);
+}
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+}
+.modal-header h2 { margin: 0; font-size: 1.3rem; color: var(--dark); }
+.close-btn {
+    background: none; border: none; font-size: 1.6rem; cursor: pointer;
+    color: var(--text-light); transition: color 0.2s;
+}
+.close-btn:hover { color: var(--rose); }
 .form-group { margin-bottom: 16px; }
-.form-group label { display: block; margin-bottom: 4px; font-weight: 500; }
-.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
-.form-group textarea { resize: vertical; }
+.form-group label {
+    display: block; margin-bottom: 4px; font-weight: 500; color: var(--text);
+}
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 1rem; background: var(--input-bg); color: var(--text);
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.1);
+}
+.form-group textarea { resize: vertical; min-height: 80px; }
 
-@media (max-width: 480px) {
+/* Responsive */
+@media (max-width: 768px) {
+    .group-title h1 { font-size: 1.8rem; }
     .group-tabs { flex-direction: column; border-bottom: none; }
     .tab-btn { border-radius: 8px; border: 1px solid var(--border); }
     .tab-btn.active { border-color: var(--rose); }
-    .members-grid { grid-template-columns: 1fr; }
+    .members-grid { grid-template-columns: 1fr 1fr; }
     .progress-table { font-size: 0.8rem; }
+}
+@media (max-width: 480px) {
+    .members-grid { grid-template-columns: 1fr; }
+    .group-actions { flex-direction: column; align-items: stretch; }
+    .invite-code { justify-content: center; }
+    .modal-content { padding: 20px; }
 }
 </style>
 

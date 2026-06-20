@@ -1,7 +1,7 @@
 <?php
 // ============================================================
-//  GROUPS.PHP – Reading Groups Dashboard (Public)
-//  Fully enhanced with all features.
+//  GROUPS.PHP – Reading Groups Dashboard (User)
+//  Supports Books, Poems, and Newsletters.
 // ============================================================
 
 require_once 'includes/config.php';
@@ -41,6 +41,7 @@ $pageTitle = 'My Reading Groups';
 
 <div class="groups-dashboard">
     <div class="container">
+        <!-- ===== PAGE HEADER ===== -->
         <div class="page-header">
             <h1>📚 My Reading Groups</h1>
             <div class="header-actions">
@@ -60,6 +61,7 @@ $pageTitle = 'My Reading Groups';
             <div class="alert alert-success"><?php echo $join_success; ?></div>
         <?php endif; ?>
 
+        <!-- ===== GROUP LIST ===== -->
         <?php if (empty($groups)): ?>
             <div class="empty-state">
                 <div class="empty-icon">📖</div>
@@ -72,39 +74,79 @@ $pageTitle = 'My Reading Groups';
             </div>
         <?php else: ?>
             <div class="groups-grid">
-                <?php foreach ($groups as $group): ?>
-                    <div class="group-card">
-                        <div class="group-card-header">
-                            <h3>
-                                <a href="group.php?id=<?php echo $group['id']; ?>">
-                                    <?php echo htmlspecialchars($group['name']); ?>
-                                </a>
-                            </h3>
-                            <span class="member-badge">
-                                <i class="fas fa-users"></i> <?php echo $group['member_count']; ?>
-                            </span>
-                        </div>
-                        <div class="group-card-body">
-                            <p class="book-info">
-                                <strong>Book:</strong>
-                                <?php echo htmlspecialchars($group['book_title']); ?>
-                                <br>
-                                <small>by <?php echo htmlspecialchars($group['book_author']); ?></small>
-                            </p>
-                            <?php if ($group['description']): ?>
-                                <p class="group-description"><?php echo htmlspecialchars($group['description']); ?></p>
-                            <?php endif; ?>
-                            <div class="group-stats">
-                                <span title="Notes"><i class="fas fa-sticky-note"></i> <?php echo $group['note_count']; ?></span>
-                                <span title="Discussions"><i class="fas fa-comments"></i> <?php echo $group['discussion_count']; ?></span>
-                            </div>
-                        </div>
-                        <div class="group-card-footer">
-                            <a href="group.php?id=<?php echo $group['id']; ?>" class="btn btn-sm btn-primary">
-                                <i class="fas fa-arrow-right"></i> Open Group
+                <?php foreach ($groups as $group):
+                    // Determine content title and author based on content_type
+                    $content_title = '';
+                    $content_author = '';
+                    $type_icon = '';
+                    $type_label = '';
+                    $type_class = '';
+
+                    switch ($group['content_type']) {
+                        case 'book':
+                            $content_title = $group['book_title'] ?? 'Untitled Book';
+                            $content_author = $group['book_author'] ?? '';
+                            $type_icon = '📖';
+                            $type_label = 'Book';
+                            $type_class = 'badge-book';
+                            break;
+                        case 'poem':
+                            $content_title = $group['poem_title'] ?? 'Untitled Poem';
+                            $content_author = $group['poem_author'] ?? '';
+                            $type_icon = '✍️';
+                            $type_label = 'Poem';
+                            $type_class = 'badge-poem';
+                            break;
+                        case 'newsletter':
+                            $content_title = $group['newsletter_title'] ?? 'Untitled Newsletter';
+                            $content_author = $group['newsletter_author'] ?? '';
+                            $type_icon = '📰';
+                            $type_label = 'Newsletter';
+                            $type_class = 'badge-newsletter';
+                            break;
+                        default:
+                            $content_title = 'Unknown';
+                            $content_author = '';
+                            $type_icon = '📄';
+                            $type_label = 'Content';
+                            $type_class = 'badge-other';
+                    }
+                ?>
+                <div class="group-card">
+                    <div class="group-card-header">
+                        <h3>
+                            <a href="group.php?id=<?php echo $group['id']; ?>">
+                                <?php echo htmlspecialchars($group['name']); ?>
                             </a>
+                        </h3>
+                        <span class="member-badge">
+                            <i class="fas fa-users"></i> <?php echo $group['member_count']; ?>
+                        </span>
+                    </div>
+                    <div class="group-card-body">
+                        <p class="content-info">
+                            <span class="content-type-badge <?php echo $type_class; ?>">
+                                <?php echo $type_icon . ' ' . $type_label; ?>
+                            </span>
+                            <strong><?php echo htmlspecialchars($content_title); ?></strong>
+                            <?php if ($content_author): ?>
+                                <br><small>by <?php echo htmlspecialchars($content_author); ?></small>
+                            <?php endif; ?>
+                        </p>
+                        <?php if ($group['description']): ?>
+                            <p class="group-description"><?php echo htmlspecialchars($group['description']); ?></p>
+                        <?php endif; ?>
+                        <div class="group-stats">
+                            <span title="Notes"><i class="fas fa-sticky-note"></i> <?php echo $group['note_count']; ?></span>
+                            <span title="Discussions"><i class="fas fa-comments"></i> <?php echo $group['discussion_count']; ?></span>
                         </div>
                     </div>
+                    <div class="group-card-footer">
+                        <a href="group.php?id=<?php echo $group['id']; ?>" class="btn btn-sm btn-primary">
+                            <i class="fas fa-arrow-right"></i> Open Group
+                        </a>
+                    </div>
+                </div>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
@@ -145,11 +187,19 @@ document.getElementById('joinModal').addEventListener('click', function(e) {
 </script>
 
 <style>
-.groups-dashboard { padding: 32px 0 60px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.page-header h1 { margin: 0; }
+/* ============================================================
+   GROUPS PAGE STYLES – Enhanced & Professional
+   ============================================================ */
+.groups-dashboard { padding: 32px 0 60px; background: var(--bg); }
+
+.page-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 16px; margin-bottom: 28px;
+}
+.page-header h1 { margin: 0; font-size: 2rem; color: var(--dark); }
 .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* ===== GROUP GRID ===== */
 .groups-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -159,69 +209,122 @@ document.getElementById('joinModal').addEventListener('click', function(e) {
 .group-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 14px;
     overflow: hidden;
     box-shadow: var(--shadow);
-    transition: transform 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
-.group-card:hover { transform: translateY(-2px); }
+.group-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+}
 
 .group-card-header {
     background: var(--vanilla);
-    padding: 14px 16px;
+    padding: 16px 18px;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
-.group-card-header h3 { margin: 0; font-size: 1.1rem; }
-.group-card-header h3 a { color: var(--text); text-decoration: none; }
+.group-card-header h3 {
+    margin: 0; font-size: 1.1rem;
+}
+.group-card-header h3 a {
+    color: var(--text); text-decoration: none;
+}
 .group-card-header h3 a:hover { color: var(--rose); }
-.member-badge { background: var(--rose); color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.8rem; }
+.member-badge {
+    background: var(--rose); color: white;
+    padding: 2px 12px; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 600;
+}
 
-.group-card-body { padding: 14px 16px; }
-.book-info { margin: 0 0 8px; font-size: 0.95rem; }
-.group-description { color: var(--text-light); font-size: 0.9rem; margin: 0 0 8px; }
-.group-stats { display: flex; gap: 12px; font-size: 0.85rem; color: var(--text-light); }
+.group-card-body { padding: 16px 18px; }
+
+.content-info {
+    margin: 0 0 10px; font-size: 0.95rem;
+    display: flex; flex-direction: column; gap: 4px;
+}
+.content-type-badge {
+    display: inline-block; padding: 2px 12px; border-radius: 20px;
+    font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;
+}
+.badge-book { background: #e3f2fd; color: #0d47a1; }
+.badge-poem { background: #f3e5f5; color: #4a148c; }
+.badge-newsletter { background: #e8f5e9; color: #1b5e20; }
+.badge-other { background: #f1f3f5; color: #495057; }
+
+.content-info strong { color: var(--dark); }
+.content-info small { color: var(--text-light); }
+
+.group-description {
+    color: var(--text-light); font-size: 0.9rem; margin: 0 0 10px;
+}
+.group-stats {
+    display: flex; gap: 14px; font-size: 0.85rem; color: var(--text-light);
+}
 .group-stats i { margin-right: 2px; color: var(--rose); }
 
-.group-card-footer { padding: 12px 16px; border-top: 1px solid var(--border); text-align: right; }
+.group-card-footer {
+    padding: 12px 18px; border-top: 1px solid var(--border);
+    text-align: right; background: var(--card-bg);
+}
 
-.empty-state { text-align: center; padding: 60px 20px; }
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    text-align: center; padding: 60px 20px;
+}
 .empty-icon { font-size: 4rem; margin-bottom: 16px; opacity: 0.6; }
-.empty-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+.empty-state h2 { margin-bottom: 8px; color: var(--text); }
+.empty-state p { color: var(--text-light); }
+.empty-actions {
+    display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px;
+}
 
 /* ===== MODAL ===== */
 .modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 9999;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
 }
 .modal-content {
-    background: white;
-    max-width: 480px;
-    width: 90%;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    background: var(--card-bg);
+    max-width: 480px; width: 90%;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: var(--shadow-hover);
 }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.modal-header h2 { margin: 0; }
-.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
-.close-btn:hover { color: #333; }
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+}
+.modal-header h2 { margin: 0; font-size: 1.3rem; color: var(--dark); }
+.close-btn {
+    background: none; border: none; font-size: 1.6rem;
+    cursor: pointer; color: var(--text-light);
+    transition: color 0.2s;
+}
+.close-btn:hover { color: var(--rose); }
 .form-group { margin-bottom: 16px; }
-.form-group label { display: block; margin-bottom: 4px; font-weight: 500; }
-.form-group input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
+.form-group label { display: block; margin-bottom: 4px; font-weight: 500; color: var(--text); }
+.form-group input {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 1rem; background: var(--input-bg); color: var(--text);
+}
+.form-group input:focus {
+    outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.1);
+}
 
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .page-header { flex-direction: column; align-items: flex-start; }
+    .header-actions { width: 100%; justify-content: flex-start; }
+}
 @media (max-width: 480px) {
     .groups-grid { grid-template-columns: 1fr; }
+    .group-card-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .group-card-footer { text-align: center; }
 }
 </style>
 

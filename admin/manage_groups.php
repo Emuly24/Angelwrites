@@ -1,4 +1,9 @@
 <?php
+// ============================================================
+//  MANAGE_GROUPS.PHP – Admin management for all reading groups
+//  Supports Books, Poems, and Newsletters.
+// ============================================================
+
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
@@ -9,13 +14,12 @@ redirectIfNotAdmin();
 $pageTitle = 'Manage Reading Groups';
 require_once '../includes/header.php';
 
-// Handle POST actions
+// ===== HANDLE POST ACTIONS =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
 
     if ($action === 'delete_group') {
         $group_id = (int)$_POST['group_id'];
-        // Delete group and all related data
         $db->exec("DELETE FROM reading_groups WHERE id = $group_id");
         $db->exec("DELETE FROM group_members WHERE group_id = $group_id");
         $db->exec("DELETE FROM group_notes WHERE group_id = $group_id");
@@ -55,61 +59,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-// Fetch all groups with stats
-$stmt = $db->prepare("
-    SELECT g.*, b.title as book_title, b.author as book_author,
-    (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
-    (SELECT COUNT(*) FROM group_notes WHERE group_id = g.id) as note_count,
-    (SELECT COUNT(*) FROM group_discussions WHERE group_id = g.id) as discussion_count,
-    u.username as creator_username, u.display_name as creator_display_name
-    FROM reading_groups g
-    JOIN books b ON g.book_id = b.id
-    LEFT JOIN users u ON g.creator_id = u.id
-    ORDER BY g.created_at DESC
-");
-$stmt->execute();
-$groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// ===== FETCH ALL GROUPS WITH CONTENT AND STATS =====
+$groups = [];
+$db_error = null;
+
+try {
+    $stmt = $db->prepare("
+        SELECT g.*,
+               b.title as book_title, b.author as book_author,
+               p.title as poem_title, p.author as poem_author,
+               n.title as newsletter_title, n.author as newsletter_author,
+               (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
+               (SELECT COUNT(*) FROM group_notes WHERE group_id = g.id) as note_count,
+               (SELECT COUNT(*) FROM group_discussions WHERE group_id = g.id) as discussion_count,
+               u.username as creator_username, u.display_name as creator_display_name
+        FROM reading_groups g
+        LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
+        LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
+        LEFT JOIN newsletters n ON g.content_type = 'newsletter' AND g.content_id = n.id
+        LEFT JOIN users u ON g.creator_id = u.id
+        ORDER BY g.created_at DESC
+    ");
+    $stmt->execute();
+    $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $db_error = $e->getMessage();
+    error_log("Manage groups query failed: " . $db_error);
+}
 ?>
 
 <div class="admin-manage-groups">
     <div class="container">
+        <!-- Header -->
         <div class="admin-header">
-            <h1>📚 Manage Reading Groups</h1>
-            <div class="admin-tabs">
-    <button class="tab-btn active" data-tab="groups">📚 Groups</button>
-    <button class="tab-btn" data-tab="activity">📊 Activity Feed</button>
-</div>
+            <div>
+                <h1>📚 Manage Reading Groups</h1>
+                <p class="subtitle">Overview of all reading groups across books, poems, and newsletters.</p>
+            </div>
             <div class="header-actions">
-                <span class="total-groups">Total: <?php echo count($groups); ?> groups</span>
+                <span class="total-groups">Total: <strong><?php echo count($groups); ?></strong> groups</span>
                 <a href="dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
         </div>
 
-        <?php if (empty($groups)): ?>
-            <div class="empty-state">
-                <div class="empty-icon">📖</div>
-                <h2>No reading groups yet</h2>
-                <p>Users haven't created any reading groups yet.</p>
+        <!-- Tabs -->
+        <div class="admin-tabs">
+            <button class="tab-btn active" data-tab="groups">📚 Groups</button>
+            <button class="tab-btn" data-tab="activity">📊 Activity Feed</button>
+        </div>
+
+        <!-- Database Error Alert -->
+        <?php if ($db_error): ?>
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                Database error: <code><?php echo htmlspecialchars($db_error); ?></code>
             </div>
-        <?php else: ?>
-            <div class="groups-table-container">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Group</th>
-                            <th>Book</th>
-                            <th>Creator</th>
-                            <th>Members</th>
-                            <th>Notes</th>
-                            <th>Discussions</th>
-                            <th>Created</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($groups as $group): ?>
+        <?php endif; ?>
+
+        <!-- ===== TAB: GROUPS ===== -->
+        <div class="tab-content" id="tab-groups">
+            <?php if (empty($groups)): ?>
+                <div class="empty-state">
+                    <div class="empty-icon">📖</div>
+                    <h2>No reading groups yet</h2>
+                    <p>Users haven't created any reading groups for books, poems, or newsletters yet.</p>
+                </div>
+            <?php else: ?>
+                <div class="groups-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Group</th>
+                                <th>Content</th>
+                                <th>Type</th>
+                                <th>Creator</th>
+                                <th>Members</th>
+                                <th>Notes</th>
+                                <th>Discussions</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($groups as $group):
+                                // Determine content title and author
+                                $content_title = $group['book_title'] ?? $group['poem_title'] ?? $group['newsletter_title'] ?? 'Unknown';
+                                $content_author = $group['book_author'] ?? $group['poem_author'] ?? $group['newsletter_author'] ?? '';
+                                $type_label = ucfirst($group['content_type']);
+                                $type_icon = [
+                                    'book' => '📖',
+                                    'poem' => '✍️',
+                                    'newsletter' => '📰'
+                                ][$group['content_type']] ?? '📄';
+                            ?>
                             <tr>
                                 <td>
                                     <strong><?php echo htmlspecialchars($group['name']); ?></strong>
@@ -118,14 +162,19 @@ $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                     <?php if ($group['description']): ?>
                                         <div class="group-desc-small">
-                                            <?php echo htmlspecialchars(substr($group['description'], 0, 40)); ?>...
+                                            <?php echo htmlspecialchars(substr($group['description'], 0, 40)); ?>…
                                         </div>
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php echo htmlspecialchars($group['book_title']); ?>
+                                    <?php echo htmlspecialchars($content_title); ?>
                                     <br>
-                                    <small><?php echo htmlspecialchars($group['book_author']); ?></small>
+                                    <small><?php echo htmlspecialchars($content_author); ?></small>
+                                </td>
+                                <td>
+                                    <span class="badge badge-<?php echo $group['content_type']; ?>">
+                                        <?php echo $type_icon . ' ' . $type_label; ?>
+                                    </span>
                                 </td>
                                 <td>
                                     <?php echo htmlspecialchars($group['creator_display_name'] ?: $group['creator_username']); ?>
@@ -148,30 +197,34 @@ $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </td>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- ===== TAB: ACTIVITY FEED ===== -->
+        <div class="tab-content" id="tab-activity" style="display:none;">
+            <div class="activity-feed-header">
+                <h2>📊 Recent Group Activity</h2>
+                <div class="activity-controls">
+                    <button class="btn btn-sm btn-outline" onclick="loadActivityFeed()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button class="btn btn-sm btn-outline" onclick="clearAllActivity()" style="color:#dc3545;">
+                        <i class="fas fa-trash"></i> Clear All
+                    </button>
+                </div>
             </div>
-        <?php endif; ?>
-    </div>
-</div>
-<!-- Activity Feed Tab -->
-<div class="tab-content" id="tab-activity" style="display:none;">
-    <div class="activity-feed-header">
-        <h2>📊 Recent Group Activity</h2>
-        <div class="activity-controls">
-            <button class="btn btn-sm btn-outline" onclick="loadActivityFeed()">
-                <i class="fas fa-sync-alt"></i> Refresh
-            </button>
-            <button class="btn btn-sm btn-outline" onclick="clearAllActivity()" style="color:#dc3545;">
-                <i class="fas fa-trash"></i> Clear All
-            </button>
+            <div id="activityFeedContainer">
+                <p style="text-align:center;color:#999;">Loading activity feed...</p>
+            </div>
         </div>
     </div>
-    <div id="activityFeedContainer">
-        <p style="text-align:center;color:#999;">Loading activity feed...</p>
-    </div>
 </div>
+
+<!-- ===== MODALS ===== -->
 
 <!-- View Group Details Modal -->
 <div id="groupDetailsModal" class="modal" style="display:none;">
@@ -213,7 +266,9 @@ $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+<!-- ===== JAVASCRIPT ===== -->
 <script>
+// View Group Details
 function viewGroupDetails(groupId) {
     document.getElementById('modalGroupTitle').textContent = '📚 Group Details';
     document.getElementById('groupDetailsContent').innerHTML = '<p style="text-align:center;color:#999;">Loading...</p>';
@@ -235,6 +290,7 @@ function viewGroupDetails(groupId) {
         document.getElementById('groupDetailsContent').innerHTML = '<p style="color:red;">Error loading details: ' + error.message + '</p>';
     });
 }
+
 // Tab switching
 document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -248,6 +304,7 @@ document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
     });
 });
 
+// Load Activity Feed
 function loadActivityFeed() {
     const container = document.getElementById('activityFeedContainer');
     container.innerHTML = '<p style="text-align:center;color:#999;">Loading activity feed...</p>';
@@ -268,13 +325,10 @@ function loadActivityFeed() {
     });
 }
 
+// Clear Activity
 function clearAllActivity() {
-    if (!confirm('Are you sure you want to clear all activity logs? This cannot be undone.')) {
-        return;
-    }
-    if (!confirm('Confirm again: All group activity history will be permanently deleted.')) {
-        return;
-    }
+    if (!confirm('Are you sure you want to clear all activity logs? This cannot be undone.')) return;
+    if (!confirm('Confirm again: All group activity history will be permanently deleted.')) return;
 
     const formData = new FormData();
     formData.append('action', 'clear_activity_logs');
@@ -297,20 +351,9 @@ function clearAllActivity() {
     });
 }
 
-// Load activity feed by default if the tab is active
-document.addEventListener('DOMContentLoaded', function() {
-    if (document.querySelector('.tab-btn[data-tab="activity"].active')) {
-        loadActivityFeed();
-    }
-});
-
-function closeGroupDetails() {
-    document.getElementById('groupDetailsModal').style.display = 'none';
-}
-
+// Edit Group
 function editGroup(groupId) {
     document.getElementById('edit_group_id').value = groupId;
-    // Pre-fill with current data (simplified – we'll fetch via AJAX)
     const formData = new FormData();
     formData.append('action', 'get_group_edit_data');
     formData.append('group_id', groupId);
@@ -356,13 +399,10 @@ function submitEditGroup(e) {
     });
 }
 
+// Delete Group
 function deleteGroup(groupId) {
-    if (!confirm('Are you sure you want to delete this group? All related data (notes, discussions, members) will be permanently removed.')) {
-        return;
-    }
-    if (!confirm('This action cannot be undone. Confirm again?')) {
-        return;
-    }
+    if (!confirm('Are you sure you want to delete this group? All related data will be permanently removed.')) return;
+    if (!confirm('This action cannot be undone. Confirm again?')) return;
 
     const formData = new FormData();
     formData.append('action', 'delete_group');
@@ -382,59 +422,152 @@ function deleteGroup(groupId) {
     });
 }
 
-// Modal close on outside click
+function closeGroupDetails() {
+    document.getElementById('groupDetailsModal').style.display = 'none';
+}
+
+// Close modals on outside click
 document.querySelectorAll('.modal').forEach(modal => {
     modal.addEventListener('click', function(e) {
         if (e.target === this) this.style.display = 'none';
     });
 });
+
+// Load activity feed on initial load if tab is active
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.querySelector('.tab-btn[data-tab="activity"].active')) {
+        loadActivityFeed();
+    }
+});
 </script>
 
 <style>
-.admin-manage-groups { padding: 32px 0 60px; }
-.admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.admin-header h1 { margin: 0; }
-.total-groups { background: var(--vanilla); padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; }
+/* ============================================================
+   STYLES – Professional Admin Panel
+   ============================================================ */
+.admin-manage-groups { padding: 32px 0 60px; background: var(--bg); }
 
-.admin-table { width: 100%; border-collapse: collapse; }
-.admin-table th { background: var(--vanilla); padding: 10px 12px; text-align: left; border-bottom: 2px solid var(--border); }
-.admin-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-.admin-table tr:hover { background: rgba(0,0,0,0.02); }
+.admin-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    flex-wrap: wrap; gap: 16px; margin-bottom: 24px;
+}
+.admin-header h1 { margin: 0 0 4px 0; font-size: 2rem; color: var(--dark); }
+.admin-header .subtitle { margin: 0; color: var(--text-light); font-size: 0.95rem; }
+.header-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.total-groups {
+    background: var(--vanilla); padding: 6px 14px; border-radius: 20px;
+    font-size: 0.9rem; color: var(--text);
+}
 
-.group-invite-code code { background: #f1f3f5; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
-.group-desc-small { font-size: 0.85rem; color: var(--text-light); }
-.action-buttons { display: flex; gap: 4px; }
-
-.modal-lg { max-width: 800px; width: 90%; }
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; }
-.modal-content { background: white; max-width: 520px; width: 90%; border-radius: 12px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
-.modal-content.modal-lg { max-width: 800px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.modal-header h2 { margin: 0; }
-.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
-.close-btn:hover { color: #333; }
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; margin-bottom: 4px; font-weight: 500; }
-.form-group input, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
-.modal-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); text-align: right; }
-
-.empty-state { text-align: center; padding: 60px 20px; }
-.empty-icon { font-size: 4rem; margin-bottom: 16px; opacity: 0.6; }
-.btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; }
-.admin-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
-.admin-tabs .tab-btn { padding: 8px 16px; border: none; background: none; cursor: pointer; font-size: 0.95rem; border-radius: 6px 6px 0 0; }
-.admin-tabs .tab-btn:hover { background: var(--vanilla); }
-.admin-tabs .tab-btn.active { background: var(--rose); color: white; }
+.admin-tabs {
+    display: flex; gap: 4px; margin-bottom: 24px;
+    border-bottom: 2px solid var(--border); flex-wrap: wrap;
+}
+.admin-tabs .tab-btn {
+    padding: 10px 20px; border: none; background: none; cursor: pointer;
+    font-size: 0.95rem; font-weight: 500; color: var(--text-light);
+    border-radius: 8px 8px 0 0; transition: all 0.2s;
+}
+.admin-tabs .tab-btn:hover { background: var(--vanilla); color: var(--text); }
+.admin-tabs .tab-btn.active {
+    background: var(--rose); color: white; font-weight: 600;
+}
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-.activity-feed-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.alert-danger {
+    background: #f8d7da; color: #721c24; padding: 12px 16px;
+    border-radius: 8px; border: 1px solid #f5c6cb; margin-bottom: 20px;
+}
+
+.groups-table-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+.admin-table {
+    width: 100%; border-collapse: collapse; font-size: 0.9rem;
+    background: var(--card-bg);
+}
+.admin-table th {
+    background: var(--vanilla); padding: 12px 14px; text-align: left;
+    border-bottom: 2px solid var(--border); font-weight: 600; color: var(--text);
+}
+.admin-table td {
+    padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text);
+}
+.admin-table tbody tr:last-child td { border-bottom: none; }
+.admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.04); }
+
+.group-invite-code code {
+    background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; color: var(--text);
+}
+.group-desc-small { font-size: 0.85rem; color: var(--text-light); margin-top: 2px; }
+
+/* Badges for Content Type */
+.badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+.badge-book { background: #e3f2fd; color: #0d47a1; }
+.badge-poem { background: #f3e5f5; color: #4a148c; }
+.badge-newsletter { background: #e8f5e9; color: #1b5e20; }
+
+.action-buttons { display: flex; gap: 4px; flex-wrap: nowrap; }
+.action-buttons .btn { padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; }
+
+/* Empty State */
+.empty-state { text-align: center; padding: 60px 20px; background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border); }
+.empty-icon { font-size: 4rem; margin-bottom: 16px; opacity: 0.6; }
+.empty-state h2 { margin-bottom: 8px; color: var(--text); }
+.empty-state p { color: var(--text-light); }
+
+/* Modals */
+.modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+}
+.modal-content {
+    background: var(--card-bg); max-width: 520px; width: 90%; border-radius: 16px;
+    padding: 24px; box-shadow: var(--shadow-hover);
+}
+.modal-content.modal-lg { max-width: 800px; }
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+}
+.modal-header h2 { margin: 0; font-size: 1.3rem; color: var(--dark); }
+.close-btn {
+    background: none; border: none; font-size: 1.5rem; cursor: pointer;
+    color: var(--text-light); transition: color 0.2s;
+}
+.close-btn:hover { color: var(--rose); }
+.modal-body { max-height: 70vh; overflow-y: auto; }
+.modal-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); text-align: right; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; margin-bottom: 4px; font-weight: 500; color: var(--text); }
+.form-group input, .form-group textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 1rem; background: var(--input-bg); color: var(--text);
+}
+.form-group input:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.1);
+}
+
+/* Activity Feed */
+.activity-feed-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+}
 .activity-feed-header h2 { margin: 0; }
 .activity-controls { display: flex; gap: 8px; }
 
-.activity-table tbody tr:hover { background: rgba(0,0,0,0.02); }
-.activity-table a { color: var(--rose); text-decoration: none; }
-.activity-table a:hover { text-decoration: underline; }
+/* Responsive */
+@media (max-width: 768px) {
+    .admin-header { flex-direction: column; align-items: flex-start; }
+    .header-actions { width: 100%; justify-content: flex-start; }
+    .admin-table { font-size: 0.8rem; }
+    .admin-table th, .admin-table td { padding: 8px 10px; }
+    .action-buttons .btn { padding: 2px 6px; font-size: 0.7rem; }
+}
+@media (max-width: 480px) {
+    .admin-table { font-size: 0.75rem; }
+    .admin-table th, .admin-table td { padding: 6px 8px; }
+    .total-groups { font-size: 0.8rem; }
+}
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

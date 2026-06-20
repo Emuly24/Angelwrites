@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 //  READING_GROUPS.PHP – Backend functions for reading groups
-//  Fully enhanced with all features.
+//  Supports Books, Poems, and Newsletters.
 // ============================================================
 
 require_once __DIR__ . '/db.php';
@@ -13,17 +13,20 @@ function generateInviteCode($length = 8) {
 }
 
 // ===== CREATE READING GROUP =====
-function createReadingGroup($book_id, $creator_id, $name, $description = '', $is_private = false) {
+function createReadingGroup($content_type, $content_id, $creator_id, $name, $description = '', $is_private = false) {
     global $db;
     $invite_code = generateInviteCode();
-    $stmt = $db->prepare("INSERT INTO reading_groups (book_id, creator_id, name, description, invite_code, is_private) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$book_id, $creator_id, $name, $description, $invite_code, $is_private ? 1 : 0]);
+    $stmt = $db->prepare("
+        INSERT INTO reading_groups (content_type, content_id, creator_id, name, description, invite_code, is_private)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([$content_type, $content_id, $creator_id, $name, $description, $invite_code, $is_private ? 1 : 0]);
     $group_id = $db->lastInsertId();
 
+    // Add creator as member
     $stmt = $db->prepare("INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'creator')");
     $stmt->execute([$group_id, $creator_id]);
 
-    // Log activity
     logGroupActivity($group_id, $creator_id, 'create', 'group', $group_id, ['name' => $name]);
 
     return $group_id;
@@ -49,7 +52,6 @@ function joinGroupByCode($invite_code, $user_id) {
     $stmt = $db->prepare("INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'member')");
     $stmt->execute([$group_id, $user_id]);
 
-    // Log activity
     logGroupActivity($group_id, $user_id, 'join', 'member', $user_id);
 
     return $group_id;
@@ -59,12 +61,17 @@ function joinGroupByCode($invite_code, $user_id) {
 function getUserGroups($user_id) {
     global $db;
     $stmt = $db->prepare("
-        SELECT g.*, b.title as book_title, b.author as book_author,
-        (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
-        (SELECT COUNT(*) FROM group_notes WHERE group_id = g.id) as note_count,
-        (SELECT COUNT(*) FROM group_discussions WHERE group_id = g.id) as discussion_count
+        SELECT g.*,
+               b.title as book_title, b.author as book_author,
+               p.title as poem_title, p.author as poem_author,
+               n.title as newsletter_title, n.author as newsletter_author,
+               (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
+               (SELECT COUNT(*) FROM group_notes WHERE group_id = g.id) as note_count,
+               (SELECT COUNT(*) FROM group_discussions WHERE group_id = g.id) as discussion_count
         FROM reading_groups g
-        JOIN books b ON g.book_id = b.id
+        LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
+        LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
+        LEFT JOIN newsletters n ON g.content_type = 'newsletter' AND g.content_id = n.id
         JOIN group_members m ON g.id = m.group_id
         WHERE m.user_id = ?
         ORDER BY g.created_at DESC
@@ -77,11 +84,16 @@ function getUserGroups($user_id) {
 function getGroupDetails($group_id, $user_id) {
     global $db;
     $stmt = $db->prepare("
-        SELECT g.*, b.title as book_title, b.author as book_author,
-        (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
-        (SELECT role FROM group_members WHERE group_id = g.id AND user_id = ?) as user_role
+        SELECT g.*,
+               b.title as book_title, b.author as book_author,
+               p.title as poem_title, p.author as poem_author,
+               n.title as newsletter_title, n.author as newsletter_author,
+               (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
+               (SELECT role FROM group_members WHERE group_id = g.id AND user_id = ?) as user_role
         FROM reading_groups g
-        JOIN books b ON g.book_id = b.id
+        LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
+        LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
+        LEFT JOIN newsletters n ON g.content_type = 'newsletter' AND g.content_id = n.id
         WHERE g.id = ?
     ");
     $stmt->execute([$user_id, $group_id]);
@@ -104,19 +116,16 @@ function getGroupMembers($group_id) {
 }
 
 // ===== ADD GROUP NOTE =====
-function addGroupNote($group_id, $user_id, $book_id, $text, $chapter_index = null, $paragraph_index = null, $page_number = null, $is_private = false) {
+function addGroupNote($group_id, $user_id, $content_id, $text, $chapter_index = null, $paragraph_index = null, $page_number = null, $is_private = false) {
     global $db;
     $stmt = $db->prepare("
         INSERT INTO group_notes (group_id, user_id, book_id, chapter_index, paragraph_index, page_number, text, is_private)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$group_id, $user_id, $book_id, $chapter_index, $paragraph_index, $page_number, $text, $is_private ? 1 : 0]);
+    $stmt->execute([$group_id, $user_id, $content_id, $chapter_index, $paragraph_index, $page_number, $text, $is_private ? 1 : 0]);
     $note_id = $db->lastInsertId();
 
-    // Log activity
-    $metadata = ['chapter' => $chapter_index, 'private' => $is_private];
-    logGroupActivity($group_id, $user_id, 'note', 'note', $note_id, $metadata);
-
+    logGroupActivity($group_id, $user_id, 'note', 'note', $note_id, ['chapter' => $chapter_index, 'private' => $is_private]);
     return $note_id;
 }
 
@@ -159,10 +168,7 @@ function createDiscussion($group_id, $user_id, $title, $content, $chapter_index 
     $stmt->execute([$group_id, $user_id, $title, $content, $chapter_index]);
     $discussion_id = $db->lastInsertId();
 
-    // Log activity
-    $metadata = ['title' => $title, 'chapter' => $chapter_index];
-    logGroupActivity($group_id, $user_id, 'discussion', 'discussion', $discussion_id, $metadata);
-
+    logGroupActivity($group_id, $user_id, 'discussion', 'discussion', $discussion_id, ['title' => $title, 'chapter' => $chapter_index]);
     return $discussion_id;
 }
 
@@ -199,10 +205,7 @@ function addDiscussionReply($discussion_id, $user_id, $content) {
     $stmt->execute([$discussion_id]);
     $group_id = $stmt->fetchColumn();
 
-    // Log activity
-    $metadata = ['discussion_id' => $discussion_id];
-    logGroupActivity($group_id, $user_id, 'reply', 'reply', $reply_id, $metadata);
-
+    logGroupActivity($group_id, $user_id, 'reply', 'reply', $reply_id, ['discussion_id' => $discussion_id]);
     return $reply_id;
 }
 
@@ -250,8 +253,7 @@ function addReaction($target_type, $target_id, $user_id, $reaction_type) {
     }
 
     if ($group_id) {
-        $metadata = ['target_type' => $target_type, 'reaction' => $reaction_type];
-        logGroupActivity($group_id, $user_id, 'reaction', $target_type, $target_id, $metadata);
+        logGroupActivity($group_id, $user_id, 'reaction', $target_type, $target_id, ['reaction' => $reaction_type]);
     }
 }
 
@@ -277,8 +279,7 @@ function updateReadingProgress($group_id, $user_id, $chapter_index, $status) {
     ");
     $stmt->execute([$group_id, $user_id, $chapter_index, $status]);
 
-    $metadata = ['chapter' => $chapter_index, 'status' => $status];
-    logGroupActivity($group_id, $user_id, 'progress', 'chapter', $chapter_index, $metadata);
+    logGroupActivity($group_id, $user_id, 'progress', 'chapter', $chapter_index, ['status' => $status]);
 }
 
 // ===== GET USER READING PROGRESS =====
@@ -318,9 +319,8 @@ function getGroupReadingProgress($group_id) {
 function getGroupSchedule($group_id) {
     global $db;
     $stmt = $db->prepare("
-        SELECT s.*, b.title as chapter_title
+        SELECT s.*
         FROM group_schedules s
-        LEFT JOIN book_chapters b ON s.chapter_index = b.chapter_index AND b.book_id = (SELECT book_id FROM reading_groups WHERE id = s.group_id)
         WHERE s.group_id = ?
         ORDER BY s.chapter_index ASC
     ");
@@ -386,29 +386,28 @@ function getAllGroupActivity($limit = 50) {
 function formatActivity($activity) {
     $user = htmlspecialchars($activity['display_name'] ?: $activity['username']);
     $group = htmlspecialchars($activity['group_name']);
-    $time = time_ago($activity['created_at']);
     $metadata = $activity['metadata'] ? json_decode($activity['metadata'], true) : null;
 
     switch ($activity['activity_type']) {
         case 'note':
-            return "<strong>{$user}</strong> added a note in <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> added a note in <strong>{$group}</strong>";
         case 'discussion':
-            return "<strong>{$user}</strong> started a discussion in <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> started a discussion in <strong>{$group}</strong>";
         case 'reply':
-            return "<strong>{$user}</strong> replied to a discussion in <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> replied to a discussion in <strong>{$group}</strong>";
         case 'join':
-            return "<strong>{$user}</strong> joined <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> joined <strong>{$group}</strong>";
         case 'progress':
             $chapter = isset($metadata['chapter']) ? 'Chapter ' . ($metadata['chapter'] + 1) : 'a chapter';
             $status = isset($metadata['status']) ? $metadata['status'] : 'updated';
-            return "<strong>{$user}</strong> marked {$chapter} as {$status} in <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> marked {$chapter} as {$status} in <strong>{$group}</strong>";
         case 'reaction':
             $target = isset($metadata['target']) ? $metadata['target'] : 'a post';
-            return "<strong>{$user}</strong> reacted to {$target} in <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> reacted to {$target} in <strong>{$group}</strong>";
         case 'create':
-            return "<strong>{$user}</strong> created <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> created <strong>{$group}</strong>";
         default:
-            return "<strong>{$user}</strong> did something in <strong>{$group}</strong> {$time}";
+            return "<strong>{$user}</strong> did something in <strong>{$group}</strong>";
     }
 }
 
