@@ -4,9 +4,15 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
 
+// ===== CAPTURE REDIRECT URL (if present) =====
+$redirect = isset($_GET['redirect']) ? trim($_GET['redirect']) : '';
+
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
-    if (isAdmin()) {
+    // If already logged in, obey the redirect or default dashboard
+    if (!empty($redirect) && strpos($redirect, SITE_URL) === 0) {
+        header('Location: ' . $redirect);
+    } elseif (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
     } else {
         header('Location: ' . SITE_URL . '/dashboard.php');
@@ -106,8 +112,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
                 $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
                 $stmt->execute([$user['id']]);
 
-                // Redirect based on role
-                if ($user['role'] === 'admin') {
+                // ===== 🚀 REDIRECT LOGIC =====
+                // If a valid redirect URL was passed, send them there; otherwise go to dashboard
+                if (!empty($redirect) && strpos($redirect, SITE_URL) === 0) {
+                    header('Location: ' . $redirect);
+                } elseif ($user['role'] === 'admin') {
                     header('Location: ' . SITE_URL . '/admin/dashboard.php');
                 } else {
                     header('Location: ' . SITE_URL . '/dashboard.php');
