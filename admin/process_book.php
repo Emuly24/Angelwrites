@@ -492,14 +492,14 @@ function renderVersionSideBySide($old_html, $new_html, $label_old, $label_new) {
         <div class="diff-columns">
             <div class="diff-column">
                 <div class="column-header">' . htmlspecialchars($label_old) . '</div>
-                <div class="column-content">
-                    <pre>' . htmlspecialchars($old_html) . '</pre>
+                <div class="column-content" style="max-height:500px;overflow-y:auto;padding:24px;background:#ffffff;border:1px solid #eee;border-radius:0 0 12px 12px;font-family:Georgia, serif;line-height:1.8;font-size:16px;color:#333;">
+                    ' . $old_html . '
                 </div>
             </div>
             <div class="diff-column">
                 <div class="column-header">' . htmlspecialchars($label_new) . '</div>
-                <div class="column-content">
-                    <pre>' . htmlspecialchars($new_html) . '</pre>
+                <div class="column-content" style="max-height:500px;overflow-y:auto;padding:24px;background:#ffffff;border:1px solid #eee;border-radius:0 0 12px 12px;font-family:Georgia, serif;line-height:1.8;font-size:16px;color:#333;">
+                    ' . $new_html . '
                 </div>
             </div>
         </div>
