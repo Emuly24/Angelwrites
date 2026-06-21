@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
@@ -6,42 +7,88 @@ require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
 
-$error = '';
-$success = '';
+// ===== HANDLE FLASH MESSAGES =====
+$flash_message = '';
+$flash_type = '';
+
+if (isset($_SESSION['flash_message'])) {
+    $flash_message = $_SESSION['flash_message'];
+    $flash_type = $_SESSION['flash_type'] ?? 'success';
+    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+}
+
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
-// ===== HANDLE DELETE =====
+// ===== HANDLE PUBLISH / UNPUBLISH =====
+if (isset($_GET['publish']) && is_numeric($_GET['publish'])) {
+    $id = (int)$_GET['publish'];
+    $stmt = $db->prepare("UPDATE poem_status SET status = 'published' WHERE poem_id = ?");
+    $stmt->execute([$id]);
+    $_SESSION['flash_message'] = '✅ Poem published and is now live for all users!';
+    $_SESSION['flash_type'] = 'success';
+    header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+    exit;
+}
+if (isset($_GET['unpublish']) && is_numeric($_GET['unpublish'])) {
+    $id = (int)$_GET['unpublish'];
+    $stmt = $db->prepare("UPDATE poem_status SET status = 'draft' WHERE poem_id = ?");
+    $stmt->execute([$id]);
+    $_SESSION['flash_message'] = '🔒 Poem unpublished and reverted to draft.';
+    $_SESSION['flash_type'] = 'success';
+    header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+    exit;
+}
+
+// ===== HANDLE BULK DELETE =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action']) && $_POST['bulk_action'] === 'delete') {
+    $ids = array_filter(explode(',', $_POST['selected_ids'] ?? ''));
+    if (!empty($ids)) {
+        $db->beginTransaction();
+        try {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id IN ($placeholders)");
+            $stmt->execute($ids);
+            $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id IN ($placeholders)");
+            $stmt->execute($ids);
+            $stmt = $db->prepare("DELETE FROM poems WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            $db->commit();
+            $_SESSION['flash_message'] = count($ids) . ' poem(s) deleted successfully.';
+            $_SESSION['flash_type'] = 'success';
+        } catch (Exception $e) {
+            $db->rollBack();
+            $_SESSION['flash_message'] = 'Error deleting poems: ' . $e->getMessage();
+            $_SESSION['flash_type'] = 'error';
+        }
+        header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+        exit;
+    }
+}
+
+// ===== HANDLE SINGLE DELETE =====
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    
     try {
         $db->beginTransaction();
         $stmt = $db->prepare("SELECT image_path, audio_path FROM poems WHERE id = ?");
         $stmt->execute([$id]);
         $poem = $stmt->fetch(PDO::FETCH_ASSOC);
-        
         if ($poem) {
             $doc_root = $_SERVER['DOCUMENT_ROOT'];
-            if (!empty($poem['image_path']) && file_exists($doc_root . '/' . $poem['image_path'])) {
-                @unlink($doc_root . '/' . $poem['image_path']);
-            }
-            if (!empty($poem['audio_path']) && file_exists($doc_root . '/' . $poem['audio_path'])) {
-                @unlink($doc_root . '/' . $poem['audio_path']);
-            }
-            $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?");
-            $stmt->execute([$id]);
-            $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?");
-            $stmt->execute([$id]);
-            $stmt = $db->prepare("DELETE FROM poems WHERE id = ?");
-            $stmt->execute([$id]);
+            if (!empty($poem['image_path']) && file_exists($doc_root . '/' . $poem['image_path'])) @unlink($doc_root . '/' . $poem['image_path']);
+            if (!empty($poem['audio_path']) && file_exists($doc_root . '/' . $poem['audio_path'])) @unlink($doc_root . '/' . $poem['audio_path']);
+            
+            $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?"); $stmt->execute([$id]);
+            $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?"); $stmt->execute([$id]);
+            $stmt = $db->prepare("DELETE FROM poems WHERE id = ?"); $stmt->execute([$id]);
             $db->commit();
-            $success = 'Poem deleted successfully.';
-        } else {
-            $error = 'Poem not found.';
+            $_SESSION['flash_message'] = 'Poem deleted successfully.';
+            $_SESSION['flash_type'] = 'success';
         }
     } catch (PDOException $e) {
         $db->rollBack();
-        $error = 'Database error: ' . $e->getMessage();
+        $_SESSION['flash_message'] = 'Database error: ' . $e->getMessage();
+        $_SESSION['flash_type'] = 'error';
     }
     header('Location: ' . SITE_URL . '/admin/manage_poems.php');
     exit;
@@ -54,13 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
     $intro = trim($_POST['intro']);
     $content = trim($_POST['content']);
 
-    if (empty($title)) {
-        $error = 'Please enter a title.';
-    } elseif (empty($content)) {
-        $error = 'Please enter the poem content.';
-    } else {
-        // Handle image upload (live photo or drag & drop)
-        $image_path = null;
+    $error = null;
+    if (empty($title)) $error = 'Please enter a title.';
+    elseif (empty($content)) $error = 'Please enter the poem content.';
+
+    // Handle Image Upload
+    $image_path = null;
+    if (is_null($error)) {
         if (!empty($_FILES['image']['name'])) {
             $upload_dir = '../assets/uploads/poems/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -68,25 +115,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
             $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
             if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $filename)) {
                 $image_path = 'assets/uploads/poems/' . $filename;
-            } else {
-                $error = 'Failed to upload image.';
-            }
-        }
-        // Fallback: drag & drop (image_fallback)
-        if (empty($image_path) && !empty($_FILES['image_fallback']['name'])) {
+            } else $error = 'Failed to upload image.';
+        } elseif (!empty($_FILES['image_fallback']['name'])) { // Fallback drag & drop
             $upload_dir = '../assets/uploads/poems/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
             $ext = pathinfo($_FILES['image_fallback']['name'], PATHINFO_EXTENSION);
             $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
             if (move_uploaded_file($_FILES['image_fallback']['tmp_name'], $upload_dir . $filename)) {
                 $image_path = 'assets/uploads/poems/' . $filename;
-            } else {
-                $error = 'Failed to upload image.';
-            }
+            } else $error = 'Failed to upload image.';
         }
+    }
 
-        // Handle audio upload (regular input)
-        $audio_path = null;
+    // Handle Audio Upload
+    $audio_path = null;
+    if (is_null($error)) {
         if (!empty($_FILES['audio']['name'])) {
             $upload_dir = '../assets/uploads/poems/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -94,70 +137,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
             $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
             if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $filename)) {
                 $audio_path = 'assets/uploads/poems/' . $filename;
-            } else {
-                $error = 'Failed to upload audio.';
-            }
-        }
-        // Handle audio recording (audio_recording)
-        if (empty($audio_path) && !empty($_FILES['audio_recording']['name'])) {
+            } else $error = 'Failed to upload audio.';
+        } elseif (!empty($_FILES['audio_recording']['name'])) { // Recording fallback
             $upload_dir = '../assets/uploads/poems/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
             $ext = pathinfo($_FILES['audio_recording']['name'], PATHINFO_EXTENSION);
             $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
             if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $filename)) {
                 $audio_path = 'assets/uploads/poems/' . $filename;
-            } else {
-                $error = 'Failed to upload recording.';
-            }
-        }
-
-        if (empty($error)) {
-            try {
-                if ($id > 0) {
-                    // Update existing poem
-                    $stmt = $db->prepare("
-                        UPDATE poems SET 
-                            title = ?, intro = ?, content = ?, 
-                            image_path = COALESCE(?, image_path), 
-                            audio_path = COALESCE(?, audio_path),
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                    ");
-                    $stmt->execute([$title, $intro, $content, $image_path, $audio_path, $id]);
-                    $success = 'Poem updated successfully.';
-                } else {
-                    // Insert new poem
-                    $stmt = $db->prepare("
-                        INSERT INTO poems (title, intro, content, image_path, audio_path, view_count, created_at, updated_at) 
-                        VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    ");
-                    $stmt->execute([$title, $intro, $content, $image_path, $audio_path]);
-                    $new_id = $db->lastInsertId();
-                    // Insert default status
-                    $stmt = $db->prepare("INSERT INTO poem_status (poem_id, status) VALUES (?, 'published')");
-                    $stmt->execute([$new_id]);
-                    $success = 'Poem added successfully.';
-                }
-                // Redirect to clear POST
-                header('Location: ' . SITE_URL . '/admin/manage_poems.php');
-                exit;
-            } catch (PDOException $e) {
-                $error = 'Database error: ' . $e->getMessage();
-            }
+            } else $error = 'Failed to upload recording.';
         }
     }
+
+    if (is_null($error)) {
+        try {
+            if ($id > 0) {
+                // Update existing poem (DO NOT change status)
+                $stmt = $db->prepare("
+                    UPDATE poems SET 
+                        title = ?, intro = ?, content = ?, 
+                        image_path = COALESCE(?, image_path), 
+                        audio_path = COALESCE(?, audio_path),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ");
+                $stmt->execute([$title, $intro, $content, $image_path, $audio_path, $id]);
+                $_SESSION['flash_message'] = '✅ Poem updated successfully. Status remains unchanged.';
+                $_SESSION['flash_type'] = 'success';
+            } else {
+                // Insert new poem (Default to DRAFT)
+                $stmt = $db->prepare("
+                    INSERT INTO poems (title, intro, content, image_path, audio_path, view_count, created_at, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ");
+                $stmt->execute([$title, $intro, $content, $image_path, $audio_path]);
+                $new_id = $db->lastInsertId();
+                
+                // Insert default status as DRAFT
+                $stmt = $db->prepare("INSERT INTO poem_status (poem_id, status) VALUES (?, 'draft')");
+                $stmt->execute([$new_id]);
+                
+                $_SESSION['flash_message'] = '✅ Poem added successfully as a Draft. Click the "Publish" button in the table to make it live!';
+                $_SESSION['flash_type'] = 'success';
+            }
+        } catch (PDOException $e) {
+            $_SESSION['flash_message'] = '❌ Database error: ' . $e->getMessage();
+            $_SESSION['flash_type'] = 'error';
+        }
+    } else {
+        $_SESSION['flash_message'] = '❌ ' . $error;
+        $_SESSION['flash_type'] = 'error';
+    }
+    header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+    exit;
 }
 
-// ===== FETCH POEMS WITH SEARCH =====
-$sql = "SELECT * FROM poems";
+// ===== FETCH POEMS WITH SEARCH (JOIN status) =====
+$sql = "SELECT p.*, COALESCE(s.status, 'draft') as status 
+        FROM poems p 
+        LEFT JOIN poem_status s ON p.id = s.poem_id";
 $params = [];
 if (!empty($search)) {
-    $sql .= " WHERE title LIKE ? OR intro LIKE ? OR content LIKE ?";
+    $sql .= " WHERE p.title LIKE ? OR p.intro LIKE ? OR p.content LIKE ?";
     $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
-$sql .= " ORDER BY created_at DESC";
+$sql .= " ORDER BY p.created_at DESC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -180,12 +226,8 @@ $pageTitle = 'Manage Poems';
             </div>
         </div>
 
-        <?php if ($error): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
+        <!-- Toast Notification Container -->
+        <div id="toastContainer"></div>
 
         <!-- Search Bar -->
         <div class="search-bar">
@@ -202,8 +244,8 @@ $pageTitle = 'Manage Poems';
         <div class="card">
             <div class="card-header">
                 <h2>All Poems (<?php echo count($poems); ?>)</h2>
-                <div class="card-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <select id="bulkActionSelect" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);font-size:0.85rem;">
+                <div class="card-header-actions">
+                    <select id="bulkActionSelect" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.85rem;background:var(--card-bg);color:var(--text);">
                         <option value="">Bulk Actions</option>
                         <option value="delete">Delete Selected</option>
                     </select>
@@ -219,51 +261,65 @@ $pageTitle = 'Manage Poems';
                             <table class="admin-table">
                                 <thead>
                                     <tr>
-                                        <th><input type="checkbox" id="selectAllRows"></th>
+                                        <th><input type="checkbox" id="selectAllRows" class="styled-checkbox"></th>
                                         <th>Image</th>
                                         <th>Title</th>
                                         <th>Introduction</th>
                                         <th>Audio</th>
+                                        <th>Status</th>
                                         <th>Views</th>
-                                        <th>Created</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($poems as $poem): ?>
                                         <tr>
-                                            <td><input type="checkbox" class="row-select" value="<?php echo $poem['id']; ?>"></td>
+                                            <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $poem['id']; ?>"></td>
                                             <td>
                                                 <?php if ($poem['image_path']): ?>
-                                                    <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px;">
+                                                    <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
                                                 <?php else: ?>
-                                                    <div style="width: 50px; height: 50px; background: var(--vanilla); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-light);">
+                                                    <div style="width: 50px; height: 50px; background: var(--vanilla); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text-light);">
                                                         <i class="fas fa-image"></i>
                                                     </div>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
                                                 <strong><?php echo htmlspecialchars($poem['title']); ?></strong>
-                                                <br><small><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></small>
+                                                <br><small style="color:var(--text-light);font-size:0.8rem;"><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></small>
                                             </td>
                                             <td>
                                                 <?php if ($poem['intro']): ?>
-                                                    <span class="intro-preview"><?php echo htmlspecialchars(substr($poem['intro'], 0, 60)); ?>...</span>
+                                                    <span class="intro-preview" style="color:var(--text-light);font-size:0.9rem;"><?php echo htmlspecialchars(substr($poem['intro'], 0, 60)); ?>...</span>
                                                 <?php else: ?>
-                                                    <span class="text-muted">No introduction</span>
+                                                    <span class="text-muted" style="color:#999;font-size:0.9rem;">No introduction</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php if ($poem['audio_path']): ?>
-                                                    <i class="fas fa-music" style="color: var(--rose);"></i>
-                                                    <span class="audio-label">Yes</span>
+                                                    <span style="display:flex;align-items:center;gap:6px;color:var(--rose);"><i class="fas fa-music"></i> Yes</span>
                                                 <?php else: ?>
-                                                    <span class="text-muted">No</span>
+                                                    <span style="color:#999;font-size:0.9rem;">No</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo number_format($poem['view_count'] ?? 0); ?></td>
-                                            <td><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></td>
+                                            <td>
+                                                <span class="status-badge status-<?php echo $poem['status']; ?>">
+                                                    <?php echo ucfirst($poem['status']); ?>
+                                                </span>
+                                            </td>
+                                            <td style="font-weight:600;"><?php echo number_format($poem['view_count'] ?? 0); ?></td>
                                             <td class="actions">
+                                                <!-- MANUAL PUBLISH / UNPUBLISH BUTTON -->
+                                                <?php if ($poem['status'] === 'published'): ?>
+                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?unpublish=<?php echo $poem['id']; ?>" class="btn btn-sm btn-warning" title="Unpublish (Revert to Draft)">
+                                                        <i class="fas fa-eye-slash"></i>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?publish=<?php echo $poem['id']; ?>" class="btn btn-sm btn-success" title="Publish (Make Live)">
+                                                        <i class="fas fa-check-circle"></i>
+                                                    </a>
+                                                <?php endif; ?>
+
                                                 <button class="btn btn-sm btn-secondary edit-btn" 
                                                         data-id="<?php echo $poem['id']; ?>" 
                                                         data-title="<?php echo htmlspecialchars($poem['title']); ?>" 
@@ -271,7 +327,7 @@ $pageTitle = 'Manage Poems';
                                                         data-content="<?php echo htmlspecialchars($poem['content'] ?? ''); ?>">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?delete=<?php echo $poem['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this poem?');">
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?delete=<?php echo $poem['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this poem permanently?');">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                                 <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary" target="_blank">
@@ -285,7 +341,7 @@ $pageTitle = 'Manage Poems';
                         </div>
                     </form>
                 <?php else: ?>
-                    <p class="no-items">No poems yet. Click "Add New Poem" to get started.</p>
+                    <p class="no-items" style="text-align:center;padding:40px;color:var(--text-light);">No poems yet. Click <strong>"Add New Poem"</strong> to get started.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -294,7 +350,7 @@ $pageTitle = 'Manage Poems';
 
 <!-- ===== ADD/EDIT POEM MODAL ===== -->
 <div id="poemModal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width: 800px;">
+    <div class="modal-content" style="max-width: 850px;">
         <div class="modal-header">
             <h2 id="modalTitle">Add New Poem</h2>
             <button class="modal-close">&times;</button>
@@ -305,7 +361,7 @@ $pageTitle = 'Manage Poems';
             
             <div class="form-group">
                 <label for="title">Title <span class="required">*</span></label>
-                <input type="text" id="title" name="title" required>
+                <input type="text" id="title" name="title" required placeholder="Enter poem title...">
             </div>
             
             <div class="form-group">
@@ -315,15 +371,15 @@ $pageTitle = 'Manage Poems';
             
             <div class="form-group">
                 <label for="content">Content <span class="required">*</span></label>
-                <textarea id="editor" name="content" rows="10"></textarea>
+                <textarea id="editor" name="content" rows="12"></textarea>
             </div>
 
             <!-- ===== CAMERA & IMAGE ===== -->
             <div class="form-group">
                 <label>Image (Live Photo or Upload)</label>
                 <div class="camera-trigger-group">
-                    <button type="button" id="openCameraBtn" class="btn btn-secondary">
-                        <i class="fas fa-camera"></i> Open Camera (Photo)
+                    <button type="button" id="openCameraBtn" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-camera"></i> Open Camera
                     </button>
                     <span id="photoStatus" class="status-indicator">No photo captured</span>
                     <input type="file" id="livePhotoInput" name="image" accept="image/*" style="display:none;">
@@ -369,14 +425,35 @@ $pageTitle = 'Manage Poems';
                         <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
                     </div>
                 </div>
-                <p class="field-hint">Record your poem directly in the browser. The recording will be saved when you submit the form.</p>
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Save Poem</button>
-                <button type="button" class="btn btn-outline modal-close">Cancel</button>
+                <button type="button" id="previewPoemBtn" class="btn btn-outline">
+                    <i class="fas fa-eye"></i> Preview
+                </button>
+                <button type="submit" id="savePoemBtn" class="btn btn-primary">
+                    <i class="fas fa-save"></i> <span id="saveBtnText">Save Poem</span>
+                </button>
+                <button type="button" class="btn btn-secondary modal-close">Cancel</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- ===== LIVE PREVIEW MODAL ===== -->
+<div id="previewModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 800px; background: var(--fantasy); padding:0; overflow:hidden;">
+        <div class="preview-header" style="padding:16px 24px; background: var(--vanilla); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-family:'Playfair Display',Georgia,serif;">📖 Live Preview</h3>
+            <button class="preview-close" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
+        </div>
+        <div class="preview-body" style="padding:40px 30px; background:#fff; max-height:70vh; overflow-y:auto; display:flex; flex-direction:column; align-items:center;">
+            <div class="preview-book" style="max-width:600px; width:100%;">
+                <h1 id="prevTitle" style="font-family:'Playfair Display',Georgia,serif; font-size:2rem; color:var(--dark); margin-bottom:8px;">Title</h1>
+                <p id="prevIntro" style="font-style:italic; color:var(--text-light); margin-bottom:24px; border-left:4px solid var(--rose); padding-left:16px;">Introduction</p>
+                <div id="prevContent" style="font-family:'Georgia',serif; line-height:2; font-size:1.1rem; color:var(--text);"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -387,38 +464,27 @@ $pageTitle = 'Manage Poems';
             <video id="cameraPreview" autoplay muted playsinline></video>
         </div>
         
-        <!-- Top Bar -->
         <div class="camera-top-bar">
-            <button type="button" class="camera-close-btn" id="cameraCloseBtn">
-                <i class="fas fa-times"></i>
-            </button>
+            <button type="button" class="camera-close-btn" id="cameraCloseBtn"><i class="fas fa-times"></i></button>
             <div class="camera-mode-switch">
                 <button type="button" class="mode-btn active" data-mode="photo">📷 Photo</button>
                 <button type="button" class="mode-btn" data-mode="video">🎥 Video</button>
             </div>
         </div>
 
-        <!-- Bottom Controls -->
         <div class="camera-bottom-controls">
             <div class="camera-controls-left">
-                <button type="button" id="retakeMediaBtn" class="camera-btn" disabled>
-                    <i class="fas fa-redo"></i> Retake
-                </button>
+                <button type="button" id="retakeMediaBtn" class="camera-btn" disabled><i class="fas fa-redo"></i> Retake</button>
             </div>
             <div class="camera-controls-center">
                 <button type="button" id="captureBtn" class="camera-shutter-btn">
-                    <span class="shutter-ring"></span>
-                    <span class="shutter-inner"></span>
+                    <span class="shutter-ring"></span><span class="shutter-inner"></span>
                 </button>
             </div>
             <div class="camera-controls-right">
-                <button type="button" id="confirmMediaBtn" class="camera-btn" disabled>
-                    <i class="fas fa-check"></i> Confirm
-                </button>
+                <button type="button" id="confirmMediaBtn" class="camera-btn" disabled><i class="fas fa-check"></i> Confirm</button>
             </div>
         </div>
-
-        <!-- Status / Timer -->
         <div id="cameraStatus" class="camera-status">Ready</div>
     </div>
 </div>
@@ -428,7 +494,35 @@ $pageTitle = 'Manage Poems';
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let editorInitialized = false;
-    let editingId = 0;
+
+    // ===== TOAST NOTIFICATIONS =====
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast-notification toast-${type}`;
+        toast.innerHTML = `
+            <span class="toast-icon">${type === 'success' ? '✅' : '❌'}</span>
+            <span class="toast-message">${message}</span>
+            <span class="toast-close">&times;</span>
+        `;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100px)';
+            setTimeout(() => toast.remove(), 500);
+        }, 5000);
+
+        toast.querySelector('.toast-close').addEventListener('click', () => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100px)';
+            setTimeout(() => toast.remove(), 500);
+        });
+    }
+
+    <?php if (!empty($flash_message)): ?>
+        showToast("<?php echo addslashes($flash_message); ?>", "<?php echo addslashes($flash_type); ?>");
+    <?php endif; ?>
 
     // ===== MODAL LOGIC =====
     const modal = document.getElementById('poemModal');
@@ -436,7 +530,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeButtons = document.querySelectorAll('.modal-close');
     const addBtn = document.getElementById('showAddModal');
     const editBtns = document.querySelectorAll('.edit-btn');
-    const cancelBtn = document.querySelector('.modal-close');
+    const saveBtn = document.getElementById('savePoemBtn');
+    const saveBtnText = document.getElementById('saveBtnText');
 
     function openModal(title, data) {
         modalTitle.textContent = title;
@@ -447,11 +542,13 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('title').value = data.title;
             document.getElementById('intro').value = data.intro;
             tinymce.get('editor').setContent(data.content);
+            saveBtnText.textContent = 'Update Poem';
         } else {
             document.getElementById('poem_id').value = 0;
             document.getElementById('title').value = '';
             document.getElementById('intro').value = '';
             tinymce.get('editor').setContent('');
+            saveBtnText.textContent = 'Save Poem (Draft)';
         }
         resetCamera();
         resetAudioRecorder();
@@ -460,15 +557,20 @@ document.addEventListener('DOMContentLoaded', function() {
     addBtn.addEventListener('click', function() { openModal('Add New Poem', null); });
     editBtns.forEach(btn => {
         btn.addEventListener('click', function() {
-            const data = {
+            openModal('Edit Poem', {
                 id: this.dataset.id,
                 title: this.dataset.title,
                 intro: this.dataset.intro,
                 content: this.dataset.content
-            };
-            openModal('Edit Poem', data);
+            });
         });
     });
+
+    document.getElementById('poemForm').addEventListener('submit', function() {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Saving...`;
+    });
+
     closeButtons.forEach(btn => btn.addEventListener('click', function() { modal.style.display = 'none'; }));
     window.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
 
@@ -477,21 +579,41 @@ document.addEventListener('DOMContentLoaded', function() {
         if (editorInitialized) return;
         tinymce.init({
             selector: '#editor',
-            height: 400,
+            height: 450,
             menubar: true,
             plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
             toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
             content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
             forced_root_block: 'p',
-            setup: function(editor) {
-                editor.on('change', function() { tinymce.triggerSave(); });
-            }
+            setup: function(editor) { editor.on('change', function() { tinymce.triggerSave(); }); }
         });
         editorInitialized = true;
     }
 
+    // ===== LIVE PREVIEW BUTTON =====
+    const previewBtn = document.getElementById('previewPoemBtn');
+    const previewModal = document.getElementById('previewModal');
+    const prevTitle = document.getElementById('prevTitle');
+    const prevIntro = document.getElementById('prevIntro');
+    const prevContent = document.getElementById('prevContent');
+
+    previewBtn.addEventListener('click', function() {
+        const title = document.getElementById('title').value.trim() || 'Untitled Poem';
+        const intro = document.getElementById('intro').value.trim() || 'No introduction provided.';
+        let content = tinymce.get('editor').getContent();
+        if(content.trim() === '') content = '<p style="color:#999;font-style:italic;">No content entered yet.</p>';
+
+        prevTitle.textContent = title;
+        prevIntro.textContent = intro;
+        prevContent.innerHTML = content;
+        previewModal.style.display = 'flex';
+    });
+
+    document.querySelector('.preview-close').addEventListener('click', function() { previewModal.style.display = 'none'; });
+    window.addEventListener('click', function(e) { if (e.target === previewModal) previewModal.style.display = 'none'; });
+
     // ============================================================
-    // FULL-SCREEN CAMERA MODAL
+    // CAMERA / RECORDER / DRAG & DROP LOGIC
     // ============================================================
     const cameraModal = document.getElementById('cameraModal');
     const cameraPreview = document.getElementById('cameraPreview');
@@ -504,395 +626,175 @@ document.addEventListener('DOMContentLoaded', function() {
     const openCameraBtn = document.getElementById('openCameraBtn');
     const livePhotoInput = document.getElementById('livePhotoInput');
     const photoStatus = document.getElementById('photoStatus');
-
-    // For video, we map to audio input (or use a hidden video input)
     const audioInput = document.getElementById('audioInput');
 
-    let cameraStream = null;
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let capturedBlob = null;
-    let recordedBlob = null;
-    let currentMode = 'photo';
+    let cameraStream = null, mediaRecorder = null, recordedChunks = [], capturedBlob = null, recordedBlob = null, currentMode = 'photo';
 
-    // ===== OPEN CAMERA =====
     function openCamera(mode) {
         currentMode = mode;
         cameraModal.style.display = 'flex';
         cameraStatus.textContent = 'Starting camera...';
-
-        modeBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === mode);
-        });
-
-        if (mode === 'photo') {
-            captureBtn.classList.remove('recording');
-            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
-        } else {
-            captureBtn.classList.remove('recording');
-            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
-        }
-
+        modeBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
         retakeBtn.disabled = true;
         confirmBtn.disabled = true;
-        capturedBlob = null;
-        recordedBlob = null;
-        recordedChunks = [];
-
+        capturedBlob = null; recordedBlob = null; recordedChunks = [];
         startCameraStream();
     }
 
     function closeCamera() {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraStream = null;
-        }
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-        }
-        cameraPreview.srcObject = null;
-        cameraPreview.src = '';
+        if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        cameraPreview.srcObject = null; cameraPreview.src = '';
         cameraModal.style.display = 'none';
     }
 
     async function startCameraStream() {
         try {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                cameraStatus.textContent = '❌ Camera not supported';
-                return;
-            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return cameraStatus.textContent = '❌ Camera not supported';
             cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: currentMode === 'video' });
             cameraPreview.srcObject = cameraStream;
             cameraStatus.textContent = currentMode === 'photo' ? 'Ready' : 'Ready to record';
-        } catch (error) {
-            cameraStatus.textContent = '❌ Camera access denied: ' + error.message;
-        }
+        } catch (error) { cameraStatus.textContent = '❌ Camera access denied: ' + error.message; }
     }
 
-    // ===== CAPTURE PHOTO =====
     function capturePhoto() {
         if (!cameraStream) return;
         const canvas = document.createElement('canvas');
-        canvas.width = cameraPreview.videoWidth || 1280;
-        canvas.height = cameraPreview.videoHeight || 720;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
+        canvas.width = cameraPreview.videoWidth || 1280; canvas.height = cameraPreview.videoHeight || 720;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
         canvas.toBlob((blob) => {
-            capturedBlob = blob;
-            retakeBtn.disabled = false;
-            confirmBtn.disabled = false;
+            capturedBlob = blob; retakeBtn.disabled = false; confirmBtn.disabled = false;
             cameraStatus.textContent = '✅ Photo captured';
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraPreview.srcObject = null;
+            cameraStream.getTracks().forEach(track => track.stop()); cameraPreview.srcObject = null;
         }, 'image/jpeg');
     }
 
-    // ===== VIDEO RECORDING =====
     function startRecording() {
         if (!cameraStream) return;
-        recordedChunks = [];
-        mediaRecorder = new MediaRecorder(cameraStream);
-        mediaRecorder.ondataavailable = function(e) {
-            if (e.data.size > 0) recordedChunks.push(e.data);
-        };
+        recordedChunks = []; mediaRecorder = new MediaRecorder(cameraStream);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = function() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             if (blob.size > 0) {
-                recordedBlob = blob;
-                retakeBtn.disabled = false;
-                confirmBtn.disabled = false;
+                recordedBlob = blob; retakeBtn.disabled = false; confirmBtn.disabled = false;
                 cameraStatus.textContent = '✅ Recording complete';
-                cameraStream.getTracks().forEach(track => track.stop());
-                cameraPreview.srcObject = null;
+                cameraStream.getTracks().forEach(track => track.stop()); cameraPreview.srcObject = null;
             }
         };
         mediaRecorder.start();
-        captureBtn.classList.add('recording');
-        captureBtn.querySelector('.shutter-inner').style.borderRadius = '6px';
-        cameraStatus.textContent = '🔴 Recording...';
+        captureBtn.classList.add('recording'); cameraStatus.textContent = '🔴 Recording...';
     }
 
-    function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-            captureBtn.classList.remove('recording');
-        }
-    }
+    function stopRecording() { if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.stop(); captureBtn.classList.remove('recording'); } }
 
-    // ===== RETAKES =====
     function retakeMedia() {
-        capturedBlob = null;
-        recordedBlob = null;
-        recordedChunks = [];
-        retakeBtn.disabled = true;
-        confirmBtn.disabled = true;
+        capturedBlob = null; recordedBlob = null; recordedChunks = []; retakeBtn.disabled = true; confirmBtn.disabled = true;
         cameraStatus.textContent = 'Retaking...';
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraStream = null;
-        }
+        if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
         startCameraStream();
     }
 
-    // ===== CONFIRM MEDIA =====
     function confirmMedia() {
         if (currentMode === 'photo' && capturedBlob) {
             const file = new File([capturedBlob], 'live_photo.jpg', { type: 'image/jpeg' });
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            livePhotoInput.files = dt.files;
-            photoStatus.textContent = '✅ Photo confirmed!';
-            photoStatus.style.color = '#2ecc71';
-            closeCamera();
+            const dt = new DataTransfer(); dt.items.add(file); livePhotoInput.files = dt.files;
+            photoStatus.textContent = '✅ Photo confirmed!'; photoStatus.style.color = '#2ecc71'; closeCamera();
         } else if (currentMode === 'video' && recordedBlob) {
             const file = new File([recordedBlob], 'live_video.webm', { type: 'video/webm' });
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            audioInput.files = dt.files;
+            const dt = new DataTransfer(); dt.items.add(file); audioInput.files = dt.files;
             document.getElementById('audioPreviewContainer').style.display = 'block';
-            const url = URL.createObjectURL(file);
-            document.getElementById('audioPreview').src = url;
-            closeCamera();
-            alert('✅ Video captured and saved as audio!');
+            const url = URL.createObjectURL(file); document.getElementById('audioPreview').src = url; closeCamera();
+            showToast('✅ Video captured and saved as audio!', 'success');
         }
     }
 
-    // ===== EVENT LISTENERS =====
     openCameraBtn.addEventListener('click', function() { openCamera('photo'); });
     cameraCloseBtn.addEventListener('click', closeCamera);
-
-    captureBtn.addEventListener('click', function() {
-        if (currentMode === 'photo') {
-            capturePhoto();
-        } else {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                stopRecording();
-            } else {
-                startRecording();
-            }
-        }
-    });
-
+    captureBtn.addEventListener('click', function() { currentMode === 'photo' ? capturePhoto() : (mediaRecorder && mediaRecorder.state !== 'inactive' ? stopRecording() : startRecording()); });
     retakeBtn.addEventListener('click', retakeMedia);
     confirmBtn.addEventListener('click', confirmMedia);
-
-    modeBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const mode = this.dataset.mode;
-            if (mode === currentMode) return;
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
-            closeCamera();
-            setTimeout(() => openCamera(mode), 200);
-        });
-    });
-
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && cameraModal.style.display !== 'none') {
-            closeCamera();
-        }
-    });
+    modeBtns.forEach(btn => { btn.addEventListener('click', function() { if (this.dataset.mode === currentMode) return; if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); closeCamera(); setTimeout(() => openCamera(this.dataset.mode), 200); }); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && cameraModal.style.display !== 'none') closeCamera(); });
 
     function resetCamera() {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraStream = null;
-        }
-        cameraPreview.srcObject = null;
-        cameraPreview.src = '';
-        cameraModal.style.display = 'none';
-        livePhotoInput.value = '';
-        photoStatus.textContent = 'No photo captured';
-        photoStatus.style.color = 'var(--text-light)';
-        // Reset video input if it was used
-        audioInput.value = '';
+        if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
+        cameraPreview.srcObject = null; cameraPreview.src = ''; cameraModal.style.display = 'none'; livePhotoInput.value = '';
+        photoStatus.textContent = 'No photo captured'; photoStatus.style.color = 'var(--text-light)'; audioInput.value = '';
     }
 
     // ===== DRAG & DROP IMAGE =====
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const previewContainer = document.getElementById('previewContainer');
-    const previewImage = document.getElementById('previewImage');
-
+    const dropZone = document.getElementById('dropZone'); const fileInput = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer'); const previewImage = document.getElementById('previewImage');
     dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) handleDragDrop(e.target.files[0]);
-    });
-    dropZone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--rose)';
-        dropZone.style.background = 'rgba(219,161,162,0.1)';
-    });
-    dropZone.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--border)';
-        dropZone.style.background = 'transparent';
-    });
-    dropZone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--border)';
-        dropZone.style.background = 'transparent';
-        if (e.dataTransfer.files.length > 0) handleDragDrop(e.dataTransfer.files[0]);
-    });
+    fileInput.addEventListener('change', function(e) { if (e.target.files.length > 0) handleDragDrop(e.target.files[0]); });
+    dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--rose)'; dropZone.style.background = 'rgba(219,161,162,0.1)'; });
+    dropZone.addEventListener('dragleave', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; dropZone.style.background = 'transparent'; });
+    dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; dropZone.style.background = 'transparent'; if (e.dataTransfer.files.length > 0) handleDragDrop(e.dataTransfer.files[0]); });
 
     function handleDragDrop(file) {
-        if (!file.type.startsWith('image/')) {
-            alert('Please drop an image file.');
-            return;
-        }
+        if (!file.type.startsWith('image/')) return alert('Please drop an image file.');
         const reader = new FileReader();
-        reader.onload = function(e) {
-            previewImage.src = e.target.result;
-            previewContainer.style.display = 'block';
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            fileInput.files = dt.files;
-        };
+        reader.onload = function(e) { previewImage.src = e.target.result; previewContainer.style.display = 'block'; const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; };
         reader.readAsDataURL(file);
     }
 
     // ===== AUDIO DRAG & DROP =====
-    const audioDropZone = document.getElementById('audioDropZone');
-    const audioInputFallback = document.getElementById('audioInput');
-    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
-    const audioPreview = document.getElementById('audioPreview');
-
+    const audioDropZone = document.getElementById('audioDropZone'); const audioInputFallback = document.getElementById('audioInput'); const audioPreviewContainer = document.getElementById('audioPreviewContainer'); const audioPreview = document.getElementById('audioPreview');
     audioDropZone.addEventListener('click', () => audioInputFallback.click());
-    audioInputFallback.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) handleAudio(e.target.files[0]);
-    });
-    audioDropZone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        audioDropZone.style.borderColor = 'var(--rose)';
-        audioDropZone.style.background = 'rgba(219,161,162,0.1)';
-    });
-    audioDropZone.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        audioDropZone.style.borderColor = 'var(--border)';
-        audioDropZone.style.background = 'transparent';
-    });
-    audioDropZone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        audioDropZone.style.borderColor = 'var(--border)';
-        audioDropZone.style.background = 'transparent';
-        if (e.dataTransfer.files.length > 0) handleAudio(e.dataTransfer.files[0]);
-    });
+    audioInputFallback.addEventListener('change', function(e) { if (e.target.files.length > 0) handleAudio(e.target.files[0]); });
+    audioDropZone.addEventListener('dragover', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--rose)'; audioDropZone.style.background = 'rgba(219,161,162,0.1)'; });
+    audioDropZone.addEventListener('dragleave', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--border)'; audioDropZone.style.background = 'transparent'; });
+    audioDropZone.addEventListener('drop', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--border)'; audioDropZone.style.background = 'transparent'; if (e.dataTransfer.files.length > 0) handleAudio(e.dataTransfer.files[0]); });
 
     function handleAudio(file) {
-        if (!file.type.startsWith('audio/')) {
-            alert('Please drop an audio file.');
-            return;
-        }
-        const url = URL.createObjectURL(file);
-        audioPreview.src = url;
-        audioPreviewContainer.style.display = 'block';
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        audioInputFallback.files = dt.files;
+        if (!file.type.startsWith('audio/')) return alert('Please drop an audio file.');
+        const url = URL.createObjectURL(file); audioPreview.src = url; audioPreviewContainer.style.display = 'block';
+        const dt = new DataTransfer(); dt.items.add(file); audioInputFallback.files = dt.files;
     }
 
     // ===== AUDIO RECORDER =====
-    const recordBtn = document.getElementById('recordBtn');
-    const recordingStatus = document.getElementById('recordingStatus');
-    const recordingInput = document.getElementById('recordingInput');
-    const recordingPreviewContainer = document.getElementById('recordingPreviewContainer');
-    const recordingPreview = document.getElementById('recordingPreview');
-
+    const recordBtn = document.getElementById('recordBtn'); const recordingStatus = document.getElementById('recordingStatus'); const recordingInput = document.getElementById('recordingInput'); const recordingPreviewContainer = document.getElementById('recordingPreviewContainer'); const recordingPreview = document.getElementById('recordingPreview');
     let audioRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
 
     recordBtn.addEventListener('click', async function() {
         if (audioRecorder.mediaRecorder && audioRecorder.mediaRecorder.state === 'recording') {
-            audioRecorder.mediaRecorder.stop();
-            recordingStatus.style.display = 'none';
-            recordBtn.textContent = '🎙️ Start Recording';
-            recordBtn.classList.remove('btn-danger');
-            recordBtn.classList.add('btn-secondary');
-            return;
+            audioRecorder.mediaRecorder.stop(); recordingStatus.style.display = 'none';
+            recordBtn.textContent = '🎙️ Start Recording'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary'); return;
         }
-
         try {
             audioRecorder.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioRecorder.mediaRecorder = new MediaRecorder(audioRecorder.stream);
-            audioRecorder.chunks = [];
-
-            audioRecorder.mediaRecorder.ondataavailable = event => {
-                audioRecorder.chunks.push(event.data);
-            };
-
+            audioRecorder.mediaRecorder = new MediaRecorder(audioRecorder.stream); audioRecorder.chunks = [];
+            audioRecorder.mediaRecorder.ondataavailable = event => { audioRecorder.chunks.push(event.data); };
             audioRecorder.mediaRecorder.onstop = () => {
                 audioRecorder.blob = new Blob(audioRecorder.chunks, { type: 'audio/webm' });
                 const file = new File([audioRecorder.blob], 'poem_recording.webm', { type: 'audio/webm' });
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                recordingInput.files = dt.files;
-
-                const url = URL.createObjectURL(file);
-                recordingPreview.src = url;
-                recordingPreview.load();
-                recordingPreviewContainer.style.display = 'block';
-                document.getElementById('recordingForm').style.display = 'block';
-                recordBtn.textContent = '🎙️ Record Again';
-                recordBtn.classList.remove('btn-danger');
-                recordBtn.classList.add('btn-secondary');
+                const dt = new DataTransfer(); dt.items.add(file); recordingInput.files = dt.files;
+                const url = URL.createObjectURL(file); recordingPreview.src = url; recordingPreview.load(); recordingPreviewContainer.style.display = 'block'; document.getElementById('recordingForm').style.display = 'block';
+                recordBtn.textContent = '🎙️ Record Again'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary');
             };
-
-            audioRecorder.mediaRecorder.start();
-            recordingStatus.style.display = 'inline';
-            recordBtn.textContent = '⏹️ Stop Recording';
-            recordBtn.classList.remove('btn-secondary');
-            recordBtn.classList.add('btn-danger');
-        } catch (error) {
-            alert('Microphone access denied or not available.');
-            console.error('Recording error:', error);
-        }
+            audioRecorder.mediaRecorder.start(); recordingStatus.style.display = 'inline'; recordBtn.textContent = '⏹️ Stop Recording'; recordBtn.classList.remove('btn-secondary'); recordBtn.classList.add('btn-danger');
+        } catch (error) { alert('Microphone access denied.'); console.error('Recording error:', error); }
     });
 
     function resetAudioRecorder() {
-        if (audioRecorder.stream) {
-            audioRecorder.stream.getTracks().forEach(track => track.stop());
-            audioRecorder.stream = null;
-        }
-        audioRecorder.mediaRecorder = null;
-        audioRecorder.chunks = [];
-        audioRecorder.blob = null;
-        recordingPreviewContainer.style.display = 'none';
-        recordingPreview.src = '';
-        document.getElementById('recordingForm').style.display = 'none';
-        recordingStatus.style.display = 'none';
-        recordBtn.textContent = '🎙️ Start Recording';
-        recordBtn.classList.remove('btn-danger');
-        recordBtn.classList.add('btn-secondary');
+        if (audioRecorder.stream) { audioRecorder.stream.getTracks().forEach(track => track.stop()); audioRecorder.stream = null; }
+        audioRecorder.mediaRecorder = null; audioRecorder.chunks = []; audioRecorder.blob = null;
+        recordingPreviewContainer.style.display = 'none'; recordingPreview.src = ''; document.getElementById('recordingForm').style.display = 'none'; recordingStatus.style.display = 'none';
+        recordBtn.textContent = '🎙️ Start Recording'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary');
     }
 
     // ===== BULK ACTIONS =====
-    const selectAllRows = document.getElementById('selectAllRows');
-    const rowCheckboxes = document.querySelectorAll('.row-select');
-    const executeBulkBtn = document.getElementById('executeBulkAction');
-    const bulkActionSelect = document.getElementById('bulkActionSelect');
-
-    selectAllRows?.addEventListener('change', function() {
-        rowCheckboxes.forEach(cb => cb.checked = this.checked);
-        updateBulkButton();
-    });
+    const selectAllRows = document.getElementById('selectAllRows'); const rowCheckboxes = document.querySelectorAll('.row-select'); const executeBulkBtn = document.getElementById('executeBulkAction'); const bulkActionSelect = document.getElementById('bulkActionSelect');
+    selectAllRows?.addEventListener('change', function() { rowCheckboxes.forEach(cb => cb.checked = this.checked); updateBulkButton(); });
     rowCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkButton));
 
-    function updateBulkButton() {
-        const checked = document.querySelectorAll('.row-select:checked').length;
-        executeBulkBtn.disabled = (checked === 0);
-    }
-
+    function updateBulkButton() { const checked = document.querySelectorAll('.row-select:checked').length; executeBulkBtn.disabled = (checked === 0); }
+    
     executeBulkBtn?.addEventListener('click', function() {
-        const action = bulkActionSelect.value;
-        const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
-        if (!action || ids.length === 0) {
-            alert('Please select an action and at least one poem.');
-            return;
-        }
-        if (!confirm(`Apply "${action}" to ${ids.length} poem(s)?`)) return;
-        document.getElementById('bulkActionInput').value = action;
-        document.getElementById('selectedIdsInput').value = ids.join(',');
-        document.getElementById('bulkForm').submit();
+        const action = bulkActionSelect.value; const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
+        if (!action || ids.length === 0) return alert('Please select an action and at least one poem.');
+        if (!confirm(`Apply "${action}" to ${ids.length} poem(s)? This cannot be undone.`)) return;
+        document.getElementById('bulkActionInput').value = action; document.getElementById('selectedIdsInput').value = ids.join(','); document.getElementById('bulkForm').submit();
     });
 });
 </script>
@@ -917,19 +819,14 @@ document.addEventListener('DOMContentLoaded', function() {
     --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
 
 /* ===== TYPOGRAPHY ===== */
 h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
 .rose-text { color:var(--rose); }
 
 /* ===== BUTTONS ===== */
-.btn {
-    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
-    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
-    cursor:pointer; text-decoration:none; transition:all var(--transition);
-    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
-}
+.btn { display:inline-flex; align-items:center; gap:8px; padding:12px 28px; border-radius:50px; font-weight:700; font-size:0.95rem; border:none; cursor:pointer; text-decoration:none; transition:all var(--transition); box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px; }
 .btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
 .btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
 .btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
@@ -961,10 +858,20 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .search-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
 .search-form .btn { padding:8px 20px; font-size:0.85rem; border-radius:50px; }
 
-/* ===== ALERTS ===== */
-.alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
-.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+/* ===== TOAST NOTIFICATIONS ===== */
+#toastContainer { position: fixed; top: 30px; right: 30px; z-index: 9999999; display: flex; flex-direction: column; gap: 12px; align-items: flex-end; pointer-events: none; }
+.toast-notification { background: #fff; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 40px rgba(44,30,30,0.15); display: flex; align-items: center; gap: 12px; border-left: 6px solid #28a745; font-size: 0.95rem; animation: slideInRight 0.4s ease forwards; pointer-events: auto; min-width: 280px; max-width: 450px; border: 1px solid rgba(0,0,0,0.05); color: var(--text); }
+.toast-notification.toast-error { border-left-color: #dc3545; }
+.toast-notification .toast-icon { font-size: 1.2rem; }
+.toast-notification .toast-message { flex: 1; font-weight: 500; }
+.toast-notification .toast-close { cursor: pointer; color: var(--text-light); font-size: 1.2rem; line-height: 1; transition: color 0.2s; }
+.toast-notification .toast-close:hover { color: var(--dark); }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ===== STATUS BADGE ===== */
+.status-badge { padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }
+.status-published { background: #d4edda; color: #155724; }
+.status-draft { background: #fff3cd; color: #856404; }
 
 /* ===== CARD ===== */
 .card { background:var(--card-bg); border-radius:20px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; margin-bottom:24px; transition:all var(--transition); }
@@ -980,7 +887,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .admin-table thead { background:var(--vanilla); }
 .admin-table th { text-align:left; padding:14px 20px; font-weight:600; color:var(--text); border-bottom:2px solid var(--border); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; }
 .admin-table td { padding:14px 20px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); font-size:0.9rem; }
-.admin-table tbody tr:hover { background:rgba(219,161,162,0.08); }
+.admin-table tbody tr:hover { background:rgba(219,161,162,0.06); transition:background 0.2s; }
 .styled-checkbox { width:18px; height:18px; accent-color:var(--rose); cursor:pointer; }
 .actions { display:flex; gap:4px; flex-wrap:wrap; }
 
@@ -995,7 +902,14 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .modal-close { background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light); transition:color 0.2s; }
 .modal-close:hover { color:var(--rose); }
 
-/* ===== FORM ===== */
+/* ===== PREVIEW MODAL ENHANCEMENTS ===== */
+.preview-book h1 { margin-top: 0; }
+.preview-close:hover { color: var(--rose); transform: rotate(90deg); transition: transform 0.3s; }
+.preview-body::-webkit-scrollbar { width: 8px; }
+.preview-body::-webkit-scrollbar-track { background: var(--fantasy); }
+.preview-body::-webkit-scrollbar-thumb { background: var(--rose); border-radius: 10px; }
+
+/* ===== FORM & UPLOADS ===== */
 .poem-form .form-group { margin-bottom:16px; }
 .poem-form label { display:block; font-weight:600; margin-bottom:6px; font-size:0.9rem; color:var(--text); }
 .poem-form .required { color:#dc3545; }
@@ -1004,18 +918,12 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .poem-form textarea { resize:vertical; min-height:60px; font-family:'Inter',sans-serif; }
 .poem-form .form-actions { display:flex; gap:12px; margin-top:16px; }
 .poem-form .form-actions .btn { min-width:120px; justify-content:center; }
-
-/* ===== CAMERA TRIGGER ===== */
 .camera-trigger-group { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 .status-indicator { font-size:0.9rem; color:var(--text-light); font-weight:500; }
-
-/* ===== UPLOAD ZONES ===== */
 .upload-zone { border:2px dashed var(--border); border-radius:16px; padding:30px; text-align:center; cursor:pointer; transition:all 0.3s; background:var(--fantasy); }
 .upload-zone i { font-size:2.5rem; color:var(--rose); margin-bottom:8px; display:block; }
 .upload-zone p { margin:0; color:var(--text-light); }
 .upload-zone:hover { border-color:var(--rose); background:rgba(219,161,162,0.05); }
-
-/* ===== RECORDER SECTION ===== */
 .recorder-section { background:var(--fantasy); border-radius:16px; padding:16px; margin-top:12px; border:1px solid var(--border); }
 .recorder-section h4 { margin-bottom:8px; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
 .recorder-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
@@ -1023,35 +931,17 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 #recordingStatus { font-weight:600; color:#e74c3c; }
 
 /* ===== FULL-SCREEN CAMERA MODAL ===== */
-.camera-modal {
-    position:fixed;
-    top:0; left:0; width:100%; height:100%;
-    background:#000;
-    z-index:999999;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-}
+.camera-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:999999; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 .camera-modal-inner { width:100%; height:100%; position:relative; display:flex; flex-direction:column; background:#000; }
 .camera-preview-wrapper { flex:1; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#000; overflow:hidden; }
 .camera-preview-wrapper video { width:100%; height:100%; object-fit:cover; }
-.camera-top-bar {
-    position:absolute; top:0; left:0; right:0; padding:20px;
-    background:linear-gradient(to bottom,rgba(0,0,0,0.6) 0%,transparent 100%);
-    display:flex; justify-content:space-between; align-items:center; z-index:2;
-}
+.camera-top-bar { position:absolute; top:0; left:0; right:0; padding:20px; background:linear-gradient(to bottom,rgba(0,0,0,0.6) 0%,transparent 100%); display:flex; justify-content:space-between; align-items:center; z-index:2; }
 .camera-close-btn { background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:1.5rem; width:44px; height:44px; border-radius:50%; cursor:pointer; transition:background 0.2s; display:flex; align-items:center; justify-content:center; }
 .camera-close-btn:hover { background:rgba(255,255,255,0.3); }
 .camera-mode-switch { display:flex; gap:4px; background:rgba(255,255,255,0.2); border-radius:30px; padding:4px; }
 .camera-mode-switch .mode-btn { background:transparent; border:none; color:rgba(255,255,255,0.6); padding:8px 20px; border-radius:26px; font-size:0.9rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
 .camera-mode-switch .mode-btn.active { background:rgba(255,255,255,0.9); color:#000; }
-.camera-bottom-controls {
-    position:absolute; bottom:30px; left:0; right:0; padding:0 20px;
-    display:flex; justify-content:space-between; align-items:center; z-index:2;
-    background:linear-gradient(to top,rgba(0,0,0,0.6) 0%,transparent 100%);
-    padding-top:30px; padding-bottom:30px;
-}
+.camera-bottom-controls { position:absolute; bottom:30px; left:0; right:0; padding:0 20px; display:flex; justify-content:space-between; align-items:center; z-index:2; background:linear-gradient(to top,rgba(0,0,0,0.6) 0%,transparent 100%); padding-top:30px; padding-bottom:30px; }
 .camera-controls-left, .camera-controls-right { flex:0 0 80px; display:flex; justify-content:center; }
 .camera-controls-center { flex:1; display:flex; justify-content:center; }
 .camera-shutter-btn { width:72px; height:72px; border-radius:50%; border:4px solid rgba(255,255,255,0.8); background:transparent; cursor:pointer; position:relative; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
@@ -1062,26 +952,50 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .camera-btn { background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:#fff; padding:8px 16px; border-radius:30px; font-size:0.85rem; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:6px; }
 .camera-btn:disabled { opacity:0.4; cursor:not-allowed; }
 .camera-btn:hover:not(:disabled) { background:rgba(255,255,255,0.3); }
-.camera-status {
-    position:absolute; bottom:110px; left:50%; transform:translateX(-50%);
-    color:#fff; font-size:1rem; font-weight:500; text-shadow:0 0 20px rgba(0,0,0,0.5);
-    z-index:2; background:rgba(0,0,0,0.5); padding:6px 16px; border-radius:20px; backdrop-filter:blur(4px);
-}
+.camera-status { position:absolute; bottom:110px; left:50%; transform:translateX(-50%); color:#fff; font-size:1rem; font-weight:500; text-shadow:0 0 20px rgba(0,0,0,0.5); z-index:2; background:rgba(0,0,0,0.5); padding:6px 16px; border-radius:20px; backdrop-filter:blur(4px); }
+
+/* ===== BUTTON LOADING STATE ===== */
+.btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none !important; }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width:768px) {
-    .admin-header { flex-direction:column; align-items:stretch; text-align:center; }
-    .admin-actions { justify-content:center; }
-    .modal-content { padding:24px; }
+@media (max-width:768px) { .admin-header { flex-direction:column; align-items:stretch; text-align:center; } .admin-actions { justify-content:center; } .modal-content { padding:24px; } }
+@media (max-width:480px) { .search-form { flex-direction:column; } .search-form input { width:100%; } .camera-bottom-controls { bottom:16px; padding:0 12px; padding-bottom:16px; } .camera-shutter-btn { width:64px; height:64px; } .camera-shutter-btn .shutter-inner { width:48px; height:48px; } .camera-btn { font-size:0.75rem; padding:6px 12px; } }
+/* ===== TOAST NOTIFICATIONS ===== */
+#toastContainer {
+    position: fixed; top: 30px; right: 30px; z-index: 9999999;
+    display: flex; flex-direction: column; gap: 12px; align-items: flex-end; pointer-events: none;
 }
-@media (max-width:480px) {
-    .search-form { flex-direction:column; }
-    .search-form input { width:100%; }
-    .camera-bottom-controls { bottom:16px; padding:0 12px; padding-bottom:16px; }
-    .camera-shutter-btn { width:64px; height:64px; }
-    .camera-shutter-btn .shutter-inner { width:48px; height:48px; }
-    .camera-btn { font-size:0.75rem; padding:6px 12px; }
+.toast-notification {
+    background: #fff; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 40px rgba(44,30,30,0.15);
+    display: flex; align-items: center; gap: 12px; border-left: 6px solid #28a745; font-size: 0.95rem;
+    animation: slideInRight 0.4s ease forwards; pointer-events: auto; min-width: 280px; max-width: 450px;
+    border: 1px solid rgba(0,0,0,0.05); color: var(--text);
 }
+.toast-notification.toast-error { border-left-color: #dc3545; }
+.toast-notification .toast-icon { font-size: 1.2rem; }
+.toast-notification .toast-message { flex: 1; font-weight: 500; }
+.toast-notification .toast-close { cursor: pointer; color: var(--text-light); font-size: 1.2rem; line-height: 1; transition: color 0.2s; }
+.toast-notification .toast-close:hover { color: var(--dark); }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ===== STATUS BADGE ===== */
+.status-badge { padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }
+.status-published { background: #d4edda; color: #155724; }
+.status-draft { background: #fff3cd; color: #856404; }
+
+/* ===== PREVIEW MODAL ENHANCEMENTS ===== */
+.preview-book h1 { margin-top: 0; }
+.preview-close:hover { color: var(--rose); transform: rotate(90deg); transition: transform 0.3s; }
+.preview-body::-webkit-scrollbar { width: 8px; }
+.preview-body::-webkit-scrollbar-track { background: var(--fantasy); }
+.preview-body::-webkit-scrollbar-thumb { background: var(--rose); border-radius: 10px; }
+
+/* ===== BUTTON LOADING STATE ===== */
+.btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none !important; }
+
+/* ===== CHECKBOX & BULK STYLES ===== */
+.styled-checkbox { width: 18px; height: 18px; accent-color: var(--rose); cursor: pointer; }
+.admin-table tbody tr:hover { background: rgba(219,161,162,0.06); transition: background 0.2s; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
