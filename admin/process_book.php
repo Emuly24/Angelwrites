@@ -170,18 +170,18 @@ function extractPDF($file_path) {
             @unlink($txt_path);
         }
     }
-    if (!$text && class_exists('\\Smalot\\PdfParser\\Parser')) {
-        try {
-            $config = new \Smalot\PdfParser\Config();
-            $config->setIgnoreEncryption(true);
-            $parser = new \Smalot\PdfParser\Parser();
-            $parser->setConfig($config);
-            $pdf = $parser->parseFile($file_path);
-            $text = $pdf->getText();
-        } catch (Exception $e) {
-            $text = false;
-        }
+   if (!$text && class_exists('\\Smalot\\PdfParser\\Parser')) {
+    try {
+        // $config = new \Smalot\PdfParser\Config();
+        // $config->setIgnoreEncryption(true);
+        $parser = new \Smalot\PdfParser\Parser();
+        // $parser->setConfig($config);
+        $pdf = $parser->parseFile($file_path);
+        $text = $pdf->getText();
+    } catch (Exception $e) {
+        $text = false;
     }
+}
     if (!$text || empty(trim($text))) {
         $handle = fopen($file_path, 'rb');
         $content = fread($handle, filesize($file_path));
