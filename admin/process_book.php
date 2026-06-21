@@ -486,6 +486,25 @@ function renderTOCSidebar($toc_json) {
     $html .= '</div>';
     return $html;
 }
+function renderVersionSideBySide($old_html, $new_html, $label_old, $label_new) {
+    return '
+    <div class="diff-container side-by-side">
+        <div class="diff-columns">
+            <div class="diff-column">
+                <div class="column-header">' . htmlspecialchars($label_old) . '</div>
+                <div class="column-content">
+                    <pre>' . htmlspecialchars($old_html) . '</pre>
+                </div>
+            </div>
+            <div class="diff-column">
+                <div class="column-header">' . htmlspecialchars($label_new) . '</div>
+                <div class="column-content">
+                    <pre>' . htmlspecialchars($new_html) . '</pre>
+                </div>
+            </div>
+        </div>
+    </div>';
+}
 
 function publishVersion($book_id, $version) {
     global $db;
