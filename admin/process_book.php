@@ -113,10 +113,12 @@ function fixEncoding($text) {
         return trim($iso);
     }
     $win1250 = mb_convert_encoding($text, 'UTF-8', 'Windows-1250');
-    if ($win1250 === false) $win1250 = '';
-    if (!preg_match('/[â€œâ€™â€“]/', $win1250)) {
-        return trim($win1250);
-    }
+    if (in_array('Windows-1250', mb_list_encodings())) {
+            $win1250 = mb_convert_encoding($text, 'UTF-8', 'Windows-1250');
+            if ($win1250 !== false && !preg_match('/[â€œâ€™â€“]/', $win1250)) {
+                return trim($win1250);
+            }
+        }
     $map = [
         'â€œ' => '“', 'â€' => '”', 'â€™' => '’', 'â€˜' => '‘',
         'â€"' => '—', 'â€”' => '—', 'â€“' => '–',
