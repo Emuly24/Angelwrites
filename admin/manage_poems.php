@@ -39,26 +39,40 @@ if (isset($_GET['unpublish']) && is_numeric($_GET['unpublish'])) {
     exit;
 }
 
-// ===== HANDLE BULK DELETE =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action']) && $_POST['bulk_action'] === 'delete') {
+// ===== HANDLE BULK ACTIONS =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
     $ids = array_filter(explode(',', $_POST['selected_ids'] ?? ''));
+    $action = $_POST['bulk_action'];
+    
     if (!empty($ids)) {
-        $db->beginTransaction();
-        try {
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id IN ($placeholders)");
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        if ($action === 'delete') {
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id IN ($placeholders)");
+                $stmt->execute($ids);
+                $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id IN ($placeholders)");
+                $stmt->execute($ids);
+                $stmt = $db->prepare("DELETE FROM poems WHERE id IN ($placeholders)");
+                $stmt->execute($ids);
+                $db->commit();
+                $_SESSION['flash_message'] = count($ids) . ' poem(s) deleted successfully.';
+                $_SESSION['flash_type'] = 'success';
+            } catch (Exception $e) {
+                $db->rollBack();
+                $_SESSION['flash_message'] = 'Error deleting poems: ' . $e->getMessage();
+                $_SESSION['flash_type'] = 'error';
+            }
+        } elseif ($action === 'publish') {
+            $stmt = $db->prepare("UPDATE poem_status SET status = 'published' WHERE poem_id IN ($placeholders)");
             $stmt->execute($ids);
-            $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id IN ($placeholders)");
-            $stmt->execute($ids);
-            $stmt = $db->prepare("DELETE FROM poems WHERE id IN ($placeholders)");
-            $stmt->execute($ids);
-            $db->commit();
-            $_SESSION['flash_message'] = count($ids) . ' poem(s) deleted successfully.';
+            $_SESSION['flash_message'] = count($ids) . ' poem(s) published successfully.';
             $_SESSION['flash_type'] = 'success';
-        } catch (Exception $e) {
-            $db->rollBack();
-            $_SESSION['flash_message'] = 'Error deleting poems: ' . $e->getMessage();
-            $_SESSION['flash_type'] = 'error';
+        } elseif ($action === 'draft') {
+            $stmt = $db->prepare("UPDATE poem_status SET status = 'draft' WHERE poem_id IN ($placeholders)");
+            $stmt->execute($ids);
+            $_SESSION['flash_message'] = count($ids) . ' poem(s) moved to draft.';
+            $_SESSION['flash_type'] = 'success';
         }
         header('Location: ' . SITE_URL . '/admin/manage_poems.php');
         exit;
@@ -247,6 +261,8 @@ $pageTitle = 'Manage Poems';
                 <div class="card-header-actions">
                     <select id="bulkActionSelect" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.85rem;background:var(--card-bg);color:var(--text);">
                         <option value="">Bulk Actions</option>
+                        <option value="publish">Publish Selected</option>
+                        <option value="draft">Move to Draft</option>
                         <option value="delete">Delete Selected</option>
                     </select>
                     <button id="executeBulkAction" class="btn btn-sm btn-primary" disabled>Apply</button>
@@ -324,7 +340,9 @@ $pageTitle = 'Manage Poems';
                                                         data-id="<?php echo $poem['id']; ?>" 
                                                         data-title="<?php echo htmlspecialchars($poem['title']); ?>" 
                                                         data-intro="<?php echo htmlspecialchars($poem['intro'] ?? ''); ?>" 
-                                                        data-content="<?php echo htmlspecialchars($poem['content'] ?? ''); ?>">
+                                                        data-content="<?php echo htmlspecialchars($poem['content'] ?? ''); ?>"
+                                                        data-image="<?php echo htmlspecialchars($poem['image_path'] ?? ''); ?>"
+                                                        data-audio="<?php echo htmlspecialchars($poem['audio_path'] ?? ''); ?>">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                                 <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php?delete=<?php echo $poem['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this poem permanently?');">
@@ -384,6 +402,11 @@ $pageTitle = 'Manage Poems';
                     <span id="photoStatus" class="status-indicator">No photo captured</span>
                     <input type="file" id="livePhotoInput" name="image" accept="image/*" style="display:none;">
                 </div>
+                <!-- Show current image if editing -->
+                <div id="currentImagePreview" style="display:none; margin-top:8px;">
+                    <small>Current image:</small><br>
+                    <img id="currentImage" style="max-width:150px; max-height:150px; border-radius:8px; border:1px solid var(--border);">
+                </div>
             </div>
 
             <!-- ===== DRAG & DROP IMAGE (FALLBACK) ===== -->
@@ -409,6 +432,11 @@ $pageTitle = 'Manage Poems';
                     <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
                         <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
                     </div>
+                </div>
+                <!-- Show current audio if editing -->
+                <div id="currentAudioPreview" style="display:none; margin-top:8px;">
+                    <small>Current audio:</small><br>
+                    <audio controls id="currentAudio" style="width:100%;"><source src="" type="audio/mpeg"></audio>
                 </div>
             </div>
 
@@ -577,6 +605,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('editor').value = data.content;
             }
             saveBtnText.textContent = 'Update Poem';
+
+            // Show current image if exists
+            const currentImagePreview = document.getElementById('currentImagePreview');
+            const currentImage = document.getElementById('currentImage');
+            if (data.image) {
+                currentImage.src = '<?php echo SITE_URL; ?>/' + data.image;
+                currentImagePreview.style.display = 'block';
+            } else {
+                currentImagePreview.style.display = 'none';
+            }
+
+            // Show current audio if exists
+            const currentAudioPreview = document.getElementById('currentAudioPreview');
+            const currentAudio = document.getElementById('currentAudio');
+            if (data.audio) {
+                currentAudio.src = '<?php echo SITE_URL; ?>/' + data.audio;
+                currentAudioPreview.style.display = 'block';
+            } else {
+                currentAudioPreview.style.display = 'none';
+            }
         } else {
             document.getElementById('poem_id').value = 0;
             document.getElementById('title').value = '';
@@ -587,6 +635,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('editor').value = '';
             }
             saveBtnText.textContent = 'Save Poem (Draft)';
+            document.getElementById('currentImagePreview').style.display = 'none';
+            document.getElementById('currentAudioPreview').style.display = 'none';
         }
 
         try { resetCamera(); } catch(e) { console.log('Camera reset skipped'); }
@@ -600,7 +650,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: this.dataset.id,
                 title: this.dataset.title,
                 intro: this.dataset.intro,
-                content: this.dataset.content
+                content: this.dataset.content,
+                image: this.dataset.image,
+                audio: this.dataset.audio
             });
         });
     });
