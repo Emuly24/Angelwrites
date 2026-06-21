@@ -569,9 +569,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Note: The JS form listener has been REMOVED intentionally to prevent the 
-    // "main.js" crash from blocking the native HTML form submission.
-    // The Save button uses `type="submit"` and `name="save_poem"`.
+    // =====  BYPASS main.js FORM SUBMISSION CRASH =====
+const saveBtn = document.getElementById('savePoemBtn');
+if (saveBtn) {
+    saveBtn.addEventListener('click', function(e) {
+        // Prevent the default submit event (which triggers the crashing main.js listener)
+        e.preventDefault(); 
+        
+        // Force TinyMCE to write its content into the <textarea> right now
+        if (tinymce && tinymce.get('editor')) {
+            tinymce.get('editor').save(); 
+        }
+        
+        // Manually trigger a native form submission (bypasses all JS 'submit' event listeners)
+        document.getElementById('poemForm').submit();
+    });
+}
 
     closeButtons.forEach(btn => btn.addEventListener('click', function() { modal.style.display = 'none'; }));
     window.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
