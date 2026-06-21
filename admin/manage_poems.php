@@ -474,6 +474,8 @@ $pageTitle = 'Manage Poems';
 
         <div class="camera-bottom-controls">
             <div class="camera-controls-left">
+                <!-- 🚀 NEW FLIP BUTTON FOR FRONT/BACK CAMERA -->
+                <button type="button" id="flipCameraBtn" class="camera-btn"><i class="fas fa-sync-alt"></i> Flip</button>
                 <button type="button" id="retakeMediaBtn" class="camera-btn" disabled><i class="fas fa-redo"></i> Retake</button>
             </div>
             <div class="camera-controls-center">
@@ -533,27 +535,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveBtn = document.getElementById('savePoemBtn');
     const saveBtnText = document.getElementById('saveBtnText');
 
-   function openModal(title, data) {
-    modalTitle.textContent = title;
-    modal.style.display = 'flex';
-    initTinyMCE();
-    if (data) {
-        document.getElementById('poem_id').value = data.id;
-        document.getElementById('title').value = data.title;
-        document.getElementById('intro').value = data.intro;
-        tinymce.get('editor').setContent(data.content);
-        saveBtnText.textContent = 'Update Poem';
-    } else {
-        document.getElementById('poem_id').value = 0;
-        document.getElementById('title').value = '';
-        document.getElementById('intro').value = '';
-        tinymce.get('editor').setContent('');
-        saveBtnText.textContent = 'Save Poem (Draft)';
-    }
+    function openModal(title, data) {
+        modalTitle.textContent = title;
+        modal.style.display = 'flex';
+        initTinyMCE();
+        if (data) {
+            document.getElementById('poem_id').value = data.id;
+            document.getElementById('title').value = data.title;
+            document.getElementById('intro').value = data.intro;
+            if(tinymce.get('editor')) tinymce.get('editor').setContent(data.content);
+            saveBtnText.textContent = 'Update Poem';
+        } else {
+            document.getElementById('poem_id').value = 0;
+            document.getElementById('title').value = '';
+            document.getElementById('intro').value = '';
+            if(tinymce.get('editor')) tinymce.get('editor').setContent('');
+            saveBtnText.textContent = 'Save Poem (Draft)';
+        }
 
-    try { resetCamera(); } catch(e) { console.log('Camera reset skipped'); }
-    try { resetAudioRecorder(); } catch(e) { console.log('Audio recorder reset skipped'); }
-}
+        try { resetCamera(); } catch(e) { console.log('Camera reset skipped'); }
+        try { resetAudioRecorder(); } catch(e) { console.log('Audio recorder reset skipped'); }
+    }
 
     addBtn.addEventListener('click', function() { openModal('Add New Poem', null); });
     editBtns.forEach(btn => {
@@ -567,10 +569,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    document.getElementById('poemForm').addEventListener('submit', function() {
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Saving...`;
-    });
+    // Note: The JS form listener has been REMOVED intentionally to prevent the 
+    // "main.js" crash from blocking the native HTML form submission.
+    // The Save button uses `type="submit"` and `name="save_poem"`.
 
     closeButtons.forEach(btn => btn.addEventListener('click', function() { modal.style.display = 'none'; }));
     window.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
@@ -601,7 +602,9 @@ document.addEventListener('DOMContentLoaded', function() {
     previewBtn.addEventListener('click', function() {
         const title = document.getElementById('title').value.trim() || 'Untitled Poem';
         const intro = document.getElementById('intro').value.trim() || 'No introduction provided.';
-        let content = tinymce.get('editor').getContent();
+        let content = '';
+        if(tinymce.get('editor')) content = tinymce.get('editor').getContent();
+        
         if(content.trim() === '') content = '<p style="color:#999;font-style:italic;">No content entered yet.</p>';
 
         prevTitle.textContent = title;
@@ -619,6 +622,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cameraModal = document.getElementById('cameraModal');
     const cameraPreview = document.getElementById('cameraPreview');
     const cameraCloseBtn = document.getElementById('cameraCloseBtn');
+    const flipCameraBtn = document.getElementById('flipCameraBtn'); // New Button
     const captureBtn = document.getElementById('captureBtn');
     const retakeBtn = document.getElementById('retakeMediaBtn');
     const confirmBtn = document.getElementById('confirmMediaBtn');
@@ -630,6 +634,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const audioInput = document.getElementById('audioInput');
 
     let cameraStream = null, mediaRecorder = null, recordedChunks = [], capturedBlob = null, recordedBlob = null, currentMode = 'photo';
+    let currentFacingMode = 'user'; // Default to front camera. Use 'environment' for back.
 
     function openCamera(mode) {
         currentMode = mode;
@@ -639,7 +644,7 @@ document.addEventListener('DOMContentLoaded', function() {
         retakeBtn.disabled = true;
         confirmBtn.disabled = true;
         capturedBlob = null; recordedBlob = null; recordedChunks = [];
-        startCameraStream();
+        startCameraStream(currentFacingMode);
     }
 
     function closeCamera() {
@@ -649,14 +654,32 @@ document.addEventListener('DOMContentLoaded', function() {
         cameraModal.style.display = 'none';
     }
 
-    async function startCameraStream() {
+    async function startCameraStream(facingMode) {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return cameraStatus.textContent = '❌ Camera not supported';
-            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: currentMode === 'video' });
+            
+            // Apply the facing mode constraint
+            let constraints = { 
+                video: { facingMode: facingMode }, 
+                audio: currentMode === 'video' 
+            };
+            
+            cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
             cameraPreview.srcObject = cameraStream;
             cameraStatus.textContent = currentMode === 'photo' ? 'Ready' : 'Ready to record';
         } catch (error) { cameraStatus.textContent = '❌ Camera access denied: ' + error.message; }
     }
+
+    // 🚀 FLIP CAMERA LOGIC
+    flipCameraBtn.addEventListener('click', function() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+        startCameraStream(currentFacingMode);
+        cameraStatus.textContent = `Switched to ${currentFacingMode === 'user' ? 'Front' : 'Back'} Camera`;
+    });
 
     function capturePhoto() {
         if (!cameraStream) return;
@@ -692,7 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
         capturedBlob = null; recordedBlob = null; recordedChunks = []; retakeBtn.disabled = true; confirmBtn.disabled = true;
         cameraStatus.textContent = 'Retaking...';
         if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
-        startCameraStream();
+        startCameraStream(currentFacingMode);
     }
 
     function confirmMedia() {
@@ -703,8 +726,8 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (currentMode === 'video' && recordedBlob) {
             const file = new File([recordedBlob], 'live_video.webm', { type: 'video/webm' });
             const dt = new DataTransfer(); dt.items.add(file); audioInput.files = dt.files;
-            document.getElementById('audioPreviewContainer').style.display = 'block';
-            const url = URL.createObjectURL(file); document.getElementById('audioPreview').src = url; closeCamera();
+            if(document.getElementById('audioPreviewContainer')) document.getElementById('audioPreviewContainer').style.display = 'block';
+            const url = URL.createObjectURL(file); if(document.getElementById('audioPreview')) document.getElementById('audioPreview').src = url; closeCamera();
             showToast('✅ Video captured and saved as audio!', 'success');
         }
     }
@@ -720,17 +743,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetCamera() {
         if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
         cameraPreview.srcObject = null; cameraPreview.src = ''; cameraModal.style.display = 'none'; livePhotoInput.value = '';
-        photoStatus.textContent = 'No photo captured'; photoStatus.style.color = 'var(--text-light)'; audioInput.value = '';
+        if(photoStatus) { photoStatus.textContent = 'No photo captured'; photoStatus.style.color = 'var(--text-light)'; }
+        if(audioInput) audioInput.value = '';
     }
 
     // ===== DRAG & DROP IMAGE =====
     const dropZone = document.getElementById('dropZone'); const fileInput = document.getElementById('fileInput');
     const previewContainer = document.getElementById('previewContainer'); const previewImage = document.getElementById('previewImage');
-    dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', function(e) { if (e.target.files.length > 0) handleDragDrop(e.target.files[0]); });
-    dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--rose)'; dropZone.style.background = 'rgba(219,161,162,0.1)'; });
-    dropZone.addEventListener('dragleave', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; dropZone.style.background = 'transparent'; });
-    dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; dropZone.style.background = 'transparent'; if (e.dataTransfer.files.length > 0) handleDragDrop(e.dataTransfer.files[0]); });
+    if(dropZone) {
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', function(e) { if (e.target.files.length > 0) handleDragDrop(e.target.files[0]); });
+        dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--rose)'; dropZone.style.background = 'rgba(219,161,162,0.1)'; });
+        dropZone.addEventListener('dragleave', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; dropZone.style.background = 'transparent'; });
+        dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--border)'; dropZone.style.background = 'transparent'; if (e.dataTransfer.files.length > 0) handleDragDrop(e.dataTransfer.files[0]); });
+    }
 
     function handleDragDrop(file) {
         if (!file.type.startsWith('image/')) return alert('Please drop an image file.');
@@ -741,47 +767,58 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== AUDIO DRAG & DROP =====
     const audioDropZone = document.getElementById('audioDropZone'); const audioInputFallback = document.getElementById('audioInput'); const audioPreviewContainer = document.getElementById('audioPreviewContainer'); const audioPreview = document.getElementById('audioPreview');
-    audioDropZone.addEventListener('click', () => audioInputFallback.click());
-    audioInputFallback.addEventListener('change', function(e) { if (e.target.files.length > 0) handleAudio(e.target.files[0]); });
-    audioDropZone.addEventListener('dragover', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--rose)'; audioDropZone.style.background = 'rgba(219,161,162,0.1)'; });
-    audioDropZone.addEventListener('dragleave', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--border)'; audioDropZone.style.background = 'transparent'; });
-    audioDropZone.addEventListener('drop', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--border)'; audioDropZone.style.background = 'transparent'; if (e.dataTransfer.files.length > 0) handleAudio(e.dataTransfer.files[0]); });
+    if(audioDropZone) {
+        audioDropZone.addEventListener('click', () => audioInputFallback.click());
+        audioInputFallback.addEventListener('change', function(e) { if (e.target.files.length > 0) handleAudio(e.target.files[0]); });
+        audioDropZone.addEventListener('dragover', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--rose)'; audioDropZone.style.background = 'rgba(219,161,162,0.1)'; });
+        audioDropZone.addEventListener('dragleave', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--border)'; audioDropZone.style.background = 'transparent'; });
+        audioDropZone.addEventListener('drop', function(e) { e.preventDefault(); audioDropZone.style.borderColor = 'var(--border)'; audioDropZone.style.background = 'transparent'; if (e.dataTransfer.files.length > 0) handleAudio(e.dataTransfer.files[0]); });
+    }
 
     function handleAudio(file) {
         if (!file.type.startsWith('audio/')) return alert('Please drop an audio file.');
-        const url = URL.createObjectURL(file); audioPreview.src = url; audioPreviewContainer.style.display = 'block';
+        const url = URL.createObjectURL(file); if(audioPreview) audioPreview.src = url; if(audioPreviewContainer) audioPreviewContainer.style.display = 'block';
         const dt = new DataTransfer(); dt.items.add(file); audioInputFallback.files = dt.files;
     }
 
-    // ===== AUDIO RECORDER =====
+    // ===== AUDIO RECORDER (Null-Safe) =====
     const recordBtn = document.getElementById('recordBtn'); const recordingStatus = document.getElementById('recordingStatus'); const recordingInput = document.getElementById('recordingInput'); const recordingPreviewContainer = document.getElementById('recordingPreviewContainer'); const recordingPreview = document.getElementById('recordingPreview');
     let audioRecorder = { mediaRecorder: null, chunks: [], stream: null, blob: null };
 
-    recordBtn.addEventListener('click', async function() {
-        if (audioRecorder.mediaRecorder && audioRecorder.mediaRecorder.state === 'recording') {
-            audioRecorder.mediaRecorder.stop(); recordingStatus.style.display = 'none';
-            recordBtn.textContent = '🎙️ Start Recording'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary'); return;
-        }
-        try {
-            audioRecorder.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioRecorder.mediaRecorder = new MediaRecorder(audioRecorder.stream); audioRecorder.chunks = [];
-            audioRecorder.mediaRecorder.ondataavailable = event => { audioRecorder.chunks.push(event.data); };
-            audioRecorder.mediaRecorder.onstop = () => {
-                audioRecorder.blob = new Blob(audioRecorder.chunks, { type: 'audio/webm' });
-                const file = new File([audioRecorder.blob], 'poem_recording.webm', { type: 'audio/webm' });
-                const dt = new DataTransfer(); dt.items.add(file); recordingInput.files = dt.files;
-                const url = URL.createObjectURL(file); recordingPreview.src = url; recordingPreview.load(); recordingPreviewContainer.style.display = 'block'; document.getElementById('recordingForm').style.display = 'block';
-                recordBtn.textContent = '🎙️ Record Again'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary');
-            };
-            audioRecorder.mediaRecorder.start(); recordingStatus.style.display = 'inline'; recordBtn.textContent = '⏹️ Stop Recording'; recordBtn.classList.remove('btn-secondary'); recordBtn.classList.add('btn-danger');
-        } catch (error) { alert('Microphone access denied.'); console.error('Recording error:', error); }
-    });
+    if(recordBtn) {
+        recordBtn.addEventListener('click', async function() {
+            if (audioRecorder.mediaRecorder && audioRecorder.mediaRecorder.state === 'recording') {
+                audioRecorder.mediaRecorder.stop(); if(recordingStatus) recordingStatus.style.display = 'none';
+                recordBtn.textContent = '🎙️ Start Recording'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary'); return;
+            }
+            try {
+                audioRecorder.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioRecorder.mediaRecorder = new MediaRecorder(audioRecorder.stream); audioRecorder.chunks = [];
+                audioRecorder.mediaRecorder.ondataavailable = event => { audioRecorder.chunks.push(event.data); };
+                audioRecorder.mediaRecorder.onstop = () => {
+                    audioRecorder.blob = new Blob(audioRecorder.chunks, { type: 'audio/webm' });
+                    const file = new File([audioRecorder.blob], 'poem_recording.webm', { type: 'audio/webm' });
+                    const dt = new DataTransfer(); dt.items.add(file); recordingInput.files = dt.files;
+                    const url = URL.createObjectURL(file); if(recordingPreview) recordingPreview.src = url; if(recordingPreview) recordingPreview.load(); if(recordingPreviewContainer) recordingPreviewContainer.style.display = 'block'; if(document.getElementById('recordingForm')) document.getElementById('recordingForm').style.display = 'block';
+                    recordBtn.textContent = '🎙️ Record Again'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary');
+                };
+                audioRecorder.mediaRecorder.start(); if(recordingStatus) recordingStatus.style.display = 'inline'; recordBtn.textContent = '⏹️ Stop Recording'; recordBtn.classList.remove('btn-secondary'); recordBtn.classList.add('btn-danger');
+            } catch (error) { alert('Microphone access denied.'); console.error('Recording error:', error); }
+        });
+    }
 
     function resetAudioRecorder() {
         if (audioRecorder.stream) { audioRecorder.stream.getTracks().forEach(track => track.stop()); audioRecorder.stream = null; }
         audioRecorder.mediaRecorder = null; audioRecorder.chunks = []; audioRecorder.blob = null;
-        recordingPreviewContainer.style.display = 'none'; recordingPreview.src = ''; document.getElementById('recordingForm').style.display = 'none'; recordingStatus.style.display = 'none';
-        recordBtn.textContent = '🎙️ Start Recording'; recordBtn.classList.remove('btn-danger'); recordBtn.classList.add('btn-secondary');
+        if(recordingPreviewContainer) recordingPreviewContainer.style.display = 'none';
+        if(recordingPreview) recordingPreview.src = '';
+        if(document.getElementById('recordingForm')) document.getElementById('recordingForm').style.display = 'none';
+        if(recordingStatus) recordingStatus.style.display = 'none';
+        if(recordBtn) {
+            recordBtn.textContent = '🎙️ Start Recording';
+            recordBtn.classList.remove('btn-danger');
+            recordBtn.classList.add('btn-secondary');
+        }
     }
 
     // ===== BULK ACTIONS =====
@@ -961,42 +998,6 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 /* ===== RESPONSIVE ===== */
 @media (max-width:768px) { .admin-header { flex-direction:column; align-items:stretch; text-align:center; } .admin-actions { justify-content:center; } .modal-content { padding:24px; } }
 @media (max-width:480px) { .search-form { flex-direction:column; } .search-form input { width:100%; } .camera-bottom-controls { bottom:16px; padding:0 12px; padding-bottom:16px; } .camera-shutter-btn { width:64px; height:64px; } .camera-shutter-btn .shutter-inner { width:48px; height:48px; } .camera-btn { font-size:0.75rem; padding:6px 12px; } }
-/* ===== TOAST NOTIFICATIONS ===== */
-#toastContainer {
-    position: fixed; top: 30px; right: 30px; z-index: 9999999;
-    display: flex; flex-direction: column; gap: 12px; align-items: flex-end; pointer-events: none;
-}
-.toast-notification {
-    background: #fff; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 40px rgba(44,30,30,0.15);
-    display: flex; align-items: center; gap: 12px; border-left: 6px solid #28a745; font-size: 0.95rem;
-    animation: slideInRight 0.4s ease forwards; pointer-events: auto; min-width: 280px; max-width: 450px;
-    border: 1px solid rgba(0,0,0,0.05); color: var(--text);
-}
-.toast-notification.toast-error { border-left-color: #dc3545; }
-.toast-notification .toast-icon { font-size: 1.2rem; }
-.toast-notification .toast-message { flex: 1; font-weight: 500; }
-.toast-notification .toast-close { cursor: pointer; color: var(--text-light); font-size: 1.2rem; line-height: 1; transition: color 0.2s; }
-.toast-notification .toast-close:hover { color: var(--dark); }
-@keyframes slideInRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
-
-/* ===== STATUS BADGE ===== */
-.status-badge { padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }
-.status-published { background: #d4edda; color: #155724; }
-.status-draft { background: #fff3cd; color: #856404; }
-
-/* ===== PREVIEW MODAL ENHANCEMENTS ===== */
-.preview-book h1 { margin-top: 0; }
-.preview-close:hover { color: var(--rose); transform: rotate(90deg); transition: transform 0.3s; }
-.preview-body::-webkit-scrollbar { width: 8px; }
-.preview-body::-webkit-scrollbar-track { background: var(--fantasy); }
-.preview-body::-webkit-scrollbar-thumb { background: var(--rose); border-radius: 10px; }
-
-/* ===== BUTTON LOADING STATE ===== */
-.btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none !important; }
-
-/* ===== CHECKBOX & BULK STYLES ===== */
-.styled-checkbox { width: 18px; height: 18px; accent-color: var(--rose); cursor: pointer; }
-.admin-table tbody tr:hover { background: rgba(219,161,162,0.06); transition: background 0.2s; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
