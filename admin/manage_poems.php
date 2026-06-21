@@ -431,7 +431,7 @@ $pageTitle = 'Manage Poems';
                 <button type="button" id="previewPoemBtn" class="btn btn-outline">
                     <i class="fas fa-eye"></i> Preview
                 </button>
-                <button type="submit" id="savePoemBtn" name="save_poem" class="btn btn-primary">
+                <button type="button" id="savePoemBtn" name="save_poem" class="btn btn-primary">
                     <i class="fas fa-save"></i> <span id="saveBtnText">Save Poem</span>
                 </button>
                 <button type="button" class="btn btn-secondary modal-close">Cancel</button>
@@ -474,7 +474,6 @@ $pageTitle = 'Manage Poems';
 
         <div class="camera-bottom-controls">
             <div class="camera-controls-left">
-                <!-- 🚀 NEW FLIP BUTTON FOR FRONT/BACK CAMERA -->
                 <button type="button" id="flipCameraBtn" class="camera-btn"><i class="fas fa-sync-alt"></i> Flip</button>
                 <button type="button" id="retakeMediaBtn" class="camera-btn" disabled><i class="fas fa-redo"></i> Retake</button>
             </div>
@@ -535,21 +534,58 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveBtn = document.getElementById('savePoemBtn');
     const saveBtnText = document.getElementById('saveBtnText');
 
+    // ===== SAFE TINYMCE INIT =====
+    function initTinyMCE() {
+        if (editorInitialized) return;
+        if (typeof tinymce === 'undefined') {
+            console.warn('TinyMCE library not loaded. Please check your CDN connection.');
+            return;
+        }
+        tinymce.init({
+            selector: '#editor',
+            height: 450,
+            menubar: true,
+            plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+            toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
+            content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
+            forced_root_block: 'p',
+            setup: function(editor) { editor.on('change', function() { tinymce.triggerSave(); }); }
+        });
+        editorInitialized = true;
+    }
+
+    // ===== SAFE MODAL OPENER =====
     function openModal(title, data) {
         modalTitle.textContent = title;
         modal.style.display = 'flex';
-        initTinyMCE();
+        
+        // Try to initialize TinyMCE, but don't crash the modal if it fails
+        try {
+            initTinyMCE();
+        } catch (e) {
+            console.warn('TinyMCE initialization warning (Modal will still open):', e.message);
+        }
+        
         if (data) {
             document.getElementById('poem_id').value = data.id;
             document.getElementById('title').value = data.title;
             document.getElementById('intro').value = data.intro;
-            if(tinymce.get('editor')) tinymce.get('editor').setContent(data.content);
+            // Only set TinyMCE content if the editor is actually there
+            if (typeof tinymce !== 'undefined' && tinymce.get('editor')) {
+                tinymce.get('editor').setContent(data.content);
+            } else {
+                document.getElementById('editor').value = data.content;
+            }
             saveBtnText.textContent = 'Update Poem';
         } else {
             document.getElementById('poem_id').value = 0;
             document.getElementById('title').value = '';
             document.getElementById('intro').value = '';
-            if(tinymce.get('editor')) tinymce.get('editor').setContent('');
+            if (typeof tinymce !== 'undefined' && tinymce.get('editor')) {
+                tinymce.get('editor').setContent('');
+            } else {
+                document.getElementById('editor').value = '';
+            }
             saveBtnText.textContent = 'Save Poem (Draft)';
         }
 
@@ -569,41 +605,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // =====  BYPASS main.js FORM SUBMISSION CRASH =====
-const saveBtn = document.getElementById('savePoemBtn');
-if (saveBtn) {
-    saveBtn.addEventListener('click', function(e) {
-        // Prevent the default submit event (which triggers the crashing main.js listener)
-        e.preventDefault(); 
-        
-        // Force TinyMCE to write its content into the <textarea> right now
-        if (tinymce && tinymce.get('editor')) {
-            tinymce.get('editor').save(); 
-        }
-        
-        // Manually trigger a native form submission (bypasses all JS 'submit' event listeners)
-        document.getElementById('poemForm').submit();
-    });
-}
+    // ===== BYPASS external main.js FORM SUBMISSION CRASH =====
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function(e) {
+            // Prevent the default submit event (which triggers the crashing main.js listener)
+            e.preventDefault(); 
+            
+            // Force TinyMCE to write its content into the <textarea> right now safely
+            if (typeof tinymce !== 'undefined' && tinymce.get('editor')) {
+                tinymce.get('editor').save(); 
+            }
+            
+            // Manually trigger a native form submission (bypasses all JS 'submit' event listeners)
+            document.getElementById('poemForm').submit();
+        });
+    }
 
     closeButtons.forEach(btn => btn.addEventListener('click', function() { modal.style.display = 'none'; }));
     window.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
-
-    // ===== TINYMCE =====
-    function initTinyMCE() {
-        if (editorInitialized) return;
-        tinymce.init({
-            selector: '#editor',
-            height: 450,
-            menubar: true,
-            plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
-            toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
-            content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
-            forced_root_block: 'p',
-            setup: function(editor) { editor.on('change', function() { tinymce.triggerSave(); }); }
-        });
-        editorInitialized = true;
-    }
 
     // ===== LIVE PREVIEW BUTTON =====
     const previewBtn = document.getElementById('previewPoemBtn');
@@ -616,7 +635,11 @@ if (saveBtn) {
         const title = document.getElementById('title').value.trim() || 'Untitled Poem';
         const intro = document.getElementById('intro').value.trim() || 'No introduction provided.';
         let content = '';
-        if(tinymce.get('editor')) content = tinymce.get('editor').getContent();
+        if(typeof tinymce !== 'undefined' && tinymce.get('editor')) {
+            content = tinymce.get('editor').getContent();
+        } else {
+            content = document.getElementById('editor').value;
+        }
         
         if(content.trim() === '') content = '<p style="color:#999;font-style:italic;">No content entered yet.</p>';
 
@@ -635,7 +658,7 @@ if (saveBtn) {
     const cameraModal = document.getElementById('cameraModal');
     const cameraPreview = document.getElementById('cameraPreview');
     const cameraCloseBtn = document.getElementById('cameraCloseBtn');
-    const flipCameraBtn = document.getElementById('flipCameraBtn'); // New Button
+    const flipCameraBtn = document.getElementById('flipCameraBtn');
     const captureBtn = document.getElementById('captureBtn');
     const retakeBtn = document.getElementById('retakeMediaBtn');
     const confirmBtn = document.getElementById('confirmMediaBtn');
@@ -671,7 +694,6 @@ if (saveBtn) {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return cameraStatus.textContent = '❌ Camera not supported';
             
-            // Apply the facing mode constraint
             let constraints = { 
                 video: { facingMode: facingMode }, 
                 audio: currentMode === 'video' 
@@ -683,7 +705,6 @@ if (saveBtn) {
         } catch (error) { cameraStatus.textContent = '❌ Camera access denied: ' + error.message; }
     }
 
-    // 🚀 FLIP CAMERA LOGIC
     flipCameraBtn.addEventListener('click', function() {
         if (cameraStream) {
             cameraStream.getTracks().forEach(track => track.stop());
