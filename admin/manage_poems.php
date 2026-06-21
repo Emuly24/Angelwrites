@@ -336,7 +336,8 @@ $pageTitle = 'Manage Poems';
                                                     </a>
                                                 <?php endif; ?>
 
-                                                <button class="btn btn-sm btn-secondary edit-btn" 
+                                                <!-- 🚀 FIX: Added type="button" to prevent form submission -->
+                                                <button type="button" class="btn btn-sm btn-secondary edit-btn" 
                                                         data-id="<?php echo $poem['id']; ?>" 
                                                         data-title="<?php echo htmlspecialchars($poem['title']); ?>" 
                                                         data-intro="<?php echo htmlspecialchars($poem['intro'] ?? ''); ?>" 
@@ -459,7 +460,7 @@ $pageTitle = 'Manage Poems';
                 <button type="button" id="previewPoemBtn" class="btn btn-outline">
                     <i class="fas fa-eye"></i> Preview
                 </button>
-                <button type="button" id="savePoemBtn" name="save_poem" class="btn btn-primary">
+                <button type="submit" id="savePoemBtn" name="save_poem" class="btn btn-primary">
                     <i class="fas fa-save"></i> <span id="saveBtnText">Save Poem</span>
                 </button>
                 <button type="button" class="btn btn-secondary modal-close">Cancel</button>
