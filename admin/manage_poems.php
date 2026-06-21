@@ -431,7 +431,7 @@ $pageTitle = 'Manage Poems';
                 <button type="button" id="previewPoemBtn" class="btn btn-outline">
                     <i class="fas fa-eye"></i> Preview
                 </button>
-                <button type="submit" id="savePoemBtn" class="btn btn-primary">
+                <button type="submit" id="savePoemBtn" name="save_poem" class="btn btn-primary">
                     <i class="fas fa-save"></i> <span id="saveBtnText">Save Poem</span>
                 </button>
                 <button type="button" class="btn btn-secondary modal-close">Cancel</button>
@@ -533,26 +533,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveBtn = document.getElementById('savePoemBtn');
     const saveBtnText = document.getElementById('saveBtnText');
 
-    function openModal(title, data) {
-        modalTitle.textContent = title;
-        modal.style.display = 'flex';
-        initTinyMCE();
-        if (data) {
-            document.getElementById('poem_id').value = data.id;
-            document.getElementById('title').value = data.title;
-            document.getElementById('intro').value = data.intro;
-            tinymce.get('editor').setContent(data.content);
-            saveBtnText.textContent = 'Update Poem';
-        } else {
-            document.getElementById('poem_id').value = 0;
-            document.getElementById('title').value = '';
-            document.getElementById('intro').value = '';
-            tinymce.get('editor').setContent('');
-            saveBtnText.textContent = 'Save Poem (Draft)';
-        }
-        resetCamera();
-        resetAudioRecorder();
+   function openModal(title, data) {
+    modalTitle.textContent = title;
+    modal.style.display = 'flex';
+    initTinyMCE();
+    if (data) {
+        document.getElementById('poem_id').value = data.id;
+        document.getElementById('title').value = data.title;
+        document.getElementById('intro').value = data.intro;
+        tinymce.get('editor').setContent(data.content);
+        saveBtnText.textContent = 'Update Poem';
+    } else {
+        document.getElementById('poem_id').value = 0;
+        document.getElementById('title').value = '';
+        document.getElementById('intro').value = '';
+        tinymce.get('editor').setContent('');
+        saveBtnText.textContent = 'Save Poem (Draft)';
     }
+
+    try { resetCamera(); } catch(e) { console.log('Camera reset skipped'); }
+    try { resetAudioRecorder(); } catch(e) { console.log('Audio recorder reset skipped'); }
+}
 
     addBtn.addEventListener('click', function() { openModal('Add New Poem', null); });
     editBtns.forEach(btn => {
