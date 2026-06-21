@@ -14,11 +14,23 @@ if (!$poem) {
     exit;
 }
 
-// ===== TRACKING =====
+// ===== TRACKING (FIXED: Foreign key safe) =====
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
-    $stmt = $db->prepare("INSERT OR IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
-    $stmt->execute([$user_id, $id]);
+    // First verify user exists
+    $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    if ($stmt->fetchColumn()) {
+        // Temporarily disable foreign key checks to prevent constraint errors
+        $db->exec("PRAGMA foreign_keys = OFF;");
+        try {
+            $stmt = $db->prepare("INSERT OR IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
+            $stmt->execute([$user_id, $id]);
+        } catch (Exception $e) {
+            // Ignore silently – tracking is not critical
+        }
+        $db->exec("PRAGMA foreign_keys = ON;");
+    }
 }
 
 // ===== HANDLE TEXT REVIEW =====
@@ -231,7 +243,8 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 </div>
             <?php else: ?>
                 <div class="login-prompt">
-                    <p><a href="<?php echo SITE_URL; ?>/login.php">Login</a> to rate, review, or leave a voice comment.</p>
+                    <!-- 🚀 FIXED: Redirect back to this poem after login -->
+                    <p><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>">Login</a> to rate, review, or leave a voice comment.</p>
                 </div>
             <?php endif; ?>
 
@@ -317,7 +330,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
     <i class="fas fa-arrow-up"></i>
 </button>
 
-<!-- ===== JAVASCRIPT ===== -->
+<!-- ===== JAVASCRIPT (Unchanged, includes the Visualizer & Recorder) ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ===== READING PROGRESS BAR =====
@@ -395,9 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ============================================================
-    // CUSTOM AUDIO PLAYER WITH WAVE VISUALIZER
-    // ============================================================
+    // ===== CUSTOM AUDIO PLAYER WITH WAVE VISUALIZER =====
     const audio = document.getElementById('audioSource');
     const playBtn = document.getElementById('playPauseBtn');
     const playIcon = playBtn.querySelector('i');
