@@ -115,6 +115,16 @@ $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
 $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
 
+// ============================================================
+// 🚀 SHARE URL FIX: Build a rock-solid absolute URL for social sharing
+// ============================================================
+$base_url = defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc';
+$full_url = $base_url . '/poem_view.php?id=' . $id;
+$encoded_url = urlencode($full_url);
+$encoded_title = urlencode($poem['title']);
+$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $full_url);
+$twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
+
 $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -316,13 +326,13 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
         <div class="poem-footer-actions">
             <div class="share-section">
                 <span>Share:</span>
-                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>" target="_blank" class="share-btn facebook">
+                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $encoded_url; ?>" target="_blank" class="share-btn facebook">
                     <i class="fab fa-facebook-f"></i>
                 </a>
-                <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode($poem['title'] . ' — a poem by Angella Bottoman'); ?>&url=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>" target="_blank" class="share-btn twitter">
+                <a href="https://twitter.com/intent/tweet?text=<?php echo $twitter_text; ?>&url=<?php echo $encoded_url; ?>" target="_blank" class="share-btn twitter">
                     <i class="fab fa-twitter"></i>
                 </a>
-                <a href="https://api.whatsapp.com/send?text=<?php echo urlencode($poem['title'] . ' — read this poem: ' . SITE_URL . '/poem_view.php?id=' . $id); ?>" target="_blank" class="share-btn whatsapp">
+                <a href="https://api.whatsapp.com/send?text=<?php echo $wa_text; ?>" target="_blank" class="share-btn whatsapp">
                     <i class="fab fa-whatsapp"></i>
                 </a>
             </div>
