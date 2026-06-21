@@ -159,7 +159,7 @@ $pageTitle = 'Videos';
             <div class="videos-grid" id="videosGrid">
                 <?php foreach ($videos as $video): ?>
                     <div class="video-card">
-                        <div class="video-thumbnail">
+                        <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="video-thumbnail">
                             <?php if ($video['thumbnail']): ?>
                                 <img src="<?php echo SITE_URL . '/' . $video['thumbnail']; ?>" alt="<?php echo htmlspecialchars($video['title']); ?>" loading="lazy">
                             <?php else: ?>
@@ -175,29 +175,35 @@ $pageTitle = 'Videos';
                             <?php if (!empty($video['duration'])): ?>
                                 <span class="video-duration"><?php echo formatDuration($video['duration']); ?></span>
                             <?php endif; ?>
-                        </div>
+                        </a>
+                        
                         <div class="video-info">
                             <h3><a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>"><?php echo htmlspecialchars($video['title']); ?></a></h3>
                             <?php if ($video['description']): ?>
                                 <p class="video-description"><?php echo htmlspecialchars(substr($video['description'], 0, 100)); ?>...</p>
                             <?php endif; ?>
+                            
                             <div class="video-footer">
                                 <div class="video-meta">
-                                    <span class="video-date"><?php echo date('M j, Y', strtotime($video['created_at'])); ?></span>
+                                    <span class="video-date"><i class="far fa-calendar-alt"></i> <?php echo date('M j, Y', strtotime($video['created_at'])); ?></span>
                                     <span class="video-views"><i class="fas fa-eye"></i> <?php echo number_format($video['views'] ?? 0); ?></span>
                                 </div>
-                                <div class="video-reactions">
-                                    <button class="reaction-btn" onclick="reactVideo(<?php echo $video['id']; ?>, 'like')">
+                                
+                                <!-- 🚀 ENHANCED: Reactions & Share -->
+                                <div class="video-actions">
+                                    <button class="action-btn like-btn" onclick="reactVideo(<?php echo $video['id']; ?>, 'like')">
                                         <i class="fas fa-thumbs-up"></i> <span id="likes-<?php echo $video['id']; ?>"><?php echo $video['likes'] ?? 0; ?></span>
                                     </button>
-                                    <button class="reaction-btn" onclick="reactVideo(<?php echo $video['id']; ?>, 'love')">
+                                    <button class="action-btn love-btn" onclick="reactVideo(<?php echo $video['id']; ?>, 'love')">
                                         ❤️ <span id="loves-<?php echo $video['id']; ?>"><?php echo $video['loves'] ?? 0; ?></span>
                                     </button>
-                                    <button class="reaction-btn" onclick="reactVideo(<?php echo $video['id']; ?>, 'pray')">
+                                    <button class="action-btn pray-btn" onclick="reactVideo(<?php echo $video['id']; ?>, 'pray')">
                                         🙏 <span id="prays-<?php echo $video['id']; ?>"><?php echo $video['prays'] ?? 0; ?></span>
                                     </button>
+                                    <button class="action-btn share-btn" onclick="copyVideoLink(<?php echo $video['id']; ?>)">
+                                        <i class="fas fa-share-alt"></i>
+                                    </button>
                                 </div>
-                                <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch</a>
                             </div>
                         </div>
                     </div>
@@ -239,7 +245,6 @@ $pageTitle = 'Videos';
     <i class="fas fa-arrow-up"></i>
 </button>
 
-<!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ===== READING PROGRESS BAR =====
@@ -326,7 +331,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ===== REACTIONS =====
+    // ===== SORT DROPDOWN =====
+    document.getElementById('sortSelect').addEventListener('change', function() {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('sort', this.value);
+        window.location.href = currentUrl.toString();
+    });
+    
+    // ===== SHARE VIDEO LINK =====
+    window.copyVideoLink = function(videoId) {
+        const url = '<?php echo SITE_URL; ?>/video_watch.php?id=' + videoId;
+        navigator.clipboard.writeText(url).then(() => {
+            alert('Video link copied to clipboard!');
+        });
+    };
+
+    // ===== REACTIONS (Like, Love, Pray) =====
     window.reactVideo = function(videoId, reaction) {
         fetch('<?php echo SITE_URL; ?>/videos_reactions.php', {
             method: 'POST',
@@ -339,21 +359,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('likes-' + videoId).textContent = data.likes;
                 document.getElementById('loves-' + videoId).textContent = data.loves;
                 document.getElementById('prays-' + videoId).textContent = data.prays;
+            } else if (data.error) {
+                alert(data.error); // e.g., "Please login first"
             }
         });
     };
-
-    // ===== SORT DROPDOWN =====
-    document.getElementById('sortSelect').addEventListener('change', function() {
-        const currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set('sort', this.value);
-        window.location.href = currentUrl.toString();
-    });
 });
 </script>
 
 <style>
-/* ===== BRAND VARIABLES (Matches index & dashboard) ===== */
+/* ===== BRAND VARIABLES ===== */
 :root {
     --rose: #DBA1A2;
     --rose-dark: #c08a8b;
@@ -375,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
 
-/* ===== BUTTONS (exact match from index) ===== */
+/* ===== BUTTONS ===== */
 .btn {
     display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
     border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
@@ -389,13 +404,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
 .btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
 .btn-outline:hover { background:var(--rose); color:var(--white); }
-.btn-white { background:var(--white); color:var(--dark); border:2px solid var(--white); }
-.btn-white:hover { background:var(--vanilla); border-color:var(--vanilla); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-danger { background:#e74c3c; color:white; border:2px solid #e74c3c; }
-.btn-danger:hover { background:#c0392b; border-color:#c0392b; }
-.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
-.btn-success:hover { background:#218838; border-color:#218838; }
 
 /* ===== DARK MODE SUPPORT ===== */
 body.dark-mode {
@@ -445,36 +454,44 @@ body.dark-mode {
 /* ===== VIDEOS GRID ===== */
 .videos-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:24px; }
 .videos-grid.list-view { grid-template-columns:1fr; }
-.video-card { background:var(--card-bg); border-radius:16px; overflow:hidden; border:1px solid var(--border); box-shadow:var(--shadow); transition:transform 0.3s, box-shadow 0.3s; }
-.video-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-hover); }
 
-.video-thumbnail { position:relative; height:180px; overflow:hidden; background:var(--vanilla); }
+.video-card { background:var(--card-bg); border-radius:16px; overflow:hidden; border:1px solid var(--border); box-shadow:var(--shadow); transition:transform 0.3s, box-shadow 0.3s; }
+.video-card:hover { transform:translateY(-6px); box-shadow:var(--shadow-hover); }
+
+.video-thumbnail { position:relative; height:180px; overflow:hidden; background:var(--vanilla); display:block; }
 .video-thumbnail img { width:100%; height:100%; object-fit:cover; transition:transform 0.4s; }
 .video-card:hover .video-thumbnail img { transform:scale(1.05); }
 .video-thumbnail-placeholder { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:2.5rem; color:var(--rose); background:var(--vanilla); }
 .video-thumbnail-placeholder span { font-size:0.8rem; color:var(--text-light); margin-top:4px; }
 
-.play-overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.2); color:white; font-size:3rem; opacity:0.7; transition:opacity 0.3s; }
-.video-card:hover .play-overlay { opacity:1; }
+.play-overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.15); color:white; font-size:3rem; opacity:0; transition:opacity 0.3s, transform 0.3s; transform:scale(0.9); }
+.video-card:hover .play-overlay { opacity:1; transform:scale(1); }
 
 .video-type-badge { position:absolute; top:12px; left:12px; padding:4px 12px; border-radius:20px; font-size:0.7rem; font-weight:700; text-transform:uppercase; background:var(--rose); color:white; z-index:1; }
-.video-duration { position:absolute; bottom:12px; right:12px; padding:2px 8px; background:rgba(0,0,0,0.7); color:white; border-radius:4px; font-size:0.75rem; z-index:1; }
+.video-duration { position:absolute; bottom:12px; right:12px; padding:2px 8px; background:rgba(0,0,0,0.75); color:white; border-radius:4px; font-size:0.75rem; z-index:1; }
 
 .video-info { padding:16px; }
 .video-info h3 { font-size:1.1rem; margin-bottom:4px; font-family:'Playfair Display',Georgia,serif; }
 .video-info h3 a { color:var(--text); text-decoration:none; transition:color 0.2s; }
 .video-info h3 a:hover { color:var(--rose); }
-.video-description { color:var(--text-light); font-size:0.9rem; line-height:1.5; margin-bottom:8px; }
+.video-description { color:var(--text-light); font-size:0.9rem; line-height:1.5; margin-bottom:12px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
-.video-footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+.video-footer { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:8px; }
 .video-meta { display:flex; gap:12px; font-size:0.85rem; color:var(--text-light); }
-.video-reactions { display:flex; gap:6px; }
-.reaction-btn { background:none; border:none; cursor:pointer; color:var(--text-light); font-size:0.85rem; transition:color 0.2s; display:flex; align-items:center; gap:2px; }
-.reaction-btn:hover { color:var(--rose); }
-.video-footer .btn { padding:4px 16px; font-size:0.75rem; border-radius:30px; }
+.video-meta i { margin-right:2px; }
+
+/* 🚀 ENHANCED: Interactive Action Buttons */
+.video-actions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.action-btn { background:transparent; border:none; cursor:pointer; color:var(--text-light); font-size:0.8rem; transition:all 0.2s; display:flex; align-items:center; gap:3px; padding:4px 8px; border-radius:30px; }
+.action-btn:hover { background:var(--vanilla); color:var(--rose); transform:scale(1.05); }
+.action-btn.like-btn:hover { color:#3b82f6; }
+.action-btn.love-btn:hover { color:#ef4444; }
+.action-btn.pray-btn:hover { color:#8b5cf6; }
+.action-btn.share-btn { padding:4px 6px; font-size:0.9rem; }
+.action-btn.share-btn:hover { color:var(--rose); }
 
 /* ===== PAGINATION ===== */
-.pagination { display:flex; justify-content:center; gap:6px; margin-top:24px; flex-wrap:wrap; }
+.pagination { display:flex; justify-content:center; gap:6px; margin-top:32px; flex-wrap:wrap; }
 .page-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 14px; border-radius:8px; background:var(--card-bg); border:1px solid var(--border); color:var(--text); font-size:0.9rem; transition:all 0.2s; min-width:36px; text-decoration:none; }
 .page-link:hover { border-color:var(--rose); }
 .page-link.active { background:var(--rose); color:white; border-color:var(--rose); }
@@ -494,6 +511,8 @@ body.dark-mode {
     .videos-controls-right { justify-content:space-between; }
     .type-filter { justify-content:center; }
     .videos-header h1 { font-size:2rem; }
+    .video-footer { flex-direction:column; align-items:flex-start; }
+    .video-actions { width:100%; justify-content:flex-start; }
 }
 @media (max-width:480px) {
     .videos-grid { grid-template-columns:1fr; }

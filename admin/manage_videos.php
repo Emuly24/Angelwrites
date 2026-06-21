@@ -318,9 +318,12 @@ $pageTitle = 'Manage Videos';
     </div>
 </div>
 
-<!-- ===== FULL-SCREEN CAMERA MODAL ===== -->
+<!-- ===== FULL-SCREEN CAMERA MODAL (ENHANCED) ===== -->
 <div id="cameraModal" class="camera-modal" style="display:none;">
     <div class="camera-modal-inner">
+        <!-- Shutter Flash Overlay -->
+        <div id="shutterFlash" class="shutter-flash" style="display:none;"></div>
+        
         <div class="camera-preview-wrapper">
             <video id="cameraPreview" autoplay muted playsinline></video>
         </div>
@@ -334,13 +337,29 @@ $pageTitle = 'Manage Videos';
                 <button type="button" class="mode-btn active" data-mode="photo">📷 Photo</button>
                 <button type="button" class="mode-btn" data-mode="video">🎥 Video</button>
             </div>
+            
+            <!-- 🚀 NEW: Filter Effects -->
+            <div class="camera-effects">
+                <button type="button" class="filter-btn active" data-filter="none">Normal</button>
+                <button type="button" class="filter-btn" data-filter="grayscale(100%)">B&W</button>
+                <button type="button" class="filter-btn" data-filter="sepia(100%)">Sepia</button>
+                <button type="button" class="filter-btn" data-filter="invert(100%)">Invert</button>
+                <button type="button" class="filter-btn" data-filter="contrast(150%) brightness(120%)">Vivid</button>
+            </div>
         </div>
 
         <!-- Bottom Controls -->
         <div class="camera-bottom-controls">
             <div class="camera-controls-left">
+                <!-- 🚀 NEW: Flip Camera Button -->
+                <button type="button" id="flipCameraBtn" class="camera-btn">
+                    <i class="fas fa-sync-alt"></i> Flip
+                </button>
                 <button type="button" id="retakeMediaBtn" class="camera-btn" disabled>
                     <i class="fas fa-redo"></i> Retake
+                </button>
+                <button type="button" id="timerBtn" class="camera-btn" data-timer="off">
+                    <i class="fas fa-clock"></i> <span id="timerLabel">Timer: Off</span>
                 </button>
             </div>
             <div class="camera-controls-center">
@@ -356,8 +375,9 @@ $pageTitle = 'Manage Videos';
             </div>
         </div>
 
-        <!-- Status / Timer -->
+        <!-- Status / Timer Countdown -->
         <div id="cameraStatus" class="camera-status">Ready</div>
+        <div id="timerCountdown" class="camera-timer" style="display:none;"></div>
     </div>
 </div>
 
@@ -403,6 +423,12 @@ $pageTitle = 'Manage Videos';
     object-fit: cover;
 }
 
+/* 🚀 Shutter Flash Effect */
+.shutter-flash {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(255, 255, 255, 0.9); pointer-events: none; z-index: 6; display: none;
+}
+
 /* Top Bar */
 .camera-top-bar {
     position: absolute;
@@ -413,8 +439,10 @@ $pageTitle = 'Manage Videos';
     background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     z-index: 2;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .camera-close-btn {
@@ -458,6 +486,23 @@ $pageTitle = 'Manage Videos';
     color: #000;
 }
 
+/* 🚀 Camera Filter Effects UI */
+.camera-effects {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    background: rgba(0,0,0,0.4);
+    padding: 6px 10px;
+    border-radius: 30px;
+    backdrop-filter: blur(2px);
+}
+.filter-btn {
+    background: transparent; border: none; color: rgba(255,255,255,0.6); 
+    padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.filter-btn.active { background: rgba(255,255,255,0.9); color: #000; }
+.filter-btn:hover:not(.active) { color: #fff; background: rgba(255,255,255,0.1); }
+
 /* Bottom Controls */
 .camera-bottom-controls {
     position: absolute;
@@ -467,18 +512,19 @@ $pageTitle = 'Manage Videos';
     padding: 0 20px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     z-index: 2;
     background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%);
     padding-top: 30px;
     padding-bottom: 30px;
 }
 
-.camera-controls-left,
-.camera-controls-right {
-    flex: 0 0 80px;
+.camera-controls-left, .camera-controls-right {
+    flex: 0 0 100px;
     display: flex;
     justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .camera-controls-center {
@@ -503,30 +549,22 @@ $pageTitle = 'Manage Videos';
 
 .camera-shutter-btn .shutter-ring {
     position: absolute;
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     border-radius: 50%;
     border: 4px solid rgba(255,255,255,0.3);
-    top: -4px;
-    left: -4px;
+    top: -4px; left: -4px;
     pointer-events: none;
 }
 
 .camera-shutter-btn .shutter-inner {
-    width: 56px;
-    height: 56px;
+    width: 56px; height: 56px;
     border-radius: 50%;
     background: #fff;
     transition: all 0.2s;
 }
-
 .camera-shutter-btn:hover .shutter-inner { opacity: 0.8; }
-
 .camera-shutter-btn.recording .shutter-inner {
-    background: #ff3b30;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
+    background: #ff3b30; width: 24px; height: 24px; border-radius: 6px;
 }
 
 .camera-btn {
@@ -542,21 +580,14 @@ $pageTitle = 'Manage Videos';
     align-items: center;
     gap: 6px;
 }
-.camera-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
+.camera-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .camera-btn:hover:not(:disabled) { background: rgba(255,255,255,0.3); }
 
-/* Status */
-.camera-status {
+/* Status & Timer */
+.camera-status, .camera-timer {
     position: absolute;
-    bottom: 110px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #fff;
-    font-size: 1rem;
-    font-weight: 500;
+    left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 1.2rem; font-weight: 500;
     text-shadow: 0 0 20px rgba(0,0,0,0.5);
     z-index: 2;
     background: rgba(0,0,0,0.5);
@@ -564,19 +595,19 @@ $pageTitle = 'Manage Videos';
     border-radius: 20px;
     backdrop-filter: blur(4px);
 }
+.camera-status { bottom: 110px; }
+.camera-timer { bottom: 150px; display: none; font-size: 2.5rem; padding: 10px 20px; }
 
-/* ===== Existing Styles (kept intact) ===== */
+/* ===== EXISTING STYLES ===== */
 .admin-page { padding: 32px 0 60px; }
 .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
 .admin-header h1 { font-size: 2rem; margin: 0; }
 .admin-actions { display: flex; gap: 12px; }
-
 .search-bar { margin-bottom: 24px; }
 .search-form { display: flex; gap: 8px; flex-wrap: wrap; }
 .search-form input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--input-bg); color: var(--text); }
 .search-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
 .search-form .btn { padding: 8px 16px; font-size: 0.85rem; }
-
 .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 8px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
 .admin-table thead { background: var(--vanilla); }
 .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -584,15 +615,12 @@ $pageTitle = 'Manage Videos';
 .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
 .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
-
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; background: var(--vanilla); color: var(--text); }
 .source-local { color: #27ae60; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px; }
 .source-link { color: var(--rose); font-size: 0.85rem; text-decoration: none; }
 .source-link:hover { text-decoration: underline; }
-
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 20px; }
-
 .admin-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .admin-form .form-group { margin-bottom: 16px; }
 .admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }
@@ -603,7 +631,6 @@ $pageTitle = 'Manage Videos';
 .required { color: #dc2626; }
 .admin-form .form-actions { display: flex; gap: 12px; margin-top: 16px; }
 .admin-form .btn-large { padding: 14px 28px; border-radius: 30px; font-size: 1.05rem; }
-
 .video-upload-section { border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; background: var(--fantasy); }
 .upload-tabs { margin-top: 8px; }
 .tab-buttons { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
@@ -612,7 +639,6 @@ $pageTitle = 'Manage Videos';
 .tab-btn:hover { color: var(--rose); }
 .tab-content { display: none; padding-top: 8px; }
 .tab-content.active { display: block; }
-
 .recorder-wrapper { padding: 12px 0; }
 .camera-trigger-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .status-indicator { font-size: 0.9rem; color: var(--text-light); }
@@ -623,7 +649,7 @@ $pageTitle = 'Manage Videos';
     .tab-buttons { flex-direction: column; gap: 4px; border-bottom: none; }
     .tab-btn { border-radius: 8px; border: 1px solid var(--border); }
     .camera-modal-inner { padding: 0; }
-    .camera-top-bar { padding: 12px; }
+    .camera-top-bar { padding: 12px; flex-direction: column; align-items: flex-end; }
     .camera-bottom-controls { bottom: 16px; padding: 0 12px; padding-bottom: 16px; }
     .camera-shutter-btn { width: 64px; height: 64px; }
     .camera-shutter-btn .shutter-inner { width: 48px; height: 48px; }
@@ -697,7 +723,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ============================================================
-    // FULL-SCREEN CAMERA MODAL
+    // FULL-SCREEN CAMERA MODAL (ENHANCED)
     // ============================================================
     const cameraModal = document.getElementById('cameraModal');
     const cameraPreview = document.getElementById('cameraPreview');
@@ -714,42 +740,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const openPhotoBtn = document.getElementById('openPhotoCameraBtn');
     const openVideoBtn = document.getElementById('openVideoCameraBtn');
     const modeBtns = document.querySelectorAll('.mode-btn');
+    const flipBtn = document.getElementById('flipCameraBtn');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    const timerBtn = document.getElementById('timerBtn');
+    const timerLabel = document.getElementById('timerLabel');
+    const timerCountdown = document.getElementById('timerCountdown');
+    const shutterFlash = document.getElementById('shutterFlash');
 
     let cameraStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let capturedBlob = null;
     let recordedBlob = null;
-    let currentMode = 'photo'; // 'photo' or 'video'
+    let currentMode = 'photo';
+    let currentFacingMode = 'user'; // 'user' (front) or 'environment' (back)
+    let currentFilter = 'none';
+    let timerEnabled = false; // false = instant, true = 3s delay
+    let countdownInterval = null;
 
     // ===== OPEN CAMERA =====
     function openCamera(mode) {
         currentMode = mode;
         cameraModal.style.display = 'flex';
         cameraStatus.textContent = 'Starting camera...';
-
-        // Update mode switch UI
-        modeBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === mode);
-        });
-
-        // Update capture button appearance
-        if (mode === 'photo') {
-            captureBtn.classList.remove('recording');
-            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
-        } else {
-            captureBtn.classList.remove('recording');
-            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
-        }
-
-        // Reset state
+        modeBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
         retakeBtn.disabled = true;
         confirmBtn.disabled = true;
         capturedBlob = null;
         recordedBlob = null;
         recordedChunks = [];
-
-        // Start camera stream
         startCameraStream();
     }
 
@@ -764,6 +783,11 @@ document.addEventListener('DOMContentLoaded', function() {
         cameraPreview.srcObject = null;
         cameraPreview.src = '';
         cameraModal.style.display = 'none';
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+            timerCountdown.style.display = 'none';
+        }
     }
 
     async function startCameraStream() {
@@ -772,28 +796,104 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraStatus.textContent = '❌ Camera not supported';
                 return;
             }
-            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: currentMode === 'video' });
+            cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode }, 
+                audio: currentMode === 'video' 
+            });
             cameraPreview.srcObject = cameraStream;
+            // Re-apply filter when stream restarts
+            cameraPreview.style.filter = currentFilter;
             cameraStatus.textContent = currentMode === 'photo' ? 'Ready' : 'Ready to record';
         } catch (error) {
             cameraStatus.textContent = '❌ Camera access denied: ' + error.message;
         }
     }
 
+    // 🚀 FLIP CAMERA LOGIC
+    flipBtn.addEventListener('click', function() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+        startCameraStream();
+        cameraStatus.textContent = `Switched to ${currentFacingMode === 'user' ? 'Front' : 'Back'} Camera`;
+    });
+
+    // 🚀 FILTER EFFECTS LOGIC
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentFilter = this.dataset.filter;
+            if (cameraPreview) cameraPreview.style.filter = currentFilter;
+        });
+    });
+
+    // 🚀 TIMER LOGIC (Toggle between Off, 3s, 5s)
+    timerBtn.addEventListener('click', function() {
+        if (timerEnabled === false) {
+            timerEnabled = 3;
+            timerLabel.textContent = 'Timer: 3s';
+            timerBtn.classList.add('active');
+        } else if (timerEnabled === 3) {
+            timerEnabled = 5;
+            timerLabel.textContent = 'Timer: 5s';
+        } else {
+            timerEnabled = false;
+            timerLabel.textContent = 'Timer: Off';
+            timerBtn.classList.remove('active');
+        }
+    });
+
+    function startCountdown(duration) {
+        let seconds = duration;
+        timerCountdown.textContent = seconds;
+        timerCountdown.style.display = 'block';
+        captureBtn.disabled = true;
+
+        countdownInterval = setInterval(() => {
+            seconds--;
+            timerCountdown.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                timerCountdown.style.display = 'none';
+                captureBtn.disabled = false;
+                if (currentMode === 'photo') {
+                    capturePhoto();
+                } else {
+                    startRecording();
+                }
+            }
+        }, 1000);
+    }
+
+    // 🚀 SHUTTER FLASH EFFECT
+    function triggerFlash() {
+        shutterFlash.style.display = 'block';
+        shutterFlash.style.opacity = 1;
+        setTimeout(() => {
+            shutterFlash.style.opacity = 0;
+            setTimeout(() => shutterFlash.style.display = 'none', 300);
+        }, 150);
+    }
+
     // ===== CAPTURE PHOTO =====
     function capturePhoto() {
         if (!cameraStream) return;
+        triggerFlash();
         const canvas = document.createElement('canvas');
         canvas.width = cameraPreview.videoWidth || 1280;
         canvas.height = cameraPreview.videoHeight || 720;
         const ctx = canvas.getContext('2d');
+        ctx.filter = currentFilter; // Apply filter to captured image!
         ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
         canvas.toBlob((blob) => {
             capturedBlob = blob;
             retakeBtn.disabled = false;
             confirmBtn.disabled = false;
             cameraStatus.textContent = '✅ Photo captured';
-            // Stop camera stream
             cameraStream.getTracks().forEach(track => track.stop());
             cameraPreview.srcObject = null;
         }, 'image/jpeg');
@@ -802,6 +902,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===== VIDEO RECORDING =====
     function startRecording() {
         if (!cameraStream) return;
+        // Apply filter to video preview element, the recorder captures it natively
         recordedChunks = [];
         mediaRecorder = new MediaRecorder(cameraStream);
         mediaRecorder.ondataavailable = function(e) {
@@ -828,18 +929,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop();
             captureBtn.classList.remove('recording');
+            captureBtn.querySelector('.shutter-inner').style.borderRadius = '50%';
         }
     }
 
-    // ===== RETAKES =====
     function retakeMedia() {
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+            timerCountdown.style.display = 'none';
+            captureBtn.disabled = false;
+        }
         capturedBlob = null;
         recordedBlob = null;
         recordedChunks = [];
         retakeBtn.disabled = true;
         confirmBtn.disabled = true;
         cameraStatus.textContent = 'Retaking...';
-        // Restart stream
         if (cameraStream) {
             cameraStream.getTracks().forEach(track => track.stop());
             cameraStream = null;
@@ -870,48 +976,53 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ===== EVENT LISTENERS =====
-    // Open camera buttons
     openPhotoBtn.addEventListener('click', function() { openCamera('photo'); });
     openVideoBtn.addEventListener('click', function() { openCamera('video'); });
-
-    // Close camera
     cameraCloseBtn.addEventListener('click', closeCamera);
 
-    // Capture / Record button
     captureBtn.addEventListener('click', function() {
         if (currentMode === 'photo') {
-            capturePhoto();
+            if (timerEnabled !== false) {
+                startCountdown(timerEnabled);
+                cameraStatus.textContent = `⏳ ${timerEnabled} seconds countdown!`;
+            } else {
+                capturePhoto();
+            }
         } else {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 stopRecording();
             } else {
-                startRecording();
+                if (timerEnabled !== false) {
+                    startCountdown(timerEnabled);
+                } else {
+                    startRecording();
+                }
             }
         }
     });
 
-    // Retake button
     retakeBtn.addEventListener('click', retakeMedia);
-
-    // Confirm button
     confirmBtn.addEventListener('click', confirmMedia);
 
-    // Mode switch
     modeBtns.forEach(btn => {
         btn.addEventListener('click', function() {
             const mode = this.dataset.mode;
             if (mode === currentMode) return;
-            // Stop any ongoing recording
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
             }
-            // Close and reopen camera with new mode
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                timerCountdown.style.display = 'none';
+                captureBtn.disabled = false;
+            }
             closeCamera();
             setTimeout(() => openCamera(mode), 200);
         });
     });
 
-    // File input change – update status
+    // File input changes
     document.getElementById('thumbnail').addEventListener('change', function() {
         if (this.files && this.files[0]) {
             document.querySelector('.camera-trigger-group .status-indicator').textContent = '📎 ' + this.files[0].name;
@@ -923,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Keyboard shortcut: Escape to close camera
+    // Keyboard shortcut: Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && cameraModal.style.display !== 'none') {
             closeCamera();
