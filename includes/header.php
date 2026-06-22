@@ -56,13 +56,17 @@ if ($isLoggedIn) {
     <meta name="theme-color" content="#DBA1A2">
     <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
 
-    <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
+   <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
 <?php if (isset($og_title)): ?>
     <meta property="og:type" content="article" />
     <meta property="og:title" content="<?php echo htmlspecialchars($og_title); ?>" />
     <meta property="og:description" content="<?php echo htmlspecialchars($og_description); ?>" />
     <meta property="og:url" content="<?php echo htmlspecialchars($og_url); ?>" />
     <meta property="og:image" content="<?php echo htmlspecialchars($og_image); ?>" />
+    <?php if (isset($og_image_width)): ?>
+        <meta property="og:image:width" content="<?php echo $og_image_width; ?>" />
+        <meta property="og:image:height" content="<?php echo $og_image_height; ?>" />
+    <?php endif; ?>
     
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="<?php echo htmlspecialchars($og_title); ?>" />

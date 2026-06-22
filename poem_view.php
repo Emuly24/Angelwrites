@@ -111,10 +111,9 @@ $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
 $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
 
-// ============================================================
+/// ============================================================
 // 🚀 SHARE & OG DATA (Bulletproof URL formatting)
 // ============================================================
-// Strip trailing slashes to prevent double slashes (//)
 $base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
 $full_url = $base_url . '/poem_view.php?id=' . $id;
 $encoded_url = urlencode($full_url);
@@ -128,14 +127,20 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 $og_title = htmlspecialchars($poem['title']);
 $og_url = $full_url;
 $og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
+
+// 📸 Image Path (Foolproof)
 $og_image = '';
 if (!empty($poem['image_path'])) {
     // Remove leading slash from stored path, then append to clean base URL
     $og_image = $base_url . '/' . ltrim($poem['image_path'], '/');
 } else {
-    // 📌 PLACEHOLDER: Ensure this file physically exists in your assets folder!
+    // 📌 Make sure this file physically exists in your assets folder!
     $og_image = $base_url . '/assets/images/angelwrites-logo.png'; 
 }
+
+// 🖼️ OG Image Dimensions (Helps WhatsApp/Facebook process it faster)
+$og_image_width = 1200;
+$og_image_height = 630;
 ?>
 <?php require_once 'includes/header.php'; ?>
 
