@@ -14,29 +14,28 @@ if (!$poem) {
     exit;
 }
 
-// ===== TRACKING (PERMANENT FIX: Check-then-Insert, NO PRAGMA used) =====
+// ============================================================
+// 🚀 FIX: HONEST VIEW COUNTER (Increments on EVERY visit)
+// ============================================================
+$stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
+$stmt->execute([$id]);
+$poem['view_count'] = ($poem['view_count'] ?? 0) + 1;
+
+// ===== TRACKING (Only for logged-in users) =====
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
-    
-    // 1. Verify user truly exists
     $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user_exists = $stmt->fetchColumn();
-
-    // 2. Verify poem exists (we already know it does, but safeguard)
     if ($user_exists && $poem) {
-        // 3. Check if the record already exists to avoid duplicate keys
         $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ? AND poem_id = ?");
         $stmt->execute([$user_id, $id]);
         $already_read = $stmt->fetchColumn();
-
-        // 4. Only insert if it's completely missing. This bypasses FK constraints safely.
         if (!$already_read) {
             try {
                 $stmt = $db->prepare("INSERT INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
                 $stmt->execute([$user_id, $id]);
             } catch (PDOException $e) {
-                // Silently fail, tracking is non-critical.
                 error_log("Poem tracking failed: " . $e->getMessage());
             }
         }
@@ -49,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     $target_id = (int)$_POST['target_id'];
     $rating = (int)$_POST['rating'];
     $comment = trim($_POST['comment']);
-    
     if ($rating >= 1 && $rating <= 5 && !empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$target_type, $target_id, $_SESSION['user_id'], $rating, $comment]);
@@ -62,7 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment']) && isLoggedIn()) {
     $target_id = (int)$_POST['target_id'];
     $rating = isset($_POST['rating']) ? (int)$_POST['rating'] : 0;
-    
     if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/voice_comments/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -81,7 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment'
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) && isAdmin()) {
     $target_id = (int)$_POST['target_id'];
     $reply = trim($_POST['admin_reply']);
-    
     if (!empty($reply)) {
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, comment, is_admin_reply) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute(['poem', $target_id, $_SESSION['user_id'], $reply, 1]);
@@ -116,9 +112,10 @@ $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
 
 // ============================================================
-// 🚀 SHARE URL FIX: Build a rock-solid absolute URL for social sharing
+// 🚀 SHARE & OG DATA (Bulletproof URL formatting)
 // ============================================================
-$base_url = defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc';
+// Strip trailing slashes to prevent double slashes (//)
+$base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
 $full_url = $base_url . '/poem_view.php?id=' . $id;
 $encoded_url = urlencode($full_url);
 $encoded_title = urlencode($poem['title']);
@@ -126,6 +123,19 @@ $wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $
 $twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
 
 $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
+
+// 🖼️ OG Variables (To be read by header.php)
+$og_title = htmlspecialchars($poem['title']);
+$og_url = $full_url;
+$og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
+$og_image = '';
+if (!empty($poem['image_path'])) {
+    // Remove leading slash from stored path, then append to clean base URL
+    $og_image = $base_url . '/' . ltrim($poem['image_path'], '/');
+} else {
+    // 📌 PLACEHOLDER: Ensure this file physically exists in your assets folder!
+    $og_image = $base_url . '/assets/images/angelwrites-logo.png'; 
+}
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -151,10 +161,10 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
             </div>
         </header>
 
-        <!-- Poem Image -->
+        <!-- 🚀 FIXED: Bulletproof IMG URL -->
         <?php if ($poem['image_path']): ?>
             <div class="poem-image-container">
-                <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
+                <img src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['image_path'], '/'); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
             </div>
         <?php endif; ?>
 
@@ -167,7 +177,8 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 </div>
                 <div id="customAudioPlayer">
                     <canvas id="waveCanvas"></canvas>
-                    <audio id="audioSource" src="<?php echo SITE_URL . '/' . $poem['audio_path']; ?>" preload="metadata"></audio>
+                    <!-- 🚀 FIXED: Bulletproof AUDIO URL -->
+                    <audio id="audioSource" src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['audio_path'], '/'); ?>" preload="metadata"></audio>
                     <div class="audio-controls-bar">
                         <button id="playPauseBtn" class="play-btn" aria-label="Play">
                             <i class="fas fa-play"></i>
@@ -263,7 +274,6 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 </div>
             <?php else: ?>
                 <div class="login-prompt">
-                    <!-- 🚀 REDIRECT FIX: Passes the original page URL to login.php -->
                     <p><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>">Login</a> to rate, review, or leave a voice comment.</p>
                 </div>
             <?php endif; ?>
@@ -309,7 +319,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                                 <?php if (!empty($review['voice_path'])): ?>
                                     <div class="voice-comment-player">
                                         <audio controls>
-                                            <source src="<?php echo SITE_URL . '/' . $review['voice_path']; ?>" type="audio/webm">
+                                            <source src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($review['voice_path'], '/'); ?>" type="audio/webm">
                                         </audio>
                                     </div>
                                 <?php else: ?>
@@ -353,15 +363,12 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 <!-- ===== JAVASCRIPT (Unchanged) ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== READING PROGRESS BAR =====
     window.addEventListener('scroll', function() {
         const scrollTop = window.scrollY;
         const docHeight = document.documentElement.scrollHeight - window.innerHeight;
         const scrollPercent = (scrollTop / docHeight) * 100;
         document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
     });
-
-    // ===== BACK TO TOP BUTTON =====
     const backToTopBtn = document.getElementById('backToTop');
     window.addEventListener('scroll', function() {
         if (window.scrollY > 400) {
@@ -370,18 +377,14 @@ document.addEventListener('DOMContentLoaded', function() {
             backToTopBtn.style.display = 'none';
         }
     });
-
-    // ===== VOICE RECORDER =====
     const recordBtn = document.getElementById('recordBtn');
     const recordingStatus = document.getElementById('recordingStatus');
     const voiceForm = document.getElementById('voiceForm');
     const voiceFileInput = document.getElementById('voiceFileInput');
     const voicePreviewContainer = document.getElementById('voicePreviewContainer');
     const voicePreview = document.getElementById('voicePreview');
-
     let mediaRecorder = null;
     let audioChunks = [];
-
     if (recordBtn) {
         recordBtn.addEventListener('click', async function() {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -392,30 +395,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 recordBtn.classList.add('btn-secondary');
                 return;
             }
-
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
-
                 mediaRecorder.ondataavailable = event => {
                     audioChunks.push(event.data);
                 };
-
                 mediaRecorder.onstop = () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     const file = new File([audioBlob], 'voice_comment.webm', { type: 'audio/webm' });
                     const dt = new DataTransfer();
                     dt.items.add(file);
                     voiceFileInput.files = dt.files;
-
                     const url = URL.createObjectURL(file);
                     voicePreview.src = url;
                     voicePreviewContainer.style.display = 'block';
                     voiceForm.style.display = 'block';
                     recordBtn.textContent = '🎙️ Record Again';
                 };
-
                 mediaRecorder.start();
                 recordingStatus.style.display = 'inline';
                 recordBtn.textContent = '⏹️ Stop Recording';
@@ -427,8 +425,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
-    // ===== CUSTOM AUDIO PLAYER WITH WAVE VISUALIZER =====
     const audio = document.getElementById('audioSource');
     const playBtn = document.getElementById('playPauseBtn');
     const playIcon = playBtn.querySelector('i');
@@ -439,15 +435,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const volumeSlider = document.getElementById('volumeSlider');
     const canvas = document.getElementById('waveCanvas');
     const ctx = canvas.getContext('2d');
-
     let isPlaying = false;
     let audioContext = null;
     let analyser = null;
     let source = null;
     let animationId = null;
     let dataArray = null;
-
-    // ---- Canvas setup ----
     function resizeCanvas() {
         const rect = canvas.parentElement.getBoundingClientRect();
         canvas.width = rect.width;
@@ -455,8 +448,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-
-    // ---- Audio context setup ----
     function initAudioContext() {
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -472,34 +463,25 @@ document.addEventListener('DOMContentLoaded', function() {
             audioContext.resume();
         }
     }
-
-    // ---- Draw wave on canvas ----
     function drawWave() {
         if (!analyser) return;
         animationId = requestAnimationFrame(drawWave);
-
         analyser.getByteFrequencyData(dataArray);
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const barCount = 64;
         const barWidth = (canvas.width / barCount) * 0.6;
         const gap = (canvas.width / barCount) * 0.4;
         const halfHeight = canvas.height / 2;
-
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
         gradient.addColorStop(0, '#DBA1A2');
         gradient.addColorStop(0.5, '#e8c0c0');
         gradient.addColorStop(1, '#DBA1A2');
-
         ctx.fillStyle = gradient;
-
         for (let i = 0; i < barCount; i++) {
             const value = dataArray[i] / 255;
             const barHeight = value * halfHeight * 1.5;
             const x = i * (barWidth + gap) + gap / 2;
             const y = halfHeight - barHeight / 2;
-
-            // Create a rounded rectangle
             const radius = 4;
             ctx.beginPath();
             ctx.moveTo(x + radius, y);
@@ -514,8 +496,6 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.closePath();
             ctx.fill();
         }
-
-        // Gradient overlay for a glow effect
         const overlayGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
         overlayGradient.addColorStop(0, 'rgba(219, 161, 162, 0.15)');
         overlayGradient.addColorStop(0.5, 'rgba(219, 161, 162, 0)');
@@ -523,8 +503,6 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.fillStyle = overlayGradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
-
-    // ---- Stop visualizer ----
     function stopVisualizer() {
         if (animationId) {
             cancelAnimationFrame(animationId);
@@ -532,8 +510,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-
-    // ---- Play/Pause ----
     playBtn.addEventListener('click', function() {
         if (audio.paused) {
             initAudioContext();
@@ -548,8 +524,6 @@ document.addEventListener('DOMContentLoaded', function() {
             stopVisualizer();
         }
     });
-
-    // ---- Audio events ----
     audio.addEventListener('ended', function() {
         isPlaying = false;
         playIcon.className = 'fas fa-play';
@@ -557,42 +531,32 @@ document.addEventListener('DOMContentLoaded', function() {
         progressFill.style.width = '0%';
         updateTimeDisplay();
     });
-
     audio.addEventListener('timeupdate', function() {
         const percent = (audio.currentTime / audio.duration) * 100;
         progressFill.style.width = percent + '%';
         updateTimeDisplay();
     });
-
-    // ---- Progress bar click ----
     progressBar.addEventListener('click', function(e) {
         const rect = this.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const percent = x / rect.width;
         audio.currentTime = percent * audio.duration;
     });
-
-    // ---- Time display ----
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return mins + ':' + (secs < 10 ? '0' : '') + secs;
     }
-
     function updateTimeDisplay() {
         const current = formatTime(audio.currentTime || 0);
         const total = formatTime(audio.duration || 0);
         timeDisplay.textContent = current + ' / ' + total;
     }
-
     audio.addEventListener('loadedmetadata', updateTimeDisplay);
-
-    // ---- Volume controls ----
     volumeSlider.addEventListener('input', function() {
         audio.volume = this.value;
         muteBtn.querySelector('i').className = this.value == 0 ? 'fas fa-volume-mute' : 'fas fa-volume-up';
     });
-
     muteBtn.addEventListener('click', function() {
         if (audio.volume > 0) {
             audio.volume = 0;
@@ -604,8 +568,6 @@ document.addEventListener('DOMContentLoaded', function() {
             muteBtn.querySelector('i').className = 'fas fa-volume-up';
         }
     });
-
-    // ---- Resume visualizer if tab becomes active ----
     document.addEventListener('visibilitychange', function() {
         if (!document.hidden && isPlaying && !animationId) {
             drawWave();
@@ -615,8 +577,6 @@ document.addEventListener('DOMContentLoaded', function() {
             animationId = null;
         }
     });
-
-    // ---- Cleanup on page unload ----
     window.addEventListener('beforeunload', function() {
         if (audioContext) {
             audioContext.close();
@@ -655,27 +615,20 @@ body.dark-mode {
     --input-bg: #333;
 }
 body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
-
-/* ===== POEM VIEW ===== */
 .poem-view-page { padding: 32px 0 60px; }
 .poem-nav { margin-bottom: 24px; }
 .poem-nav .back-link { color: var(--text-light); font-size: 0.95rem; transition: color 0.2s; }
 .poem-nav .back-link:hover { color: var(--rose); }
 .poem-nav .back-link i { margin-right: 6px; }
-
 .poem-header { text-align: center; margin-bottom: 32px; }
 .poem-header h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 4vw, 3.2rem); color: var(--dark); margin-bottom: 8px; line-height: 1.2; }
 .poem-meta { display: flex; justify-content: center; gap: 24px; color: var(--text-light); font-size: 0.9rem; flex-wrap: wrap; }
 .poem-meta i { margin-right: 4px; }
-
 .poem-image-container { margin: 0 auto 32px; max-width: 700px; text-align: center; }
 .poem-feature-image { width: 100%; height: auto; border: 6px solid var(--rose); border-radius: 16px; box-shadow: var(--shadow-hover); display: block; }
-
-/* ===== ENHANCED AUDIO PLAYER ===== */
 .poem-audio-player { max-width: 700px; margin: 0 auto 24px; background: var(--card-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .audio-label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 .audio-label i { color: var(--rose); font-size: 1.2rem; }
-
 #customAudioPlayer { position: relative; }
 #waveCanvas { width: 100%; height: 100px; border-radius: 8px; display: block; }
 .audio-controls-bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
@@ -690,31 +643,23 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .volume-control input[type="range"] { width: 60px; accent-color: var(--rose); background: var(--border); height: 4px; border-radius: 2px; }
 .volume-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--rose); cursor: pointer; }
 .volume-control input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--rose); cursor: pointer; border: none; }
-
-/* ===== POEM INTRO ===== */
 .poem-intro-section { max-width: 700px; margin: 0 auto 32px; background: var(--fantasy); border-left: 4px solid var(--rose); border-radius: 0 12px 12px 0; padding: 20px 24px; }
 .intro-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--rose); margin-bottom: 6px; }
 .intro-body { font-style: italic; font-size: 1.05rem; color: var(--text); line-height: 1.8; text-align: justify; }
-
-/* ===== POEM CONTENT ===== */
 .poem-content-section { max-width: 700px; margin: 0 auto 32px; border: 4px solid var(--rose); border-radius: 16px; padding: 32px; background: var(--card-bg); box-shadow: var(--shadow-hover); }
 .poem-body { font-family: 'Georgia', serif; font-size: 1.15rem; line-height: 2.4; color: var(--text); text-align: center; padding: 0; }
 .poem-body p { margin-bottom: 24px; }
 .poem-body p:last-child { margin-bottom: 0; }
 .poem-body br { display: block; content: ""; margin: 12px 0; }
 .poem-body img { max-width: 100%; height: auto; margin: 16px auto; display: block; border-radius: 8px; }
-
-/* ===== REVIEWS ===== */
 .reviews-section { max-width: 700px; margin: 48px auto 0; }
 .reviews-section h3 { font-size: 1.4rem; margin-bottom: 16px; }
-
 .rating-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .rating-stars { display: flex; gap: 2px; }
 .rating-stars .filled { color: #f1c40f; }
 .rating-stars .empty { color: #ddd; }
 .rating-score { font-weight: 700; font-size: 1.1rem; }
 .rating-count { color: var(--text-light); font-size: 0.9rem; }
-
 .review-form-container { background: var(--vanilla); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
 .review-form-container h4 { margin-bottom: 12px; }
 .review-form .star-rating { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -726,18 +671,15 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .review-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
 .review-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .review-form .btn { margin-top: 8px; }
-
 .voice-comment-section { margin-top: 20px; padding: 16px; background: var(--fantasy); border-radius: 12px; }
 .voice-comment-section h4 { margin-bottom: 12px; }
 .recorder-wrapper { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 #recordingStatus { font-weight: 600; }
 .recorder-wrapper .btn { padding: 8px 16px; }
-
 .admin-reply-container { background: var(--vanilla); border-radius: 12px; padding: 20px; border-left: 5px solid var(--rose); margin-top: 16px; }
 .admin-reply-container h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--dark); }
 .admin-reply-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
 .admin-reply-form .btn { margin-top: 8px; }
-
 .reviews-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
 .review-item { background: var(--card-bg); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); }
 .review-item.admin-reply { background: var(--vanilla); border-left: 5px solid var(--rose); }
@@ -751,8 +693,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .review-comment { line-height: 1.6; color: var(--text); }
 .voice-comment-player { margin: 6px 0; }
 .voice-comment-player audio { width: 100%; border-radius: 8px; }
-
-/* ===== POEM FOOTER ===== */
 .poem-footer-actions { max-width: 700px; margin: 32px auto 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding-top: 24px; border-top: 1px solid var(--border); }
 .share-section { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--text-light); }
 .share-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: white; font-size: 0.9rem; transition: transform 0.2s; }
@@ -760,14 +700,9 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .share-btn.facebook { background: #1877f2; }
 .share-btn.twitter { background: #1da1f2; }
 .share-btn.whatsapp { background: #25d366; }
-
 .reading-actions .btn { font-size: 0.85rem; }
-
-/* ===== BACK TO TOP ===== */
 .back-to-top { position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px; border-radius: 50%; background: var(--rose); color: white; border: none; font-size: 1.2rem; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; transition: transform 0.2s; z-index: 1000; }
 .back-to-top:hover { transform: scale(1.05); }
-
-/* ===== RESPONSIVE ===== */
 @media (max-width: 480px) {
     .poem-header h1 { font-size: 1.8rem; }
     .poem-meta { flex-direction: column; gap: 4px; align-items: center; }

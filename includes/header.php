@@ -59,15 +59,15 @@ if ($isLoggedIn) {
     <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
 <?php if (isset($og_title)): ?>
     <meta property="og:type" content="article" />
-    <meta property="og:title" content="<?php echo $og_title; ?>" />
-    <meta property="og:description" content="<?php echo $og_description; ?>" />
-    <meta property="og:url" content="<?php echo $og_url; ?>" />
-    <meta property="og:image" content="<?php echo $og_image; ?>" />
+    <meta property="og:title" content="<?php echo htmlspecialchars($og_title); ?>" />
+    <meta property="og:description" content="<?php echo htmlspecialchars($og_description); ?>" />
+    <meta property="og:url" content="<?php echo htmlspecialchars($og_url); ?>" />
+    <meta property="og:image" content="<?php echo htmlspecialchars($og_image); ?>" />
     
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="<?php echo $og_title; ?>" />
-    <meta name="twitter:description" content="<?php echo $og_description; ?>" />
-    <meta name="twitter:image" content="<?php echo $og_image; ?>" />
+    <meta name="twitter:title" content="<?php echo htmlspecialchars($og_title); ?>" />
+    <meta name="twitter:description" content="<?php echo htmlspecialchars($og_description); ?>" />
+    <meta name="twitter:image" content="<?php echo htmlspecialchars($og_image); ?>" />
 <?php endif; ?>
     
     <style>
