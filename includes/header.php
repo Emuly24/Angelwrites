@@ -55,6 +55,20 @@ if ($isLoggedIn) {
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
     <meta name="theme-color" content="#DBA1A2">
     <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
+
+    <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
+<?php if (isset($og_title)): ?>
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="<?php echo $og_title; ?>" />
+    <meta property="og:description" content="<?php echo $og_description; ?>" />
+    <meta property="og:url" content="<?php echo $og_url; ?>" />
+    <meta property="og:image" content="<?php echo $og_image; ?>" />
+    
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="<?php echo $og_title; ?>" />
+    <meta name="twitter:description" content="<?php echo $og_description; ?>" />
+    <meta name="twitter:image" content="<?php echo $og_image; ?>" />
+<?php endif; ?>
     
     <style>
         /* ===== RESET & BASE ===== */
