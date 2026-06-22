@@ -111,7 +111,7 @@ $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
 $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
 
-/// ============================================================
+// ============================================================
 // 🚀 SHARE & OG DATA (Bulletproof URL formatting)
 // ============================================================
 $base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
@@ -123,24 +123,23 @@ $twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
 
 $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 
-// 🖼️ OG Variables (To be read by header.php)
+// 🖼️ OG Variables (Read by header.php)
 $og_title = htmlspecialchars($poem['title']);
 $og_url = $full_url;
 $og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
 
-// 📸 Image Path (Foolproof)
+// 📸 Image Path (Uses Dynamic Generator to add Brand Border for Social Platforms!)
 $og_image = '';
-if (!empty($poem['image_path'])) {
-    // Remove leading slash from stored path, then append to clean base URL
-    $og_image = $base_url . '/' . ltrim($poem['image_path'], '/');
-} else {
-    // 📌 Make sure this file physically exists in your assets folder!
-    $og_image = $base_url . '/assets/images/angelwrites-logo.png'; 
-}
-
-// 🖼️ OG Image Dimensions (Helps WhatsApp/Facebook process it faster)
 $og_image_width = 1200;
 $og_image_height = 630;
+
+if (!empty($poem['image_path'])) {
+    // Points to the dynamic image script which crops to 1200x630 and adds the Rose Border
+    $og_image = $base_url . '/generate_og_image.php?src=' . urlencode(ltrim($poem['image_path'], '/'));
+} else {
+    // Fallback logo if no poem image exists
+    $og_image = $base_url . '/assets/images/angelwrites-logo.png'; 
+}
 ?>
 <?php require_once 'includes/header.php'; ?>
 
