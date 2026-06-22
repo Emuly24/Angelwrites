@@ -57,22 +57,27 @@ if ($isLoggedIn) {
     <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
 
    <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
-<?php if (isset($og_title)): ?>
-    <meta property="og:type" content="article" />
-    <meta property="og:title" content="<?php echo htmlspecialchars($og_title); ?>" />
-    <meta property="og:description" content="<?php echo htmlspecialchars($og_description); ?>" />
-    <meta property="og:url" content="<?php echo htmlspecialchars($og_url); ?>" />
-    <meta property="og:image" content="<?php echo htmlspecialchars($og_image); ?>" />
-    <?php if (isset($og_image_width)): ?>
-        <meta property="og:image:width" content="<?php echo $og_image_width; ?>" />
-        <meta property="og:image:height" content="<?php echo $og_image_height; ?>" />
-    <?php endif; ?>
-    
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="<?php echo htmlspecialchars($og_title); ?>" />
-    <meta name="twitter:description" content="<?php echo htmlspecialchars($og_description); ?>" />
-    <meta name="twitter:image" content="<?php echo htmlspecialchars($og_image); ?>" />
+<?php
+    // 1. Strictly ENSURE these variables are defined, even if they are empty.
+    $og_title       = isset($og_title)       ? htmlspecialchars($og_title)       : (isset($pageTitle) ? htmlspecialchars($pageTitle) : SITE_NAME);
+    $og_description = isset($og_description) ? htmlspecialchars($og_description) : 'AngelWrites — Christian writing and community platform.';
+    $og_url         = isset($og_url)         ? htmlspecialchars($og_url)         : SITE_URL . $_SERVER['REQUEST_URI'];
+    $og_image       = isset($og_image)       ? htmlspecialchars($og_image)       : SITE_URL . '/assets/images/angelwrites-logo.png';
+?>
+<meta property="og:type" content="article" />
+<meta property="og:title" content="<?php echo $og_title; ?>" />
+<meta property="og:description" content="<?php echo $og_description; ?>" />
+<meta property="og:url" content="<?php echo $og_url; ?>" />
+<meta property="og:image" content="<?php echo $og_image; ?>" />
+<?php if (isset($og_image_width)): ?>
+    <meta property="og:image:width" content="<?php echo $og_image_width; ?>" />
+    <meta property="og:image:height" content="<?php echo $og_image_height; ?>" />
 <?php endif; ?>
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="<?php echo $og_title; ?>" />
+<meta name="twitter:description" content="<?php echo $og_description; ?>" />
+<meta name="twitter:image" content="<?php echo $og_image; ?>" />
     
     <style>
         /* ===== RESET & BASE ===== */
