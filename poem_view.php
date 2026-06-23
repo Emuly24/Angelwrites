@@ -69,51 +69,54 @@ $og_image_height = 630;
 // ============================================================
 // PERMANENT FIX: Generate a Static OG Image for WhatsApp & Status
 // ============================================================
+// ============================================================
+// PERMANENT FIX: Generate & serve OG Image (HTTP fallback for SSL)
+// ============================================================
 $og_image = '';
 if (!empty($poem['image_path'])) {
     $static_og_file = 'assets/uploads/poems/og_' . $id . '.png';
     $static_og_full_path = __DIR__ . '/' . $static_og_file;
-    $raw_image = $base_url . '/' . ltrim($poem['image_path'], '/');
+    $raw_image_path = ltrim($poem['image_path'], '/');
 
-    // ✅ FIX 1: Detect & Delete 0-byte/Corrupt images before generating
+    // ✅ 1. Auto-Delete corrupt files
     if (file_exists($static_og_full_path) && filesize($static_og_full_path) < 100) {
         @unlink($static_og_full_path);
     }
 
-    // If the static bordered image does NOT exist, try to create it.
+    // ✅ 2. Generate if missing
     if (!file_exists($static_og_full_path)) {
-        $gen_url = $base_url . '/generate_og_image.php?src=' . urlencode(ltrim($poem['image_path'], '/'));
-        
-        // ✅ FIX 2: Use http://localhost to bypass the XAMPP Self-Signed SSL issue
-        $local_gen_url = str_replace('https://angelwrites.gt.tc', 'http://localhost', $gen_url);
+        // Use the local XAMPP HTTP bypass (safe for localhost)
+        $local_gen_url = 'http://localhost/generate_og_image.php?src=' . urlencode($raw_image_path);
         
         $image_data = @file_get_contents($local_gen_url);
-
-        // ✅ FIX 3: Fallback to cURL if file_get_contents fails (e.g. disabled by server)
         if ($image_data === false) {
+            // Fallback: cURL in case file_get_contents is disabled
             $ch = curl_init($local_gen_url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Bypass SSL checks
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             $image_data = curl_exec($ch);
             curl_close($ch);
         }
 
-        // Only save if we got valid data
+        // ✅ 3. Safely save to a temp file first to prevent corruption, then rename
         if ($image_data !== false && strlen($image_data) > 100) {
-            file_put_contents($static_og_full_path, $image_data);
+            $temp_file = $static_og_full_path . '.tmp';
+            file_put_contents($temp_file, $image_data);
+            rename($temp_file, $static_og_full_path);
         }
     }
 
-    // If the static file NOW exists, use it. Otherwise, fallback to the raw original image.
+    // ✅ 4. Serve via HTTP to bypass the Windows XAMPP SSL handshake bug
     if (file_exists($static_og_full_path) && filesize($static_og_full_path) > 100) {
-        $og_image = $base_url . '/' . $static_og_file;
+        $og_image = 'http://angelwrites.gt.tc/' . $static_og_file;
     } else {
-        // Fallback: Use the raw image without the border so WhatsApp at least shows the image
-        $og_image = $raw_image; 
+        // Fallback: Serve the raw image over HTTP as well
+        $og_image = 'http://angelwrites.gt.tc/' . $raw_image_path; 
     }
 } else {
-    $og_image = $base_url . '/assets/images/angelwrites-logo.png';
+    // Logo fallback (HTTP)
+    $og_image = 'http://angelwrites.gt.tc/assets/images/angelwrites-logo.png';
 }
 
 // ===== HANDLE TEXT REVIEW =====
