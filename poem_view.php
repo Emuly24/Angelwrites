@@ -43,12 +43,16 @@ if (isLoggedIn()) {
 }
 
 // ============================================================
-// 🚀 SHARE & OG DATA (Bulletproof URL formatting) - MOVED TO TOP
+// 🚀 SHARE & OG DATA - Bulletproof Bot Detection
 // ============================================================
 $base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
 $full_url = $base_url . '/poem_view.php?id=' . $id;
 
-// 🕒 CACHE BUSTER: Appends a unique timestamp to force WhatsApp to recrawl the link
+// Detect if a social crawler (WhatsApp, Facebook, Twitter) is hitting the page
+$user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+$is_social_crawler = preg_match('/facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot/i', $user_agent);
+
+// 🕒 Cache busters for crawlers
 $cache_buster = '&_=' . time();
 $share_url = $full_url . $cache_buster;
 
@@ -61,84 +65,60 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 
 // 🖼️ OG Variables (Read by header.php)
 $og_title = htmlspecialchars($poem['title']);
-$og_url = $full_url; // Kept clean and canonical for proper Meta tags
+$og_url = $full_url;
 $og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
 $og_image_width = 1200;
 $og_image_height = 630;
 
 // ============================================================
-// 🚀 SHARE & OG DATA - FORCE HTTP FOR WHATSAPP BOTS
-// ============================================================
-// Keep HTTPS for human visitors, but use HTTP for bots due to self-signed SSL
-$site_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
-$share_base_url = 'http://angelwrites.gt.tc'; 
-
-$full_url = $share_base_url . '/poem_view.php?id=' . $id;
-
-// 🕒 CACHE BUSTER: Appends a unique timestamp to force WhatsApp to recrawl the link
-$cache_buster = '&_=' . time();
-$share_url = $full_url . $cache_buster;
-
-$encoded_url = urlencode($share_url);
-$encoded_title = urlencode($poem['title']);
-$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $share_url);
-$twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
-
-$pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
-
-// 🖼️ OG Variables (Read by header.php)
-$og_title = htmlspecialchars($poem['title']);
-$og_url = $share_base_url . '/poem_view.php?id=' . $id; // Keep it clean for Meta tags
-$og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
-$og_image_width = 1200;
-$og_image_height = 630;
-
-// ============================================================
-// PERMANENT FIX: Generate & serve OG Image (HTTP fallback for SSL)
+// 🔥 THE BOT-PROOF IMAGE GENERATION
 // ============================================================
 $og_image = '';
 if (!empty($poem['image_path'])) {
     $static_og_file = 'assets/uploads/poems/og_' . $id . '.png';
     $static_og_full_path = __DIR__ . '/' . $static_og_file;
-    $raw_image_path = ltrim($poem['image_path'], '/');
+    $raw_image_url = $base_url . '/' . ltrim($poem['image_path'], '/');
+    $dynamic_gen_url = $base_url . '/generate_og_image.php?src=' . urlencode(ltrim($poem['image_path'], '/'));
 
-    // ✅ 1. Auto-Delete corrupt files
-    if (file_exists($static_og_full_path) && filesize($static_og_full_path) < 100) {
-        @unlink($static_og_full_path);
-    }
-
-    // ✅ 2. Generate if missing
-    if (!file_exists($static_og_full_path)) {
-        // Use the local XAMPP HTTP bypass (safe for localhost)
-        $local_gen_url = 'http://localhost/generate_og_image.php?src=' . urlencode($raw_image_path);
-        
-        $image_data = @file_get_contents($local_gen_url);
-        if ($image_data === false) {
-            $ch = curl_init($local_gen_url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            $image_data = curl_exec($ch);
-            curl_close($ch);
-        }
-
-        if ($image_data !== false && strlen($image_data) > 100) {
-            $temp_file = $static_og_full_path . '.tmp';
-            file_put_contents($temp_file, $image_data);
-            rename($temp_file, $static_og_full_path);
-        }
-    }
-
-    // ✅ 3. Serve via HTTP to bypass the Windows XAMPP SSL handshake bug
-    if (file_exists($static_og_full_path) && filesize($static_og_full_path) > 100) {
-        $og_image = $share_base_url . '/' . $static_og_file;
+    // ✅ BOT DETECTION LOGIC:
+    if ($is_social_crawler) {
+        // Bots will fetch the image from the LIVE generator script. 
+        // InfinityFree allows PHP execution, so this bypasses their static-file blocks entirely!
+        $og_image = $dynamic_gen_url;
     } else {
-        // Fallback: Serve the raw image over HTTP as well
-        $og_image = $share_base_url . '/' . $raw_image_path; 
+        // HUMAN VIEWERS: Use the static file to save server resources and speed
+        // Check for corruption and delete if needed
+        if (file_exists($static_og_full_path) && filesize($static_og_full_path) < 100) {
+            @unlink($static_og_full_path);
+        }
+
+        // If it's missing, generate it
+        if (!file_exists($static_og_full_path)) {
+            $local_gen_url = str_replace('https://angelwrites.gt.tc', 'http://localhost', $dynamic_gen_url);
+            $image_data = @file_get_contents($local_gen_url);
+            if ($image_data === false) {
+                // cURL fallback if file_get_contents fails
+                $ch = curl_init($local_gen_url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                $image_data = curl_exec($ch);
+                curl_close($ch);
+            }
+            if ($image_data !== false && strlen($image_data) > 100) {
+                file_put_contents($static_og_full_path, $image_data);
+            }
+        }
+
+        // Use the static file if available, otherwise fallback to raw
+        if (file_exists($static_og_full_path) && filesize($static_og_full_path) > 100) {
+            $og_image = $base_url . '/' . $static_og_file;
+        } else {
+            $og_image = $raw_image_url;
+        }
     }
 } else {
-    // Logo fallback (HTTP)
-    $og_image = $share_base_url . '/assets/images/angelwrites-logo.png';
+    $og_image = $base_url . '/assets/images/angelwrites-logo.png';
 }
 // ===== HANDLE TEXT REVIEW =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
