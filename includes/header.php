@@ -400,7 +400,6 @@ if ($isLoggedIn) {
                 </div>
             </div>
         <?php endif; ?>
-    </main>
 
     <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
