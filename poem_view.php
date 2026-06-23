@@ -47,16 +47,21 @@ if (isLoggedIn()) {
 // ============================================================
 $base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
 $full_url = $base_url . '/poem_view.php?id=' . $id;
-$encoded_url = urlencode($full_url);
+
+// 🕒 CACHE BUSTER: Appends a unique timestamp to force WhatsApp to recrawl the link
+$cache_buster = '&_=' . time();
+$share_url = $full_url . $cache_buster;
+
+$encoded_url = urlencode($share_url);
 $encoded_title = urlencode($poem['title']);
-$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $full_url);
+$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $share_url);
 $twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
 
 $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 
 // 🖼️ OG Variables (Read by header.php)
 $og_title = htmlspecialchars($poem['title']);
-$og_url = $full_url;
+$og_url = $full_url; // Kept clean and canonical for proper Meta tags
 $og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
 $og_image_width = 1200;
 $og_image_height = 630;
@@ -70,17 +75,38 @@ if (!empty($poem['image_path'])) {
     $static_og_full_path = __DIR__ . '/' . $static_og_file;
     $raw_image = $base_url . '/' . ltrim($poem['image_path'], '/');
 
+    // ✅ FIX 1: Detect & Delete 0-byte/Corrupt images before generating
+    if (file_exists($static_og_full_path) && filesize($static_og_full_path) < 100) {
+        @unlink($static_og_full_path);
+    }
+
     // If the static bordered image does NOT exist, try to create it.
     if (!file_exists($static_og_full_path)) {
         $gen_url = $base_url . '/generate_og_image.php?src=' . urlencode(ltrim($poem['image_path'], '/'));
-        $image_data = @file_get_contents($gen_url);
-        if ($image_data !== false) {
+        
+        // ✅ FIX 2: Use http://localhost to bypass the XAMPP Self-Signed SSL issue
+        $local_gen_url = str_replace('https://angelwrites.gt.tc', 'http://localhost', $gen_url);
+        
+        $image_data = @file_get_contents($local_gen_url);
+
+        // ✅ FIX 3: Fallback to cURL if file_get_contents fails (e.g. disabled by server)
+        if ($image_data === false) {
+            $ch = curl_init($local_gen_url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Bypass SSL checks
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            $image_data = curl_exec($ch);
+            curl_close($ch);
+        }
+
+        // Only save if we got valid data
+        if ($image_data !== false && strlen($image_data) > 100) {
             file_put_contents($static_og_full_path, $image_data);
         }
     }
 
     // If the static file NOW exists, use it. Otherwise, fallback to the raw original image.
-    if (file_exists($static_og_full_path)) {
+    if (file_exists($static_og_full_path) && filesize($static_og_full_path) > 100) {
         $og_image = $base_url . '/' . $static_og_file;
     } else {
         // Fallback: Use the raw image without the border so WhatsApp at least shows the image
