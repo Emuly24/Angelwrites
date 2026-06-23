@@ -67,8 +67,32 @@ $og_image_width = 1200;
 $og_image_height = 630;
 
 // ============================================================
-// PERMANENT FIX: Generate a Static OG Image for WhatsApp & Status
+// 🚀 SHARE & OG DATA - FORCE HTTP FOR WHATSAPP BOTS
 // ============================================================
+// Keep HTTPS for human visitors, but use HTTP for bots due to self-signed SSL
+$site_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
+$share_base_url = 'http://angelwrites.gt.tc'; 
+
+$full_url = $share_base_url . '/poem_view.php?id=' . $id;
+
+// 🕒 CACHE BUSTER: Appends a unique timestamp to force WhatsApp to recrawl the link
+$cache_buster = '&_=' . time();
+$share_url = $full_url . $cache_buster;
+
+$encoded_url = urlencode($share_url);
+$encoded_title = urlencode($poem['title']);
+$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $share_url);
+$twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
+
+$pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
+
+// 🖼️ OG Variables (Read by header.php)
+$og_title = htmlspecialchars($poem['title']);
+$og_url = $share_base_url . '/poem_view.php?id=' . $id; // Keep it clean for Meta tags
+$og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
+$og_image_width = 1200;
+$og_image_height = 630;
+
 // ============================================================
 // PERMANENT FIX: Generate & serve OG Image (HTTP fallback for SSL)
 // ============================================================
@@ -90,7 +114,6 @@ if (!empty($poem['image_path'])) {
         
         $image_data = @file_get_contents($local_gen_url);
         if ($image_data === false) {
-            // Fallback: cURL in case file_get_contents is disabled
             $ch = curl_init($local_gen_url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -99,7 +122,6 @@ if (!empty($poem['image_path'])) {
             curl_close($ch);
         }
 
-        // ✅ 3. Safely save to a temp file first to prevent corruption, then rename
         if ($image_data !== false && strlen($image_data) > 100) {
             $temp_file = $static_og_full_path . '.tmp';
             file_put_contents($temp_file, $image_data);
@@ -107,18 +129,17 @@ if (!empty($poem['image_path'])) {
         }
     }
 
-    // ✅ 4. Serve via HTTP to bypass the Windows XAMPP SSL handshake bug
+    // ✅ 3. Serve via HTTP to bypass the Windows XAMPP SSL handshake bug
     if (file_exists($static_og_full_path) && filesize($static_og_full_path) > 100) {
-        $og_image = 'http://angelwrites.gt.tc/' . $static_og_file;
+        $og_image = $share_base_url . '/' . $static_og_file;
     } else {
         // Fallback: Serve the raw image over HTTP as well
-        $og_image = 'http://angelwrites.gt.tc/' . $raw_image_path; 
+        $og_image = $share_base_url . '/' . $raw_image_path; 
     }
 } else {
     // Logo fallback (HTTP)
-    $og_image = 'http://angelwrites.gt.tc/assets/images/angelwrites-logo.png';
+    $og_image = $share_base_url . '/assets/images/angelwrites-logo.png';
 }
-
 // ===== HANDLE TEXT REVIEW =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
     $target_type = $_POST['target_type'];
