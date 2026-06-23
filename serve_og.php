@@ -1,23 +1,32 @@
 <?php
-// serve_og.php - The Proxy that bypasses InfinityFree's static-file bot block
-header('Cache-Control: no-cache, must-revalidate');
-
+// serve_og.php - Serves the image via a safe PHP endpoint
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$static_og_file = 'assets/uploads/poems/og_' . $id . '.png';
-$static_og_full_path = __DIR__ . '/' . $static_og_file;
+$static_file = 'assets/uploads/poems/og_' . $id . '.png';
+$full_path = __DIR__ . '/' . $static_file;
 
-// If the static file exists and is valid, serve it directly
-if (file_exists($static_og_full_path) && filesize($static_og_full_path) > 100) {
+// If the properly generated image exists, serve it
+if (file_exists($full_path) && filesize($full_path) > 100) {
     header('Content-Type: image/png');
     header('Cache-Control: public, max-age=2592000');
-    readfile($static_og_full_path);
+    readfile($full_path);
     exit;
 }
 
-// If the static file is missing/corrupt, fallback to the raw original image
-$raw_image = 'assets/uploads/poems/poem_1782047795_6a37e433f3f42.png'; // Replace with dynamic fetch if needed, but readfile works locally
-// For safety, let's just show the logo fallback
+// Fallback: serve the raw poem image
+$poem_data = $db->prepare("SELECT image_path FROM poems WHERE id = ?");
+$poem_data->execute([$id]);
+$poem = $poem_data->fetch(PDO::FETCH_ASSOC);
+
+if ($poem && !empty($poem['image_path'])) {
+    $raw_path = __DIR__ . '/' . ltrim($poem['image_path'], '/');
+    if (file_exists($raw_path)) {
+        header('Content-Type: image/png');
+        readfile($raw_path);
+        exit;
+    }
+}
+
+// Ultimate fallback: Logo
 header('Content-Type: image/png');
 readfile(__DIR__ . '/assets/images/angelwrites-logo.png');
 exit;
-?>

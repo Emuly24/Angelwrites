@@ -5,45 +5,49 @@ require_once 'includes/auth.php';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-$stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
-$stmt->execute([$id]);
-$poem = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$poem) {
-    header('Location: ' . SITE_URL . '/poetry.php');
-    exit;
+// 🔥 CRITICAL FIX: Catch database errors so the bot isn't redirected away
+$poem = null;
+try {
+    $stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
+    $stmt->execute([$id]);
+    $poem = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // Silent fail to prevent redirects
 }
 
-// ============================================================
-// 🚀 FIX: HONEST VIEW COUNTER
-// ============================================================
-$stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
-$stmt->execute([$id]);
-$poem['view_count'] = ($poem['view_count'] ?? 0) + 1;
+// REMOVED: if (!$poem) { header('Location: ' . SITE_URL . '/poetry.php'); exit; }
 
-// ===== TRACKING (Only for logged-in users) =====
-if (isLoggedIn()) {
-    $user_id = $_SESSION['user_id'];
-    $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
-    $stmt->execute([$user_id]);
-    $user_exists = $stmt->fetchColumn();
-    if ($user_exists && $poem) {
-        $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ? AND poem_id = ?");
-        $stmt->execute([$user_id, $id]);
-        $already_read = $stmt->fetchColumn();
-        if (!$already_read) {
-            try {
-                $stmt = $db->prepare("INSERT INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
-                $stmt->execute([$user_id, $id]);
-            } catch (PDOException $e) {
-                error_log("Poem tracking failed: " . $e->getMessage());
+// ============================================================
+// 🚀 VIEW COUNTER & TRACKING (Only if poem exists)
+// ============================================================
+if ($poem) {
+    $stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
+    $stmt->execute([$id]);
+    $poem['view_count'] = ($poem['view_count'] ?? 0) + 1;
+
+    if (isLoggedIn()) {
+        $user_id = $_SESSION['user_id'];
+        $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $user_exists = $stmt->fetchColumn();
+        if ($user_exists && $poem) {
+            $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ? AND poem_id = ?");
+            $stmt->execute([$user_id, $id]);
+            $already_read = $stmt->fetchColumn();
+            if (!$already_read) {
+                try {
+                    $stmt = $db->prepare("INSERT INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
+                    $stmt->execute([$user_id, $id]);
+                } catch (PDOException $e) {
+                    error_log("Poem tracking failed: " . $e->getMessage());
+                }
             }
         }
     }
 }
 
 // ============================================================
-// 🚀 SHARE & OG DATA - ULTIMATE INFINITYFREE FIX
+// 🚀 SHARE & OG DATA (With Fallbacks for Bots)
 // ============================================================
 $base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
 $full_url = $base_url . '/poem_view.php?id=' . $id;
@@ -52,21 +56,31 @@ $full_url = $base_url . '/poem_view.php?id=' . $id;
 $cache_buster = '&_=' . time();
 $share_url = $full_url . $cache_buster;
 
+// Set safe fallbacks if database was blocked
+$poem_title = $poem ? $poem['title'] : 'A Poem on AngelWrites';
+$poem_intro = $poem ? ($poem['intro'] ?? strip_tags($poem['content'])) : 'Discover heartfelt poetry and reflections on AngelWrites.';
+$poem_image = $poem ? ltrim($poem['image_path'], '/') : 'assets/images/angelwrites-logo.png';
+
 $encoded_url = urlencode($share_url);
-$encoded_title = urlencode($poem['title']);
-$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $share_url);
-$twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
+$encoded_title = urlencode($poem_title);
+$wa_text = urlencode($poem_title . ' — read this poem on AngelWrites: ' . $share_url);
+$twitter_text = urlencode($poem_title . ' — a poem by Angella Bottoman');
 
-$pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
+$pageTitle = htmlspecialchars($poem_title) . ' — Poetry';
 
-// 🖼️ OG Variables (Read by header.php)
-$og_title = htmlspecialchars($poem['title']);
+// 🖼️ OG Variables
+$og_title = htmlspecialchars($poem_title);
 $og_url = $full_url;
-$og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
+$og_description = htmlspecialchars(substr($poem_intro, 0, 150));
+if (empty($og_description)) {
+    $og_description = 'Read this poem on AngelWrites.';
+}
 $og_image_width = 1200;
 $og_image_height = 630;
 
-$og_image = $base_url . '/serve_og.php?id=' . $id;
+// 🔥 INFINITYFREE BOT BYPASS: Use a clean URL (/img/22) with no extension.
+// The .htaccess rule RewriteRule ^img/([0-9]+)/?$ serve_og.php?id=$1 processes this.
+$og_image = $base_url . '/img/' . $id;
 
 // ===== HANDLE TEXT REVIEW =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
@@ -112,30 +126,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) &&
     }
 }
 
-// ===== READING TIME =====
-function readingTime($content) {
-    $word_count = str_word_count(strip_tags($content));
-    $minutes = ceil($word_count / 200);
-    return $minutes < 1 ? '1 min read' : $minutes . ' min read';
+// ===== FETCH REVIEWS & RATINGS (Only if poem exists) =====
+$reviews = [];
+$avg_rating = 0;
+$total_reviews = 0;
+if ($poem) {
+    function readingTime($content) {
+        $word_count = str_word_count(strip_tags($content));
+        $minutes = ceil($word_count / 200);
+        return $minutes < 1 ? '1 min read' : $minutes . ' min read';
+    }
+
+    $stmt = $db->prepare("
+        SELECT r.*, u.name AS author_name 
+        FROM reviews r
+        JOIN users u ON r.user_id = u.id
+        WHERE r.target_type = 'poem' AND r.target_id = ?
+        ORDER BY r.created_at DESC
+    ");
+    $stmt->execute([$id]);
+    $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'poem' AND target_id = ?");
+    $stmt->execute([$id]);
+    $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
+    $total_reviews = $rating_data['total'] ?? 0;
 }
-
-// ===== FETCH REVIEWS =====
-$stmt = $db->prepare("
-    SELECT r.*, u.name AS author_name 
-    FROM reviews r
-    JOIN users u ON r.user_id = u.id
-    WHERE r.target_type = 'poem' AND r.target_id = ?
-    ORDER BY r.created_at DESC
-");
-$stmt->execute([$id]);
-$reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// ===== AVERAGE RATING =====
-$stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'poem' AND target_id = ?");
-$stmt->execute([$id]);
-$rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
-$avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
-$total_reviews = $rating_data['total'] ?? 0;
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -151,186 +168,193 @@ $total_reviews = $rating_data['total'] ?? 0;
             </a>
         </div>
 
-        <!-- Poem Header -->
-        <header class="poem-header">
-            <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
-            <div class="poem-meta">
-                <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
-                <span class="poem-views"><i class="fas fa-eye"></i> <?php echo number_format($poem['view_count'] ?? 1); ?> views</span>
-                <span class="poem-reading-time"><i class="fas fa-clock"></i> <?php echo readingTime($poem['content']); ?></span>
-            </div>
-        </header>
-
-        <!-- 🚀 FIXED: Bulletproof IMG URL -->
-        <?php if ($poem['image_path']): ?>
-            <div class="poem-image-container">
-                <img src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['image_path'], '/'); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
-            </div>
-        <?php endif; ?>
-
-        <!-- ===== ENHANCED AUDIO PLAYER WITH WAVE VISUALIZER ===== -->
-        <?php if ($poem['audio_path']): ?>
-            <div class="poem-audio-player">
-                <div class="audio-label">
-                    <i class="fas fa-headphones"></i>
-                    <span>Listen to this poem</span>
+        <?php if ($poem): ?>
+            <!-- Poem Header -->
+            <header class="poem-header">
+                <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
+                <div class="poem-meta">
+                    <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
+                    <span class="poem-views"><i class="fas fa-eye"></i> <?php echo number_format($poem['view_count'] ?? 1); ?> views</span>
+                    <span class="poem-reading-time"><i class="fas fa-clock"></i> <?php echo readingTime($poem['content']); ?></span>
                 </div>
-                <div id="customAudioPlayer">
-                    <canvas id="waveCanvas"></canvas>
-                    <!-- 🚀 FIXED: Bulletproof AUDIO URL -->
-                    <audio id="audioSource" src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['audio_path'], '/'); ?>" preload="metadata"></audio>
-                    <div class="audio-controls-bar">
-                        <button id="playPauseBtn" class="play-btn" aria-label="Play">
-                            <i class="fas fa-play"></i>
-                        </button>
-                        <div class="progress-container">
-                            <div class="progress-bar" id="progressBar">
-                                <div class="progress-fill" id="progressFill"></div>
-                            </div>
-                        </div>
-                        <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
-                        <div class="volume-control">
-                            <button id="muteBtn" aria-label="Mute"><i class="fas fa-volume-up"></i></button>
-                            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
+            </header>
 
-        <!-- Poem Introduction -->
-        <?php if ($poem['intro']): ?>
-            <div class="poem-intro-section">
-                <div class="intro-label">✧ Purpose of this poem</div>
-                <div class="intro-body">
-                    <?php echo nl2br(htmlspecialchars($poem['intro'])); ?>
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <!-- Poem Content -->
-        <div class="poem-content-section">
-            <div class="poem-body">
-                <?php echo $poem['content']; ?>
-            </div>
-        </div>
-
-        <!-- ===== REVIEWS & COMMENTS ===== -->
-        <div class="reviews-section">
-            <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
-            
-            <div class="rating-summary">
-                <div class="rating-stars">
-                    <?php for ($i = 1; $i <= 5; $i++): ?>
-                        <i class="fas fa-star <?php echo $i <= $avg_rating ? 'filled' : 'empty'; ?>"></i>
-                    <?php endfor; ?>
-                </div>
-                <span class="rating-score"><?php echo number_format($avg_rating, 1); ?> / 5</span>
-                <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
-            </div>
-
-            <!-- Text Review Form -->
-            <?php if (isLoggedIn()): ?>
-                <div class="review-form-container">
-                    <h4>Write a Text Review</h4>
-                    <form method="POST" class="review-form">
-                        <input type="hidden" name="target_type" value="poem">
-                        <input type="hidden" name="target_id" value="<?php echo $id; ?>">
-                        <div class="star-rating">
-                            <span>Your rating:</span>
-                            <div class="stars">
-                                <input type="radio" name="rating" value="5" id="star5"><label for="star5"><i class="fas fa-star"></i></label>
-                                <input type="radio" name="rating" value="4" id="star4"><label for="star4"><i class="fas fa-star"></i></label>
-                                <input type="radio" name="rating" value="3" id="star3"><label for="star3"><i class="fas fa-star"></i></label>
-                                <input type="radio" name="rating" value="2" id="star2"><label for="star2"><i class="fas fa-star"></i></label>
-                                <input type="radio" name="rating" value="1" id="star1"><label for="star1"><i class="fas fa-star"></i></label>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <textarea name="comment" rows="3" placeholder="Share your thoughts about this poem..." required></textarea>
-                        </div>
-                        <button type="submit" name="submit_review" class="btn btn-primary">
-                            <i class="fas fa-paper-plane"></i> Submit Review
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Voice Comment Form -->
-                <div class="voice-comment-section">
-                    <h4>🎙️ Record a Voice Comment</h4>
-                    <div class="recorder-wrapper">
-                        <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                        <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                        <form method="POST" enctype="multipart/form-data" id="voiceForm" style="display:none; margin-top:10px;">
-                            <input type="hidden" name="submit_voice_comment" value="1">
-                            <input type="hidden" name="target_id" value="<?php echo $id; ?>">
-                            <input type="file" name="voice_file" id="voiceFileInput" accept="audio/webm" required>
-                            <button type="submit" class="btn btn-success btn-sm">Upload Voice Comment</button>
-                        </form>
-                        <div id="voicePreviewContainer" style="display:none; margin-top:10px;">
-                            <audio controls id="voicePreview" style="width:100%;"><source src="" type="audio/webm"></audio>
-                        </div>
-                    </div>
-                </div>
-            <?php else: ?>
-                <div class="login-prompt">
-                    <p><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>">Login</a> to rate, review, or leave a voice comment.</p>
+            <!-- 🚀 FIXED: Bulletproof IMG URL -->
+            <?php if ($poem['image_path']): ?>
+                <div class="poem-image-container">
+                    <img src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['image_path'], '/'); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
                 </div>
             <?php endif; ?>
 
-            <!-- Admin Reply Form -->
-            <?php if (isAdmin()): ?>
-                <div class="admin-reply-container">
-                    <h4>🛡️ Angella's Reply</h4>
-                    <form method="POST" class="admin-reply-form">
-                        <input type="hidden" name="add_admin_reply" value="1">
-                        <input type="hidden" name="target_id" value="<?php echo $id; ?>">
-                        <div class="form-group">
-                            <textarea name="admin_reply" rows="3" placeholder="Reply to this poem directly..." required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Post Reply</button>
-                    </form>
-                </div>
-            <?php endif; ?>
-
-            <!-- Reviews List -->
-            <?php if (count($reviews) > 0): ?>
-                <div class="reviews-list">
-                    <?php foreach ($reviews as $review): ?>
-                        <div class="review-item <?php echo $review['is_admin_reply'] ? 'admin-reply' : ''; ?>">
-                            <div class="review-header">
-                                <span class="review-author">
-                                    <i class="fas fa-user-circle"></i>
-                                    <?php echo htmlspecialchars($review['author_name']); ?>
-                                    <?php if ($review['is_admin_reply']): ?>
-                                        <span class="admin-badge">🛡️ Angella</span>
-                                    <?php endif; ?>
-                                </span>
-                                <span class="review-date"><?php echo date('M j, Y', strtotime($review['created_at'])); ?></span>
-                            </div>
-                            <?php if ($review['rating'] > 0): ?>
-                                <div class="review-rating">
-                                    <?php for ($i = 1; $i <= 5; $i++): ?>
-                                        <i class="fas fa-star <?php echo $i <= $review['rating'] ? 'filled' : 'empty'; ?>"></i>
-                                    <?php endfor; ?>
+            <!-- ===== ENHANCED AUDIO PLAYER WITH WAVE VISUALIZER ===== -->
+            <?php if ($poem['audio_path']): ?>
+                <div class="poem-audio-player">
+                    <div class="audio-label">
+                        <i class="fas fa-headphones"></i>
+                        <span>Listen to this poem</span>
+                    </div>
+                    <div id="customAudioPlayer">
+                        <canvas id="waveCanvas"></canvas>
+                        <!-- 🚀 FIXED: Bulletproof AUDIO URL -->
+                        <audio id="audioSource" src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['audio_path'], '/'); ?>" preload="metadata"></audio>
+                        <div class="audio-controls-bar">
+                            <button id="playPauseBtn" class="play-btn" aria-label="Play">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <div class="progress-container">
+                                <div class="progress-bar" id="progressBar">
+                                    <div class="progress-fill" id="progressFill"></div>
                                 </div>
-                            <?php endif; ?>
-                            <div class="review-comment">
-                                <?php if (!empty($review['voice_path'])): ?>
-                                    <div class="voice-comment-player">
-                                        <audio controls>
-                                            <source src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($review['voice_path'], '/'); ?>" type="audio/webm">
-                                        </audio>
-                                    </div>
-                                <?php else: ?>
-                                    <?php echo nl2br(htmlspecialchars($review['comment'])); ?>
-                                <?php endif; ?>
+                            </div>
+                            <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+                            <div class="volume-control">
+                                <button id="muteBtn" aria-label="Mute"><i class="fas fa-volume-up"></i></button>
+                                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
                             </div>
                         </div>
-                    <?php endforeach; ?>
+                    </div>
                 </div>
             <?php endif; ?>
-        </div>
+
+            <!-- Poem Introduction -->
+            <?php if ($poem['intro']): ?>
+                <div class="poem-intro-section">
+                    <div class="intro-label">✧ Purpose of this poem</div>
+                    <div class="intro-body">
+                        <?php echo nl2br(htmlspecialchars($poem['intro'])); ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Poem Content -->
+            <div class="poem-content-section">
+                <div class="poem-body">
+                    <?php echo $poem['content']; ?>
+                </div>
+            </div>
+
+            <!-- ===== REVIEWS & COMMENTS ===== -->
+            <div class="reviews-section">
+                <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
+                
+                <div class="rating-summary">
+                    <div class="rating-stars">
+                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                            <i class="fas fa-star <?php echo $i <= $avg_rating ? 'filled' : 'empty'; ?>"></i>
+                        <?php endfor; ?>
+                    </div>
+                    <span class="rating-score"><?php echo number_format($avg_rating, 1); ?> / 5</span>
+                    <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
+                </div>
+
+                <!-- Text Review Form -->
+                <?php if (isLoggedIn()): ?>
+                    <div class="review-form-container">
+                        <h4>Write a Text Review</h4>
+                        <form method="POST" class="review-form">
+                            <input type="hidden" name="target_type" value="poem">
+                            <input type="hidden" name="target_id" value="<?php echo $id; ?>">
+                            <div class="star-rating">
+                                <span>Your rating:</span>
+                                <div class="stars">
+                                    <input type="radio" name="rating" value="5" id="star5"><label for="star5"><i class="fas fa-star"></i></label>
+                                    <input type="radio" name="rating" value="4" id="star4"><label for="star4"><i class="fas fa-star"></i></label>
+                                    <input type="radio" name="rating" value="3" id="star3"><label for="star3"><i class="fas fa-star"></i></label>
+                                    <input type="radio" name="rating" value="2" id="star2"><label for="star2"><i class="fas fa-star"></i></label>
+                                    <input type="radio" name="rating" value="1" id="star1"><label for="star1"><i class="fas fa-star"></i></label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <textarea name="comment" rows="3" placeholder="Share your thoughts about this poem..." required></textarea>
+                            </div>
+                            <button type="submit" name="submit_review" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Submit Review
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Voice Comment Form -->
+                    <div class="voice-comment-section">
+                        <h4>🎙️ Record a Voice Comment</h4>
+                        <div class="recorder-wrapper">
+                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <form method="POST" enctype="multipart/form-data" id="voiceForm" style="display:none; margin-top:10px;">
+                                <input type="hidden" name="submit_voice_comment" value="1">
+                                <input type="hidden" name="target_id" value="<?php echo $id; ?>">
+                                <input type="file" name="voice_file" id="voiceFileInput" accept="audio/webm" required>
+                                <button type="submit" class="btn btn-success btn-sm">Upload Voice Comment</button>
+                            </form>
+                            <div id="voicePreviewContainer" style="display:none; margin-top:10px;">
+                                <audio controls id="voicePreview" style="width:100%;"><source src="" type="audio/webm"></audio>
+                            </div>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="login-prompt">
+                        <p><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>">Login</a> to rate, review, or leave a voice comment.</p>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Admin Reply Form -->
+                <?php if (isAdmin()): ?>
+                    <div class="admin-reply-container">
+                        <h4>🛡️ Angella's Reply</h4>
+                        <form method="POST" class="admin-reply-form">
+                            <input type="hidden" name="add_admin_reply" value="1">
+                            <input type="hidden" name="target_id" value="<?php echo $id; ?>">
+                            <div class="form-group">
+                                <textarea name="admin_reply" rows="3" placeholder="Reply to this poem directly..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Post Reply</button>
+                        </form>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Reviews List -->
+                <?php if (count($reviews) > 0): ?>
+                    <div class="reviews-list">
+                        <?php foreach ($reviews as $review): ?>
+                            <div class="review-item <?php echo $review['is_admin_reply'] ? 'admin-reply' : ''; ?>">
+                                <div class="review-header">
+                                    <span class="review-author">
+                                        <i class="fas fa-user-circle"></i>
+                                        <?php echo htmlspecialchars($review['author_name']); ?>
+                                        <?php if ($review['is_admin_reply']): ?>
+                                            <span class="admin-badge">🛡️ Angella</span>
+                                        <?php endif; ?>
+                                    </span>
+                                    <span class="review-date"><?php echo date('M j, Y', strtotime($review['created_at'])); ?></span>
+                                </div>
+                                <?php if ($review['rating'] > 0): ?>
+                                    <div class="review-rating">
+                                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                                            <i class="fas fa-star <?php echo $i <= $review['rating'] ? 'filled' : 'empty'; ?>"></i>
+                                        <?php endfor; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="review-comment">
+                                    <?php if (!empty($review['voice_path'])): ?>
+                                        <div class="voice-comment-player">
+                                            <audio controls>
+                                                <source src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($review['voice_path'], '/'); ?>" type="audio/webm">
+                                            </audio>
+                                        </div>
+                                    <?php else: ?>
+                                        <?php echo nl2br(htmlspecialchars($review['comment'])); ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php else: ?>
+            <!-- If the poem is not found, show this instead of redirecting -->
+            <div class="poem-content-section">
+                <p style="text-align: center;">Poem not found. <a href="<?php echo SITE_URL; ?>/poetry.php">Browse all poems</a>.</p>
+            </div>
+        <?php endif; ?>
 
         <!-- Poem Footer Actions -->
         <div class="poem-footer-actions">
