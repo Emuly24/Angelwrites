@@ -42,6 +42,52 @@ if (isLoggedIn()) {
     }
 }
 
+// ============================================================
+// 🚀 SHARE & OG DATA (Bulletproof URL formatting) - MOVED TO TOP
+// ============================================================
+$base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
+$full_url = $base_url . '/poem_view.php?id=' . $id;
+$encoded_url = urlencode($full_url);
+$encoded_title = urlencode($poem['title']);
+$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $full_url);
+$twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
+
+$pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
+
+// 🖼️ OG Variables (Read by header.php)
+$og_title = htmlspecialchars($poem['title']);
+$og_url = $full_url;
+$og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
+$og_image_width = 1200;
+$og_image_height = 630;
+
+// ============================================================
+// PERMANENT FIX: Generate a Static OG Image for WhatsApp
+// ============================================================
+$og_image = '';
+if (!empty($poem['image_path'])) {
+    $static_og_file = 'assets/uploads/poems/og_' . $id . '.png';
+    $static_og_full_path = __DIR__ . '/' . $static_og_file;
+
+    // If the static bordered image does NOT exist, create it.
+    if (!file_exists($static_og_full_path)) {
+        $gen_url = $base_url . '/generate_og_image.php?src=' . urlencode(ltrim($poem['image_path'], '/'));
+        
+        // Fetch the generated image from the PHP script
+        $image_data = @file_get_contents($gen_url);
+        if ($image_data !== false) {
+            // Save it physically to the server as a .png file
+            file_put_contents($static_og_full_path, $image_data);
+        }
+    }
+
+    // Now point the OG Image directly to this static .png file
+    $og_image = $base_url . '/' . $static_og_file;
+} else {
+    // Fallback logo if no poem image exists
+    $og_image = $base_url . '/assets/images/angelwrites-logo.png'; 
+}
+
 // ===== HANDLE TEXT REVIEW =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
     $target_type = $_POST['target_type'];
@@ -110,61 +156,6 @@ $stmt->execute([$id]);
 $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
 $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
-// ============================================================
-// PERMANENT FIX: Generate a Static OG Image for WhatsApp
-// ============================================================
-if (!empty($poem['image_path'])) {
-    $static_og_file = 'assets/uploads/poems/og_' . $id . '.png';
-    $static_og_full_path = __DIR__ . '/' . $static_og_file;
-
-    // If the static bordered image does NOT exist, create it.
-    if (!file_exists($static_og_full_path)) {
-        $gen_url = rtrim((defined('SITE_URL') ? SITE_URL : 'https://angelwrites.gt.tc'), '/') 
-                   . '/generate_og_image.php?src=' . urlencode(ltrim($poem['image_path'], '/'));
-        
-        // Fetch the generated image from the PHP script
-        $image_data = @file_get_contents($gen_url);
-        if ($image_data !== false) {
-            // Save it physically to the server as a .png file
-            file_put_contents($static_og_full_path, $image_data);
-        }
-    }
-
-    // Now point the OG Image directly to this static .png file
-    $og_image = $base_url . '/' . $static_og_file;
-} else {
-    $og_image = $base_url . '/assets/images/angelwrites-logo.png';
-}
-
-// ============================================================
-// 🚀 SHARE & OG DATA (Bulletproof URL formatting)
-// ============================================================
-$base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
-$full_url = $base_url . '/poem_view.php?id=' . $id;
-$encoded_url = urlencode($full_url);
-$encoded_title = urlencode($poem['title']);
-$wa_text = urlencode($poem['title'] . ' — read this poem on AngelWrites: ' . $full_url);
-$twitter_text = urlencode($poem['title'] . ' — a poem by Angella Bottoman');
-
-$pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
-
-// 🖼️ OG Variables (Read by header.php)
-$og_title = htmlspecialchars($poem['title']);
-$og_url = $full_url;
-$og_description = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
-
-// 📸 Image Path (Uses Dynamic Generator to add Brand Border for Social Platforms!)
-$og_image = '';
-$og_image_width = 1200;
-$og_image_height = 630;
-
-if (!empty($poem['image_path'])) {
-    // Points to the dynamic image script which crops to 1200x630 and adds the Rose Border
-    $og_image = $base_url . '/' . ltrim($poem['image_path'], '/');
-} else {
-    // Fallback logo if no poem image exists
-    $og_image = $base_url . '/assets/images/angelwrites-logo.png'; 
-}
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -365,7 +356,8 @@ if (!empty($poem['image_path'])) {
         <div class="poem-footer-actions">
             <div class="share-section">
                 <span>Share:</span>
-                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $encoded_url; ?>" target="_blank" class="share-btn facebook">
+                <!-- UPDATED: Added &display=popup to prevent blank Facebook tab -->
+                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $encoded_url; ?>&display=popup" target="_blank" class="share-btn facebook">
                     <i class="fab fa-facebook-f"></i>
                 </a>
                 <a href="https://twitter.com/intent/tweet?text=<?php echo $twitter_text; ?>&url=<?php echo $encoded_url; ?>" target="_blank" class="share-btn twitter">
