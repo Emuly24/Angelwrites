@@ -15,7 +15,7 @@ if (!$poem) {
 }
 
 // ============================================================
-// 🚀 FIX: HONEST VIEW COUNTER (Increments on EVERY visit)
+// 🚀 FIX: HONEST VIEW COUNTER
 // ============================================================
 $stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
 $stmt->execute([$id]);
@@ -62,30 +62,32 @@ $og_image_width = 1200;
 $og_image_height = 630;
 
 // ============================================================
-// PERMANENT FIX: Generate a Static OG Image for WhatsApp
+// PERMANENT FIX: Generate a Static OG Image for WhatsApp & Status
 // ============================================================
 $og_image = '';
 if (!empty($poem['image_path'])) {
     $static_og_file = 'assets/uploads/poems/og_' . $id . '.png';
     $static_og_full_path = __DIR__ . '/' . $static_og_file;
+    $raw_image = $base_url . '/' . ltrim($poem['image_path'], '/');
 
-    // If the static bordered image does NOT exist, create it.
+    // If the static bordered image does NOT exist, try to create it.
     if (!file_exists($static_og_full_path)) {
         $gen_url = $base_url . '/generate_og_image.php?src=' . urlencode(ltrim($poem['image_path'], '/'));
-        
-        // Fetch the generated image from the PHP script
         $image_data = @file_get_contents($gen_url);
         if ($image_data !== false) {
-            // Save it physically to the server as a .png file
             file_put_contents($static_og_full_path, $image_data);
         }
     }
 
-    // Now point the OG Image directly to this static .png file
-    $og_image = $base_url . '/' . $static_og_file;
+    // If the static file NOW exists, use it. Otherwise, fallback to the raw original image.
+    if (file_exists($static_og_full_path)) {
+        $og_image = $base_url . '/' . $static_og_file;
+    } else {
+        // Fallback: Use the raw image without the border so WhatsApp at least shows the image
+        $og_image = $raw_image; 
+    }
 } else {
-    // Fallback logo if no poem image exists
-    $og_image = $base_url . '/assets/images/angelwrites-logo.png'; 
+    $og_image = $base_url . '/assets/images/angelwrites-logo.png';
 }
 
 // ===== HANDLE TEXT REVIEW =====
