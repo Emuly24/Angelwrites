@@ -1,0 +1,9 @@
+{
+    "name": "AngelWrites",
+    "short_name": "AngelWrites",
+    "start_url": "/",
+    "display": "standalone",
+    "theme_color": "#DBA1A2",
+    "background_color": "#F7F3ED",
+    "icons": []
+}
