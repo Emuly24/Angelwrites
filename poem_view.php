@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     $comment = trim($_POST['comment']);
     $parent_id = isset($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
     $is_private = isset($_POST['is_private']) ? 1 : 0;
-    $target_user_id = $is_private ? 1 : null; // admin ID (Angella)
+    $target_user_id = $is_private ? 1 : null;
 
     if (!empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, parent_id, is_private, target_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -164,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
 }
 
 // ============================================================
-// 10. FETCH COMMENTS (threaded)
+// 10. FETCH COMMENTS (threaded) – WITH OLD COMMENTS FIX
 // ============================================================
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
 $admin_id = 1; // change to your actual admin user ID
@@ -176,7 +176,11 @@ $stmt = $db->prepare("
     FROM reviews r
     JOIN users u ON r.user_id = u.id
     WHERE r.target_type = 'poem' AND r.target_id = ?
-    AND (r.is_private = 0 OR (r.is_private = 1 AND r.target_user_id = ?) OR r.user_id = ? OR ? = 1)
+    AND (r.is_private IS NULL OR r.is_private = 0 
+         OR (r.is_private = 1 AND r.target_user_id = ?) 
+         OR r.user_id = ? 
+         OR ? = 1)
+    AND (r.deleted_at IS NULL)
     ORDER BY r.parent_id ASC, r.created_at ASC
 ");
 $stmt->execute([$id, $user_id, $user_id, $admin_id]);
@@ -250,7 +254,14 @@ function render_comment($comment, $level = 0) {
 }
 
 // ============================================================
-// 11. FETCH RATINGS STATS
+// 11. COMMENT COUNTER
+// ============================================================
+$stmt = $db->prepare("SELECT COUNT(*) FROM reviews WHERE target_type='poem' AND target_id=? AND is_private=0 AND deleted_at IS NULL");
+$stmt->execute([$id]);
+$public_comment_count = $stmt->fetchColumn();
+
+// ============================================================
+// 12. FETCH RATINGS STATS
 // ============================================================
 $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type='poem' AND target_id=? AND is_private=0");
 $stmt->execute([$id]);
@@ -259,7 +270,7 @@ $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
 
 // ============================================================
-// 12. OUTPUT PAGE
+// 13. OUTPUT PAGE
 // ============================================================
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -325,37 +336,17 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .rating-stars .empty { color: #ddd; }
 .rating-score { font-weight: 700; font-size: 1.1rem; }
 .rating-count { color: var(--text-light); font-size: 0.9rem; }
-.review-form-container { background: var(--vanilla); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
-.review-form-container h4 { margin-bottom: 12px; }
-.review-form .star-rating { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.review-form .stars { display: flex; flex-direction: row-reverse; gap: 2px; }
-.review-form .stars input { display: none; }
-.review-form .stars label { font-size: 1.4rem; color: #ddd; cursor: pointer; transition: color 0.2s; }
-.review-form .stars label:hover, .review-form .stars label:hover ~ label { color: #f1c40f; }
-.review-form .stars input:checked ~ label { color: #f1c40f; }
-.review-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
-.review-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.review-form .btn { margin-top: 8px; }
-.reaction-section { text-align: center; margin: 20px 0; }
-.reaction-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
-.reaction-btn { background: none; border: 1px solid var(--border); cursor: pointer; font-size: 1.2rem; padding: 4px 10px; border-radius: 20px; transition: 0.2s; display: inline-flex; align-items: center; gap: 4px; }
-.reaction-btn:hover { background: var(--rose-light); border-color: var(--rose); }
-.reaction-btn.active { background: var(--rose); color: #fff; border-color: var(--rose); }
-.reaction-btn .count { font-size: 0.8rem; font-weight: 600; }
 
-/* ===== UPDATED SPLASHY EFFECT (Longer delay, more particles) ===== */
+/* ===== UPDATED SPLASHY EFFECT (Longer delay, more particles, exact emoji) ===== */
 .reaction-particle{position:fixed;pointer-events:none;z-index:99999;font-size:2rem;animation:burst 1.6s cubic-bezier(.2,.8,.2,1.2) forwards}@keyframes burst{0%{opacity:1;transform:translate(0)scale(.5)}100%{opacity:0;transform:translate(var(--tx),var(--ty))scale(1.8)rotate(720deg)}}.reaction-btn:active{transform:scale(.85);transition:transform .1s}.reaction-btn.active{animation:pop-active .4s ease}@keyframes pop-active{0%{transform:scale(1)}50%{transform:scale(1.3);box-shadow:0 0 20px var(--rose)}100%{transform:scale(1)}}
 
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
 .reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
 .reply-link:hover { color: var(--rose-dark); }
 .private-badge { background: #ffd700; color: #333; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: 6px; }
-
-/* ===== UPDATED TAG SUGGESTIONS (Bulletproof positioning) ===== */
 .tag-suggestions { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; z-index: 99999; min-width: 150px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 4px 0; }
 .tag-suggestions div { padding: 8px 16px; cursor: pointer; font-size: 0.95rem; color: var(--text); }
 .tag-suggestions div:hover { background: var(--vanilla); }
-
 .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .checkbox-group input[type="checkbox"] { accent-color: var(--rose); width: 16px; height: 16px; }
 .review-item { background: var(--card-bg); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); margin-bottom: 12px; }
@@ -474,6 +465,12 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                 <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
             </div>
 
+            <!-- Comment Counter -->
+            <div style="font-size:0.9rem; color:var(--text-light); margin-bottom:12px;">
+                <i class="fas fa-comment"></i> <?php echo $public_comment_count; ?> public <?php echo $public_comment_count == 1 ? 'comment' : 'comments'; ?>
+            </div>
+
+            <!-- Text Review Form -->
             <?php if (isLoggedIn()): ?>
                 <div class="review-form-container">
                     <h4>Write a Comment</h4>
@@ -506,16 +503,53 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                         </button>
                     </form>
                 </div>
+
+                <!-- ===== VOICE COMMENT SECTION (RESTORED) ===== -->
+                <div class="voice-comment-section">
+                    <h4>🎙️ Record a Voice Comment</h4>
+                    <div class="recorder-wrapper">
+                        <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
+                        <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                        <form method="POST" enctype="multipart/form-data" id="voiceForm" style="display:none; margin-top:10px;">
+                            <input type="hidden" name="submit_voice_comment" value="1">
+                            <input type="hidden" name="target_id" value="<?php echo $id; ?>">
+                            <input type="file" name="voice_file" id="voiceFileInput" accept="audio/webm" required>
+                            <button type="submit" class="btn btn-success btn-sm">Upload Voice Comment</button>
+                        </form>
+                        <div id="voicePreviewContainer" style="display:none; margin-top:10px;">
+                            <audio controls id="voicePreview" style="width:100%;"><source src="" type="audio/webm"></audio>
+                        </div>
+                    </div>
+                </div>
             <?php else: ?>
                 <div class="login-prompt">
                     <p><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>">Login</a> to comment, rate, or react.</p>
                 </div>
             <?php endif; ?>
 
+            <!-- ===== ADMIN REPLY SECTION (RESTORED) ===== -->
+            <?php if (isAdmin()): ?>
+                <div class="admin-reply-container">
+                    <h4>🛡️ Angella's Reply</h4>
+                    <form method="POST" class="admin-reply-form">
+                        <input type="hidden" name="add_admin_reply" value="1">
+                        <input type="hidden" name="target_id" value="<?php echo $id; ?>">
+                        <div class="form-group">
+                            <textarea name="admin_reply" rows="3" placeholder="Reply to this poem directly..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Post Reply</button>
+                    </form>
+                </div>
+            <?php endif; ?>
+
             <div class="reviews-list">
-                <?php foreach ($comments as $comment): ?>
-                    <?php render_comment($comment); ?>
-                <?php endforeach; ?>
+                <?php if (count($comments) > 0): ?>
+                    <?php foreach ($comments as $comment): ?>
+                        <?php render_comment($comment); ?>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p style="text-align:center; color:var(--text-light);">No comments yet. Be the first to share your thoughts!</p>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -536,23 +570,22 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 <button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})"><i class="fas fa-arrow-up"></i></button>
 
 <!-- ================================================================ -->
-<!-- COMPLETE JAVASCRIPT – Audio, Reactions, Tagging, Reply toggle    -->
+<!-- COMPLETE JAVASCRIPT – Audio, Reactions, Tagging, Reply, Recorder  -->
 <!-- ================================================================ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== UPDATED SPLASHY BURST FUNCTION (Exact emoji, more particles, longer life) =====
+    // ===== SPLASHY BURST FUNCTION =====
     function createReactionBurst(element, emoji) {
         const rect = element.getBoundingClientRect();
         const x = rect.left + rect.width / 2;
         const y = rect.top + rect.height / 2;
-        const count = 30; // More splashes
-        // Use ONLY the exact clicked emoji
+        const count = 30;
         for (let i = 0; i < count; i++) {
             const particle = document.createElement('div');
             particle.className = 'reaction-particle';
-            particle.textContent = emoji; // Only the reaction symbol
+            particle.textContent = emoji;
             const angle = Math.random() * Math.PI * 2;
-            const distance = 80 + Math.random() * 150; // Fly farther
+            const distance = 80 + Math.random() * 150;
             const tx = Math.cos(angle) * distance;
             const ty = Math.sin(angle) * distance - 40;
             particle.style.left = x + 'px';
@@ -561,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
             particle.style.setProperty('--ty', ty + 'px');
             particle.style.fontSize = (1.5 + Math.random() * 2.5) + 'rem';
             document.body.appendChild(particle);
-            setTimeout(() => particle.remove(), 1800); // Extended delay
+            setTimeout(() => particle.remove(), 1800);
         }
     }
 
@@ -571,7 +604,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const targetId = container.dataset.targetId;
         const buttons = container.querySelectorAll('.reaction-btn');
 
-        // Load existing reactions
         fetch(`ajax_get_reactions.php?target_type=${targetType}&target_id=${targetId}`)
             .then(res => res.json())
             .then(data => {
@@ -586,12 +618,11 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(err => console.error('Error loading reactions:', err));
 
-        // Handle click events
         buttons.forEach(btn => {
             btn.addEventListener('click', function() {
                 const reaction = this.dataset.reaction;
                 const emoji = this.textContent.trim().charAt(0);
-                createReactionBurst(this, emoji); // Exact splash on click
+                createReactionBurst(this, emoji);
 
                 fetch('ajax_toggle_reaction.php', {
                     method: 'POST',
@@ -616,7 +647,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ===== FIXED TAGGING AUTOCOMPLETE (Bulletproof positioning) =====
+    // ===== TAGGING AUTOCOMPLETE =====
     const commentText = document.getElementById('commentText');
     const suggestions = document.getElementById('tagSuggestions');
     let usersList = [];
@@ -642,8 +673,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     suggestions.innerHTML = matches.map(u => 
                         `<div data-id="${u.id}" data-name="${u.name}">${u.name}</div>`
                     ).join('');
-                    
-                    // Set position fixed relative to textarea
                     const rect = this.getBoundingClientRect();
                     suggestions.style.position = 'fixed';
                     suggestions.style.top = rect.bottom + 'px';
@@ -659,7 +688,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Click a suggestion to insert the tag
     suggestions.addEventListener('click', function(e) {
         if (e.target.tagName === 'DIV') {
             const name = e.target.dataset.name;
@@ -671,7 +699,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Close tagging dropdown if clicking outside
     document.addEventListener('click', function(e) {
         if (suggestions.style.display === 'block' && 
             !suggestions.contains(e.target) && 
@@ -693,6 +720,57 @@ document.addEventListener('DOMContentLoaded', function() {
             this.closest('.comment-reply-form').style.display = 'none';
         });
     });
+
+    // ===== VOICE RECORDER (RESTORED) =====
+    const recordBtn = document.getElementById('recordBtn');
+    const recordingStatus = document.getElementById('recordingStatus');
+    const voiceForm = document.getElementById('voiceForm');
+    const voiceFileInput = document.getElementById('voiceFileInput');
+    const voicePreviewContainer = document.getElementById('voicePreviewContainer');
+    const voicePreview = document.getElementById('voicePreview');
+    let mediaRecorder = null;
+    let audioChunks = [];
+
+    if (recordBtn) {
+        recordBtn.addEventListener('click', async function() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                recordingStatus.style.display = 'none';
+                recordBtn.textContent = '🎙️ Start Recording';
+                recordBtn.classList.remove('btn-danger');
+                recordBtn.classList.add('btn-secondary');
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const file = new File([audioBlob], 'voice_comment.webm', { type: 'audio/webm' });
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    voiceFileInput.files = dt.files;
+                    const url = URL.createObjectURL(file);
+                    voicePreview.src = url;
+                    voicePreviewContainer.style.display = 'block';
+                    voiceForm.style.display = 'block';
+                    recordBtn.textContent = '🎙️ Record Again';
+                };
+                mediaRecorder.start();
+                recordingStatus.style.display = 'inline';
+                recordBtn.textContent = '⏹️ Stop Recording';
+                recordBtn.classList.remove('btn-secondary');
+                recordBtn.classList.add('btn-danger');
+            } catch (error) {
+                alert('Microphone access denied or not available.');
+                console.error('Recording error:', error);
+            }
+        });
+    }
 
     // ===== AUDIO PLAYER =====
     const audio = document.getElementById('audioSource');
