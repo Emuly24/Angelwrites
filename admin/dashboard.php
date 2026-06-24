@@ -66,7 +66,13 @@ $pageTitle = 'Admin Dashboard';
     --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
     --shadow: 0 4px 20px rgba(0,0,0,0.04);
 }
-body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #333; }
+body { 
+    background: var(--bg); 
+    font-family: 'Inter', sans-serif; 
+    min-height: 100vh; 
+    overflow-y: auto; 
+    color: #333; 
+}
 body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
 body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
