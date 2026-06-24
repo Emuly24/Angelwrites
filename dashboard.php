@@ -44,210 +44,74 @@ if (!function_exists('get_image_url')) {
         return $base . '/' . ltrim($path, '/');
     }
 }
-if (!function_exists('rate_limit')) {
-    function rate_limit($key, $limit = 10, $window = 60) {
-        $ip = $_SERVER['REMOTE_ADDR'];
-        $cache_key = 'rate_limit_' . md5($ip . '_' . $key);
-        $file = sys_get_temp_dir() . '/' . $cache_key . '.txt';
-        $current = time();
-        if (file_exists($file)) {
-            $data = file_get_contents($file);
-            list($timestamp, $count) = explode('|', $data);
-            if ($current - $timestamp < $window) {
-                if ($count >= $limit) {
-                    http_response_code(429);
-                    exit('Rate limit exceeded. Try again later.');
-                }
-                $count++;
-            } else {
-                $timestamp = $current;
-                $count = 1;
-            }
-        } else {
-            $timestamp = $current;
-            $count = 1;
-        }
-        file_put_contents($file, "$timestamp|$count");
-    }
-}
 
 // ============================================================
-// 2. FETCH USER DATA
+// 2. FETCH USER PROFILE DATA
 // ============================================================
 $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // ============================================================
-// 3. ADVANCED STATS
+// 3. FETCH STATISTICS (All tied to current user)
 // ============================================================
-// Books finished
-$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'finished'");
-$stmt->execute([$user_id]);
-$books_finished = $stmt->fetchColumn();
+// Books reading & finished
+try { $stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'currently reading'"); $stmt->execute([$user_id]); $stats['books_reading'] = $stmt->fetchColumn(); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'finished'"); $stmt->execute([$user_id]); $stats['books_finished'] = $stmt->fetchColumn(); } catch (Exception $e) {}
+// Poems & Videos
+try { $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['poems_read'] = $stmt->fetchColumn(); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['videos_watched'] = $stmt->fetchColumn(); } catch (Exception $e) {}
+// Questions & Sessions
+try { $stmt = $db->prepare("SELECT COUNT(*) FROM questions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['questions_asked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['sessions_booked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
+// Streak & Rep
+try { $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['current_streak'] = $stmt->fetchColumn() ?? 0; } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT points, level FROM user_reputations WHERE user_id = ?"); $stmt->execute([$user_id]); $rep = $stmt->fetch(PDO::FETCH_ASSOC); $stats['points'] = $rep['points'] ?? 0; $stats['level'] = $rep['level'] ?? 1; } catch (Exception $e) {}
 
-// Books currently reading
-$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'currently reading'");
-$stmt->execute([$user_id]);
-$books_reading = $stmt->fetchColumn();
+// My total view counts
+$stats['my_views'] = 0;
+try { 
+    $stmt = $db->prepare("SELECT SUM(view_count) FROM poems WHERE id IN (SELECT poem_id FROM poem_reads WHERE user_id = ?)"); 
+    $stmt->execute([$user_id]); $stats['my_poem_views'] = $stmt->fetchColumn() ?? 0;
+    $stmt = $db->prepare("SELECT SUM(view_count) FROM books WHERE id IN (SELECT book_id FROM reading_status WHERE user_id = ?)"); 
+    $stmt->execute([$user_id]); $stats['my_book_views'] = $stmt->fetchColumn() ?? 0;
+    $stats['my_views'] = $stats['my_poem_views'] + $stats['my_book_views'];
+} catch (Exception $e) {}
 
-// Poems read
-$stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$poems_read = $stmt->fetchColumn();
-
-// Videos watched
-$stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$videos_watched = $stmt->fetchColumn();
-
-// Questions asked
-$stmt = $db->prepare("SELECT COUNT(*) FROM questions WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$questions_asked = $stmt->fetchColumn();
-
-// Sessions booked
-$stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$sessions_booked = $stmt->fetchColumn();
-
-// Reading streak
-$stmt = $db->prepare("SELECT current_streak, longest_streak FROM reading_streaks WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$streak = $stmt->fetch(PDO::FETCH_ASSOC);
-$current_streak = $streak['current_streak'] ?? 0;
-$longest_streak = $streak['longest_streak'] ?? 0;
-
-// Total reading time
-$stmt = $db->prepare("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions WHERE user_id = ? AND end_time IS NOT NULL");
-$stmt->execute([$user_id]);
-$total_seconds = $stmt->fetchColumn() ?? 0;
-$total_hours = floor($total_seconds / 3600);
-$total_minutes = floor(($total_seconds % 3600) / 60);
-
-// Achievements
-$stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC");
-$stmt->execute([$user_id]);
-$achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// User reputation
-$stmt = $db->prepare("SELECT points, level, badges FROM user_reputations WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$reputation = $stmt->fetch(PDO::FETCH_ASSOC);
-$rep_points = $reputation['points'] ?? 0;
-$rep_level = $reputation['level'] ?? 1;
-$badges = json_decode($reputation['badges'] ?? '[]', true);
-
-// Currently reading books
-$stmt = $db->prepare("
-    SELECT b.*, rs.progress 
-    FROM books b
-    JOIN reading_status rs ON b.id = rs.book_id
-    WHERE rs.user_id = ? AND rs.status = 'currently reading'
-    ORDER BY rs.updated_at DESC
-");
-$stmt->execute([$user_id]);
-$reading_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recently finished books
-$stmt = $db->prepare("
-    SELECT b.* FROM books b
-    JOIN reading_status rs ON b.id = rs.book_id
-    WHERE rs.user_id = ? AND rs.status = 'finished'
-    ORDER BY rs.updated_at DESC
-    LIMIT 5
-");
-$stmt->execute([$user_id]);
-$finished_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent poems
-$stmt = $db->prepare("
-    SELECT p.* FROM poems p
-    JOIN poem_reads pr ON p.id = pr.poem_id
-    WHERE pr.user_id = ?
-    ORDER BY pr.read_at DESC
-    LIMIT 5
-");
-$stmt->execute([$user_id]);
-$recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent videos
-$stmt = $db->prepare("
-    SELECT v.* FROM videos v
-    JOIN video_watches vw ON v.id = vw.video_id
-    WHERE vw.user_id = ?
-    ORDER BY vw.watched_at DESC
-    LIMIT 5
-");
-$stmt->execute([$user_id]);
-$recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent blog posts
-$stmt = $db->prepare("
-    SELECT bp.* FROM blog_posts bp
-    JOIN blog_reads br ON bp.id = br.blog_post_id
-    WHERE br.user_id = ?
-    ORDER BY br.read_at DESC
-    LIMIT 5
-");
-$stmt->execute([$user_id]);
-$recent_blog = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent reflections
-$stmt = $db->prepare("
-    SELECT r.* FROM reflections r
-    JOIN reflection_reads rr ON r.id = rr.reflection_id
-    WHERE rr.user_id = ?
-    ORDER BY rr.read_at DESC
-    LIMIT 5
-");
-$stmt->execute([$user_id]);
-$recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Upcoming sessions
-$stmt = $db->prepare("
-    SELECT * FROM sessions 
-    WHERE user_id = ? AND date >= date('now')
-    ORDER BY date ASC, time ASC
-");
-$stmt->execute([$user_id]);
-$upcoming_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent questions
-$stmt = $db->prepare("
-    SELECT q.*, COUNT(a.id) as answer_count 
-    FROM questions q
-    LEFT JOIN answers a ON q.id = a.question_id
-    WHERE q.user_id = ?
-    GROUP BY q.id
-    ORDER BY q.created_at DESC
-    LIMIT 5
-");
-$stmt->execute([$user_id]);
-$recent_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Notifications
-$stmt = $db->prepare("
-    SELECT * FROM notifications 
-    WHERE user_id = ? 
-    ORDER BY created_at DESC 
-    LIMIT 8
-");
-$stmt->execute([$user_id]);
-$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Unread notifications count (for badge)
-$stmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
-$stmt->execute([$user_id]);
-$unread_notifs = $stmt->fetchColumn();
+// My personal reading times
+try { 
+    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ?"); 
+    $stmt->execute([$user_id]); $stats['my_reading_hours'] = floor(($stmt->fetchColumn() ?? 0) / 3600);
+    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-1 day')"); 
+    $stmt->execute([$user_id]); $stats['my_minutes_today'] = floor(($stmt->fetchColumn() ?? 0) / 60);
+    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-7 days')"); 
+    $stmt->execute([$user_id]); $stats['my_minutes_week'] = floor(($stmt->fetchColumn() ?? 0) / 60);
+    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-30 days')"); 
+    $stmt->execute([$user_id]); $stats['my_minutes_month'] = floor(($stmt->fetchColumn() ?? 0) / 60);
+    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-365 days')"); 
+    $stmt->execute([$user_id]); $stats['my_minutes_year'] = floor(($stmt->fetchColumn() ?? 0) / 60);
+} catch (Exception $e) {}
 
 // ============================================================
-// 4. HANDLE MARK ALL NOTIFICATIONS AS READ (with CSRF)
+// 4. FETCH RECENT CONTENT (Books, Poems, Blog, Videos)
+// ============================================================
+try { $stmt = $db->prepare("SELECT b.*, rs.progress FROM books b JOIN reading_status rs ON b.id = rs.book_id WHERE rs.user_id = ? AND rs.status = 'currently reading' ORDER BY rs.updated_at DESC LIMIT 2"); $stmt->execute([$user_id]); $reading_books = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT p.* FROM poems p JOIN poem_reads pr ON p.id = pr.poem_id WHERE pr.user_id = ? ORDER BY pr.read_at DESC LIMIT 3"); $stmt->execute([$user_id]); $recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT v.* FROM videos v JOIN video_watches vw ON v.id = vw.video_id WHERE vw.user_id = ? ORDER BY vw.watched_at DESC LIMIT 3"); $stmt->execute([$user_id]); $recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT bp.* FROM blog_posts bp JOIN blog_reads br ON bp.id = br.blog_post_id WHERE br.user_id = ? ORDER BY br.read_at DESC LIMIT 3"); $stmt->execute([$user_id]); $recent_blog = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+
+// ============================================================
+// 5. FETCH NOTIFICATIONS & UPCOMING SESSIONS
+// ============================================================
+try { $stmt = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5"); $stmt->execute([$user_id]); $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $stmt->execute([$user_id]); $unread_count = $stmt->fetchColumn(); } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT * FROM sessions WHERE user_id = ? AND date >= date('now') ORDER BY date ASC, time ASC LIMIT 5"); $stmt->execute([$user_id]); $upcoming_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+
+// ============================================================
+// 6. HANDLE MARK ALL NOTIFICATIONS AS READ
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
-    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
-        die('Invalid CSRF token.');
-    }
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) { die('Invalid CSRF token.'); }
     $stmt = $db->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
     $stmt->execute([$user_id]);
     header('Location: ' . SITE_URL . '/dashboard.php');
@@ -257,834 +121,330 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
 $pageTitle = 'My Dashboard';
 ?>
 <?php require_once 'includes/header.php'; ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ===== FULL USER DASHBOARD CSS (with Dark Mode & Mobile enhancements) ===== */
 :root {
-    --rose: #DBA1A2;
-    --rose-dark: #c08a8b;
-    --rose-light: #e8c0c0;
-    --vanilla: #EFD8D6;
-    --fantasy: #F7F3ED;
-    --white: #ffffff;
-    --dark: #2c1e1e;
-    --text: #3d2e2e;
-    --text-light: #6b5a5a;
-    --bg: #F7F3ED;
-    --card-bg: #ffffff;
-    --border: #e5d5d5;
-    --shadow: 0 4px 16px rgba(44,30,30,0.08);
-    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
-    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9;
+    --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
+    --shadow: 0 4px 20px rgba(0,0,0,0.04);
 }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; transition:background 0.3s, color 0.3s; }
-body.dark-mode {
-    --bg: #1a1212;
-    --card-bg: #2c1e1e;
-    --border: #4a3a3a;
-    --text: #e8dddd;
-    --text-light: #a08a8a;
-    --vanilla: #2c1e1e;
-    --fantasy: #2c1e1e;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
-}
-.rose-text { color:var(--rose); }
+body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #333; }
+body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
+body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
-/* ===== BUTTONS ===== */
-.btn {
-    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
-    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
-    cursor:pointer; text-decoration:none; transition:all var(--transition);
-    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
-}
-.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
-.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
-.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
-.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
-.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
-.btn-outline:hover { background:var(--rose); color:var(--white); }
-.btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-danger { background:#e74c3c; color:white; border:2px solid #e74c3c; }
-.btn-danger:hover { background:#c0392b; border-color:#c0392b; }
-.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
-.btn-success:hover { background:#218838; border-color:#218838; }
+/* User Hero */
+.user-hero { background: linear-gradient(135deg, #fff, var(--rose-light)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--rose-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.user-hero h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; margin:0; letter-spacing: -0.5px; }
+.user-hero .sub { color: #666; margin-top: 4px; font-size: 0.95rem; }
 
-/* ===== DASHBOARD PAGE ===== */
-.dashboard-page { padding:32px 0 60px; }
+/* Core Stats */
+.user-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.user-stat-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); text-align: center; transition: 0.2s; }
+.user-stat-card:hover { transform: translateY(-4px); border-color: var(--rose); }
+.user-stat-card .num { font-size: 2.2rem; font-weight: 700; color: var(--rose); display: block; }
+.user-stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-top: 6px; }
 
-/* ===== HERO ===== */
-.dashboard-hero {
-    background: linear-gradient(135deg, var(--vanilla), var(--fantasy));
-    border-radius:20px; padding:24px 32px; margin-bottom:24px;
-    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;
-    border:1px solid var(--rose-light); box-shadow:var(--shadow); position:relative; overflow:hidden;
-}
-.dashboard-hero::before {
-    content:''; position:absolute; top:-50%; right:-20%; width:300px; height:300px;
-    background:rgba(219,161,162,0.08); border-radius:50%; pointer-events:none;
-}
-.hero-content { flex:1; min-width:250px; position:relative; z-index:1; }
-.hero-content h1 { font-size:2.4rem; margin:0 0 4px 0; color:var(--text); line-height:1.1; font-weight:700; }
-.hero-content .hero-sub { color:var(--text-light); font-size:1.05rem; margin:0 0 12px 0; max-width:500px; }
-.hero-stats { display:flex; gap:12px; flex-wrap:wrap; }
-.hero-stat {
-    display:flex; align-items:center; gap:6px; font-size:0.85rem; color:var(--text-light);
-    background:var(--card-bg); padding:6px 14px; border-radius:20px; border:1px solid var(--border);
-    box-shadow:var(--shadow); transition:all 0.2s ease;
-}
-.hero-stat:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.hero-stat i { color:var(--rose); }
-.hero-stat strong { color:var(--text); font-weight:600; }
-.hero-stat-points { font-size:0.7rem; color:var(--text-light); }
+/* Alerts Row */
+.user-alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+.user-alert-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.user-alert-card h4 { font-size: 1rem; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; }
+.user-alert-list { display: flex; flex-direction: column; gap: 10px; }
+.user-alert-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.user-alert-item:last-child { border-bottom: none; }
 
-.hero-profile { display:flex; align-items:center; gap:16px; flex-shrink:0; position:relative; z-index:1; }
-.profile-pic-large { width:80px; height:80px; border-radius:50%; overflow:hidden; background:var(--vanilla); display:flex; align-items:center; justify-content:center; border:3px solid var(--rose-light); flex-shrink:0; box-shadow:var(--shadow); }
-.profile-pic-large img { width:100%; height:100%; object-fit:cover; }
-.profile-pic-large i { font-size:3.5rem; color:var(--rose); }
-.profile-details h3 { font-size:1.2rem; margin:0 0 2px 0; font-weight:700; color:var(--text); }
-.profile-details .user-email { color:var(--text-light); font-size:0.9rem; margin:0; }
-.profile-details .user-bio { color:var(--text-light); font-size:0.85rem; margin:4px 0 0; }
-.badge-container { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
-.badge-container .badge { background:var(--rose); color:white; padding:0 10px; border-radius:12px; font-size:0.7rem; font-weight:600; }
+/* Charts */
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+.chart-container { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); height: 260px; position: relative; }
+@media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } .user-alert-row { grid-template-columns: 1fr; } }
 
-/* Dark Mode Toggle Button */
-.dark-toggle-btn {
-    background: transparent; border: none; cursor: pointer;
-    color: var(--text-light); font-size: 1.2rem; transition: color 0.2s;
-}
-.dark-toggle-btn:hover { color: var(--rose); }
+/* User Monitoring Stats */
+.user-monitoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
+.user-monitor-card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
+.user-monitor-card .title { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+.user-monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); margin: 4px 0; }
+.user-monitor-card .sub { font-size: 0.75rem; color: #666; }
 
-/* Notification Badge */
-.notif-badge {
-    position: absolute; top: -6px; right: -6px;
-    background: #e74c3c; color: white; border-radius: 50%;
-    padding: 2px 6px; font-size: 0.65rem; font-weight: 600;
-}
+/* Recent Content */
+.user-content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.user-content-card { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.user-content-card h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 
-/* ===== STATS ROW ===== */
-.stats-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:20px; }
-.stat-card {
-    background:var(--card-bg); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px;
-    border:1px solid var(--border); box-shadow:var(--shadow); transition:all 0.2s ease;
-    position:relative; overflow:hidden; min-height:55px;
-}
-.stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:10px 10px 0 0; }
-.stat-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.stat-reading::before { background:var(--rose); }
-.stat-reading .stat-icon { background:rgba(219,161,162,0.15); color:var(--rose); }
-.stat-finished::before { background:var(--rose-dark); }
-.stat-finished .stat-icon { background:rgba(192,138,139,0.15); color:var(--rose-dark); }
-.stat-poems::before { background:var(--rose-light); }
-.stat-poems .stat-icon { background:rgba(232,192,192,0.15); color:var(--rose-light); }
-.stat-videos::before { background:var(--vanilla); }
-.stat-videos .stat-icon { background:rgba(239,216,214,0.15); color:var(--vanilla); }
-.stat-questions::before { background:var(--rose); }
-.stat-questions .stat-icon { background:rgba(219,161,162,0.15); color:var(--rose); }
-.stat-sessions::before { background:var(--rose-dark); }
-.stat-sessions .stat-icon { background:rgba(192,138,139,0.15); color:var(--rose-dark); }
-.stat-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.85rem; flex-shrink:0; }
-.stat-number { font-size:1.1rem; font-weight:700; color:var(--text); line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.stat-label { font-size:0.5rem; color:var(--text-light); text-transform:uppercase; letter-spacing:0.3px; font-weight:600; line-height:1.1; white-space:normal; word-break:break-word; max-width:100%; }
+/* User Quick Actions */
+.user-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
+.user-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.user-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.user-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.user-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #333; transition: 0.2s; text-align: center; }
+.user-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
+.user-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
+.user-module-btn span { font-size: 0.75rem; font-weight: 500; }
 
-/* ===== GRID LAYOUT ===== */
-.dashboard-grid { display:grid; grid-template-columns:2fr 1fr; gap:32px; }
-.main-content { display:flex; flex-direction:column; gap:32px; }
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 9999; display: none; justify-content: center; align-items: center; }
+.modal-overlay.active { display: flex; }
+.modal-box { background: var(--card-bg); border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); border: 1px solid var(--rose-light); }
+.modal-box h2 { font-family: 'Playfair Display', serif; margin-top: 0; color: var(--rose-dark); }
+.modal-box .btn { width: 100%; justify-content: center; margin-bottom: 10px; }
 
-/* ===== SECTIONS ===== */
-.dashboard-section {
-    background:var(--card-bg); border-radius:16px; padding:24px;
-    border:1px solid var(--border); box-shadow:var(--shadow); transition:all 0.2s ease;
-}
-.dashboard-section:hover { box-shadow:var(--shadow-hover); }
-.section-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
-.section-header h2 { font-size:1.2rem; margin:0; display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text); }
-.section-header h2 .section-icon { color:var(--rose); }
-.section-actions { display:flex; gap:8px; flex-wrap:wrap; }
-
-/* ===== BOOK GRID ===== */
-.book-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:16px; }
-.book-card { background:var(--bg); border-radius:12px; overflow:hidden; border:1px solid var(--border); transition:all 0.3s cubic-bezier(0.4,0,0.2,1); }
-.book-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-hover); }
-.book-cover-wrapper { position:relative; height:180px; background:var(--vanilla); overflow:hidden; }
-.book-cover-wrapper img { width:100%; height:100%; object-fit:cover; }
-.placeholder-cover { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.5rem; color:var(--rose); }
-.progress-badge { position:absolute; bottom:8px; right:8px; background:var(--rose); color:white; padding:2px 10px; border-radius:12px; font-size:0.7rem; font-weight:600; }
-.finished-badge { position:absolute; top:8px; right:8px; font-size:1.5rem; }
-.book-info { padding:12px; }
-.book-info h3 { font-size:0.95rem; margin:0 0 4px; color:var(--text); font-weight:600; }
-.book-author { font-size:0.75rem; color:var(--text-light); margin:0; }
-.book-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
-
-/* ===== POEM GRID ===== */
-.poem-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px; }
-.poem-card { background:var(--bg); border-radius:12px; overflow:hidden; border:1px solid var(--border); transition:all 0.2s ease; }
-.poem-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.poem-thumbnail { height:120px; background:var(--vanilla); overflow:hidden; }
-.poem-thumbnail img { width:100%; height:100%; object-fit:cover; }
-.poem-thumbnail-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.5rem; color:var(--rose); }
-.poem-body { padding:10px; }
-.poem-body h3 { font-size:0.9rem; margin:0 0 2px; color:var(--text); font-weight:600; }
-.poem-intro { font-size:0.75rem; color:var(--text-light); margin:0 0 4px; }
-.poem-actions { display:flex; gap:6px; flex-wrap:wrap; }
-
-/* ===== VIDEO GRID ===== */
-.video-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:16px; }
-.video-card { background:var(--bg); border-radius:12px; overflow:hidden; border:1px solid var(--border); transition:all 0.2s ease; }
-.video-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.video-thumb { position:relative; height:120px; background:var(--vanilla); overflow:hidden; }
-.video-thumb img { width:100%; height:100%; object-fit:cover; }
-.video-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.5rem; color:var(--rose); }
-.play-overlay { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:2.5rem; color:white; opacity:0.8; }
-.video-info { padding:10px; }
-.video-info h3 { font-size:0.85rem; margin:0 0 4px; color:var(--text); font-weight:600; }
-
-/* ===== BLOG GRID ===== */
-.blog-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px; }
-.blog-card { background:var(--bg); border-radius:12px; overflow:hidden; border:1px solid var(--border); transition:all 0.2s ease; }
-.blog-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.blog-thumbnail { height:120px; background:var(--vanilla); overflow:hidden; }
-.blog-thumbnail img { width:100%; height:100%; object-fit:cover; }
-.blog-thumbnail-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.5rem; color:var(--rose); }
-.blog-body { padding:10px; }
-.blog-body h3 { font-size:0.9rem; margin:0 0 2px; color:var(--text); font-weight:600; }
-.blog-excerpt { font-size:0.75rem; color:var(--text-light); margin:0 0 4px; }
-
-/* ===== REFLECTION GRID ===== */
-.reflection-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:16px; }
-.reflection-card { background:var(--bg); border-radius:12px; overflow:hidden; border:1px solid var(--border); transition:all 0.2s ease; }
-.reflection-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.reflection-thumb { height:100px; background:var(--vanilla); overflow:hidden; }
-.reflection-thumb img { width:100%; height:100%; object-fit:cover; }
-.reflection-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.5rem; color:var(--rose); }
-.reflection-body { padding:10px; }
-.reflection-body h3 { font-size:0.85rem; margin:0 0 2px; color:var(--text); font-weight:600; }
-
-/* ===== SESSION & QA LISTS ===== */
-.session-list, .qa-list { display:flex; flex-direction:column; gap:8px; }
-.session-item, .qa-item { background:var(--bg); padding:12px; border-radius:10px; border:1px solid var(--border); transition:all 0.2s ease; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
-.session-item:hover, .qa-item:hover { box-shadow:var(--shadow); border-color:var(--rose-light); }
-.session-info { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.session-date, .session-time { font-weight:500; font-size:0.9rem; color:var(--text); }
-.session-message { font-size:0.85rem; color:var(--text-light); margin-top:4px; width:100%; }
-.session-actions { display:flex; gap:6px; }
-
-/* ===== STATUS BADGES ===== */
-.status-badge { padding:2px 12px; border-radius:12px; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
-.status-pending { background:#f1c40f; color:white; }
-.status-unread { background:var(--rose); color:white; }
-.status-available { background:#2ecc71; color:white; }
-.status-missing { background:#e74c3c; color:white; }
-
-/* ===== EMPTY STATE ===== */
-.empty-state { text-align:center; padding:24px; color:var(--text-light); }
-.empty-state-icon { display:block; font-size:2.5rem; color:var(--rose); margin-bottom:12px; opacity:0.6; }
-.empty-state p { margin:0; font-size:0.95rem; }
-.empty-state a { color:var(--rose); font-weight:600; text-decoration:none; }
-.empty-state a:hover { text-decoration:underline; }
-
-/* ===== SIDEBAR ===== */
-.dashboard-sidebar { display:flex; flex-direction:column; gap:32px; }
-.sidebar-card { background:var(--card-bg); border-radius:16px; padding:20px; border:1px solid var(--border); box-shadow:var(--shadow); transition:all 0.2s ease; }
-.sidebar-card:hover { box-shadow:var(--shadow-hover); }
-.sidebar-card .card-header { margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
-.sidebar-card .card-header h4 { font-size:1rem; margin:0; display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text); }
-.sidebar-card .card-header h4 i { color:var(--rose); }
-.sidebar-card .card-header-actions { display:flex; gap:8px; align-items:center; }
-.view-all-link { font-size:0.8rem; font-weight:600; color:var(--rose); text-decoration:none; transition:color 0.2s; }
-.view-all-link:hover { color:var(--rose-dark); text-decoration:underline; }
-
-/* ===== NOTIFICATIONS ===== */
-.notification-list { display:flex; flex-direction:column; gap:8px; }
-.notification-item { background:var(--bg); padding:12px; border-radius:10px; border-left:3px solid transparent; transition:all 0.2s ease; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
-.notification-item:hover { box-shadow:var(--shadow); }
-.notification-item.unread { border-left-color:var(--rose); }
-.notif-content { flex:1; }
-.notif-title { font-weight:600; font-size:0.9rem; color:var(--text); }
-.notif-message { font-size:0.85rem; color:var(--text-light); margin:2px 0; }
-.notif-date { font-size:0.75rem; color:var(--text-light); }
-.notif-type { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-weight:600; text-transform:uppercase; }
-.notif-type.reply { background:#e8f0fe; color:#1a73e8; }
-.notif-type.tag { background:#fce8e6; color:#d93025; }
-.notif-type.general { background:var(--vanilla); color:var(--text); }
-
-/* ===== ACHIEVEMENTS ===== */
-.achievement-list { display:flex; flex-direction:column; gap:6px; }
-.achievement-item { display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--bg); border-radius:8px; border:1px solid var(--border); transition:all 0.2s ease; }
-.achievement-item:hover { box-shadow:var(--shadow); }
-.achievement-icon { font-size:1.2rem; }
-.achievement-name { font-weight:500; font-size:0.85rem; flex:1; color:var(--text); }
-.achievement-date { font-size:0.7rem; color:var(--text-light); }
-.no-items { text-align:center; color:var(--text-light); font-size:0.9rem; padding:8px 0; }
-
-/* ===== QUICK ACTIONS ===== */
-.quick-actions-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px; }
-.quick-action-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:12px 8px; background:var(--bg); border-radius:10px; border:1px solid var(--border); text-decoration:none; color:var(--text); transition:all 0.3s cubic-bezier(0.4,0,0.2,1); gap:6px; }
-.quick-action-btn:hover { background:var(--vanilla); border-color:var(--rose); transform:translateY(-3px); box-shadow:var(--shadow); }
-.quick-action-btn i { font-size:1.4rem; color:var(--rose); }
-.quick-action-btn span { font-size:0.7rem; text-align:center; line-height:1.2; font-weight:500; word-break:break-word; white-space:normal; max-width:100%; }
-
-/* ===== RESPONSIVE ===== */
-@media (max-width:1024px) { .dashboard-grid { grid-template-columns:1fr; } }
-@media (max-width:768px) {
-    .dashboard-hero { flex-direction:column; text-align:center; align-items:center; padding:20px; }
-    .hero-profile { flex-direction:column; text-align:center; align-items:center; }
-    .hero-content h1 { font-size:1.8rem; }
-    .hero-content .hero-sub { font-size:1rem; }
-    .hero-stats { justify-content:center; }
-    .dashboard-section { padding:16px; }
-    .book-grid { grid-template-columns:1fr 1fr; }
-    .poem-grid, .video-grid, .blog-grid, .reflection-grid { grid-template-columns:1fr 1fr; }
-}
-@media (max-width:480px) {
-    .stats-row { grid-template-columns:1fr 1fr; gap:8px; }
-    .book-grid { grid-template-columns:1fr; }
-    .poem-grid, .video-grid, .blog-grid, .reflection-grid { grid-template-columns:1fr; }
-    .section-header { flex-direction:column; align-items:flex-start; gap:8px; }
-    .section-actions { width:100%; }
-    .quick-actions-grid { grid-template-columns:1fr 1fr; }
-}
+/* Stats Modal Override */
+#statsModal .modal-box { max-width: 800px; }
+#statsModal table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+#statsModal table th { background: var(--vanilla); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border); }
+#statsModal table td { padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; }
 </style>
 
-<div class="dashboard-page">
-    <div class="container">
-        <!-- ===== HERO ===== -->
-        <div class="dashboard-hero">
-            <div class="hero-content">
-                <h1>Welcome back, <span class="rose-text"><?php echo htmlspecialchars($user['name']); ?></span>!</h1>
-                <p class="hero-sub">Your personal reading journey — curated just for you.</p>
-                <div class="hero-stats">
-                    <div class="hero-stat">
-                        <i class="fas fa-fire"></i>
-                        <strong><?php echo $current_streak; ?> day streak</strong>
-                    </div>
-                    <div class="hero-stat">
-                        <i class="fas fa-clock"></i>
-                        <strong><?php echo $total_hours; ?>h <?php echo $total_minutes; ?>m</strong> read
-                    </div>
-                    <div class="hero-stat">
-                        <i class="fas fa-trophy"></i>
-                        <strong>Level <?php echo $rep_level; ?></strong>
-                        <span class="hero-stat-points">(<?php echo $rep_points; ?> pts)</span>
-                    </div>
-                </div>
-            </div>
-            <div class="hero-profile">
-                <div class="profile-pic-large">
-                    <?php if ($user['profile_pic']): ?>
-                        <img src="<?php echo get_image_url($user['profile_pic']); ?>" alt="<?php echo htmlspecialchars($user['name']); ?>" loading="lazy">
-                    <?php else: ?>
-                        <i class="fas fa-user-circle"></i>
-                    <?php endif; ?>
-                </div>
-                <div class="profile-details">
-                    <h3><?php echo htmlspecialchars($user['name']); ?></h3>
-                    <p class="user-email"><?php echo htmlspecialchars($user['email']); ?></p>
-                    <?php if ($user['bio']): ?>
-                        <p class="user-bio"><?php echo htmlspecialchars($user['bio']); ?></p>
-                    <?php endif; ?>
-                    <?php if ($badges): ?>
-                        <div class="badge-container">
-                            <?php foreach ($badges as $badge): ?>
-                                <span class="badge"><?php echo $badge; ?></span>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
-                    <button onclick="toggleDarkMode()" class="dark-toggle-btn"><i class="fas fa-moon"></i></button>
-                    <a href="notifications.php" class="btn btn-outline btn-sm" style="position:relative;">
-                        <i class="fas fa-bell"></i> Notifications
-                        <?php if ($unread_notifs > 0): ?>
-                            <span class="notif-badge"><?php echo $unread_notifs; ?></span>
-                        <?php endif; ?>
-                    </a>
-                    <a href="profile.php" class="btn btn-outline btn-sm">Profile</a>
-                </div>
+<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+    <!-- User Hero -->
+    <div class="user-hero">
+        <div>
+            <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars($user['name']); ?></span></h1>
+            <div class="sub">Your personal dashboard – track your reading journey.</div>
+            <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <span style="background: #f1c40f; color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo $stats['current_streak']; ?> Day Streak</span>
+                <span style="background: var(--bg); color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🏆 Level <?php echo $stats['level']; ?> (<?php echo $stats['points']; ?> pts)</span>
             </div>
         </div>
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <a href="notifications.php" class="btn btn-outline btn-sm" style="position:relative; border-radius:30px; text-decoration:none;">
+                <i class="fas fa-bell"></i> Alerts
+                <?php if ($unread_count > 0): ?>
+                    <span style="position:absolute; top:-8px; right:-8px; background:#e74c3c; color:white; border-radius:50%; padding:2px 8px; font-size:0.65rem; font-weight:700;"><?php echo $unread_count; ?></span>
+                <?php endif; ?>
+            </a>
+            <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-bolt"></i> Quick Actions</button>
+        </div>
+    </div>
 
-        <!-- ===== STATS ROW (with live IDs for AJAX) ===== -->
-        <div class="stats-row">
-            <div class="stat-card stat-reading">
-                <div class="stat-icon"><i class="fas fa-book"></i></div>
-                <div class="stat-number" id="stat_reading"><?php echo $books_reading; ?></div>
-                <div class="stat-label">Reading</div>
-            </div>
-            <div class="stat-card stat-finished">
-                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="stat-number" id="stat_finished"><?php echo $books_finished; ?></div>
-                <div class="stat-label">Finished</div>
-            </div>
-            <div class="stat-card stat-poems">
-                <div class="stat-icon"><i class="fas fa-feather-alt"></i></div>
-                <div class="stat-number" id="stat_poems"><?php echo $poems_read; ?></div>
-                <div class="stat-label">Poems Read</div>
-            </div>
-            <div class="stat-card stat-videos">
-                <div class="stat-icon"><i class="fas fa-video"></i></div>
-                <div class="stat-number" id="stat_videos"><?php echo $videos_watched; ?></div>
-                <div class="stat-label">Videos Watched</div>
-            </div>
-            <div class="stat-card stat-questions">
-                <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
-                <div class="stat-number" id="stat_questions"><?php echo $questions_asked; ?></div>
-                <div class="stat-label">Questions</div>
-            </div>
-            <div class="stat-card stat-sessions">
-                <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
-                <div class="stat-number" id="stat_sessions"><?php echo $sessions_booked; ?></div>
-                <div class="stat-label">Sessions</div>
+    <!-- Core Stats -->
+    <div class="user-stats-grid">
+        <div class="user-stat-card"><span class="num"><?php echo $stats['books_reading'] ?? 0; ?></span><span class="label">Currently Reading</span></div>
+        <div class="user-stat-card"><span class="num"><?php echo $stats['books_finished'] ?? 0; ?></span><span class="label">Books Finished</span></div>
+        <div class="user-stat-card"><span class="num"><?php echo $stats['poems_read'] ?? 0; ?></span><span class="label">Poems Read</span></div>
+        <div class="user-stat-card"><span class="num"><?php echo $stats['videos_watched'] ?? 0; ?></span><span class="label">Videos Watched</span></div>
+        <div class="user-stat-card"><span class="num"><?php echo $stats['questions_asked'] ?? 0; ?></span><span class="label">Questions Asked</span></div>
+        <div class="user-stat-card"><span class="num"><?php echo $stats['sessions_booked'] ?? 0; ?></span><span class="label">Sessions Booked</span></div>
+    </div>
+
+    <!-- Alerts Row (Custom for user) -->
+    <div class="user-alert-row">
+        <div class="user-alert-card"><h4><i class="fas fa-bell" style="color:var(--rose);"></i> Recent Notifications</h4>
+            <div class="user-alert-list"><?php if(count($notifications)>0): foreach($notifications as $n): ?>
+                <div class="user-alert-item" style="<?php echo $n['is_read'] ? '' : 'background:rgba(219,161,162,0.05); border-left:3px solid var(--rose); padding-left:8px;'; ?>">
+                    <span><strong><?php echo htmlspecialchars($n['title']); ?></strong> – <?php echo htmlspecialchars(substr($n['message'],0,30)); ?>...</span>
+                    <span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($n['created_at'])); ?></span>
+                </div>
+            <?php endforeach; else: ?><div class="user-alert-item" style="color:#999;">All caught up!</div><?php endif; ?></div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <a href="notifications.php" class="btn btn-sm btn-outline">View All</a>
+                <form method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                    <button type="submit" name="mark_all_read" class="btn btn-sm btn-secondary">Mark All Read</button>
+                </form>
             </div>
         </div>
+        <div class="user-alert-card"><h4><i class="fas fa-calendar-check" style="color:var(--rose);"></i> Upcoming Sessions</h4>
+            <div class="user-alert-list"><?php if(count($upcoming_sessions)>0): foreach($upcoming_sessions as $s): ?>
+                <div class="user-alert-item"><span><?php echo date('M j, g:i a', strtotime($s['date'].' '.$s['time'])); ?> – <?php echo htmlspecialchars($s['message'] ?: 'Booked Session'); ?></span><span class="badge badge-info"><?php echo ucfirst($s['status']); ?></span></div>
+            <?php endforeach; else: ?><div class="user-alert-item" style="color:#999;">No upcoming sessions.</div><?php endif; ?></div>
+            <a href="book_session.php" class="btn btn-sm btn-primary" style="margin-top:8px;">Book a Session</a>
+        </div>
+    </div>
 
-        <!-- ===== MAIN GRID ===== -->
-        <div class="dashboard-grid">
-            <div class="main-content">
-                <!-- ===== CURRENTLY READING ===== -->
-                <section class="dashboard-section" id="currently-reading">
-                    <div class="section-header">
-                        <h2><i class="fas fa-book-open section-icon"></i> Currently Reading</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">Browse Books</a>
-                        </div>
-                    </div>
-                    <?php if (count($reading_books) > 0): ?>
-                        <div class="book-grid">
-                            <?php foreach ($reading_books as $book): ?>
-                                <div class="book-card">
-                                    <div class="book-cover-wrapper">
-                                        <?php if ($book['cover_path']): ?>
-                                            <img src="<?php echo get_image_url($book['cover_path']); ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <div class="placeholder-cover"><i class="fas fa-book"></i></div>
-                                        <?php endif; ?>
-                                        <span class="progress-badge"><?php echo $book['progress'] ?? 0; ?>%</span>
-                                    </div>
-                                    <div class="book-info">
-                                        <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                        <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-                                        <div class="book-actions">
-                                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">Continue</a>
-                                            <form method="POST" action="<?php echo SITE_URL; ?>/library.php" style="display:inline;">
-                                                <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                                <input type="hidden" name="status" value="finished">
-                                                <input type="hidden" name="update_status" value="1">
-                                                <button type="submit" class="btn btn-sm btn-success">✓ Finished</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-book-open"></i></div>
-                            <p>No books in progress. <a href="<?php echo SITE_URL; ?>/books.php">Start reading</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
+    <!-- Charts -->
+    <div class="chart-row">
+        <div class="chart-container"><canvas id="activeChart"></canvas></div>
+        <div class="chart-container"><canvas id="viewsChart"></canvas></div>
+    </div>
 
-                <!-- ===== RECENTLY FINISHED ===== -->
-                <section class="dashboard-section" id="recently-finished">
-                    <div class="section-header">
-                        <h2><i class="fas fa-check-circle section-icon"></i> Recently Finished</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-outline">More Books</a>
-                        </div>
-                    </div>
-                    <?php if (count($finished_books) > 0): ?>
-                        <div class="book-grid">
-                            <?php foreach ($finished_books as $book): ?>
-                                <div class="book-card finished">
-                                    <div class="book-cover-wrapper">
-                                        <?php if ($book['cover_path']): ?>
-                                            <img src="<?php echo get_image_url($book['cover_path']); ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <div class="placeholder-cover"><i class="fas fa-book"></i></div>
-                                        <?php endif; ?>
-                                        <span class="finished-badge">✅</span>
-                                    </div>
-                                    <div class="book-info">
-                                        <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                        <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-                                        <div class="book-actions">
-                                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">Re-read</a>
-                                            <a href="<?php echo SITE_URL; ?>/book_review.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary">Review</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
-                            <p>No finished books yet. <a href="<?php echo SITE_URL; ?>/books.php">Start your first book</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
+    <!-- Personal Monitoring Stats -->
+    <div class="user-monitoring-grid">
+        <div class="user-monitor-card" style="cursor: pointer;" onclick="openStatsModal('views')">
+            <div class="title">My Total Views</div>
+            <div class="value" id="my_total_views"><?php echo number_format($stats['my_views'] ?? 0); ?></div>
+            <div class="sub">My Poems + Books <span style="font-size:0.7rem; color:#ccc;">(Click to view)</span></div>
+        </div>
+        <div class="user-monitor-card"><div class="title">Read Today</div><div class="value" id="my_today"><?php echo $stats['my_minutes_today'] ?? 0; ?>m</div><div class="sub">Last 24 hours</div></div>
+        <div class="user-monitor-card"><div class="title">Read This Week</div><div class="value" id="my_week"><?php echo $stats['my_minutes_week'] ?? 0; ?>m</div><div class="sub">Last 7 days</div></div>
+        <div class="user-monitor-card"><div class="title">Read This Month</div><div class="value" id="my_month"><?php echo $stats['my_minutes_month'] ?? 0; ?>m</div><div class="sub">Last 30 days</div></div>
+        <div class="user-monitor-card"><div class="title">Read This Year</div><div class="value" id="my_year"><?php echo $stats['my_minutes_year'] ?? 0; ?>m</div><div class="sub">Last 365 days</div></div>
+        <div class="user-monitor-card" style="cursor: pointer;" onclick="openStatsModal('reading')">
+            <div class="title">My Reading Hours</div>
+            <div class="value" id="my_hours"><?php echo number_format($stats['my_reading_hours'] ?? 0); ?></div>
+            <div class="sub">Lifetime <span style="font-size:0.7rem; color:#ccc;">(Click to view)</span></div>
+        </div>
+    </div>
 
-                <!-- ===== RECENT POEMS ===== -->
-                <section class="dashboard-section" id="recent-poems">
-                    <div class="section-header">
-                        <h2><i class="fas fa-feather-alt section-icon"></i> Recent Poems</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-sm btn-outline">More Poetry</a>
-                        </div>
-                    </div>
-                    <?php if (count($recent_poems) > 0): ?>
-                        <div class="poem-grid">
-                            <?php foreach ($recent_poems as $poem): ?>
-                                <div class="poem-card">
-                                    <div class="poem-thumbnail">
-                                        <?php if ($poem['image_path']): ?>
-                                            <img src="<?php echo get_image_url($poem['image_path']); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <div class="poem-thumbnail-placeholder"><i class="fas fa-feather-alt"></i></div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="poem-body">
-                                        <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                                        <?php if ($poem['intro']): ?>
-                                            <p class="poem-intro"><?php echo htmlspecialchars(substr($poem['intro'], 0, 60)); ?>...</p>
-                                        <?php endif; ?>
-                                        <div class="poem-actions">
-                                            <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">Read</a>
-                                            <?php if ($poem['audio_path']): ?>
-                                                <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>&autoplay=1" class="btn btn-sm btn-outline">Listen</a>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-feather-alt"></i></div>
-                            <p>No poems read yet. <a href="<?php echo SITE_URL; ?>/poetry.php">Start reading</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
+    <!-- My Recent Content -->
+    <div style="margin-bottom: 20px;">
+        <h3 style="font-family:'Playfair Display'; margin-bottom:12px;">📚 My Recent Activity</h3>
+        <div class="user-content-grid">
+            <div class="user-content-card"><h4>Currently Reading</h4><?php foreach($reading_books as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($b['title']); ?></div><div style="font-size:0.7rem; color:#999;"><?php echo $b['progress'] ?? 0; ?>% complete</div></div></div><?php endforeach; ?></div>
+            <div class="user-content-card"><h4>Recent Poems</h4><?php foreach($recent_poems as $p): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($p['title']); ?></div><div style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($p['created_at'])); ?></div></div></div><?php endforeach; ?></div>
+            <div class="user-content-card"><h4>Recent Videos</h4><?php foreach($recent_videos as $v): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($v['title']); ?></div><div style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($v['created_at'])); ?></div></div></div><?php endforeach; ?></div>
+            <div class="user-content-card"><h4>Recent Blog</h4><?php foreach($recent_blog as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($b['title']); ?></div><div style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($b['created_at'])); ?></div></div></div><?php endforeach; ?></div>
+        </div>
+    </div>
 
-                <!-- ===== RECENT VIDEOS ===== -->
-                <section class="dashboard-section" id="recent-videos">
-                    <div class="section-header">
-                        <h2><i class="fas fa-video section-icon"></i> Recent Videos</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/videos.php" class="btn btn-sm btn-outline">More Videos</a>
-                        </div>
-                    </div>
-                    <?php if (count($recent_videos) > 0): ?>
-                        <div class="video-grid">
-                            <?php foreach ($recent_videos as $video): ?>
-                                <div class="video-card">
-                                    <div class="video-thumb">
-                                        <?php if ($video['thumbnail']): ?>
-                                            <img src="<?php echo get_image_url($video['thumbnail']); ?>" alt="<?php echo htmlspecialchars($video['title']); ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <div class="video-thumb-placeholder"><i class="fas fa-video"></i></div>
-                                        <?php endif; ?>
-                                        <div class="play-overlay"><i class="fas fa-play-circle"></i></div>
-                                    </div>
-                                    <div class="video-info">
-                                        <h3><?php echo htmlspecialchars($video['title']); ?></h3>
-                                        <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo $video['id']; ?>" class="btn btn-sm btn-primary">Watch</a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-video"></i></div>
-                            <p>No videos watched yet. <a href="<?php echo SITE_URL; ?>/videos.php">Start watching</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
+    <!-- Quick Actions Modules (Matching the Admin Grid style) -->
+    <div class="user-actions-grid">
+        <div class="user-module"><h3>📖 My Library</h3><div class="user-module-grid">
+            <a href="books.php" class="user-module-btn"><i class="fas fa-book"></i><span>Browse Books</span></a>
+            <a href="reader/reader.php" class="user-module-btn"><i class="fas fa-book-open"></i><span>Open Reader</span></a>
+        </div></div>
+        <div class="user-module"><h3>✍️ Poetry & Blogs</h3><div class="user-module-grid">
+            <a href="poetry.php" class="user-module-btn"><i class="fas fa-feather-alt"></i><span>Read Poems</span></a>
+            <a href="blog.php" class="user-module-btn"><i class="fas fa-blog"></i><span>Read Blog</span></a>
+            <a href="reflections.php" class="user-module-btn"><i class="fas fa-pray"></i><span>Reflections</span></a>
+        </div></div>
+        <div class="user-module"><h3>👥 Community</h3><div class="user-module-grid">
+            <a href="groups.php" class="user-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
+            <a href="community.php" class="user-module-btn"><i class="fas fa-comments"></i><span>Community Q&A</span></a>
+        </div></div>
+        <div class="user-module"><h3>🎥 Videos</h3><div class="user-module-grid">
+            <a href="videos.php" class="user-module-btn"><i class="fas fa-video"></i><span>Watch Videos</span></a>
+        </div></div>
+        <div class="user-module"><h3>⚙️ My Account</h3><div class="user-module-grid">
+            <a href="profile.php" class="user-module-btn"><i class="fas fa-user"></i><span>My Profile</span></a>
+            <a href="achievements.php" class="user-module-btn"><i class="fas fa-trophy"></i><span>Achievements</span></a>
+        </div></div>
+    </div>
 
-                <!-- ===== RECENT BLOG POSTS ===== -->
-                <section class="dashboard-section" id="recent-blog">
-                    <div class="section-header">
-                        <h2><i class="fas fa-blog section-icon"></i> Recent Blog Posts</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/blog.php" class="btn btn-sm btn-outline">More Blog</a>
-                        </div>
-                    </div>
-                    <?php if (count($recent_blog) > 0): ?>
-                        <div class="blog-grid">
-                            <?php foreach ($recent_blog as $post): ?>
-                                <div class="blog-card">
-                                    <div class="blog-thumbnail">
-                                        <?php if ($post['featured_image']): ?>
-                                            <img src="<?php echo get_image_url($post['featured_image']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <div class="blog-thumbnail-placeholder"><i class="fas fa-blog"></i></div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="blog-body">
-                                        <h3><?php echo htmlspecialchars($post['title']); ?></h3>
-                                        <p class="blog-excerpt"><?php echo htmlspecialchars(substr($post['excerpt'] ?? '', 0, 80)); ?>...</p>
-                                        <a href="<?php echo SITE_URL; ?>/blog_post.php?id=<?php echo $post['id']; ?>" class="btn btn-sm btn-primary">Read</a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-blog"></i></div>
-                            <p>No blog posts read yet. <a href="<?php echo SITE_URL; ?>/blog.php">Start reading</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
-
-                <!-- ===== RECENT REFLECTIONS ===== -->
-                <section class="dashboard-section" id="recent-reflections">
-                    <div class="section-header">
-                        <h2><i class="fas fa-pray section-icon"></i> Recent Reflections</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/reflections.php" class="btn btn-sm btn-outline">More Reflections</a>
-                        </div>
-                    </div>
-                    <?php if (count($recent_reflections) > 0): ?>
-                        <div class="reflection-grid">
-                            <?php foreach ($recent_reflections as $reflection): ?>
-                                <div class="reflection-card">
-                                    <div class="reflection-thumb">
-                                        <?php if ($reflection['image_path']): ?>
-                                            <img src="<?php echo get_image_url($reflection['image_path']); ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>" loading="lazy">
-                                        <?php else: ?>
-                                            <div class="reflection-thumb-placeholder"><i class="fas fa-pray"></i></div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="reflection-body">
-                                        <h3><?php echo htmlspecialchars($reflection['title']); ?></h3>
-                                        <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="btn btn-sm btn-primary">Read</a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-pray"></i></div>
-                            <p>No reflections read yet. <a href="<?php echo SITE_URL; ?>/reflections.php">Start reading</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
-
-                <!-- ===== UPCOMING SESSIONS ===== -->
-                <section class="dashboard-section" id="upcoming-sessions">
-                    <div class="section-header">
-                        <h2><i class="fas fa-calendar-check section-icon"></i> Upcoming Sessions</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/book_session.php" class="btn btn-sm btn-primary">Book Session</a>
-                        </div>
-                    </div>
-                    <?php if (count($upcoming_sessions) > 0): ?>
-                        <div class="session-list">
-                            <?php foreach ($upcoming_sessions as $session): ?>
-                                <div class="session-item">
-                                    <div class="session-info">
-                                        <div class="session-date"><?php echo date('M j, Y', strtotime($session['date'])); ?></div>
-                                        <div class="session-time"><?php echo date('g:i a', strtotime($session['time'])); ?></div>
-                                        <span class="status-badge <?php echo $session['status']; ?>"><?php echo ucfirst($session['status']); ?></span>
-                                        <?php if ($session['message']): ?>
-                                            <p class="session-message"><?php echo htmlspecialchars($session['message']); ?></p>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="session-actions">
-                                        <a href="<?php echo SITE_URL; ?>/session_edit.php?id=<?php echo $session['id']; ?>" class="btn btn-sm btn-outline">Edit</a>
-                                        <a href="<?php echo SITE_URL; ?>/session_cancel.php?id=<?php echo $session['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this session?');">Cancel</a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-calendar-plus"></i></div>
-                            <p>No upcoming sessions. <a href="<?php echo SITE_URL; ?>/book_session.php">Book a session</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
-
-                <!-- ===== RECENT QUESTIONS ===== -->
-                <section class="dashboard-section" id="recent-questions">
-                    <div class="section-header">
-                        <h2><i class="fas fa-question-circle section-icon"></i> Recent Questions</h2>
-                        <div class="section-actions">
-                            <a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-sm btn-primary">Ask a Question</a>
-                        </div>
-                    </div>
-                    <?php if (count($recent_questions) > 0): ?>
-                        <div class="qa-list">
-                            <?php foreach ($recent_questions as $q): ?>
-                                <div class="qa-item">
-                                    <div class="qa-title">
-                                        <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>"><?php echo htmlspecialchars($q['title']); ?></a>
-                                    </div>
-                                    <div class="qa-meta">
-                                        <span><?php echo date('M j, Y', strtotime($q['created_at'])); ?></span>
-                                        <span><?php echo $q['answer_count'] ?? 0; ?> answers</span>
-                                    </div>
-                                    <div class="qa-actions">
-                                        <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>" class="btn btn-sm btn-outline">View</a>
-                                        <a href="<?php echo SITE_URL; ?>/community_edit.php?id=<?php echo $q['id']; ?>" class="btn btn-sm btn-outline">Edit</a>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="fas fa-comments"></i></div>
-                            <p>No questions asked yet. <a href="<?php echo SITE_URL; ?>/community.php">Ask a question</a></p>
-                        </div>
-                    <?php endif; ?>
-                </section>
+    <!-- Quick Actions Modal -->
+    <div class="modal-overlay" id="quickModal">
+        <div class="modal-box">
+            <h2>Quick Actions</h2>
+            <p style="color:#666; margin-bottom: 16px;">Select what you want to do.</p>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <a href="books.php" class="btn btn-primary">📖 Browse Books</a>
+                <a href="poetry.php" class="btn btn-primary">✍️ Read a Poem</a>
+                <a href="groups.php" class="btn btn-primary">👥 Join a Group</a>
+                <a href="profile.php" class="btn btn-primary">⚙️ Update Profile</a>
+                <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
             </div>
+        </div>
+    </div>
 
-            <!-- ===== SIDEBAR ===== -->
-            <div class="dashboard-sidebar">
-                <!-- ===== NOTIFICATIONS ===== -->
-                <div class="sidebar-card notifications-card">
-                    <div class="card-header">
-                        <h4><i class="fas fa-bell" style="color: var(--rose);"></i> Notifications</h4>
-                        <div class="card-header-actions">
-                            <?php if (count($notifications) > 0): ?>
-                                <form method="POST" style="display:inline;">
-                                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-                                    <button type="submit" name="mark_all_read" class="btn btn-sm btn-outline">Mark all read</button>
-                                </form>
-                            <?php endif; ?>
-                            <a href="<?php echo SITE_URL; ?>/notifications.php" class="view-all-link">View all →</a>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <?php if (count($notifications) > 0): ?>
-                            <div class="notification-list">
-                                <?php foreach ($notifications as $notif): ?>
-                                    <div class="notification-item <?php echo $notif['is_read'] ? 'read' : 'unread'; ?>">
-                                        <div class="notif-content">
-                                            <div class="notif-title"><?php echo htmlspecialchars($notif['title']); ?></div>
-                                            <div class="notif-message"><?php echo htmlspecialchars($notif['message']); ?></div>
-                                            <div class="notif-date"><?php echo date('M j, Y', strtotime($notif['created_at'])); ?></div>
-                                            <?php if (isset($notif['type'])): ?>
-                                                <span class="notif-type <?php echo $notif['type']; ?>"><?php echo ucfirst($notif['type']); ?></span>
-                                            <?php endif; ?>
-                                            <?php if (!empty($notif['link'])): ?>
-                                                <a href="<?php echo $notif['link']; ?>" class="btn btn-sm btn-outline">View</a>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php if (!$notif['is_read']): ?>
-                                            <a href="<?php echo SITE_URL; ?>/notification_read.php?id=<?php echo $notif['id']; ?>" class="btn btn-sm btn-outline">Mark read</a>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <p class="no-items">No notifications yet.</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- ===== ACHIEVEMENTS ===== -->
-                <div class="sidebar-card achievements-card">
-                    <div class="card-header">
-                        <h4><i class="fas fa-trophy" style="color: var(--rose);"></i> Achievements</h4>
-                        <a href="<?php echo SITE_URL; ?>/achievements.php" class="view-all-link">View all →</a>
-                    </div>
-                    <div class="card-body">
-                        <?php if (count($achievements) > 0): ?>
-                            <div class="achievement-list">
-                                <?php foreach ($achievements as $achievement): ?>
-                                    <div class="achievement-item">
-                                        <span class="achievement-icon">🏆</span>
-                                        <span class="achievement-name"><?php echo ucfirst(str_replace('_', ' ', $achievement['achievement_type'])); ?></span>
-                                        <span class="achievement-date"><?php echo date('M j, Y', strtotime($achievement['unlocked_at'])); ?></span>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <p class="no-items">No achievements yet. Keep reading to unlock them!</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- ===== QUICK ACTIONS ===== -->
-                <div class="sidebar-card quick-actions-card">
-                    <div class="card-header">
-                        <h4><i class="fas fa-bolt" style="color: var(--rose);"></i> Quick Actions</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="quick-actions-grid">
-                            <a href="<?php echo SITE_URL; ?>/books.php" class="quick-action-btn">
-                                <i class="fas fa-book"></i>
-                                <span>Browse Books</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/poetry.php" class="quick-action-btn">
-                                <i class="fas fa-feather-alt"></i>
-                                <span>Read Poems</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/videos.php" class="quick-action-btn">
-                                <i class="fas fa-video"></i>
-                                <span>Watch Videos</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/blog.php" class="quick-action-btn">
-                                <i class="fas fa-blog"></i>
-                                <span>Read Blog</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/reflections.php" class="quick-action-btn">
-                                <i class="fas fa-pray"></i>
-                                <span>Reflections</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/community.php" class="quick-action-btn">
-                                <i class="fas fa-question-circle"></i>
-                                <span>Community Q&A</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/book_session.php" class="quick-action-btn">
-                                <i class="fas fa-calendar-check"></i>
-                                <span>Book Session</span>
-                            </a>
-                            <a href="<?php echo SITE_URL; ?>/profile.php" class="quick-action-btn">
-                                <i class="fas fa-user-cog"></i>
-                                <span>My Profile</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+    <!-- Deep Dive Stats Modal -->
+    <div id="statsModal" class="modal-overlay" style="z-index: 99999;">
+        <div class="modal-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
+                <h2 id="statsModalTitle" style="font-family:'Playfair Display'; color: var(--rose-dark); margin:0;">Loading...</h2>
+                <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
+            </div>
+            <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem;">
+                <p style="color:#999; text-align:center;">Loading your personal data...</p>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-// ============================================================
-// 1. DARK MODE PERSISTENCE
-// ============================================================
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    localStorage.setItem('userDarkMode', document.body.classList.contains('dark-mode') ? '1' : '0');
+// Dark mode will be triggered by global header
+if (localStorage.getItem('userDarkMode') === '1') { document.body.classList.add('dark-mode'); }
+if (localStorage.getItem('adminDarkMode') === '1') { document.body.classList.add('dark-mode'); }
+
+// ===== Quick Modal Functions =====
+function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
+function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }
+document.getElementById('quickModal').addEventListener('click', function(e) { if(e.target===this) closeQuickModal(); });
+
+// ===== Live Personal Stats Polling =====
+function refreshStats() {
+    fetch('<?php echo SITE_URL; ?>/ajax_user.php?action=stats')
+        .then(res => res.json()).then(data => {
+            document.getElementById('my_total_views').textContent = data.my_total_views ?? 0;
+            document.getElementById('my_today').textContent = (data.my_minutes_today ?? 0) + 'm';
+            document.getElementById('my_week').textContent = (data.my_minutes_week ?? 0) + 'm';
+            document.getElementById('my_month').textContent = (data.my_minutes_month ?? 0) + 'm';
+            document.getElementById('my_year').textContent = (data.my_minutes_year ?? 0) + 'm';
+            document.getElementById('my_hours').textContent = data.my_reading_hours ?? 0;
+        }).catch(console.error);
 }
-if (localStorage.getItem('userDarkMode') === '1') {
-    document.body.classList.add('dark-mode');
-}
+setInterval(refreshStats, 60000);
 
 // ============================================================
-// 2. AJAX LIVE STATS REFRESH (Every 60 seconds)
+// SMOOTH & SMART CHARTS
 // ============================================================
-function refreshUserStats() {
-    fetch('ajax_user_stats.php')
+function initCharts() {
+    const gradientActive = document.getElementById('activeChart').getContext('2d').createLinearGradient(0,0,0,250);
+    const isDark = document.body.classList.contains('dark-mode');
+    gradientActive.addColorStop(0, '#DBA1A2'); gradientActive.addColorStop(1, isDark ? '#2c1e1e' : '#f0dad9');
+
+    window.activeChart = new Chart(document.getElementById('activeChart'), {
+        type: 'line', 
+        data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'My Reading Sessions', data: [0,0,0,0,0,0,0], borderColor: '#DBA1A2', backgroundColor: gradientActive, fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#DBA1A2', pointRadius: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } } }
+    });
+    window.viewsChart = new Chart(document.getElementById('viewsChart'), {
+        type: 'bar', 
+        data: { labels: ['Poems','Books','Blog','Videos'], datasets: [{ label: 'Content Read (7 days)', data: [0,0,0,0], backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], borderRadius: 6, borderSkipped: false }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } } }
+    });
+    updateCharts();
+    setInterval(updateCharts, 60000);
+}
+
+function updateCharts() {
+    fetch('<?php echo SITE_URL; ?>/ajax_user.php?action=active_chart')
+        .then(res => res.json()).then(data => { window.activeChart.data.labels = data.labels; window.activeChart.data.datasets[0].data = data.data; window.activeChart.update(); }).catch(console.error);
+    fetch('<?php echo SITE_URL; ?>/ajax_user.php?action=views_chart')
+        .then(res => res.json()).then(data => { window.viewsChart.data.datasets[0].data = data.data; window.viewsChart.update(); }).catch(console.error);
+}
+document.addEventListener('DOMContentLoaded', initCharts);
+
+// ============================================================
+// DEEP DIVE MODAL FUNCTIONS (Only displays current user's data)
+// ============================================================
+function openStatsModal(type) {
+    document.getElementById('statsModal').classList.add('active');
+    const body = document.getElementById('statsModalBody');
+    const title = document.getElementById('statsModalTitle');
+    body.innerHTML = '<p style="color:#999; text-align:center;">Loading your history...</p>';
+
+    const url = '<?php echo SITE_URL; ?>/ajax_user.php?action=' + (type === 'views' ? 'get_my_view_details' : 'get_my_reading_details');
+    title.textContent = type === 'views' ? '📊 My Viewed Content' : '📖 My Reading Sessions';
+
+    fetch(url)
         .then(res => res.json())
         .then(data => {
-            document.getElementById('stat_reading').textContent = data.reading;
-            document.getElementById('stat_finished').textContent = data.finished;
-            document.getElementById('stat_poems').textContent = data.poems;
-            document.getElementById('stat_videos').textContent = data.videos;
-            document.getElementById('stat_questions').textContent = data.questions;
-            document.getElementById('stat_sessions').textContent = data.sessions;
+            if (!data.success || data.logs.length === 0) {
+                body.innerHTML = '<p style="color:#999; text-align:center;">You haven\'t recorded any activity yet. Start reading!</p>';
+                return;
+            }
+            let html = '<table><thead><tr><th>Content</th><th>Date & Time</th></tr></thead><tbody>';
+            data.logs.forEach(row => {
+                let titleCol = row.target_type === 'poem' ? htmlspecialchars(row.poem_title) : htmlspecialchars(row.book_title);
+                let subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${row.target_type}</span>`;
+                if(type === 'views') {
+                    html += `<tr><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#666;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
+                } else {
+                    let dur = Math.floor(row.duration_seconds / 60);
+                    let sec = row.duration_seconds % 60;
+                    html += `<tr><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#666;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#eee; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
+                }
+            });
+            html += '</tbody></table>';
+            body.innerHTML = html;
         })
-        .catch(err => console.error('Stats refresh failed:', err));
+        .catch(err => {
+            body.innerHTML = '<p style="color:red; text-align:center;">Error loading data.</p>';
+            console.error(err);
+        });
 }
-setInterval(refreshUserStats, 60000);
-</script>
 
+function closeStatsModal() {
+    document.getElementById('statsModal').classList.remove('active');
+}
+document.getElementById('statsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeStatsModal();
+});
+
+function htmlspecialchars(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"]/g, function(m) {
+        if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; if (m === '"') return '&quot;'; return m;
+    });
+}
+</script>
 <?php require_once 'includes/footer.php'; ?>
