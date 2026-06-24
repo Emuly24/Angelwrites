@@ -28,15 +28,16 @@ if (!$book) {
 // ============================================================
 // UPDATE VIEW COUNT & LOG DEEP DIVE STATS (Guests & Users)
 // ============================================================
+// 1. Update the aggregate counter
 $db->prepare("UPDATE books SET view_count = view_count + 1 WHERE id = ?")->execute([$book_id]);
 
-// Log the view for the Deep-Dive Modal
+// 2. Log the detailed record for the Modal
 try {
     $user_id = isLoggedIn() ? $_SESSION['user_id'] : null;
     $stmt = $db->prepare("INSERT INTO view_logs (target_type, target_id, user_id, ip_address) VALUES ('book', ?, ?, ?)");
     $stmt->execute([$book_id, $user_id, $_SERVER['REMOTE_ADDR']]);
 } catch (Exception $e) {
-    // Silently skip if the view_logs table hasn't been created yet
+    // Table might not exist yet, silently skip
 }
 
 // ===== CHECK FOR PROCESSED HTML CONTENT (optional) =====
