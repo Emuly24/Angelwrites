@@ -6,10 +6,14 @@ require_once '../includes/auth.php';
 redirectIfNotAdmin();
 
 // ============================================================
-// ADVANCED FETCH: INITIAL STATS (will be updated via AJAX)
+// 1. FETCH STATISTICS
 // ============================================================
 $stats = [];
+
+// --- User counts ---
 $stmt = $db->query("SELECT COUNT(*) FROM users"); $stats['total_users'] = $stmt->fetchColumn();
+
+// --- Content counts ---
 $stmt = $db->query("SELECT COUNT(*) FROM books"); $stats['total_books'] = $stmt->fetchColumn();
 $stmt = $db->query("SELECT COUNT(*) FROM poems"); $stats['total_poems'] = $stmt->fetchColumn();
 $stmt = $db->query("SELECT COUNT(*) FROM sessions"); $stats['total_sessions'] = $stmt->fetchColumn();
@@ -19,11 +23,22 @@ $stmt = $db->query("SELECT COUNT(*) FROM questions"); $stats['total_questions'] 
 $stmt = $db->query("SELECT COUNT(*) FROM newsletter WHERE is_active = 1"); $stats['total_subscribers'] = $stmt->fetchColumn();
 $stmt = $db->query("SELECT COUNT(*) FROM blog_posts WHERE category = 'Christian Reflections'"); $stats['total_reflections'] = $stmt->fetchColumn();
 $stmt = $db->query("SELECT COUNT(*) FROM reading_groups"); $stats['total_groups'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions"); $stats['total_reading_hours'] = floor(($stmt->fetchColumn() ?? 0) / 3600);
-$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-7 days')"); $stats['active_readers_7days'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-30 days')"); $stats['active_readers_30days'] = $stmt->fetchColumn();
 
-// Most active readers
+// --- Reading hours ---
+$stmt = $db->query("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions"); $stats['total_reading_hours'] = floor(($stmt->fetchColumn() ?? 0) / 3600);
+
+// --- Active readers (logged‑in users) ---
+$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-1 day')"); $stats['active_today'] = $stmt->fetchColumn();
+$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-7 days')"); $stats['active_week'] = $stmt->fetchColumn();
+$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-30 days')"); $stats['active_month'] = $stmt->fetchColumn();
+$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-365 days')"); $stats['active_year'] = $stmt->fetchColumn();
+
+// --- Total content views (poems + books) ---
+$stmt = $db->query("SELECT SUM(view_count) FROM poems"); $stats['poem_views'] = $stmt->fetchColumn() ?? 0;
+$stmt = $db->query("SELECT SUM(view_count) FROM books"); $stats['book_views'] = $stmt->fetchColumn() ?? 0;
+$stats['total_views'] = $stats['poem_views'] + $stats['book_views'];
+
+// --- Most active readers (for sidebar) ---
 $stmt = $db->query("
     SELECT u.name, u.email, COUNT(rs.id) as sessions, SUM(rs.duration_seconds) as total_time
     FROM reading_sessions rs
@@ -33,19 +48,69 @@ $stmt = $db->query("
 ");
 $stats['most_active_readers'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Recent reading activity
+// ============================================================
+// 2. FETCH TOP CONTENT (with thumbnails)
+// ============================================================
+// Top 5 poems (by view_count)
+$stmt = $db->prepare("SELECT id, title, image_path, view_count FROM poems ORDER BY view_count DESC LIMIT 5");
+$stmt->execute();
+$top_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Top 5 books (by view_count)
+$stmt = $db->prepare("SELECT id, title, cover_path, view_count FROM books ORDER BY view_count DESC LIMIT 5");
+$stmt->execute();
+$top_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Top 5 blog posts (by comment count or views – we'll use view_count if exists, else comment count)
+// We'll check if blog_posts has view_count; if not, use comments from reviews.
 $stmt = $db->prepare("
-    SELECT u.name as user_name, b.title as book_title, rp.progress_percent, rp.last_accessed_at
-    FROM reading_progress rp
-    JOIN users u ON rp.user_id = u.id
-    JOIN books b ON rp.book_id = b.id
-    WHERE rp.progress_percent > 0
-    ORDER BY rp.last_accessed_at DESC LIMIT 5
+    SELECT bp.id, bp.title, bp.featured_image, 
+           (SELECT COUNT(*) FROM reviews WHERE target_type='blog' AND target_id=bp.id) as comment_count
+    FROM blog_posts bp
+    ORDER BY comment_count DESC LIMIT 5
 ");
 $stmt->execute();
-$recent_reading_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$top_blog = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Recent activity feed (for AJAX refresh)
+// Top 5 reflections (same as blog but category)
+$stmt = $db->prepare("
+    SELECT bp.id, bp.title, bp.featured_image, 
+           (SELECT COUNT(*) FROM reviews WHERE target_type='reflection' AND target_id=bp.id) as comment_count
+    FROM blog_posts bp
+    WHERE category = 'Christian Reflections'
+    ORDER BY comment_count DESC LIMIT 5
+");
+$stmt->execute();
+$top_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Top 5 videos (by view_count or comment count)
+$stmt = $db->prepare("
+    SELECT v.id, v.title, v.thumbnail, v.view_count
+    FROM videos v
+    ORDER BY v.view_count DESC LIMIT 5
+");
+$stmt->execute();
+$top_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ============================================================
+// 3. DAILY ACTIVE READERS DATA FOR CHART (last 7 days)
+// ============================================================
+$days = 7;
+$labels = [];
+$data = [];
+for ($i = $days - 1; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-$i days"));
+    $labels[] = date('D', strtotime($date));
+    $stmt = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE date(start_time) = ?");
+    $stmt->execute([$date]);
+    $data[] = $stmt->fetchColumn() ?? 0;
+}
+$chart_labels = json_encode($labels);
+$chart_data = json_encode($data);
+
+// ============================================================
+// 4. RECENT ACTIVITY (for feed)
+// ============================================================
 $stmt = $db->prepare("
     SELECT u.name, u.profile_pic, 'comment' as type, r.comment as text, r.created_at 
     FROM reviews r 
@@ -56,65 +121,6 @@ $stmt = $db->prepare("
 $stmt->execute();
 $recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ============================================================
-// FETCH RECENT ITEMS FOR GRIDS
-// ============================================================
-// Pending sessions
-$stmt = $db->prepare("
-    SELECT s.*, u.name AS user_name, u.email 
-    FROM sessions s 
-    JOIN users u ON s.user_id = u.id 
-    WHERE s.status = 'pending' 
-    ORDER BY s.date ASC, s.time ASC LIMIT 5
-");
-$stmt->execute();
-$recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Unread messages
-$stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent books (limit 4 for mini-grid)
-$stmt = $db->prepare("SELECT * FROM books ORDER BY created_at DESC LIMIT 4");
-$stmt->execute();
-$recent_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent poems
-$stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent blog posts
-$stmt = $db->prepare("SELECT * FROM blog_posts ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$recent_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent reflections
-$stmt = $db->prepare("SELECT * FROM blog_posts WHERE category = 'Christian Reflections' ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent questions
-$stmt = $db->prepare("SELECT * FROM questions ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent users
-$stmt = $db->prepare("SELECT * FROM users ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent videos
-$stmt = $db->prepare("SELECT * FROM videos ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Recent reading groups
-$stmt = $db->prepare("SELECT name, created_at FROM reading_groups ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 $pageTitle = 'Admin Dashboard';
 ?>
 <?php require_once '../includes/header.php'; ?>
@@ -123,7 +129,7 @@ $pageTitle = 'Admin Dashboard';
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ===== ADVANCED DASHBOARD CSS (with additional components) ===== */
+/* ===== MODERN DASHBOARD CSS ===== */
 :root {
     --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #e8c0c0;
     --vanilla: #EFD8D6; --bg: #F7F3ED; --card-bg: #fff; --border: #e5d5d5;
@@ -137,25 +143,31 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
 .admin-hero .live-status { background: #28a745; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; animation: pulse 2s infinite; }
 @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
 
-/* --- STATS CARDS WITH LIVE NUMBERS --- */
+/* --- STATS CARDS --- */
 .admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
 .admin-stat-card { background: var(--card-bg); border-radius: 14px; padding: 16px; border: 1px solid var(--border); text-align: center; transition: all 0.2s; }
 .admin-stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
-.admin-stat-card .num { font-size: 2rem; font-weight: 700; color: var(--rose); display: block; font-variant-numeric: tabular-nums; }
+.admin-stat-card .num { font-size: 2rem; font-weight: 700; color: var(--rose); display: block; }
 .admin-stat-card .label { font-size: 0.7rem; text-transform: uppercase; color: #666; margin-top: 4px; }
 
-/* --- ALERT ROW (Pending sessions & unread messages) --- */
-.alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-.alert-card { background: var(--card-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-.alert-card h4 { font-size: 1rem; margin: 0 0 8px 0; display: flex; align-items: center; gap: 6px; }
-.alert-list { display: flex; flex-direction: column; gap: 6px; }
-.alert-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-.alert-item:last-child { border-bottom: none; }
-.alert-item .badge { font-size: 0.7rem; padding: 2px 10px; border-radius: 12px; }
-.badge-pending { background: #f1c40f; color: #fff; }
-.badge-unread { background: var(--rose); color: #fff; }
+/* --- TRAFFIC & ENGAGEMENT CARDS --- */
+.monitoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.monitor-card { background: var(--card-bg); border-radius: 14px; padding: 16px; border: 1px solid var(--border); }
+.monitor-card .title { font-size: 0.8rem; color: #999; text-transform: uppercase; }
+.monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); }
+.monitor-card .sub { font-size: 0.85rem; color: #666; }
 
-/* --- GRID LAYOUT --- */
+/* --- CHART --- */
+.chart-container { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); margin-bottom: 24px; height: 250px; }
+
+/* --- TOP CONTENT GRID WITH THUMBNAILS --- */
+.top-content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.top-content-card { background: var(--card-bg); border-radius: 12px; padding: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.top-content-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; }
+.top-content-card h4 { font-size: 0.9rem; margin: 0; font-weight: 600; }
+.top-content-card .meta { font-size: 0.75rem; color: #999; }
+
+/* --- ADMIN MODULES --- */
 .admin-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
 .admin-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
 .admin-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 12px 0; border-bottom: 1px solid var(--border); padding-bottom: 6px; display: flex; justify-content: space-between; }
@@ -164,12 +176,6 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
 .admin-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
 .admin-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 4px; }
 .admin-module-btn span { font-size: 0.75rem; font-weight: 600; }
-
-/* --- RECENT CONTENT GRIDS --- */
-.recent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 20px; }
-.recent-card { background: var(--card-bg); border-radius: 12px; padding: 12px; border: 1px solid var(--border); text-align: center; }
-.recent-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; }
-.recent-card h4 { font-size: 0.9rem; margin: 0; }
 
 /* --- ACTIVITY FEED --- */
 .activity-feed { max-height: 300px; overflow-y: auto; }
@@ -186,24 +192,22 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
 .modal-box h2 { font-family: 'Playfair Display', serif; margin-top: 0; color: var(--rose-dark); }
 .modal-box .btn { width: 100%; justify-content: center; margin-top: 8px; }
 
-/* --- CHART CONTAINER --- */
-.chart-container { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; height: 250px; }
-
 /* --- RESPONSIVE --- */
 @media (max-width: 768px) {
-    .alert-row { grid-template-columns: 1fr; }
-}
-@media (max-width: 600px) {
     .admin-hero { flex-direction: column; text-align: center; padding: 16px; }
     .admin-module-grid { grid-template-columns: repeat(2, 1fr); }
+    .monitoring-grid { grid-template-columns: 1fr 1fr; }
+    .top-content-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
     .admin-stat-card .num { font-size: 1.4rem; }
-    .recent-grid { grid-template-columns: 1fr; }
+    .top-content-grid { grid-template-columns: 1fr; }
 }
 </style>
 
 <div class="container" style="padding: 20px;">
     
-    <!-- Hero with Live Status -->
+    <!-- Hero -->
     <div class="admin-hero">
         <div>
             <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'Admin'); ?></span></h1>
@@ -216,7 +220,7 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
         </div>
     </div>
 
-    <!-- Stats Row with Live Data IDs -->
+    <!-- Core Stats -->
     <div class="admin-stats-grid">
         <div class="admin-stat-card"><span class="num" id="stat_users"><?php echo $stats['total_users']; ?></span><span class="label">Users</span></div>
         <div class="admin-stat-card"><span class="num" id="stat_books"><?php echo $stats['total_books']; ?></span><span class="label">Books</span></div>
@@ -226,48 +230,118 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
         <div class="admin-stat-card"><span class="num" id="stat_videos"><?php echo $stats['total_videos']; ?></span><span class="label">Videos</span></div>
     </div>
 
-    <!-- Alert Row (Pending Sessions & Unread Messages) -->
-    <div class="alert-row">
-        <div class="alert-card">
-            <h4><i class="fas fa-clock" style="color:var(--rose);"></i> Pending Sessions</h4>
-            <div class="alert-list">
-                <?php if (count($recent_sessions) > 0): ?>
-                    <?php foreach ($recent_sessions as $session): ?>
-                        <div class="alert-item">
-                            <span><?php echo date('M j', strtotime($session['date'])); ?> at <?php echo date('g:i a', strtotime($session['time'])); ?> – <?php echo htmlspecialchars($session['user_name']); ?></span>
-                            <span class="badge badge-pending">Pending</span>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="alert-item" style="color:#999;">No pending sessions.</div>
-                <?php endif; ?>
-            </div>
-            <a href="manage_sessions.php" class="btn btn-sm btn-outline" style="margin-top:8px;">View All</a>
+    <!-- Monitoring Row -->
+    <div class="monitoring-grid">
+        <div class="monitor-card">
+            <div class="title">Total Views (Poems + Books)</div>
+            <div class="value" id="total_views"><?php echo number_format($stats['total_views']); ?></div>
+            <div class="sub">All time</div>
         </div>
-        <div class="alert-card">
-            <h4><i class="fas fa-envelope" style="color:var(--rose);"></i> Unread Messages</h4>
-            <div class="alert-list">
-                <?php if (count($recent_messages) > 0): ?>
-                    <?php foreach ($recent_messages as $msg): ?>
-                        <div class="alert-item">
-                            <span><strong><?php echo htmlspecialchars($msg['name']); ?></strong> – <?php echo htmlspecialchars(substr($msg['message'], 0, 35)); ?>...</span>
-                            <span class="badge badge-unread">Unread</span>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="alert-item" style="color:#999;">No unread messages.</div>
-                <?php endif; ?>
-            </div>
-            <a href="manage_messages.php" class="btn btn-sm btn-outline" style="margin-top:8px;">View All</a>
+        <div class="monitor-card">
+            <div class="title">Active Readers Today</div>
+            <div class="value" id="active_today"><?php echo $stats['active_today']; ?></div>
+            <div class="sub">Logged‑in users</div>
+        </div>
+        <div class="monitor-card">
+            <div class="title">Active This Week</div>
+            <div class="value" id="active_week"><?php echo $stats['active_week']; ?></div>
+            <div class="sub">Last 7 days</div>
+        </div>
+        <div class="monitor-card">
+            <div class="title">Active This Month</div>
+            <div class="value" id="active_month"><?php echo $stats['active_month']; ?></div>
+            <div class="sub">Last 30 days</div>
+        </div>
+        <div class="monitor-card">
+            <div class="title">Active This Year</div>
+            <div class="value" id="active_year"><?php echo $stats['active_year']; ?></div>
+            <div class="sub">Last 365 days</div>
+        </div>
+        <div class="monitor-card">
+            <div class="title">Total Reading Hours</div>
+            <div class="value" id="reading_hours"><?php echo number_format($stats['total_reading_hours']); ?></div>
+            <div class="sub">All users combined</div>
         </div>
     </div>
 
-    <!-- Chart Row (Growth Overview) -->
+    <!-- Active Readers Chart (Last 7 days) -->
     <div class="chart-container">
-        <canvas id="growthChart"></canvas>
+        <canvas id="activeChart"></canvas>
     </div>
 
-    <!-- Full Control Grid -->
+    <!-- Top Content with Thumbnails -->
+    <div style="margin-bottom: 20px;">
+        <h3 style="font-family:'Playfair Display'; margin-bottom:12px;">🔥 Trending Content</h3>
+        <div class="top-content-grid">
+            <!-- Top Poems -->
+            <div class="top-content-card">
+                <h4>Top Poems</h4>
+                <?php foreach ($top_poems as $poem): ?>
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;">
+                        <img src="<?php echo get_image_url($poem['image_path']); ?>" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                        <div style="flex:1; text-align:left;">
+                            <div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($poem['title']); ?></div>
+                            <div style="font-size:0.7rem; color:#999;"><?php echo number_format($poem['view_count']); ?> views</div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <!-- Top Books -->
+            <div class="top-content-card">
+                <h4>Top Books</h4>
+                <?php foreach ($top_books as $book): ?>
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;">
+                        <img src="<?php echo get_image_url($book['cover_path']); ?>" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                        <div style="flex:1; text-align:left;">
+                            <div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($book['title']); ?></div>
+                            <div style="font-size:0.7rem; color:#999;"><?php echo number_format($book['view_count']); ?> views</div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <!-- Top Blog -->
+            <div class="top-content-card">
+                <h4>Top Blog Posts</h4>
+                <?php foreach ($top_blog as $post): ?>
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;">
+                        <img src="<?php echo get_image_url($post['featured_image']); ?>" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                        <div style="flex:1; text-align:left;">
+                            <div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($post['title']); ?></div>
+                            <div style="font-size:0.7rem; color:#999;"><?php echo $post['comment_count']; ?> comments</div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <!-- Top Reflections -->
+            <div class="top-content-card">
+                <h4>Top Reflections</h4>
+                <?php foreach ($top_reflections as $ref): ?>
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;">
+                        <img src="<?php echo get_image_url($ref['featured_image']); ?>" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                        <div style="flex:1; text-align:left;">
+                            <div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($ref['title']); ?></div>
+                            <div style="font-size:0.7rem; color:#999;"><?php echo $ref['comment_count']; ?> comments</div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <!-- Top Videos -->
+            <div class="top-content-card">
+                <h4>Top Videos</h4>
+                <?php foreach ($top_videos as $video): ?>
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;">
+                        <img src="<?php echo get_image_url($video['thumbnail']); ?>" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                        <div style="flex:1; text-align:left;">
+                            <div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($video['title']); ?></div>
+                            <div style="font-size:0.7rem; color:#999;"><?php echo number_format($video['view_count']); ?> views</div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Modules (Management Links) -->
     <div class="admin-grid-container">
         <div class="admin-module">
             <h3>📖 Books & Poetry</h3>
@@ -311,6 +385,13 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
         </div>
 
         <div class="admin-module">
+            <h3>💬 Comments</h3>
+            <div class="admin-module-grid">
+                <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Manage Comments</span></a>
+            </div>
+        </div>
+
+        <div class="admin-module">
             <h3>⚙️ Reader & System</h3>
             <div class="admin-module-grid">
                 <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
@@ -331,59 +412,6 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
                 <a href="newsletter_tabs/queue.php" class="admin-module-btn"><i class="fas fa-hourglass-half"></i><span>Queue</span></a>
                 <a href="newsletter_tabs/archive.php" class="admin-module-btn"><i class="fas fa-archive"></i><span>Archive</span></a>
                 <a href="newsletter_tabs/audit.php" class="admin-module-btn"><i class="fas fa-history"></i><span>Audit Log</span></a>
-            </div>
-        </div>
-
-        <!-- Add a dedicated Comments module -->
-        <div class="admin-module">
-            <h3>💬 Comments</h3>
-            <div class="admin-module-grid">
-                <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Manage Comments</span></a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Content Grids -->
-    <div style="margin-top: 20px;">
-        <h3 style="font-family:'Playfair Display'; margin-bottom:12px;">📚 Recent Content</h3>
-        <div class="recent-grid">
-            <div class="recent-card">
-                <h4>Books</h4>
-                <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-                    <?php foreach ($recent_books as $book): ?>
-                        <div style="display:flex; gap:8px; align-items:center; border-bottom:1px solid var(--border); padding:4px 0;">
-                            <img src="<?php echo get_image_url($book['cover_path']); ?>" style="width:30px; height:30px; border-radius:4px; object-fit:cover;">
-                            <span style="font-size:0.85rem;"><?php echo htmlspecialchars($book['title']); ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div class="recent-card">
-                <h4>Poems</h4>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                    <?php foreach ($recent_poems as $poem): ?>
-                        <span style="background:var(--vanilla); padding:4px 10px; border-radius:20px; font-size:0.75rem;"><?php echo htmlspecialchars($poem['title']); ?></span>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div class="recent-card">
-                <h4>Blog</h4>
-                <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-                    <?php foreach ($recent_posts as $post): ?>
-                        <div style="border-bottom:1px solid var(--border); padding:4px 0;">
-                            <span style="font-size:0.85rem;"><?php echo htmlspecialchars($post['title']); ?></span>
-                            <span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($post['created_at'])); ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div class="recent-card">
-                <h4>Videos</h4>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                    <?php foreach ($recent_videos as $video): ?>
-                        <span style="background:var(--vanilla); padding:4px 10px; border-radius:20px; font-size:0.75rem;"><?php echo htmlspecialchars($video['title']); ?></span>
-                    <?php endforeach; ?>
-                </div>
             </div>
         </div>
     </div>
@@ -456,6 +484,13 @@ function refreshStats() {
             document.getElementById('stat_sessions').textContent = data.sessions;
             document.getElementById('stat_posts').textContent = data.posts;
             document.getElementById('stat_videos').textContent = data.videos;
+            // Also update monitoring stats
+            document.getElementById('total_views').textContent = data.total_views;
+            document.getElementById('active_today').textContent = data.active_today;
+            document.getElementById('active_week').textContent = data.active_week;
+            document.getElementById('active_month').textContent = data.active_month;
+            document.getElementById('active_year').textContent = data.active_year;
+            document.getElementById('reading_hours').textContent = data.reading_hours;
         })
         .catch(err => console.error('Stats refresh failed:', err));
 }
@@ -474,10 +509,10 @@ function refreshActivity() {
 }
 
 // ============================================================
-// 5. GROWTH CHART (Chart.js)
+// 5. ACTIVE READERS CHART (Last 7 Days)
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('growthChart').getContext('2d');
+    const ctx = document.getElementById('activeChart').getContext('2d');
     const gradient = ctx.createLinearGradient(0, 0, 0, 250);
     gradient.addColorStop(0, '#DBA1A2');
     gradient.addColorStop(1, '#e8c0c0');
@@ -485,10 +520,10 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            labels: <?php echo $chart_labels; ?>,
             datasets: [{
-                label: 'New Users',
-                data: [12, 19, 3, 5, 2, 3, 8],
+                label: 'Active Readers',
+                data: <?php echo $chart_data; ?>,
                 borderColor: '#DBA1A2',
                 backgroundColor: gradient,
                 fill: true,
@@ -501,7 +536,8 @@ document.addEventListener('DOMContentLoaded', function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.y + ' active'; } } }
             },
             scales: {
                 y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
