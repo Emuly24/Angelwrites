@@ -286,24 +286,38 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
         </div>
     </div>
 
-    <!-- Quick Actions Modules (Matching the Admin Grid style) -->
+    <!-- Quick Actions Modules (UPDATED TO INCLUDE READER FILES) -->
     <div class="user-actions-grid">
         <div class="user-module"><h3>📖 My Library</h3><div class="user-module-grid">
             <a href="books.php" class="user-module-btn"><i class="fas fa-book"></i><span>Browse Books</span></a>
             <a href="reader/reader.php" class="user-module-btn"><i class="fas fa-book-open"></i><span>Open Reader</span></a>
+            <a href="reader/reader_export.php" class="user-module-btn"><i class="fas fa-file-export"></i><span>Export Data</span></a>
         </div></div>
+        
         <div class="user-module"><h3>✍️ Poetry & Blogs</h3><div class="user-module-grid">
             <a href="poetry.php" class="user-module-btn"><i class="fas fa-feather-alt"></i><span>Read Poems</span></a>
             <a href="blog.php" class="user-module-btn"><i class="fas fa-blog"></i><span>Read Blog</span></a>
             <a href="reflections.php" class="user-module-btn"><i class="fas fa-pray"></i><span>Reflections</span></a>
         </div></div>
+        
         <div class="user-module"><h3>👥 Community</h3><div class="user-module-grid">
+            <a href="reader/reader_circles.php" class="user-module-btn"><i class="fas fa-circle"></i><span>Reading Circles</span></a>
             <a href="groups.php" class="user-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
             <a href="community.php" class="user-module-btn"><i class="fas fa-comments"></i><span>Community Q&A</span></a>
         </div></div>
+        
         <div class="user-module"><h3>🎥 Videos</h3><div class="user-module-grid">
             <a href="videos.php" class="user-module-btn"><i class="fas fa-video"></i><span>Watch Videos</span></a>
         </div></div>
+
+        <div class="user-module"><h3>📊 Reader Tools</h3><div class="user-module-grid">
+            <a href="reader/reader_analytics.php" class="user-module-btn"><i class="fas fa-chart-line"></i><span>My Analytics</span></a>
+            <a href="reader/reader_challenges.php" class="user-module-btn"><i class="fas fa-trophy"></i><span>Challenges</span></a>
+            <a href="reader/reader_notes.php" class="user-module-btn"><i class="fas fa-sticky-note"></i><span>My Notes</span></a>
+            <a href="reader/reader_tts.php" class="user-module-btn"><i class="fas fa-volume-up"></i><span>Text to Speech</span></a>
+            <a href="reader/reader_gamification.php" class="user-module-btn"><i class="fas fa-gamepad"></i><span>Gamification</span></a>
+        </div></div>
+        
         <div class="user-module"><h3>⚙️ My Account</h3><div class="user-module-grid">
             <a href="profile.php" class="user-module-btn"><i class="fas fa-user"></i><span>My Profile</span></a>
             <a href="achievements.php" class="user-module-btn"><i class="fas fa-trophy"></i><span>Achievements</span></a>
