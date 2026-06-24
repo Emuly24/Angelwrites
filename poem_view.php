@@ -90,7 +90,7 @@ if (!$poem) {
 }
 
 // ============================================================
-// 6. UPDATE VIEW COUNT (atomic)
+// 6. UPDATE VIEW COUNT
 // ============================================================
 $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?")->execute([$id]);
 
@@ -127,7 +127,7 @@ $og_desc = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']
 $og_image = $base_url . '/img/' . $id . '?v=' . time();
 
 // ============================================================
-// 9. HANDLE POST REQUESTS (Comment / Reply / Private) with CSRF
+// 9. HANDLE POST REQUESTS (Comment / Reply / Private)
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -146,7 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
         $stmt->execute([$target_type, $target_id, $_SESSION['user_id'], $rating, $comment, $parent_id, $is_private, $target_user_id]);
         $comment_id = $db->lastInsertId();
 
-        // Push async job for notifications/emails
         $payload = json_encode([
             'comment_id' => $comment_id,
             'poem_id' => $target_id,
@@ -165,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
 }
 
 // ============================================================
-// 10. FETCH COMMENTS (threaded) with permissions
+// 10. FETCH COMMENTS (threaded)
 // ============================================================
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
 $admin_id = 1; // change to your actual admin user ID
@@ -183,7 +182,6 @@ $stmt = $db->prepare("
 $stmt->execute([$id, $user_id, $user_id, $admin_id]);
 $comments_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Build nested tree
 $comments = [];
 foreach ($comments_raw as $c) {
     $c['children'] = [];
@@ -274,36 +272,15 @@ $total_reviews = $rating_data['total'] ?? 0;
 <meta name="twitter:card" content="summary_large_image">
 
 <style>
-/* FULL CSS – exactly as before */
 :root {
-    --rose: #DBA1A2;
-    --rose-dark: #c08a8b;
-    --rose-light: #e8c0c0;
-    --vanilla: #EFD8D6;
-    --fantasy: #F7F3ED;
-    --white: #ffffff;
-    --dark: #2c1e1e;
-    --text: #3d2e2e;
-    --text-light: #6b5a5a;
-    --bg: #F7F3ED;
-    --card-bg: #ffffff;
-    --border: #e5d5d5;
-    --shadow: 0 4px 16px rgba(44,30,30,0.08);
-    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6; --fantasy: #F7F3ED; --white: #ffffff;
+    --dark: #2c1e1e; --text: #3d2e2e; --text-light: #6b5a5a;
+    --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08); --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
     --input-bg: #ffffff;
 }
-body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text: #e8dddd;
-    --text-light: #aaa;
-    --vanilla: #2a2a2a;
-    --fantasy: #1a1a1a;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
-    --input-bg: #333;
-}
+body.dark-mode { --bg: #1a1a1a; --card-bg: #2a2a2a; --border: #444; --text: #e8dddd; --text-light: #aaa; --vanilla: #2a2a2a; --fantasy: #1a1a1a; --shadow: 0 4px 20px rgba(0,0,0,0.4); --shadow-hover: 0 12px 40px rgba(0,0,0,0.5); --input-bg: #333; }
 body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 .poem-view-page { padding: 32px 0 60px; }
 .poem-nav { margin-bottom: 24px; }
@@ -331,8 +308,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .volume-control { display: flex; align-items: center; gap: 4px; }
 .volume-control button { background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 0.9rem; padding: 2px; }
 .volume-control input[type="range"] { width: 60px; accent-color: var(--rose); background: var(--border); height: 4px; border-radius: 2px; }
-.volume-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--rose); cursor: pointer; }
-.volume-control input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--rose); cursor: pointer; border: none; }
 .poem-intro-section { max-width: 700px; margin: 0 auto 32px; background: var(--fantasy); border-left: 4px solid var(--rose); border-radius: 0 12px 12px 0; padding: 20px 24px; }
 .intro-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--rose); margin-bottom: 6px; }
 .intro-body { font-style: italic; font-size: 1.05rem; color: var(--text); line-height: 1.8; text-align: justify; }
@@ -367,6 +342,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .reaction-btn:hover { background: var(--rose-light); border-color: var(--rose); }
 .reaction-btn.active { background: var(--rose); color: #fff; border-color: var(--rose); }
 .reaction-btn .count { font-size: 0.8rem; font-weight: 600; }
+.reaction-particle{position:fixed;pointer-events:none;z-index:99999;font-size:2rem;animation:burst .9s cubic-bezier(.2,.8,.2,1.2) forwards}@keyframes burst{0%{opacity:1;transform:translate(0)scale(.5)}100%{opacity:0;transform:translate(var(--tx),var(--ty))scale(1.5)rotate(360deg)}}.reaction-btn:active{transform:scale(.85);transition:transform .1s}.reaction-btn.active{animation:pop-active .4s ease}@keyframes pop-active{0%{transform:scale(1)}50%{transform:scale(1.3);box-shadow:0 0 20px var(--rose)}100%{transform:scale(1)}}
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
 .reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
 .reply-link:hover { color: var(--rose-dark); }
@@ -408,7 +384,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
-<!-- ===== HTML CONTENT ===== -->
 <div class="poem-view-page">
     <div class="container">
         <div class="poem-nav">
@@ -555,7 +530,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 <button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})"><i class="fas fa-arrow-up"></i></button>
 
 <!-- ================================================================ -->
-<!-- JAVASCRIPT – complete -->
+<!-- COMPLETE JAVASCRIPT – Audio, Reactions, Tagging, Reply toggle     -->
 <!-- ================================================================ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -577,27 +552,80 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (data[reaction].active) btn.classList.add('active');
                     }
                 });
-            });
+            })
+            .catch(err => console.error('Error loading reactions:', err));
+        // --- SPLASHY BURST FUNCTION ---
+function createReactionBurst(element, emoji) {
+    const rect = element.getBoundingClientRect();
+    // Center of the button
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const count = 14; // Number of particles to burst
 
-        buttons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const reaction = this.dataset.reaction;
-                fetch('ajax_toggle_reaction.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `target_type=${targetType}&target_id=${targetId}&reaction=${reaction}`
-                })
-                .then(res => res.json())
-                .then(data => {
-                    const countSpan = this.querySelector('.count');
-                    countSpan.textContent = data.count;
-                    if (data.active) this.classList.add('active');
-                    else this.classList.remove('active');
-                });
-            });
-        });
+    // A mix of the main emoji + some sparkly friends
+    const burstEmojis = [emoji, emoji, '✨', '🌟', '💫', '💖'];
+
+    for (let i = 0; i < count; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'reaction-particle';
+        // Randomly pick an emoji from our mix
+        particle.textContent = burstEmojis[Math.floor(Math.random() * burstEmojis.length)];
+        
+        // Randomize direction (full circle) and distance
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 60 + Math.random() * 120; 
+        const tx = Math.cos(angle) * distance;
+        const ty = Math.sin(angle) * distance - 30; 
+        
+        // Set position and random size
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        particle.style.setProperty('--tx', tx + 'px');
+        particle.style.setProperty('--ty', ty + 'px');
+        particle.style.fontSize = (1.2 + Math.random() * 2) + 'rem';
+
+        document.body.appendChild(particle);
+        
+        // Clean up the DOM after animation finishes
+        setTimeout(() => particle.remove(), 1000);
+    }
+}
+
+        // Handle click events
+        
+buttons.forEach(btn => {
+    btn.addEventListener('click', function() {
+        const reaction = this.dataset.reaction;
+        
+        // ===== SPLASHY EFFECT ON CLICK =====
+        const emoji = this.textContent.trim().charAt(0);
+        // Trigger the burst effect from the button's location
+        createReactionBurst(this, emoji);
+        // ======================================
+
+        fetch('ajax_toggle_reaction.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `target_type=${targetType}&target_id=${targetId}&reaction=${reaction}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                
+                if(data.error.includes('logged in')) {
+                   // Optional: redirect to login or just alert
+                   alert(data.error);
+                }
+                return;
+            }
+            const countSpan = this.querySelector('.count');
+            countSpan.textContent = data.count;
+            if (data.active) this.classList.add('active');
+            else this.classList.remove('active');
+        })
+        .catch(err => console.error('Error toggling reaction:', err));
     });
-
+});
     // --- Tagging autocomplete ---
     const commentText = document.getElementById('commentText');
     const suggestions = document.getElementById('tagSuggestions');
