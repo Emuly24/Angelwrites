@@ -6,7 +6,7 @@ require_once '../includes/auth.php';
 redirectIfNotAdmin();
 
 // ============================================================
-// 1. FETCH STATISTICS
+// 1. FETCH STATISTICS (all wrapped in try-catch)
 // ============================================================
 $stats = [];
 try { $stmt = $db->query("SELECT COUNT(*) FROM users"); $stats['total_users'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats users: " . $e->getMessage()); }
@@ -25,7 +25,7 @@ try { $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions W
 $stats['total_views'] = ($stats['poem_views'] ?? 0) + ($stats['book_views'] ?? 0);
 
 // ============================================================
-// 2. FETCH RECENT ITEMS
+// 2. FETCH RECENT ITEMS (simplified for brevity)
 // ============================================================
 try { $stmt = $db->prepare("SELECT s.*, u.name AS user_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date ASC LIMIT 5"); $stmt->execute(); $recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5"); $stmt->execute(); $recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
@@ -60,23 +60,13 @@ $pageTitle = 'Admin Dashboard';
 <?php require_once '../includes/header.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- ============================================================
-      ABSOLUTE LAYOUT BREAKER FOR SCROLLING
-      Forces the browser to scroll regardless of the outer wrapper.
-     ============================================================ -->
 <style>
-/* Override parent fixed heights safely */
-html { height: auto !important; min-height: 100vh !important; overflow-y: scroll !important; }
-body { height: auto !important; min-height: 100vh !important; overflow-y: auto !important; position: relative !important; }
-#wrapper, #page-wrapper, .wrapper, .container, .page-container, .main-content { height: auto !important; min-height: 100vh !important; overflow: visible !important; }
-#reader-app { height: auto !important; min-height: 100vh !important; }
-
 :root {
     --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9;
     --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
     --shadow: 0 4px 20px rgba(0,0,0,0.04);
 }
-body { background: var(--bg); font-family: 'Inter', sans-serif; color: #333; }
+body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #333; }
 body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
 body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
@@ -117,23 +107,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .top-content-card { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .top-content-card h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 
-/* Recent Grid */
-.recent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.recent-card { background: var(--card-bg); border-radius: 12px; padding: 12px; border: 1px solid var(--border); }
-.recent-card h4 { font-size: 0.9rem; margin: 0 0 8px 0; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-.recent-list { display: flex; flex-direction: column; gap: 4px; }
-.recent-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-.recent-item:last-child { border-bottom: none; }
-
-/* Activity Feed */
-.activity-feed { max-height: 300px; overflow-y: auto; }
-.activity-item { padding: 10px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
-.activity-item:last-child { border-bottom: none; }
-.activity-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--vanilla); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--rose); }
-.activity-text { font-size: 0.9rem; }
-.activity-time { font-size: 0.7rem; color: #999; margin-left: auto; white-space: nowrap; }
-
-/* Admin Modules */
+/* Admin Modules - FIX FOR SCROLLING */
 .admin-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
 .admin-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .admin-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
@@ -143,7 +117,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .admin-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
 .admin-module-btn span { font-size: 0.75rem; font-weight: 500; }
 
-/* Modals */
+/* Modal */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 9999; display: none; justify-content: center; align-items: center; }
 .modal-overlay.active { display: flex; }
 .modal-box { background: var(--card-bg); border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); border: 1px solid var(--rose-light); }
@@ -157,7 +131,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 #statsModal table td { padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; }
 </style>
 
-<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 20px; min-height: 100vh;">
     <!-- Hero -->
     <div class="admin-hero">
         <div>
@@ -166,6 +140,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
         </div>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <span style="background:#28a745; color:white; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; animation:pulse 2s infinite;"><i class="fas fa-circle"></i> Live</span>
+            <!-- Theme toggle removed from here as header has it -->
             <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Quick Add</button>
         </div>
     </div>
@@ -243,73 +218,86 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
     <!-- Admin Modules -->
     <div class="admin-grid-container">
-        <div class="admin-module"><h3>📖 Books & Poetry</h3><div class="admin-module-grid">
-            <a href="manage_books.php" class="admin-module-btn"><i class="fas fa-book"></i><span>Manage Books</span></a>
-            <a href="process_book.php" class="admin-module-btn"><i class="fas fa-cog"></i><span>Process Book</span></a>
-            <a href="manage_poems.php" class="admin-module-btn"><i class="fas fa-feather-alt"></i><span>Manage Poems</span></a>
-            <a href="poem_editor.php" class="admin-module-btn"><i class="fas fa-edit"></i><span>Poem Editor</span></a>
-        </div></div>
-        <div class="admin-module"><h3>✍️ Blog & Reflections</h3><div class="admin-module-grid">
-            <a href="manage_blog.php" class="admin-module-btn"><i class="fas fa-blog"></i><span>Manage Blog</span></a>
-            <a href="editor.php" class="admin-module-btn"><i class="fas fa-pen-fancy"></i><span>Blog Editor</span></a>
-            <a href="manage_reflections.php" class="admin-module-btn"><i class="fas fa-pray"></i><span>Reflections</span></a>
-        </div></div>
-        <div class="admin-module"><h3>👥 Community & Users</h3><div class="admin-module-grid">
-            <a href="manage_users.php" class="admin-module-btn"><i class="fas fa-users"></i><span>Manage Users</span></a>
-            <a href="manage_community.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&A</span></a>
-            <a href="manage_groups.php" class="admin-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
-            <a href="manage_sessions.php" class="admin-module-btn"><i class="fas fa-calendar-check"></i><span>Booked Sessions</span></a>
-        </div></div>
-        <div class="admin-module"><h3>🎥 Videos & Comments</h3><div class="admin-module-grid">
-            <a href="manage_videos.php" class="admin-module-btn"><i class="fas fa-video"></i><span>Manage Videos</span></a>
-            <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Manage Comments</span></a>
-        </div></div>
-        <div class="admin-module"><h3>📧 Newsletter</h3><div class="admin-module-grid">
-            <a href="manage_newsletter.php" class="admin-module-btn"><i class="fas fa-list"></i><span>Subscribers</span></a>
-            <a href="manage_newsletter.php?tab=send" class="admin-module-btn"><i class="fas fa-paper-plane"></i><span>Send Campaign</span></a>
-            <a href="manage_newsletter.php?tab=queue" class="admin-module-btn"><i class="fas fa-clock"></i><span>Queue</span></a>
-            <a href="manage_newsletter.php?tab=archive" class="admin-module-btn"><i class="fas fa-archive"></i><span>Archive</span></a>
-        </div></div>
-        <div class="admin-module"><h3>⚙️ System & Analytics</h3><div class="admin-module-grid">
-            <a href="settings.php" class="admin-module-btn"><i class="fas fa-sliders-h"></i><span>System Settings</span></a>
-            <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
-        </div></div>
-    </div>
-
-    <!-- Activity Feed -->
-    <div class="admin-module" style="margin-top:20px;">
-        <h3 style="border:none;">🔥 Recent Activity <button class="btn btn-sm btn-outline" onclick="refreshActivity()" style="float:right;"><i class="fas fa-sync-alt"></i></button></h3>
-        <div class="activity-feed" id="activityFeed">
-            <?php if (count($recent_activity) > 0): ?>
-                <?php foreach ($recent_activity as $act): ?>
-                    <div class="activity-item">
-                        <div class="activity-avatar"><?php echo strtoupper(substr($act['name'], 0, 1)); ?></div>
-                        <div class="activity-text"><strong><?php echo htmlspecialchars($act['name']); ?></strong> <?php echo htmlspecialchars(substr($act['text'], 0, 60)); ?>...</div>
-                        <div class="activity-time"><?php echo date('M j, g:i a', strtotime($act['created_at'])); ?></div>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="activity-item" style="color:#999;">No recent activity.</div>
-            <?php endif; ?>
+        <!-- 1. Books & Poetry -->
+        <div class="admin-module">
+            <h3>📖 Books & Poetry <a href="manage_poems.php?action=new" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Poem</a></h3>
+            <div class="admin-module-grid">
+                <a href="manage_books.php" class="admin-module-btn"><i class="fas fa-book"></i><span>Manage Books</span></a>
+                <a href="process_book.php" class="admin-module-btn"><i class="fas fa-cog"></i><span>Process Book</span></a>
+                <a href="manage_poems.php" class="admin-module-btn"><i class="fas fa-feather-alt"></i><span>Manage Poems</span></a>
+                <a href="poem_editor.php" class="admin-module-btn"><i class="fas fa-edit"></i><span>Poem Editor</span></a>
+            </div>
         </div>
-    </div>
 
-    <!-- Quick Add Modal -->
-    <div class="modal-overlay" id="quickModal">
-        <div class="modal-box">
-            <h2>Quick Create</h2>
-            <p style="color:#666; margin-bottom: 16px;">Select what you want to add</p>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                <a href="manage_books.php?action=new" class="btn btn-primary">+ New Book</a>
-                <a href="manage_poems.php?action=new" class="btn btn-primary">+ New Poem</a>
-                <a href="manage_blog.php?action=new" class="btn btn-primary">+ New Blog Post</a>
-                <a href="manage_videos.php?action=new" class="btn btn-primary">+ New Video</a>
-                <a href="reflection_editor.php" class="btn btn-primary">+ New Reflection</a>
-                <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New Newsletter</a>
-                <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
+        <!-- 2. Blog & Reflections -->
+        <div class="admin-module">
+            <h3>✍️ Blog & Reflections <a href="reflection_editor.php" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Reflection</a></h3>
+            <div class="admin-module-grid">
+                <a href="manage_blog.php" class="admin-module-btn"><i class="fas fa-blog"></i><span>Manage Blog</span></a>
+                <a href="editor.php" class="admin-module-btn"><i class="fas fa-pen-fancy"></i><span>Blog Editor</span></a>
+                <a href="manage_reflections.php" class="admin-module-btn"><i class="fas fa-pray"></i><span>Reflections</span></a>
+            </div>
+        </div>
+
+        <!-- 3. Community & Users -->
+        <div class="admin-module">
+            <h3>👥 Community & Users</h3>
+            <div class="admin-module-grid">
+                <a href="manage_users.php" class="admin-module-btn"><i class="fas fa-users"></i><span>Manage Users</span></a>
+                <a href="manage_community.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&A</span></a>
+                <a href="manage_groups.php" class="admin-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
+                <a href="manage_sessions.php" class="admin-module-btn"><i class="fas fa-calendar-check"></i><span>Booked Sessions</span></a>
+            </div>
+        </div>
+
+        <!-- 4. Videos & Comments -->
+        <div class="admin-module">
+            <h3>🎥 Videos & Comments <a href="manage_videos.php?action=new" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Video</a></h3>
+            <div class="admin-module-grid">
+                <a href="manage_videos.php" class="admin-module-btn"><i class="fas fa-video"></i><span>Manage Videos</span></a>
+                <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Manage Comments</span></a>
+            </div>
+        </div>
+
+        <!-- 5. Newsletter -->
+        <div class="admin-module">
+            <h3>📧 Newsletter <a href="manage_newsletter.php?tab=send" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Campaign</a></h3>
+            <div class="admin-module-grid">
+                <a href="manage_newsletter.php" class="admin-module-btn"><i class="fas fa-list"></i><span>Subscribers</span></a>
+                <a href="manage_newsletter.php?tab=send" class="admin-module-btn"><i class="fas fa-paper-plane"></i><span>Send Campaign</span></a>
+                <a href="manage_newsletter.php?tab=queue" class="admin-module-btn"><i class="fas fa-clock"></i><span>Queue</span></a>
+                <a href="manage_newsletter.php?tab=archive" class="admin-module-btn"><i class="fas fa-archive"></i><span>Archive</span></a>
+            </div>
+        </div>
+
+        <!-- 6. System & Analytics -->
+        <div class="admin-module">
+            <h3>⚙️ System & Analytics</h3>
+            <div class="admin-module-grid">
+                <a href="settings.php" class="admin-module-btn"><i class="fas fa-sliders-h"></i><span>System Settings</span></a>
+                <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
+                <a href="../worker.php" class="admin-module-btn" target="_blank"><i class="fas fa-cogs"></i><span>Run Worker</span></a>
             </div>
         </div>
     </div>
+    
+    <!-- Quick Add Modal -->
+    <div class="modal-overlay" id="quickModal">
+        <div class="modal-box">
+        <h2>Quick Create</h2>
+        <p style="color:#666; margin-bottom: 16px;">Select what you want to add</p>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <a href="manage_books.php?action=new" class="btn btn-primary">+ New Book</a>
+            <a href="manage_poems.php?action=new" class="btn btn-primary">+ New Poem</a>
+            <a href="manage_blog.php?action=new" class="btn btn-primary">+ New Blog Post</a>
+            <a href="manage_videos.php?action=new" class="btn btn-primary">+ New Video</a>
+            <a href="reflection_editor.php" class="btn btn-primary">+ New Reflection</a>
+            <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New Newsletter</a>
+            
+            <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
+        </div>
+    </div>
+</div>
 
     <!-- Deep Dive Stats Modal -->
     <div id="statsModal" class="modal-overlay" style="z-index: 99999;">
@@ -326,15 +314,15 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 </div>
 
 <script>
-// Dark mode will be triggered by global header
+// Dark mode will be triggered by global header, we just apply the class
 if (localStorage.getItem('adminDarkMode') === '1') { document.body.classList.add('dark-mode'); }
 
-// ===== Quick Modal Functions =====
+// Modal Functions
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
 function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }
 document.getElementById('quickModal').addEventListener('click', function(e) { if(e.target===this) closeQuickModal(); });
 
-// ===== Live Stats Polling =====
+// Live Stats Polling
 function refreshStats() {
     fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=stats')
         .then(res => res.json()).then(data => {
@@ -351,38 +339,30 @@ function refreshStats() {
 }
 setInterval(refreshStats, 60000);
 
-// ===== Activity Feed Refresh =====
-function refreshActivity() {
-    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=activity')
-        .then(res => res.text())
-        .then(html => { document.getElementById('activityFeed').innerHTML = html; })
-        .catch(console.error);
-}
-
-// ===== SMOOTH & SMART CHARTS =====
+// ============================================================
+// SMOOTH & SMART CHARTS
+// ============================================================
 function initCharts() {
     const gradientActive = document.getElementById('activeChart').getContext('2d').createLinearGradient(0,0,0,250);
     gradientActive.addColorStop(0, '#DBA1A2'); gradientActive.addColorStop(1, '#e8c0c0');
-
     window.activeChart = new Chart(document.getElementById('activeChart'), {
-        type: 'line',
+        type: 'line', 
         data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'Active Readers', data: [0,0,0,0,0,0,0], borderColor: '#DBA1A2', backgroundColor: gradientActive, fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#DBA1A2', pointRadius: 3 }] },
         options: { 
             responsive: true, maintainAspectRatio: false, 
             animation: { duration: 1500, easing: 'easeOutQuart' },
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(44,30,30,0.9)', titleColor: '#fff', bodyColor: '#eee', cornerRadius: 8 } },
-            scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } }
+            plugins: { legend: { display: false } }, 
+            scales: { y: { beginAtZero: true } } 
         }
     });
-
     window.viewsChart = new Chart(document.getElementById('viewsChart'), {
         type: 'bar', 
         data: { labels: ['Poems','Books','Blog','Videos'], datasets: [{ label: 'Views (7 days)', data: [0,0,0,0], backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], borderRadius: 6, borderSkipped: false }] },
         options: { 
             responsive: true, maintainAspectRatio: false, 
             animation: { duration: 1500, easing: 'easeOutQuart' },
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(44,30,30,0.9)', titleColor: '#fff', bodyColor: '#eee', cornerRadius: 8 } },
-            scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } }
+            plugins: { legend: { display: false } }, 
+            scales: { y: { beginAtZero: true } } 
         }
     });
     updateCharts();
@@ -391,21 +371,14 @@ function initCharts() {
 
 function updateCharts() {
     fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=active_chart')
-        .then(res => res.json()).then(data => { 
-            window.activeChart.data.labels = data.labels; 
-            window.activeChart.data.datasets[0].data = data.data; 
-            window.activeChart.update(); 
-        }).catch(console.error);
+        .then(res => res.json()).then(data => { window.activeChart.data.labels = data.labels; window.activeChart.data.datasets[0].data = data.data; window.activeChart.update(); }).catch(console.error);
     fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=views_chart')
-        .then(res => res.json()).then(data => { 
-            window.viewsChart.data.datasets[0].data = data.data; 
-            window.viewsChart.update(); 
-        }).catch(console.error);
+        .then(res => res.json()).then(data => { window.viewsChart.data.datasets[0].data = data.data; window.viewsChart.update(); }).catch(console.error);
 }
 document.addEventListener('DOMContentLoaded', initCharts);
 
 // ============================================================
-// DEEP DIVE MODAL FUNCTIONS (Click on Views/Reading Cards)
+// DEEP DIVE MODAL FUNCTIONS
 // ============================================================
 function openStatsModal(type) {
     document.getElementById('statsModal').classList.add('active');
@@ -423,14 +396,11 @@ function openStatsModal(type) {
                 body.innerHTML = '<p style="color:#999; text-align:center;">No data available yet.</p>';
                 return;
             }
-
             let html = '<table><thead><tr><th>Viewer / User</th><th>Content</th><th>Date & Time</th></tr></thead><tbody>';
             data.logs.forEach(row => {
-                let titleCol = '';
-                let subTitle = '';
                 if(type === 'views') {
-                    titleCol = row.target_type === 'poem' ? htmlspecialchars(row.poem_title) : htmlspecialchars(row.book_title);
-                    subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${row.target_type}</span>`;
+                    let titleCol = row.target_type === 'poem' ? htmlspecialchars(row.poem_title) : htmlspecialchars(row.book_title);
+                    let subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${row.target_type}</span>`;
                     let viewer = htmlspecialchars(row.viewer_name);
                     if(viewer === 'Guest') {
                         viewer = `<span style="color:#888;">Guest</span> <span style="font-size:0.75rem; color:#999;">(IP: ${htmlspecialchars(row.ip_address)})</span>`;
@@ -468,17 +438,5 @@ function htmlspecialchars(str) {
         return m;
     });
 }
-
-// ============================================================
-// FORCE SCROLL UNLOCK (Prevents the page from cutting off)
-// ============================================================
-document.addEventListener('DOMContentLoaded', function() {
-    document.documentElement.style.overflowY = 'scroll';
-    document.body.style.overflowY = 'auto';
-});
-window.addEventListener('load', function() {
-    document.documentElement.style.overflowY = 'scroll';
-    document.body.style.overflowY = 'auto';
-});
 </script>
 <?php require_once '../includes/footer.php'; ?>
