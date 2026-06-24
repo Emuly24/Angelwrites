@@ -6,141 +6,239 @@ require_once '../includes/auth.php';
 redirectIfNotAdmin();
 
 // ============================================================
-// 1. FETCH STATISTICS
+// 1. FETCH STATISTICS (all wrapped in try-catch)
 // ============================================================
 $stats = [];
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM users"); $stats['total_users'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats users: " . $e->getMessage()); }
 
-$stmt = $db->query("SELECT COUNT(*) FROM users"); $stats['total_users'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM books"); $stats['total_books'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM poems"); $stats['total_poems'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM sessions"); $stats['total_sessions'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM blog_posts"); $stats['total_posts'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM videos"); $stats['total_videos'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM questions"); $stats['total_questions'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM newsletter WHERE is_active = 1"); $stats['total_subscribers'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM blog_posts WHERE category = 'Christian Reflections'"); $stats['total_reflections'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(*) FROM reading_groups"); $stats['total_groups'] = $stmt->fetchColumn();
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM books"); $stats['total_books'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats books: " . $e->getMessage()); }
 
-$stmt = $db->query("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions");
-$stats['total_reading_hours'] = floor(($stmt->fetchColumn() ?? 0) / 3600);
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM poems"); $stats['total_poems'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats poems: " . $e->getMessage()); }
 
-$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-1 day')"); $stats['active_today'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-7 days')"); $stats['active_week'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-30 days')"); $stats['active_month'] = $stmt->fetchColumn();
-$stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-365 days')"); $stats['active_year'] = $stmt->fetchColumn();
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM sessions"); $stats['total_sessions'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats sessions: " . $e->getMessage()); }
 
-$stmt = $db->query("SELECT SUM(view_count) FROM poems"); $stats['poem_views'] = $stmt->fetchColumn() ?? 0;
-$stmt = $db->query("SELECT SUM(view_count) FROM books"); $stats['book_views'] = $stmt->fetchColumn() ?? 0;
-$stats['total_views'] = $stats['poem_views'] + $stats['book_views'];
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM blog_posts"); $stats['total_posts'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats blog_posts: " . $e->getMessage()); }
 
-$stmt = $db->query("
-    SELECT u.name, u.email, COUNT(rs.id) as sessions, SUM(rs.duration_seconds) as total_time
-    FROM reading_sessions rs
-    JOIN users u ON rs.user_id = u.id
-    GROUP BY rs.user_id
-    ORDER BY total_time DESC LIMIT 5
-");
-$stats['most_active_readers'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM videos"); $stats['total_videos'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats videos: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM questions"); $stats['total_questions'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats questions: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM newsletter WHERE is_active = 1"); $stats['total_subscribers'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats newsletter: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM blog_posts WHERE category = 'Christian Reflections'"); $stats['total_reflections'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats reflections: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(*) FROM reading_groups"); $stats['total_groups'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats groups: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions");
+    $stats['total_reading_hours'] = floor(($stmt->fetchColumn() ?? 0) / 3600);
+} catch (Exception $e) { error_log("Stats reading hours: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-1 day')"); $stats['active_today'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats active today: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-7 days')"); $stats['active_week'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats active week: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-30 days')"); $stats['active_month'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats active month: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-365 days')"); $stats['active_year'] = $stmt->fetchColumn();
+} catch (Exception $e) { error_log("Stats active year: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT SUM(view_count) FROM poems"); $stats['poem_views'] = $stmt->fetchColumn() ?? 0;
+} catch (Exception $e) { error_log("Stats poem views: " . $e->getMessage()); }
+
+try {
+    $stmt = $db->query("SELECT SUM(view_count) FROM books"); $stats['book_views'] = $stmt->fetchColumn() ?? 0;
+} catch (Exception $e) { error_log("Stats book views: " . $e->getMessage()); }
+
+$stats['total_views'] = ($stats['poem_views'] ?? 0) + ($stats['book_views'] ?? 0);
+
+try {
+    $stmt = $db->query("
+        SELECT u.name, u.email, COUNT(rs.id) as sessions, SUM(rs.duration_seconds) as total_time
+        FROM reading_sessions rs
+        JOIN users u ON rs.user_id = u.id
+        GROUP BY rs.user_id
+        ORDER BY total_time DESC LIMIT 5
+    ");
+    $stats['most_active_readers'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Stats active readers: " . $e->getMessage()); }
 
 // ============================================================
-// 2. FETCH RECENT ITEMS
+// 2. FETCH RECENT ITEMS (all wrapped in try-catch)
 // ============================================================
-$stmt = $db->prepare("
-    SELECT s.*, u.name AS user_name, u.email 
-    FROM sessions s 
-    JOIN users u ON s.user_id = u.id 
-    WHERE s.status = 'pending' 
-    ORDER BY s.date ASC, s.time ASC LIMIT 5
-");
-$stmt->execute();
-$recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_sessions = [];
+try {
+    $stmt = $db->prepare("
+        SELECT s.*, u.name AS user_name, u.email 
+        FROM sessions s 
+        JOIN users u ON s.user_id = u.id 
+        WHERE s.status = 'pending' 
+        ORDER BY s.date ASC, s.time ASC LIMIT 5
+    ");
+    $stmt->execute();
+    $recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent sessions: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_messages = [];
+try {
+    $stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute();
+    $recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent messages: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM books ORDER BY created_at DESC LIMIT 4");
-$stmt->execute();
-$recent_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_books = [];
+try {
+    $stmt = $db->prepare("SELECT * FROM books ORDER BY created_at DESC LIMIT 4");
+    $stmt->execute();
+    $recent_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent books: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_poems = [];
+try {
+    $stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 6");
+    $stmt->execute();
+    $recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent poems: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM blog_posts ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$recent_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_posts = [];
+try {
+    $stmt = $db->prepare("SELECT * FROM blog_posts ORDER BY created_at DESC LIMIT 6");
+    $stmt->execute();
+    $recent_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent blog: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM videos ORDER BY created_at DESC LIMIT 6");
-$stmt->execute();
-$recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_videos = [];
+try {
+    // Fallback: if created_at missing, order by id
+    $stmt = $db->prepare("SELECT * FROM videos ORDER BY id DESC LIMIT 6");
+    $stmt->execute();
+    $recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent videos: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM blog_posts WHERE category = 'Christian Reflections' ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_reflections = [];
+try {
+    $stmt = $db->prepare("SELECT * FROM blog_posts WHERE category = 'Christian Reflections' ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute();
+    $recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent reflections: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM questions ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_questions = [];
+try {
+    $stmt = $db->prepare("SELECT * FROM questions ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute();
+    $recent_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent questions: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT * FROM users ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_users = [];
+try {
+    $stmt = $db->prepare("SELECT * FROM users ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute();
+    $recent_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent users: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT name, created_at FROM reading_groups ORDER BY created_at DESC LIMIT 5");
-$stmt->execute();
-$recent_groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_groups = [];
+try {
+    $stmt = $db->prepare("SELECT name, created_at FROM reading_groups ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute();
+    $recent_groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent groups: " . $e->getMessage()); }
 
 // ============================================================
 // 3. FETCH TOP CONTENT
 // ============================================================
-$stmt = $db->prepare("SELECT id, title, image_path, view_count FROM poems ORDER BY view_count DESC LIMIT 5");
-$stmt->execute();
-$top_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$top_poems = [];
+try {
+    $stmt = $db->prepare("SELECT id, title, image_path, view_count FROM poems ORDER BY view_count DESC LIMIT 5");
+    $stmt->execute();
+    $top_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Top poems: " . $e->getMessage()); }
 
-$stmt = $db->prepare("SELECT id, title, cover_path, view_count FROM books ORDER BY view_count DESC LIMIT 5");
-$stmt->execute();
-$top_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$top_books = [];
+try {
+    $stmt = $db->prepare("SELECT id, title, cover_path, view_count FROM books ORDER BY view_count DESC LIMIT 5");
+    $stmt->execute();
+    $top_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Top books: " . $e->getMessage()); }
 
-$stmt = $db->prepare("
-    SELECT bp.id, bp.title, bp.featured_image, 
-           (SELECT COUNT(*) FROM reviews WHERE target_type='blog' AND target_id=bp.id) as comment_count
-    FROM blog_posts bp
-    ORDER BY comment_count DESC LIMIT 5
-");
-$stmt->execute();
-$top_blog = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$top_blog = [];
+try {
+    $stmt = $db->prepare("
+        SELECT bp.id, bp.title, bp.featured_image, 
+               (SELECT COUNT(*) FROM reviews WHERE target_type='blog' AND target_id=bp.id) as comment_count
+        FROM blog_posts bp
+        ORDER BY comment_count DESC LIMIT 5
+    ");
+    $stmt->execute();
+    $top_blog = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Top blog: " . $e->getMessage()); }
 
-$stmt = $db->prepare("
-    SELECT bp.id, bp.title, bp.featured_image, 
-           (SELECT COUNT(*) FROM reviews WHERE target_type='reflection' AND target_id=bp.id) as comment_count
-    FROM blog_posts bp
-    WHERE category = 'Christian Reflections'
-    ORDER BY comment_count DESC LIMIT 5
-");
-$stmt->execute();
-$top_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$top_reflections = [];
+try {
+    $stmt = $db->prepare("
+        SELECT bp.id, bp.title, bp.featured_image, 
+               (SELECT COUNT(*) FROM reviews WHERE target_type='reflection' AND target_id=bp.id) as comment_count
+        FROM blog_posts bp
+        WHERE category = 'Christian Reflections'
+        ORDER BY comment_count DESC LIMIT 5
+    ");
+    $stmt->execute();
+    $top_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Top reflections: " . $e->getMessage()); }
 
-$stmt = $db->prepare("
-    SELECT v.id, v.title, v.thumbnail, v.view_count
-    FROM videos v
-    ORDER BY v.view_count DESC LIMIT 5
-");
-$stmt->execute();
-$top_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$top_videos = [];
+try {
+    $stmt = $db->prepare("
+        SELECT v.id, v.title, v.thumbnail, v.view_count
+        FROM videos v
+        ORDER BY v.view_count DESC LIMIT 5
+    ");
+    $stmt->execute();
+    $top_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Top videos: " . $e->getMessage()); }
 
 // ============================================================
 // 4. RECENT ACTIVITY
 // ============================================================
-$stmt = $db->prepare("
-    SELECT u.name, u.profile_pic, 'comment' as type, r.comment as text, r.created_at 
-    FROM reviews r 
-    JOIN users u ON r.user_id = u.id 
-    WHERE r.deleted_at IS NULL 
-    ORDER BY r.created_at DESC LIMIT 5
-");
-$stmt->execute();
-$recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$recent_activity = [];
+try {
+    $stmt = $db->prepare("
+        SELECT u.name, u.profile_pic, 'comment' as type, r.comment as text, r.created_at 
+        FROM reviews r 
+        JOIN users u ON r.user_id = u.id 
+        WHERE r.deleted_at IS NULL 
+        ORDER BY r.created_at DESC LIMIT 5
+    ");
+    $stmt->execute();
+    $recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { error_log("Recent activity: " . $e->getMessage()); }
 
 $pageTitle = 'Admin Dashboard';
 ?>
@@ -257,12 +355,12 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
 
     <!-- Core Stats -->
     <div class="admin-stats-grid">
-        <div class="admin-stat-card"><span class="num" id="stat_users"><?php echo $stats['total_users']; ?></span><span class="label">Users</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_books"><?php echo $stats['total_books']; ?></span><span class="label">Books</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_poems"><?php echo $stats['total_poems']; ?></span><span class="label">Poems</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_sessions"><?php echo $stats['total_sessions']; ?></span><span class="label">Sessions</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_posts"><?php echo $stats['total_posts']; ?></span><span class="label">Blog</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_videos"><?php echo $stats['total_videos']; ?></span><span class="label">Videos</span></div>
+        <div class="admin-stat-card"><span class="num" id="stat_users"><?php echo $stats['total_users'] ?? 0; ?></span><span class="label">Users</span></div>
+        <div class="admin-stat-card"><span class="num" id="stat_books"><?php echo $stats['total_books'] ?? 0; ?></span><span class="label">Books</span></div>
+        <div class="admin-stat-card"><span class="num" id="stat_poems"><?php echo $stats['total_poems'] ?? 0; ?></span><span class="label">Poems</span></div>
+        <div class="admin-stat-card"><span class="num" id="stat_sessions"><?php echo $stats['total_sessions'] ?? 0; ?></span><span class="label">Sessions</span></div>
+        <div class="admin-stat-card"><span class="num" id="stat_posts"><?php echo $stats['total_posts'] ?? 0; ?></span><span class="label">Blog</span></div>
+        <div class="admin-stat-card"><span class="num" id="stat_videos"><?php echo $stats['total_videos'] ?? 0; ?></span><span class="label">Videos</span></div>
     </div>
 
     <!-- Alert Row -->
@@ -303,12 +401,12 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
 
     <!-- Monitoring Cards -->
     <div class="monitoring-grid">
-        <div class="monitor-card"><div class="title">Total Views</div><div class="value" id="total_views"><?php echo number_format($stats['total_views']); ?></div><div class="sub">Poems + Books</div></div>
-        <div class="monitor-card"><div class="title">Active Today</div><div class="value" id="active_today"><?php echo $stats['active_today']; ?></div><div class="sub">Logged‑in users</div></div>
-        <div class="monitor-card"><div class="title">Active This Week</div><div class="value" id="active_week"><?php echo $stats['active_week']; ?></div><div class="sub">Last 7 days</div></div>
-        <div class="monitor-card"><div class="title">Active This Month</div><div class="value" id="active_month"><?php echo $stats['active_month']; ?></div><div class="sub">Last 30 days</div></div>
-        <div class="monitor-card"><div class="title">Active This Year</div><div class="value" id="active_year"><?php echo $stats['active_year']; ?></div><div class="sub">Last 365 days</div></div>
-        <div class="monitor-card"><div class="title">Reading Hours</div><div class="value" id="reading_hours"><?php echo number_format($stats['total_reading_hours']); ?></div><div class="sub">All users</div></div>
+        <div class="monitor-card"><div class="title">Total Views</div><div class="value" id="total_views"><?php echo number_format($stats['total_views'] ?? 0); ?></div><div class="sub">Poems + Books</div></div>
+        <div class="monitor-card"><div class="title">Active Today</div><div class="value" id="active_today"><?php echo $stats['active_today'] ?? 0; ?></div><div class="sub">Logged‑in users</div></div>
+        <div class="monitor-card"><div class="title">Active This Week</div><div class="value" id="active_week"><?php echo $stats['active_week'] ?? 0; ?></div><div class="sub">Last 7 days</div></div>
+        <div class="monitor-card"><div class="title">Active This Month</div><div class="value" id="active_month"><?php echo $stats['active_month'] ?? 0; ?></div><div class="sub">Last 30 days</div></div>
+        <div class="monitor-card"><div class="title">Active This Year</div><div class="value" id="active_year"><?php echo $stats['active_year'] ?? 0; ?></div><div class="sub">Last 365 days</div></div>
+        <div class="monitor-card"><div class="title">Reading Hours</div><div class="value" id="reading_hours"><?php echo number_format($stats['total_reading_hours'] ?? 0); ?></div><div class="sub">All users</div></div>
     </div>
 
     <!-- Charts Row -->
@@ -413,10 +511,50 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
     <div style="margin-bottom: 20px;">
         <h3 style="font-family:'Playfair Display'; margin-bottom:12px;">📚 Recent Content</h3>
         <div class="recent-grid">
-            <div class="recent-card"><h4>Books</h4><div class="recent-list"><?php foreach($recent_books as $book): ?><div class="recent-item"><span><?php echo htmlspecialchars($book['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($book['created_at'])); ?></span></div><?php endforeach; ?></div></div>
-            <div class="recent-card"><h4>Poems</h4><div class="recent-list"><?php foreach($recent_poems as $poem): ?><div class="recent-item"><span><?php echo htmlspecialchars($poem['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($poem['created_at'])); ?></span></div><?php endforeach; ?></div></div>
-            <div class="recent-card"><h4>Blog</h4><div class="recent-list"><?php foreach($recent_posts as $post): ?><div class="recent-item"><span><?php echo htmlspecialchars($post['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($post['created_at'])); ?></span></div><?php endforeach; ?></div></div>
-            <div class="recent-card"><h4>Videos</h4><div class="recent-list"><?php foreach($recent_videos as $video): ?><div class="recent-item"><span><?php echo htmlspecialchars($video['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($video['created_at'])); ?></span></div><?php endforeach; ?></div></div>
+            <div class="recent-card">
+                <h4>Books</h4>
+                <div class="recent-list">
+                    <?php foreach ($recent_books as $book): ?>
+                        <div class="recent-item">
+                            <span><?php echo htmlspecialchars($book['title']); ?></span>
+                            <span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($book['created_at'])); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="recent-card">
+                <h4>Poems</h4>
+                <div class="recent-list">
+                    <?php foreach ($recent_poems as $poem): ?>
+                        <div class="recent-item">
+                            <span><?php echo htmlspecialchars($poem['title']); ?></span>
+                            <span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($poem['created_at'])); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="recent-card">
+                <h4>Blog</h4>
+                <div class="recent-list">
+                    <?php foreach ($recent_posts as $post): ?>
+                        <div class="recent-item">
+                            <span><?php echo htmlspecialchars($post['title']); ?></span>
+                            <span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($post['created_at'])); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="recent-card">
+                <h4>Videos</h4>
+                <div class="recent-list">
+                    <?php foreach ($recent_videos as $video): ?>
+                        <div class="recent-item">
+                            <span><?php echo htmlspecialchars($video['title']); ?></span>
+                            <span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($video['created_at'] ?? 'now')); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -455,11 +593,15 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
         </div>
         <div class="admin-module">
             <h3>🎥 Videos</h3>
-            <div class="admin-module-grid"><a href="manage_videos.php" class="admin-module-btn"><i class="fas fa-video"></i><span>Manage Videos</span></a></div>
+            <div class="admin-module-grid">
+                <a href="manage_videos.php" class="admin-module-btn"><i class="fas fa-video"></i><span>Manage Videos</span></a>
+            </div>
         </div>
         <div class="admin-module">
             <h3>💬 Comments</h3>
-            <div class="admin-module-grid"><a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Manage Comments</span></a></div>
+            <div class="admin-module-grid">
+                <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Manage Comments</span></a>
+            </div>
         </div>
         <div class="admin-module">
             <h3>⚙️ Reader & System</h3>
@@ -544,7 +686,7 @@ document.getElementById('quickModal').addEventListener('click', function(e) {
 // 3. AJAX LIVE STATS REFRESH (Every 60 seconds)
 // ============================================================
 function refreshStats() {
-    fetch('ajax_admin.php?action=stats')
+    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=stats')
         .then(res => res.json())
         .then(data => {
             document.getElementById('stat_users').textContent = data.users;
@@ -569,7 +711,7 @@ setInterval(refreshStats, 60000);
 // 4. AJAX ACTIVITY FEED REFRESH
 // ============================================================
 function refreshActivity() {
-    fetch('ajax_admin.php?action=activity')
+    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=activity')
         .then(res => res.text())
         .then(html => {
             document.getElementById('activityFeed').innerHTML = html;
@@ -581,7 +723,7 @@ function refreshActivity() {
 // 5. CHARTS (Active Readers + Content Views) – Updated via AJAX
 // ============================================================
 function updateActiveChart() {
-    fetch('ajax_admin.php?action=active_chart')
+    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=active_chart')
         .then(res => res.json())
         .then(data => {
             if (window.activeChart) {
@@ -594,7 +736,7 @@ function updateActiveChart() {
 }
 
 function updateViewsChart() {
-    fetch('ajax_admin.php?action=views_chart')
+    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=views_chart')
         .then(res => res.json())
         .then(data => {
             if (window.viewsChart) {
@@ -676,3 +818,5 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(updateViewsChart, 60000);
 });
 </script>
+
+<?php require_once '../includes/footer.php'; ?>
