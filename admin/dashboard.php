@@ -520,18 +520,31 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
 </div>
 
 <script>
+// ============================================================
+// 1. DARK MODE PERSISTENCE
+// ============================================================
 function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('adminDarkMode', document.body.classList.contains('dark-mode') ? '1' : '0');
 }
-if (localStorage.getItem('adminDarkMode') === '1') document.body.classList.add('dark-mode');
+if (localStorage.getItem('adminDarkMode') === '1') {
+    document.body.classList.add('dark-mode');
+}
 
+// ============================================================
+// 2. QUICK MODAL
+// ============================================================
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
 function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }
-document.getElementById('quickModal').addEventListener('click', function(e) { if(e.target === this) closeQuickModal(); });
+document.getElementById('quickModal').addEventListener('click', function(e) {
+    if (e.target === this) closeQuickModal();
+});
 
+// ============================================================
+// 3. AJAX LIVE STATS REFRESH (Every 60 seconds)
+// ============================================================
 function refreshStats() {
-    fetch('ajax_admin_stats.php')
+    fetch('ajax_admin.php?action=stats')
         .then(res => res.json())
         .then(data => {
             document.getElementById('stat_users').textContent = data.users;
@@ -540,6 +553,7 @@ function refreshStats() {
             document.getElementById('stat_sessions').textContent = data.sessions;
             document.getElementById('stat_posts').textContent = data.posts;
             document.getElementById('stat_videos').textContent = data.videos;
+            // Also update monitoring stats
             document.getElementById('total_views').textContent = data.total_views;
             document.getElementById('active_today').textContent = data.active_today;
             document.getElementById('active_week').textContent = data.active_week;
@@ -551,15 +565,23 @@ function refreshStats() {
 }
 setInterval(refreshStats, 60000);
 
+// ============================================================
+// 4. AJAX ACTIVITY FEED REFRESH
+// ============================================================
 function refreshActivity() {
-    fetch('ajax_admin_activity.php')
+    fetch('ajax_admin.php?action=activity')
         .then(res => res.text())
-        .then(html => { document.getElementById('activityFeed').innerHTML = html; })
+        .then(html => {
+            document.getElementById('activityFeed').innerHTML = html;
+        })
         .catch(err => console.error('Activity refresh failed:', err));
 }
 
+// ============================================================
+// 5. CHARTS (Active Readers + Content Views) – Updated via AJAX
+// ============================================================
 function updateActiveChart() {
-    fetch('ajax_admin_monitoring.php?type=active')
+    fetch('ajax_admin.php?action=active_chart')
         .then(res => res.json())
         .then(data => {
             if (window.activeChart) {
@@ -572,7 +594,7 @@ function updateActiveChart() {
 }
 
 function updateViewsChart() {
-    fetch('ajax_admin_monitoring.php?type=views')
+    fetch('ajax_admin.php?action=views_chart')
         .then(res => res.json())
         .then(data => {
             if (window.viewsChart) {
@@ -585,6 +607,7 @@ function updateViewsChart() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initial active chart
     const ctxActive = document.getElementById('activeChart').getContext('2d');
     const gradientActive = ctxActive.createLinearGradient(0, 0, 0, 250);
     gradientActive.addColorStop(0, '#DBA1A2');
@@ -592,22 +615,64 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.activeChart = new Chart(ctxActive, {
         type: 'line',
-        data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'Active Readers', data: [0,0,0,0,0,0,0], borderColor: '#DBA1A2', backgroundColor: gradientActive, fill: true, tension: 0.4, borderWidth: 2, pointBackgroundColor: '#DBA1A2' }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { display: false } } } }
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Active Readers',
+                data: [0,0,0,0,0,0,0],
+                borderColor: '#DBA1A2',
+                backgroundColor: gradientActive,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointBackgroundColor: '#DBA1A2'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                x: { grid: { display: false } }
+            }
+        }
     });
 
+    // Initial views chart
     const ctxViews = document.getElementById('viewsChart').getContext('2d');
     window.viewsChart = new Chart(ctxViews, {
         type: 'bar',
-        data: { labels: ['Poems','Books','Blog','Videos'], datasets: [{ label: 'Views (last 7 days)', data: [0,0,0,0], backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { display: false } } } }
+        data: {
+            labels: ['Poems', 'Books', 'Blog', 'Videos'],
+            datasets: [{
+                label: 'Views (last 7 days)',
+                data: [0,0,0,0],
+                backgroundColor: ['#DBA1A2', '#c08a8b', '#e8c0c0', '#EFD8D6'],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                x: { grid: { display: false } }
+            }
+        }
     });
 
+    // Fetch initial data
     updateActiveChart();
     updateViewsChart();
+
+    // Auto-refresh charts every 60 seconds
     setInterval(updateActiveChart, 60000);
     setInterval(updateViewsChart, 60000);
 });
 </script>
-
-<?php require_once '../includes/footer.php'; ?>
