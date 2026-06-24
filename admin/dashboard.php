@@ -249,11 +249,16 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <!-- Quick Add Modal -->
     <div class="modal-overlay" id="quickModal">
         <div class="modal-box">
-            <h2>Quick Create</h2>
-            <p style="color:#666; margin-bottom: 16px;">Select what you want to add</p>
+                    <h2>Quick Create</h2>
+        <p style="color:#666; margin-bottom: 16px;">Select what you want to add</p>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
             <a href="manage_books.php?action=new" class="btn btn-primary">+ New Book</a>
             <a href="manage_poems.php?action=new" class="btn btn-primary">+ New Poem</a>
             <a href="manage_blog.php?action=new" class="btn btn-primary">+ New Blog Post</a>
+            <a href="manage_videos.php?action=new" class="btn btn-primary">+ New Video</a>
+            <a href="reflection_editor.php" class="btn btn-primary">+ New Reflection</a>
+            <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New Newsletter</a>
+            
             <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
         </div>
     </div>
