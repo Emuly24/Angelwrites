@@ -1,4 +1,10 @@
 <?php
+// ============================================================
+//  READER.PHP – Final Fully Integrated Reader
+//  Includes all enhancements: StPageFlip, highlights, TTS,
+//  gamification, challenges, sharing, and more.
+// ============================================================
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -8,156 +14,55 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/mail_helper.php';
 
-$book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if (!$book_id) {
-    header('Location: ' . SITE_URL . '/books.php');
-    exit;
-}
+// --- Load book data using the enhanced book_data.php ---
+$bookData = require_once __DIR__ . '/book_data.php';
+extract($bookData); // gives $book, $book_id, $pages, $total_pages, $chapterMap, $chapterTitles, $pageToChapter, $toc, $user_progress, etc.
 
-$stmt = $db->prepare("SELECT * FROM books WHERE id = ?");
-$stmt->execute([$book_id]);
-$book = $stmt->fetch(PDO::FETCH_ASSOC);
-if (!$book) {
-    header('Location: ' . SITE_URL . '/books.php');
-    exit;
-}
+// --- Load helper functions ---
+require_once __DIR__ . '/reader_functions.php';
 
-$stmt = $db->prepare("UPDATE books SET view_count = view_count + 1 WHERE id = ?");
-$stmt->execute([$book_id]);
+// --- User progress (already extracted, but we need some variables for the UI) ---
+$last_offset = $user_progress['position_offset'] ?? 0;
+$last_chapter = $user_progress['position_section'] ?? 0;
+$progress_percent = $user_progress['progress_percent'] ?? 0;
 
-$stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
-$stmt->execute([$book_id]);
-$processed = $stmt->fetch(PDO::FETCH_ASSOC);
-$has_processed = !empty($processed) && $processed['is_processed'] == 1;
-
-$toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
-
-$pages = [];
-if ($has_processed && !empty($processed['content_html'])) {
-    preg_match_all('/<div class="page-content" data-page="(\d+)">(.*?)<\/div>/s', $processed['content_html'], $matches, PREG_SET_ORDER);
-    foreach ($matches as $match) {
-        $pages[] = $match[2];
-    }
-}
-$total_pages = count($pages);
-
-// ------- CHAPTER DETECTION & PAGE MAPPING -------
-$chapterMap = []; // $chapterMap[chapter_index] = array of page numbers
-$currentChapter = 0;
-$chapterTitles = [];
-$pageToChapter = [];
-
-if ($has_processed) {
-    foreach ($pages as $idx => $html) {
-        $pageNum = $idx + 1;
-        // Look for chapter headings
-        if (preg_match('/<h[2-3][^>]*>(.*?Chapter\s+(\d+|[IVXLCDM]+).*?)<\/h[2-3]>/i', $html, $matches)) {
-            $currentChapter++;
-            $chapterTitles[$currentChapter] = trim(strip_tags($matches[1]));
-            $chapterMap[$currentChapter] = [];
-        }
-        $pageToChapter[$pageNum] = $currentChapter ?: 1;
-        if ($currentChapter > 0) {
-            $chapterMap[$currentChapter][] = $pageNum;
-        }
-    }
-}
-// If no chapters detected, treat whole book as one chapter
-if (empty($chapterMap)) {
-    $chapterMap[1] = range(1, $total_pages);
-    $chapterTitles[1] = 'Chapter 1';
-    foreach (range(1, $total_pages) as $p) {
-        $pageToChapter[$p] = 1;
-    }
-}
-
-// ------- BUILD COMPREHENSIVE TOC -------
-$tocEntries = [];
-
-// 1. Cover (page 1)
-$tocEntries[] = ['title' => 'Cover', 'page' => 1];
-
-// 2. Special pages (case‑insensitive detection)
-$specialTitles = ['Copyright', 'Dedication', 'Acknowledgements', 'Author\'s Note', 'About the Author'];
-foreach ($pages as $idx => $html) {
-    $pageNum = $idx + 1;
-    // Skip if already a chapter start
-    if (in_array($pageNum, array_column($chapterMap, 0) ?: [])) continue;
-    foreach ($specialTitles as $special) {
-        // Look for an <h2> or <h3> containing the special title
-        if (preg_match('/<h[2-3][^>]*>\s*' . preg_quote($special, '/') . '\s*<\/h[2-3]>/i', $html)) {
-            $tocEntries[] = ['title' => $special, 'page' => $pageNum];
-            break;
-        }
-    }
-}
-
-// 3. Regular chapters
-foreach ($chapterTitles as $chIndex => $title) {
-    $startPage = $chapterMap[$chIndex][0] ?? 1;
-    $tocEntries[] = ['title' => $title, 'page' => $startPage];
-}
-
-// ------- USER PROGRESS -------
-$user_progress = null;
-$last_offset = 0;
-$last_chapter = 0;
-$progress_percent = 0;
+// --- Get additional user data ---
 $streak_days = 0;
 $group_id = null;
 $reading_status = 'not_started';
-$reading_speed_wpm = 250; // default: words per minute
+$reading_speed_wpm = 250;
+$user_level = 1;
 
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
 
-    // --- FIX: Verify user actually exists in the database before any queries ---
-    $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
-    $stmt->execute([$user_id]);
-    if (!$stmt->fetch()) {
-        session_destroy();
-        header('Location: ' . SITE_URL . '/login.php');
-        exit;
-    }
-    // --- END FIX ---
-
-    $stmt = $db->prepare("SELECT * FROM reading_progress WHERE user_id = ? AND book_id = ?");
-    $stmt->execute([$user_id, $book_id]);
-    $user_progress = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($user_progress) {
-        $last_offset = (int)$user_progress['position_offset'];
-        $last_chapter = (int)$user_progress['position_section'];
-        $progress_percent = (int)$user_progress['progress_percent'];
-    } else {
-        $stmt = $db->prepare("INSERT INTO reading_progress (user_id, book_id, position_offset, position_section, progress_percent) VALUES (?, ?, 0, 0, 0)");
-        $stmt->execute([$user_id, $book_id]);
-    }
-
+    // Streak
     $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
     $stmt->execute([$user_id]);
-    $streak = $stmt->fetchColumn();
-    $streak_days = $streak ? (int)$streak : 0;
+    $streak_days = (int)$stmt->fetchColumn();
 
-    $stmt = $db->prepare("
-        SELECT g.id FROM reading_groups g
-        JOIN group_members m ON g.id = m.group_id
-        WHERE g.book_id = ? AND m.user_id = ?
-        LIMIT 1
-    ");
+    // Group
+    $stmt = $db->prepare("SELECT g.id FROM reading_groups g JOIN group_members m ON g.id = m.group_id WHERE g.book_id = ? AND m.user_id = ? LIMIT 1");
     $stmt->execute([$book_id, $user_id]);
     $group_id = $stmt->fetchColumn();
 
+    // Reading status
     $stmt = $db->prepare("SELECT status FROM reading_status WHERE user_id = ? AND book_id = ?");
     $stmt->execute([$user_id, $book_id]);
     $reading_status = $stmt->fetchColumn() ?: 'not_started';
 
-    // Load user reading speed preference
+    // Reading speed
     $stmt = $db->prepare("SELECT reading_speed_wpm FROM user_settings WHERE user_id = ?");
     $stmt->execute([$user_id]);
     $speed = $stmt->fetchColumn();
     if ($speed) $reading_speed_wpm = (int)$speed;
+
+    // User level (from gamification)
+    $level_data = getReaderLevel($user_id);
+    $user_level = $level_data['level'];
 }
 
+// --- Bookmarks and highlights ---
 $bookmarks = [];
 $highlights = [];
 if (isLoggedIn()) {
@@ -172,7 +77,7 @@ if (isLoggedIn()) {
 }
 
 $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter : 1;
-$cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_URL . '/' . $book['cover_path'] : '';
+$cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -183,7 +88,9 @@ $cover_path = isset($book['cover_path']) && !empty($book['cover_path']) ? SITE_U
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/page-flip/dist/js/page-flip.browser.min.css" />
 <style>
+/* ----- All styles remain the same as before (with the flip nav buttons restored) ----- */
 :root {
     --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #e8c0c0; --vanilla: #EFD8D6; --fantasy: #F7F3ED; --white: #ffffff; --dark: #2c1e1e; --text: #3d2e2e; --text-light: #6b5a5a; --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5; --shadow: 0 4px 16px rgba(44,30,30,0.08); --shadow-hover: 0 8px 30px rgba(44,30,30,0.15); --input-bg: #ffffff; --transition: 0.3s cubic-bezier(0.4,0,0.2,1); --toolbar-height: 60px; --sidebar-width: 48px; --sidebar-btn-size: 36px; --flip-nav-btn-size: 44px;
 }
@@ -213,6 +120,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .toolbar-right button { background:none; border:none; font-size:1.1rem; cursor:pointer; color:var(--text-light); padding:6px 10px; border-radius:6px; transition:all var(--transition); display:flex; align-items:center; justify-content:center; }
 .toolbar-right button:hover { background:rgba(219,161,162,0.1); color:var(--rose); transform:scale(1.05); }
 .streak-badge { background:var(--rose); color:var(--white); padding:2px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; white-space:nowrap; }
+.level-badge { background:var(--vanilla); color:var(--rose-dark); padding:2px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; white-space:nowrap; border:1px solid var(--rose-light); margin-left:4px;}
 #sidebar { position:fixed; top:var(--toolbar-height); left:0; width:var(--sidebar-width); height:calc(100vh - var(--toolbar-height)); background:var(--card-bg); border-right:1px solid var(--border); z-index:15; display:flex; flex-direction:column; align-items:center; padding:8px 0; gap:4px; overflow-y:auto; transition:transform 0.25s ease; }
 #sidebar.closed { transform:translateX(-100%); }
 #sidebar.open { transform:translateX(0); }
@@ -232,27 +140,19 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .page-content-inner h1, .page-content-inner h2 { text-align:center; margin-bottom:1.2rem; }
 .page-content-inner p { margin-bottom:16px; }
 .page-content-inner p:last-child { margin-bottom:0; }
-#flip-container { width:100%; height:100%; position:relative; perspective:2500px; justify-content:center; align-items:center; background:var(--bg); display:none; padding:0 20px; }
-.flip-book { position:relative; width:100%; max-width:900px; height:100%; max-height:92%; transform-style:preserve-3d; transition:transform 1.2s cubic-bezier(0.645,0.045,0.355,1); }
-.flip-page { position:absolute; top:0; left:0; width:100%; height:100%; backface-visibility:hidden; border-radius:20px; box-shadow:var(--shadow-hover); border:1px solid var(--rose); background:linear-gradient(145deg,var(--rose-light),var(--vanilla)); padding:10px; overflow:hidden; }
-.flip-page-front { z-index:2; transform-origin:left center; transform:rotateY(0deg); }
-.flip-page-back { transform-origin:right center; transform:rotateY(180deg); }
-.flip-page-inner { width:100%; height:100%; padding:30px 40px; background:var(--card-bg); border-radius:12px; box-shadow:inset 0 0 20px rgba(0,0,0,0.03); font-size:1.05rem; line-height:1.8; color:var(--text); font-family:'Inter',sans-serif; overflow:hidden; display:flex; flex-direction:column; }
-.flip-page-inner h1, .flip-page-inner h2, .flip-page-inner h3 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
-.flip-page-inner h1, .flip-page-inner h2 { text-align:center; margin-bottom:1.2rem; }
-.flip-page-inner p { margin-bottom:16px; }
-.flip-page-inner p:last-child { margin-bottom:0; }
-.flip-page-inner.special-page { display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; }
-.flip-page-front::before { content:''; position:absolute; top:0; left:0; width:40px; height:100%; background:linear-gradient(to right,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.02) 80%,transparent 100%); pointer-events:none; z-index:3; }
-.flip-page-back::before { content:''; position:absolute; top:0; right:0; width:40px; height:100%; background:linear-gradient(to left,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.02) 80%,transparent 100%); pointer-events:none; z-index:3; }
-.flip-book.flipped-right { transform:rotateY(-180deg); }
-.flip-book.flipped-left { transform:rotateY(180deg); }
-.flip-book.flipping { transition:transform 1.2s cubic-bezier(0.645,0.045,0.355,1); }
+
+/* Flip container for StPageFlip */
+#flip-container { width:100%; height:100%; position:relative; display:none; justify-content:center; align-items:center; background:var(--bg); padding:0 20px; }
+#flip-book-wrapper { width:100%; max-width:900px; height:100%; max-height:92%; position:relative; }
+.flip-page-custom { width:100%; height:100%; padding:30px 40px; background:var(--card-bg); border-radius:12px; box-shadow:inset 0 0 20px rgba(0,0,0,0.03); font-size:1.05rem; line-height:1.8; color:var(--text); overflow:hidden; display:flex; flex-direction:column; }
+.flip-page-custom.special-page { justify-content:center; align-items:center; text-align:center; }
 .cover-image-wrapper-flip { width:100%; height:100%; border-radius:12px; overflow:hidden; background:var(--card-bg); display:flex; align-items:center; justify-content:center; }
 .cover-image-wrapper-flip img { width:100%; height:100%; object-fit:contain; display:block; }
 .cover-placeholder-flip { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; background:linear-gradient(135deg,var(--vanilla),var(--fantasy)); color:var(--text-light); text-align:center; padding:40px; }
 .cover-placeholder-flip i { font-size:4rem; color:var(--rose); margin-bottom:16px; }
 .cover-placeholder-flip p { font-family:'Playfair Display',Georgia,serif; font-size:1.5rem; font-weight:600; color:var(--dark); }
+
+/* Restyled flip navigation buttons */
 .flip-nav-btn-wrapper { position:absolute; top:50%; transform:translateY(-50%); width:var(--flip-nav-btn-size); height:var(--flip-nav-btn-size); border-radius:50%; background:rgba(255,255,255,0.85); backdrop-filter:blur(4px); box-shadow:0 4px 16px rgba(0,0,0,0.1); display:flex; align-items:center; justify-content:center; z-index:10; transition:background .3s; border:1px solid var(--rose-light); }
 .flip-nav-btn-wrapper:hover { background:rgba(255,255,255,1); box-shadow:0 4px 24px rgba(0,0,0,0.15); }
 .flip-nav-btn-wrapper .aw-nav-btn { position:static!important; transform:none!important; background:transparent!important; border:none!important; box-shadow:none!important; color:var(--text)!important; width:var(--flip-nav-btn-size); height:var(--flip-nav-btn-size); margin:0; padding:0; display:flex; align-items:center; justify-content:center; }
@@ -260,10 +160,14 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .flip-nav-btn-wrapper .aw-nav-btn:hover { color:var(--rose)!important; transform:scale(1.1)!important; }
 #flipPrevBtnWrapper { left:16px; }
 #flipNextBtnWrapper { right:16px; }
+
 .highlight-yellow { background:#fff9c4; padding:0 4px; border-radius:3px; }
 .highlight-green { background:#c8e6c9; padding:0 4px; border-radius:3px; }
 .highlight-blue { background:#bbdefb; padding:0 4px; border-radius:3px; }
 .highlight-pink { background:#f8bbd0; padding:0 4px; border-radius:3px; }
+.highlight-purple { background:#e8d5f5; padding:0 4px; border-radius:3px; }
+.highlight-underline { text-decoration: underline; text-decoration-color: var(--rose); text-decoration-thickness: 2px; text-underline-offset: 3px; padding:0 4px; }
+
 #highlight-tooltip, #reaction-picker, #annotation-popup, #search-bar, #share-modal, #notes-panel, #toc-drawer, #settings-panel { position:fixed!important; z-index:9999!important; }
 #highlight-tooltip { display:none; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:12px 16px; box-shadow:var(--shadow-hover); min-width:280px; pointer-events:auto; }
 #highlight-tooltip.visible { display:block; }
@@ -278,12 +182,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
 #annotation-popup.visible { display:block; }
 #annotation-popup textarea { width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; resize:vertical; min-height:60px; font-size:0.9rem; background:var(--input-bg); color:var(--text); font-family:'Inter',sans-serif; }
 #annotation-popup textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.annotation-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
-.annotation-actions button { padding:6px 14px; border-radius:6px; border:none; cursor:pointer; font-size:0.8rem; transition:background var(--transition); }
-.annotation-save { background:var(--rose); color:var(--white); }
-.annotation-save:hover { background:var(--rose-dark); }
-.annotation-cancel { background:var(--border); color:var(--text); }
-.annotation-cancel:hover { background:var(--text-light); color:var(--white); }
 #search-bar { display:none; width:300px; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow-hover); pointer-events:auto; top:70px!important; left:50px!important; z-index:100001!important; }
 #search-bar.visible { display:block; }
 #search-bar input { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:0.9rem; background:var(--input-bg); color:var(--text); font-family:'Inter',sans-serif; }
@@ -343,18 +241,16 @@ html,body { height:100%; width:100%; overflow:hidden; }
 #share-modal .share-btn:last-child { margin-bottom:0!important; }
 #share-modal .share-btn:hover { border-color:var(--rose)!important; background:rgba(219,161,162,0.08)!important; transform:translateX(4px)!important; }
 #share-modal .share-btn i { width:24px!important; text-align:center!important; font-size:1.2rem!important; }
+#shareQuotePreview { margin:8px 0; padding:12px; background:var(--bg); border-radius:8px; font-style:italic; display:none; }
+#shareQuotePreview span { color:var(--text); }
 #notes-panel { max-width:550px!important; }
 .notes-header { border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
 #noteForm { margin-top:16px; }
 #noteText { width:100%; min-height:80px; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--input-bg); color:var(--text); font-family:'Inter',sans-serif; font-size:0.9rem; }
+#noteHighlightId { display:none; }
 .note-submit { background:var(--rose); color:white; border:none; padding:8px 20px; border-radius:30px; font-weight:600; cursor:pointer; transition:background 0.2s; }
 .note-submit:hover { background:var(--rose-dark); }
 .note-cancel { background:var(--border); color:var(--text); border:none; padding:8px 20px; border-radius:30px; font-weight:600; cursor:pointer; transition:0.2s; }
-.modal-content { background:var(--card-bg); border-radius:24px; padding:12px; }
-.modal-content h3 { margin-top:0; color:var(--dark); font-family:'Playfair Display',serif; }
-.modal-content button { border-radius:30px; padding:10px 20px; border:1px solid var(--border); background:var(--card-bg); cursor:pointer; transition:0.2s; display:flex; align-items:center; gap:8px; }
-.modal-content button:hover { border-color:var(--rose); background:rgba(219,161,162,0.05); }
-.modal-content textarea { border-radius:16px; border:1px solid var(--border); padding:12px; background:var(--input-bg); color:var(--text); width:100%; font-family:'Inter',sans-serif; }
 @media (max-width:768px) {
     :root { --toolbar-height:50px; --sidebar-width:40px; --sidebar-btn-size:32px; --flip-nav-btn-size:32px; }
     #toolbar { height:var(--toolbar-height)!important; min-height:var(--toolbar-height)!important; padding:0 8px!important; }
@@ -372,8 +268,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     .page-content-wrapper { padding:6px!important; margin-bottom:20px!important; }
     .page-content-inner { padding:16px!important; min-height:300px!important; font-size:95%!important; }
     #flip-container { padding:0 5px!important; }
-    .flip-page { padding:6px!important; border-radius:10px!important; }
-    .flip-page-inner { padding:12px!important; font-size:90%!important; line-height:1.6!important; }
+    .flip-page-custom { padding:12px!important; font-size:90%!important; line-height:1.6!important; }
     .flip-nav-btn-wrapper { width:var(--flip-nav-btn-size)!important; height:var(--flip-nav-btn-size)!important; top:50%!important; }
     #flipPrevBtnWrapper { left:2px!important; }
     #flipNextBtnWrapper { right:2px!important; }
@@ -386,7 +281,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 @media (max-width:480px) {
     .toolbar-left .title { font-size:0.7rem!important; max-width:50px!important; flex:0 1 auto!important; }
     .page-content-inner { padding:12px!important; }
-    .flip-page-inner { padding:10px!important; }
+    .flip-page-custom { padding:10px!important; }
 }
 </style>
 </head>
@@ -396,7 +291,8 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <div class="toolbar-left">
             <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
-            <?php if (isLoggedIn() && $streak_days > 0): ?><span class="streak-badge">🔥 <?php echo $streak_days; ?>d</span><?php endif; ?>
+            <?php echo renderStreakBadge($streak_days); ?>
+            <?php echo renderLevelBadge($user_id ?? 0); ?>
             <select id="readingStatus">
                 <option value="not_started" <?php echo $reading_status == 'not_started' ? 'selected' : ''; ?>>📌 Not Started</option>
                 <option value="currently_reading" <?php echo $reading_status == 'currently_reading' ? 'selected' : ''; ?>>📖 Currently Reading</option>
@@ -431,6 +327,10 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <button class="sidebar-btn" id="errorReportBtn" title="Report Error"><i class="fas fa-exclamation-triangle"></i></button>
         <button class="sidebar-btn" id="prayerBtn" title="Prayer Request"><i class="fas fa-hands-praying"></i></button>
         <hr class="sidebar-separator">
+        <button class="sidebar-btn" id="analyticsBtn" title="Analytics"><i class="fas fa-chart-pie"></i></button>
+        <button class="sidebar-btn" id="myNotesBtn" title="My Personal Notes"><i class="fas fa-pen-fancy"></i></button>
+        <button class="sidebar-btn" id="ttsBtn" title="Text to Speech"><i class="fas fa-volume-up"></i></button>
+        <hr class="sidebar-separator">
         <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights"><i class="fas fa-file-export"></i></button>
         <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress"><i class="fas fa-undo-alt"></i></button>
         <button class="sidebar-btn" id="resumeBtn" title="Resume Position"><i class="fas fa-history"></i></button>
@@ -451,14 +351,8 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
 
         <div id="flip-container" style="display:none;">
-            <div class="flip-book" id="flipBook">
-                <div class="flip-page flip-page-front" id="flipLeftPage">
-                    <div class="flip-page-inner" id="flipLeftContent"></div>
-                </div>
-                <div class="flip-page flip-page-back" id="flipRightPage">
-                    <div class="flip-page-inner" id="flipRightContent"></div>
-                </div>
-            </div>
+            <div id="flip-book-wrapper"></div>
+            <!-- Flip navigation buttons (restored) -->
             <div class="flip-nav-btn-wrapper" id="flipPrevBtnWrapper">
                 <button class="aw-nav-btn" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
             </div>
@@ -468,6 +362,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
+    <!-- Settings Panel -->
     <div id="settings-panel">
         <div class="settings-grid">
             <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll">Scroll</button><button data-mode="flip" class="active">Page Flip</button></div></div>
@@ -479,6 +374,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
+    <!-- TOC Drawer -->
     <div id="toc-drawer">
         <div class="toc-header">
             <h3>Table of Contents</h3>
@@ -497,6 +393,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
+    <!-- Group Notes Panel -->
     <div id="notes-panel" class="modal-wrapper">
         <button class="modal-close" id="notesClose">&times;</button>
         <div class="notes-header">
@@ -507,6 +404,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <div id="notesList" style="max-height:200px;overflow-y:auto;"></div>
             <div id="noteForm" style="display:none;margin-top:12px;">
                 <textarea id="noteText" rows="3" placeholder="Write a note..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);font-family:'Inter',sans-serif;"></textarea>
+                <input type="hidden" id="noteHighlightId" value="0">
                 <div style="margin:6px 0;"><label><input type="checkbox" id="notePrivate"> Private note</label></div>
                 <div style="display:flex;gap:8px;justify-content:flex-end;">
                     <button class="note-submit" onclick="submitNote()">Post</button>
@@ -516,9 +414,11 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
+    <!-- Share Modal -->
     <div id="share-modal" class="modal-wrapper">
         <button class="modal-close" onclick="closeModal('share-modal')">&times;</button>
-        <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share this page</h3>
+        <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share</h3>
+        <div id="shareQuotePreview">“<span id="shareQuoteText"></span>”</div>
         <div style="display:flex;flex-direction:column;margin-top:8px;">
             <button class="share-btn" onclick="share('facebook')"><i class="fab fa-facebook-f"></i> Facebook</button>
             <button class="share-btn" onclick="share('twitter')"><i class="fab fa-twitter"></i> Twitter</button>
@@ -527,6 +427,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
+    <!-- Reaction Picker -->
     <div id="reaction-picker" style="position:fixed;bottom:80px;right:20px;z-index:100002;display:none;background:var(--card-bg);border-radius:16px;padding:8px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.15);border:1px solid var(--rose-light);gap:6px;align-items:center;pointer-events:auto;">
         <button onclick="reactNote(currentNoteId, '❤️')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">❤️</button>
         <button onclick="reactNote(currentNoteId, '🙏')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">🙏</button>
@@ -536,8 +437,10 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <button onclick="document.getElementById('reaction-picker').style.display='none'" style="font-size:0.9rem;background:transparent;border:none;cursor:pointer;color:var(--text-light);">✕</button>
     </div>
 
+    <!-- Challenge Widget (empty – will be filled by reader_challenges.php) -->
     <div id="challenge-widget"></div>
 
+    <!-- Comments Modal -->
     <div id="commentsModal" class="modal-wrapper">
         <button class="modal-close" onclick="closeModal('commentsModal')">&times;</button>
         <h3><i class="fas fa-comments" style="color:var(--rose);"></i> Comments</h3>
@@ -546,6 +449,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <button onclick="submitComment()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Post Comment</button>
     </div>
 
+    <!-- Error Report Modal -->
     <div id="errorModal" class="modal-wrapper">
         <button class="modal-close" onclick="closeModal('errorModal')">&times;</button>
         <h3><i class="fas fa-exclamation-triangle" style="color:var(--rose);"></i> Report Error</h3>
@@ -560,6 +464,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <button onclick="submitError()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Submit Error Report</button>
     </div>
 
+    <!-- Prayer Request Modal -->
     <div id="prayerModal" class="modal-wrapper">
         <button class="modal-close" onclick="closeModal('prayerModal')">&times;</button>
         <h3><i class="fas fa-hands-praying" style="color:var(--rose);"></i> Prayer Request</h3>
@@ -570,6 +475,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <button onclick="submitPrayer()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Submit Prayer Request</button>
     </div>
 
+    <!-- Search Bar -->
     <div id="search-bar">
         <div class="search-header">
             <input type="text" id="searchInput" placeholder="Search in book...">
@@ -578,11 +484,26 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <div id="searchResults"></div>
     </div>
 
+    <!-- Exit Focus Button -->
     <button id="exitFocusBtn" onclick="toggleFocus()"><i class="fas fa-compress"></i> Exit Focus</button>
 
-    <!-- OVERLAY PLACED LAST TO BE BEHIND ALL MODALS -->
+    <!-- Overlay -->
     <div id="overlay"></div>
 </div>
+
+<!-- ====== Include all enhanced modules ====== -->
+<script src="https://unpkg.com/page-flip/dist/js/page-flip.browser.min.js"></script>
+<?php
+// Include TTS, sharing, challenges, and gamification toast
+require_once __DIR__ . '/reader_tts.php';
+require_once __DIR__ . '/reader_share.php';
+require_once __DIR__ . '/reader_challenges.php';
+
+// Render the achievement toast (from gamification)
+if (function_exists('renderAchievementToastJS')) {
+    renderAchievementToastJS();
+}
+?>
 
 <script>
 (function() {
@@ -598,9 +519,11 @@ html,body { height:100%; width:100%; overflow:hidden; }
     const pageToChapter = <?php echo json_encode($pageToChapter); ?>;
     const chapterTitles = <?php echo json_encode($chapterTitles); ?>;
     const readingSpeedWPM = <?php echo $reading_speed_wpm; ?>;
+    const highlights = <?php echo json_encode($highlights); ?>;
 
     const scrollContainer = document.getElementById('scroll-container');
     const flipContainer = document.getElementById('flip-container');
+    const flipWrapper = document.getElementById('flip-book-wrapper');
     const pageNumEl = document.getElementById('pageNum');
     const totalPagesEl = document.getElementById('totalPages');
     const progressFill = document.getElementById('progressFill');
@@ -617,6 +540,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     const noteForm = document.getElementById('noteForm');
     const noteText = document.getElementById('noteText');
     const notePrivate = document.getElementById('notePrivate');
+    const noteHighlightId = document.getElementById('noteHighlightId');
     const overlay = document.getElementById('overlay');
     const focusBtn = document.getElementById('focusBtn');
     const readingStatus = document.getElementById('readingStatus');
@@ -637,13 +561,10 @@ html,body { height:100%; width:100%; overflow:hidden; }
     const errorPageNumSpan = document.getElementById('errorPageNum');
     const errorPageInput = document.getElementById('errorPageInput');
     const errorText = document.getElementById('errorText');
-    const errorCorrection = document.getElementById('errorCorrection');
     const prayerBtn = document.getElementById('prayerBtn');
     const prayerModal = document.getElementById('prayerModal');
     const prayerText = document.getElementById('prayerText');
     const backBtn = document.getElementById('backBtn');
-    const prevFlipBtn = document.getElementById('flipPrevBtn');
-    const nextFlipBtn = document.getElementById('flipNextBtn');
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     const searchBtn = document.getElementById('searchBtn');
@@ -651,6 +572,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
     const searchResults = document.getElementById('searchResults');
     const searchBar = document.getElementById('search-bar');
     const exitFocusBtn = document.getElementById('exitFocusBtn');
+    const analyticsBtn = document.getElementById('analyticsBtn');
+    const myNotesBtn = document.getElementById('myNotesBtn');
+    const ttsBtn = document.getElementById('ttsBtn');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
     let readingMode = localStorage.getItem('reader_mode') || 'flip';
@@ -659,8 +583,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
     let touchStartX = 0;
     let currentNoteId = null;
     let savedRange = null;
-    let flipData = { chunks: [], currentChunk: 0, totalChunks: 0, originalPage: 1 };
+    let pageFlip = null;
 
+    // ----- Chapter helpers -----
     function getChapterForPage(page) { return pageToChapter[page] || 1; }
     function getChapterTitle(chapter) { return chapterTitles[chapter] || 'Chapter ' + chapter; }
     function getPagesInChapter(chapter) { return chapterMap[chapter] || []; }
@@ -670,13 +595,13 @@ html,body { height:100%; width:100%; overflow:hidden; }
         const idx = pagesInCh.indexOf(page);
         return idx === -1 ? 0 : pagesInCh.length - idx - 1;
     }
-    function getChapterTotalPages(chapter) { return getPagesInChapter(chapter).length; }
     function estimateTimeRemaining(page) {
         const remaining = getRemainingPagesInChapter(page);
         if (remaining <= 0) return 0;
         return Math.ceil(remaining * 300 / readingSpeedWPM);
     }
 
+    // ----- Theme -----
     function applyTheme(theme) {
         const app = document.getElementById('reader-app');
         app.classList.remove('theme-paper','theme-light','theme-dark','theme-sepia');
@@ -684,103 +609,105 @@ html,body { height:100%; width:100%; overflow:hidden; }
         localStorage.setItem('reader_theme',theme);
     }
 
-    function splitByFit(originalPageNum, html) {
-        if (originalPageNum === 1 && html.trim() === 'COVER') {
-            let coverHTML = '';
-            if (cover_path && cover_path.length > 0) {
-                coverHTML = `<div class="cover-image-wrapper-flip"><img src="${cover_path}" alt="Cover" /></div>`;
-            } else {
-                coverHTML = `<div class="cover-image-wrapper-flip"><div class="cover-placeholder-flip"><i class="fas fa-book-open"></i><p>Cover</p></div></div>`;
+    // ----- Highlight application -----
+    function applyHighlights(container) {
+        if (!highlights || !container) return;
+        const pageWrapper = container.querySelector(`.page-content-inner[data-page="${currentPage}"]`) || container;
+        if (!pageWrapper) return;
+        const walker = document.createTreeWalker(pageWrapper, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while (node = walker.nextNode()) {
+            const text = node.textContent;
+            for (let h of highlights) {
+                if (h.chapter_index != currentPage) continue;
+                const idx = text.indexOf(h.text);
+                if (idx !== -1 && node.parentElement && !node.parentElement.closest('.highlight-yellow, .highlight-green, .highlight-blue, .highlight-pink, .highlight-purple, .highlight-underline')) {
+                    const range = document.createRange();
+                    range.setStart(node, idx);
+                    range.setEnd(node, idx + h.text.length);
+                    const span = document.createElement('span');
+                    if (h.color === 'underline') {
+                        span.className = 'highlight-underline';
+                    } else {
+                        span.className = 'highlight-' + h.color;
+                    }
+                    span.textContent = h.text;
+                    range.deleteContents();
+                    range.insertNode(span);
+                    applyHighlights(container);
+                    return;
+                }
             }
-            return { chunks: [coverHTML], mapping: [1] };
         }
-        const temp = document.createElement('div');
-        temp.innerHTML = html;
-        const children = Array.from(temp.children);
-        const flipInner = document.getElementById('flipLeftContent');
-        const styles = window.getComputedStyle(flipInner);
-        const measureContainer = document.createElement('div');
-        measureContainer.style.cssText = `visibility:hidden;position:absolute;width:100%;padding:${styles.paddingTop} ${styles.paddingRight} ${styles.paddingBottom} ${styles.paddingLeft};font-size:${styles.fontSize};line-height:${styles.lineHeight};font-family:${styles.fontFamily};color:var(--text);box-sizing:border-box;`;
-        document.body.appendChild(measureContainer);
-        const maxHeight = flipContainer.clientHeight * 0.92 - 60 - 4;
-        const chunks = []; const mapping = []; let currentChunk = document.createElement('div');
-        function pushChunk() { if (currentChunk.children.length > 0) { chunks.push(currentChunk.innerHTML); mapping.push(originalPageNum); currentChunk = document.createElement('div'); } }
-        function wouldFit(child) { measureContainer.innerHTML = currentChunk.innerHTML; measureContainer.appendChild(child.cloneNode(true)); const h = measureContainer.scrollHeight; measureContainer.innerHTML = ''; return h <= maxHeight; }
-        children.forEach(child => {
-            const tag = child.tagName.toLowerCase();
-            const text = child.textContent.trim().toLowerCase();
-            if (tag === 'h2' || tag === 'h3') { pushChunk(); currentChunk.appendChild(child.cloneNode(true)); pushChunk(); return; }
-            const specialKeywords = ['acknowledgements','author\'s note','about the author','dedication','copyright'];
-            if (specialKeywords.includes(text)) { pushChunk(); const clone = child.cloneNode(true); currentChunk.appendChild(clone); pushChunk(); return; }
-            if (wouldFit(child)) { currentChunk.appendChild(child.cloneNode(true)); } else { pushChunk(); currentChunk.appendChild(child.cloneNode(true)); }
+    }
+
+    // ----- StPageFlip initialization -----
+    function initFlip() {
+        if (pageFlip) {
+            pageFlip.destroy();
+            pageFlip = null;
+        }
+        let flipPagesHTML = [];
+        if (cover_path) {
+            flipPagesHTML.push(`<div class="flip-page-custom special-page"><div class="cover-image-wrapper-flip"><img src="${cover_path}" alt="Cover" /></div></div>`);
+        } else {
+            flipPagesHTML.push(`<div class="flip-page-custom special-page"><div class="cover-placeholder-flip"><i class="fas fa-book-open"></i><p>Cover</p></div></div>`);
+        }
+        pages.forEach((html, idx) => {
+            flipPagesHTML.push(`<div class="flip-page-custom" data-page="${idx+1}">${html}</div>`);
         });
-        pushChunk(); document.body.removeChild(measureContainer);
-        if (chunks.length === 0) { chunks.push('<p style="color:var(--text-light);text-align:center;">(empty page)</p>'); mapping.push(originalPageNum); }
-        return { chunks, mapping };
-    }
 
-    function loadFlipPages(pageNum) {
-        if (pageNum < 1 || pageNum > totalPages) return;
-        const result = splitByFit(pageNum, (pageNum === 1) ? 'COVER' : pages[pageNum-1]);
-        flipData.chunks = result.chunks; flipData.totalChunks = result.chunks.length; flipData.currentChunk = 0; flipData.originalPage = pageNum;
-        renderFlipChunk(0); updateFlipUI(pageNum, 0);
-    }
+        flipWrapper.innerHTML = flipPagesHTML.join('');
 
-    function renderFlipChunk(index) {
-        const html = flipData.chunks[index] || '<p>...</p>';
-        const leftContent = document.getElementById('flipLeftContent');
-        leftContent.className = 'flip-page-inner';
-        const tempDiv = document.createElement('div'); tempDiv.innerHTML = html;
-        const text = tempDiv.textContent.trim().toLowerCase();
-        const specialKeywords = ['acknowledgements','author\'s note','about the author','dedication','copyright','cover'];
-        if (specialKeywords.some(kw => text.includes(kw)) || (flipData.originalPage === 1 && index === 0)) leftContent.classList.add('special-page');
-        leftContent.innerHTML = html;
-        const flipBook = document.getElementById('flipBook');
-        flipBook.classList.remove('flipped-right','flipped-left','flipping');
-        flipBook.style.transform = 'rotateY(0deg)';
-    }
-
-    function flipToNext() {
-        if (flipData.currentChunk < flipData.totalChunks - 1) {
-            const flipBook = document.getElementById('flipBook');
-            flipBook.classList.add('flipping','flipped-right');
-            setTimeout(() => { flipData.currentChunk++; renderFlipChunk(flipData.currentChunk); flipBook.classList.remove('flipped-right','flipping'); updateFlipUI(flipData.originalPage, flipData.currentChunk); savePosition(); }, 800);
-        } else if (flipData.originalPage < totalPages) {
-            const flipBook = document.getElementById('flipBook');
-            flipBook.classList.add('flipping','flipped-right');
-            setTimeout(() => { currentPage = flipData.originalPage + 1; loadFlipPages(currentPage); flipBook.classList.remove('flipped-right','flipping'); updateFlipUI(currentPage, 0); savePosition(); }, 800);
+        pageFlip = new StPageFlip(flipWrapper, {
+            width: 450,
+            height: 600,
+            size: 'stretch',
+            minWidth: 300,
+            maxWidth: 900,
+            minHeight: 400,
+            maxHeight: 1200,
+            showCover: true,
+            maxShadowOpacity: 0.5,
+            usePortrait: true,
+            mobileScrollSupport: true,
+        });
+        pageFlip.loadFromHTML(document.querySelectorAll('.flip-page-custom'));
+        pageFlip.on('turn', function(e) {
+            const pageIndex = e.data; // 0 = cover, 1 = first content page
+            if (pageIndex === 0) {
+                currentPage = 0;
+                updateUI(0);
+            } else {
+                currentPage = pageIndex;
+                updateUI(currentPage);
+                applyHighlights(flipWrapper);
+                savePosition();
+            }
+        });
+        // Initial page
+        if (currentPage > 0) {
+            pageFlip.turnToPage(currentPage);
+        } else {
+            pageFlip.turnToPage(0);
         }
     }
 
-    function flipToPrev() {
-        if (flipData.currentChunk > 0) {
-            const flipBook = document.getElementById('flipBook');
-            flipBook.classList.add('flipping','flipped-left');
-            setTimeout(() => { flipData.currentChunk--; renderFlipChunk(flipData.currentChunk); flipBook.classList.remove('flipped-left','flipping'); updateFlipUI(flipData.originalPage, flipData.currentChunk); savePosition(); }, 800);
-        } else if (flipData.originalPage > 1) {
-            const flipBook = document.getElementById('flipBook');
-            flipBook.classList.add('flipping','flipped-left');
-            setTimeout(() => { currentPage = flipData.originalPage - 1; loadFlipPages(currentPage); flipData.currentChunk = flipData.totalChunks - 1; renderFlipChunk(flipData.currentChunk); flipBook.classList.remove('flipped-left','flipping'); updateFlipUI(currentPage, flipData.currentChunk); savePosition(); }, 800);
-        }
-    }
-
-    function updateFlipUI(pageNum, chunkIndex) {
-        const totalChunks = flipData.totalChunks;
-        if (totalChunks > 0) pageNumEl.textContent = `${chunkIndex+1} / ${totalChunks}`; else pageNumEl.textContent = '1 / 1';
-        const approxPercent = Math.round(((pageNum-1)/totalPages + (chunkIndex+1)/totalPages/Math.max(1,totalChunks))*100);
-        const circumference = 2 * Math.PI * 16;
-        const offset = circumference - (approxPercent/100)*circumference;
-        progressFill.setAttribute('stroke-dashoffset', offset);
-        progressPercent.textContent = approxPercent + '%';
-        const ch = getChapterForPage(pageNum);
-        const chapTitle = getChapterTitle(ch);
-        chapterInfoEl.textContent = `📖 ${chapTitle}`;
-        remainingInfoEl.textContent = `⏳ ${getRemainingPagesInChapter(pageNum)} pages remaining • ${estimateTimeRemaining(pageNum)} min left`;
-    }
-
+    // ----- UI updates -----
     function updateUI(page) {
-        if (readingMode === 'flip') return;
-        pageNumEl.textContent = page;
+        if (page === 0) {
+            pageNumEl.textContent = 'Cover';
+            progressFill.setAttribute('stroke-dashoffset', '100.53');
+            progressPercent.textContent = '0%';
+            chapterInfoEl.textContent = '📖 Cover';
+            remainingInfoEl.textContent = '';
+            return;
+        }
+        if (readingMode === 'flip') {
+            pageNumEl.textContent = page;
+        } else {
+            pageNumEl.textContent = page;
+        }
         const percent = Math.round((page/totalPages)*100);
         const circumference = 2 * Math.PI * 16;
         const offset = circumference - (percent/100)*circumference;
@@ -794,58 +721,122 @@ html,body { height:100%; width:100%; overflow:hidden; }
     function goToPage(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
         currentPage = pageNum;
-        if (readingMode === 'flip') { loadFlipPages(pageNum); } else { const target = document.querySelector(`.page-content-inner[data-page="${pageNum}"]`); if (target) target.scrollIntoView({ behavior:'smooth', block:'start' }); updateUI(pageNum); }
-        savePosition(); loadNotes();
+        if (readingMode === 'flip' && pageFlip) {
+            pageFlip.turnToPage(pageNum);
+        } else {
+            const target = document.querySelector(`.page-content-inner[data-page="${pageNum}"]`);
+            if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+            updateUI(pageNum);
+            applyHighlights(scrollContainer);
+        }
+        savePosition();
+        loadNotes();
     }
 
     function savePosition() {
-        if (userId === 0) return;
+        if (userId === 0 || currentPage === 0) return;
         const data = new FormData();
-        data.append('action','save_position'); data.append('book_id',bookId); data.append('chapter',currentPage); data.append('percent',Math.round((currentPage/totalPages)*100));
+        data.append('action','save_position');
+        data.append('book_id',bookId);
+        data.append('chapter',currentPage);
+        data.append('percent',Math.round((currentPage/totalPages)*100));
         navigator.sendBeacon('/reader/reader_ajax.php',data);
     }
 
     function switchMode(mode) {
-        readingMode = mode; localStorage.setItem('reader_mode',mode);
-        if (mode === 'flip') { scrollContainer.style.display = 'none'; flipContainer.style.display = 'flex'; loadFlipPages(currentPage); }
-        else { flipContainer.style.display = 'none'; scrollContainer.style.display = 'block'; const target = document.querySelector(`.page-content-inner[data-page="${currentPage}"]`); if (target) target.scrollIntoView({ behavior:'smooth', block:'start' }); updateUI(currentPage); }
+        readingMode = mode;
+        localStorage.setItem('reader_mode',mode);
+        if (mode === 'flip') {
+            scrollContainer.style.display = 'none';
+            flipContainer.style.display = 'flex';
+            if (!pageFlip) initFlip();
+            if (currentPage > 0) pageFlip.turnToPage(currentPage);
+            else pageFlip.turnToPage(0);
+            updateUI(currentPage);
+            setTimeout(() => applyHighlights(flipWrapper), 100);
+        } else {
+            flipContainer.style.display = 'none';
+            scrollContainer.style.display = 'block';
+            const target = document.querySelector(`.page-content-inner[data-page="${currentPage}"]`);
+            if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+            updateUI(currentPage);
+            applyHighlights(scrollContainer);
+        }
     }
 
-    prevFlipBtn.addEventListener('click',flipToPrev); nextFlipBtn.addEventListener('click',flipToNext);
-
-    document.addEventListener('keydown',function(e) {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); if (readingMode === 'flip') flipToNext(); else scrollContainer.scrollBy({ top: scrollContainer.clientHeight*0.8, behavior:'smooth' }); }
-        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); if (readingMode === 'flip') flipToPrev(); else scrollContainer.scrollBy({ top: -scrollContainer.clientHeight*0.8, behavior:'smooth' }); }
-        else if (e.key === 'Escape') { closeAll(); }
+    // ----- Flip navigation buttons -----
+    document.getElementById('flipPrevBtn').addEventListener('click', function() {
+        if (pageFlip) pageFlip.turnToPrevPage();
+    });
+    document.getElementById('flipNextBtn').addEventListener('click', function() {
+        if (pageFlip) pageFlip.turnToNextPage();
     });
 
+    // ----- Keyboard shortcuts -----
+    document.addEventListener('keydown',function(e) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (readingMode === 'flip' && pageFlip) pageFlip.turnToNextPage();
+            else scrollContainer.scrollBy({ top: scrollContainer.clientHeight*0.8, behavior:'smooth' });
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (readingMode === 'flip' && pageFlip) pageFlip.turnToPrevPage();
+            else scrollContainer.scrollBy({ top: -scrollContainer.clientHeight*0.8, behavior:'smooth' });
+        } else if (e.key === 'Escape') { closeAll(); }
+    });
+
+    // ----- Click/touch navigation -----
     document.getElementById('page-viewport').addEventListener('click',function(e) {
         if (e.target.closest('button') || e.target.closest('a') || e.target.closest('#highlight-tooltip')) return;
-        if (readingMode === 'flip') { const rect = this.getBoundingClientRect(); if (e.clientX - rect.left > rect.width/2) flipToNext(); else flipToPrev(); }
+        if (readingMode === 'flip' && pageFlip) {
+            const rect = this.getBoundingClientRect();
+            if (e.clientX - rect.left > rect.width/2) pageFlip.turnToNextPage();
+            else pageFlip.turnToPrevPage();
+        }
     });
 
     document.addEventListener('touchstart',function(e) { touchStartX = e.changedTouches[0].screenX; });
     document.addEventListener('touchend',function(e) {
-        if (readingMode === 'flip') { const diff = touchStartX - e.changedTouches[0].screenX; if (Math.abs(diff) > 30) { if (diff > 0) flipToNext(); else flipToPrev(); } }
+        if (readingMode === 'flip' && pageFlip) {
+            const diff = touchStartX - e.changedTouches[0].screenX;
+            if (Math.abs(diff) > 30) {
+                if (diff > 0) pageFlip.turnToNextPage();
+                else pageFlip.turnToPrevPage();
+            }
+        }
     });
 
+    // ----- Bookmarks -----
     bookmarkBtn.addEventListener('click',function() {
         if (userId === 0) { alert('Please log in to bookmark.'); return; }
         if (isBookmarked) {
-            const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true); const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); xhr.send(fd);
+            const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
+            const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); xhr.send(fd);
             isBookmarked = false; bookmarkBtn.querySelector('i').className = 'far fa-bookmark'; bookmarkBtn.style.color = '#555';
         } else {
-            const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true); const fd = new FormData(); fd.append('action','add_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); fd.append('offset',0); xhr.send(fd);
+            const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
+            const fd = new FormData(); fd.append('action','add_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); fd.append('offset',0); xhr.send(fd);
             isBookmarked = true; bookmarkBtn.querySelector('i').className = 'fas fa-bookmark'; bookmarkBtn.style.color = 'var(--rose)';
         }
     });
 
     function loadBookmarkStatus() {
         if (userId === 0) return;
-        const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',false); const fd = new FormData(); fd.append('action','list_bookmarks'); fd.append('book_id',bookId); xhr.send(fd);
-        try { const data = JSON.parse(xhr.responseText); if (data.success) { let exists = false; data.bookmarks.forEach(b => { if (b.chapter_index == currentPage) exists = true; }); isBookmarked = exists; bookmarkBtn.querySelector('i').className = exists ? 'fas fa-bookmark' : 'far fa-bookmark'; bookmarkBtn.style.color = exists ? 'var(--rose)' : '#555'; } } catch(e) {}
+        const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',false);
+        const fd = new FormData(); fd.append('action','list_bookmarks'); fd.append('book_id',bookId); xhr.send(fd);
+        try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+                let exists = false;
+                data.bookmarks.forEach(b => { if (b.chapter_index == currentPage) exists = true; });
+                isBookmarked = exists;
+                bookmarkBtn.querySelector('i').className = exists ? 'fas fa-bookmark' : 'far fa-bookmark';
+                bookmarkBtn.style.color = exists ? 'var(--rose)' : '#555';
+            }
+        } catch(e) {}
     }
 
+    // ----- TOC -----
     document.querySelectorAll('.toc-link').forEach(link => {
         link.addEventListener('click',function(e) {
             e.preventDefault();
@@ -858,50 +849,132 @@ html,body { height:100%; width:100%; overflow:hidden; }
         });
     });
 
+    // ----- Settings -----
     document.querySelectorAll('#modeGroup button').forEach(btn => {
-        btn.addEventListener('click',function() { const mode = this.dataset.mode; document.querySelectorAll('#modeGroup button').forEach(b => b.classList.remove('active')); this.classList.add('active'); switchMode(mode); });
-    });
-    document.querySelectorAll('#themeGroup button').forEach(btn => {
-        btn.addEventListener('click',function() { const theme = this.dataset.theme; document.querySelectorAll('#themeGroup button').forEach(b => b.classList.remove('active')); this.classList.add('active'); applyTheme(theme); });
+        btn.addEventListener('click',function() {
+            const mode = this.dataset.mode;
+            document.querySelectorAll('#modeGroup button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            switchMode(mode);
+        });
     });
 
-    const savedTheme = localStorage.getItem('reader_theme') || 'light'; applyTheme(savedTheme);
+    document.querySelectorAll('#themeGroup button').forEach(btn => {
+        btn.addEventListener('click',function() {
+            const theme = this.dataset.theme;
+            document.querySelectorAll('#themeGroup button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            applyTheme(theme);
+        });
+    });
+
+    const savedTheme = localStorage.getItem('reader_theme') || 'light';
+    applyTheme(savedTheme);
     document.querySelector('#themeGroup [data-theme="'+savedTheme+'"]')?.classList.add('active');
 
+    // ----- Font size -----
     document.getElementById('fontSizeSlider').addEventListener('input',function() {
-        const val = parseInt(this.value); document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(el => el.style.fontSize = val+'%'); document.getElementById('fontSizeLabel').textContent = val+'%'; localStorage.setItem('reader_font_size',val);
+        const val = parseInt(this.value);
+        document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontSize = val+'%');
+        document.getElementById('fontSizeLabel').textContent = val+'%';
+        localStorage.setItem('reader_font_size',val);
     });
     window.adjustFontSize = function(amount) {
-        const slider = document.getElementById('fontSizeSlider'); let val = parseInt(slider.value)+amount; val = Math.min(160,Math.max(70,val)); slider.value = val; slider.dispatchEvent(new Event('input'));
+        const slider = document.getElementById('fontSizeSlider');
+        let val = parseInt(slider.value)+amount;
+        val = Math.min(160,Math.max(70,val));
+        slider.value = val;
+        slider.dispatchEvent(new Event('input'));
     };
-    const savedSize = localStorage.getItem('reader_font_size') || 100; document.getElementById('fontSizeSlider').value = savedSize; document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(el => el.style.fontSize = savedSize+'%'); document.getElementById('fontSizeLabel').textContent = savedSize+'%';
+    const savedSize = localStorage.getItem('reader_font_size') || 100;
+    document.getElementById('fontSizeSlider').value = savedSize;
+    document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontSize = savedSize+'%');
+    document.getElementById('fontSizeLabel').textContent = savedSize+'%';
 
+    // ----- Line height -----
     document.getElementById('lineHeightSlider').addEventListener('input',function() {
-        const val = parseInt(this.value); document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(el => el.style.lineHeight = (val/100).toFixed(1)); document.getElementById('lineHeightLabel').textContent = (val/100).toFixed(1); localStorage.setItem('reader_line_height',val);
+        const val = parseInt(this.value);
+        document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.lineHeight = (val/100).toFixed(1));
+        document.getElementById('lineHeightLabel').textContent = (val/100).toFixed(1);
+        localStorage.setItem('reader_line_height',val);
     });
     window.adjustLineHeight = function(amount) {
-        const slider = document.getElementById('lineHeightSlider'); let val = parseInt(slider.value)+amount; val = Math.min(220,Math.max(140,val)); slider.value = val; slider.dispatchEvent(new Event('input'));
+        const slider = document.getElementById('lineHeightSlider');
+        let val = parseInt(slider.value)+amount;
+        val = Math.min(220,Math.max(140,val));
+        slider.value = val;
+        slider.dispatchEvent(new Event('input'));
     };
-    const savedLine = localStorage.getItem('reader_line_height') || 180; document.getElementById('lineHeightSlider').value = savedLine; document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(el => el.style.lineHeight = (savedLine/100).toFixed(1)); document.getElementById('lineHeightLabel').textContent = (savedLine/100).toFixed(1);
+    const savedLine = localStorage.getItem('reader_line_height') || 180;
+    document.getElementById('lineHeightSlider').value = savedLine;
+    document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.lineHeight = (savedLine/100).toFixed(1));
+    document.getElementById('lineHeightLabel').textContent = (savedLine/100).toFixed(1);
 
-    const fontTypeSelect = document.getElementById('fontTypeSelect'); const savedFont = localStorage.getItem('reader_font_family') || 'Inter,sans-serif'; if (savedFont) { fontTypeSelect.value = savedFont; applyFontType(savedFont); }
+    // ----- Font type -----
+    const fontTypeSelect = document.getElementById('fontTypeSelect');
+    const savedFont = localStorage.getItem('reader_font_family') || 'Inter,sans-serif';
+    if (savedFont) { fontTypeSelect.value = savedFont; applyFontType(savedFont); }
     fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); });
-    function applyFontType(font) { document.querySelectorAll('.page-content-inner,.flip-page-inner').forEach(el => el.style.fontFamily = font); }
+    function applyFontType(font) { document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontFamily = font); }
 
+    // ----- Reading speed -----
     document.getElementById('readingSpeedSlider').addEventListener('input',function() {
-        const val = parseInt(this.value); document.getElementById('readingSpeedLabel').textContent = val + ' wpm'; if (userId > 0) { const data = new FormData(); data.append('action','update_reading_speed'); data.append('speed',val); navigator.sendBeacon('/reader/reader_ajax.php',data); } updateUI(currentPage);
+        const val = parseInt(this.value);
+        document.getElementById('readingSpeedLabel').textContent = val + ' wpm';
+        if (userId > 0) {
+            const data = new FormData();
+            data.append('action','update_reading_speed');
+            data.append('speed',val);
+            navigator.sendBeacon('/reader/reader_ajax.php',data);
+        }
+        updateUI(currentPage);
     });
 
+    // ----- Reading status auto-update -----
+    readingStatus.addEventListener('change', function() {
+        if (userId === 0) return;
+        const status = this.value;
+        const data = new FormData();
+        data.append('action','update_reading_status');
+        data.append('book_id',bookId);
+        data.append('status',status);
+        fetch('/reader/reader_ajax.php', { method:'POST', body:data });
+    });
+
+    // ----- Sidebar toggles -----
     sidebarToggle.addEventListener('click',function() { sidebar.classList.toggle('closed'); });
     settingsBtn.addEventListener('click',function() { settingsPanel.classList.toggle('open'); overlay.classList.toggle('active',settingsPanel.classList.contains('open')); });
     tocBtn.addEventListener('click', function() { tocDrawer.classList.toggle('open'); overlay.classList.toggle('active', tocDrawer.classList.contains('open')); });
     tocClose.addEventListener('click', function() { tocDrawer.classList.remove('open'); overlay.classList.remove('active'); });
-    shareBtn.addEventListener('click', function() { openModal('share-modal'); });
+    shareBtn.addEventListener('click', function() {
+        const preview = document.getElementById('shareQuotePreview');
+        const quoteSpan = document.getElementById('shareQuoteText');
+        if (window.currentQuote && window.currentQuote.trim() !== '') {
+            quoteSpan.textContent = window.currentQuote;
+            preview.style.display = 'block';
+        } else {
+            preview.style.display = 'none';
+        }
+        openModal('share-modal');
+    });
     commentsBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to view comments.'); return; } loadComments(); openModal('commentsModal'); });
     errorReportBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to report errors.'); return; } errorPageInput.value = currentPage; errorPageNumSpan.textContent = '(current: ' + currentPage + ')'; openModal('errorModal'); });
     prayerBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to submit prayer requests.'); return; } prayerText.value = ''; openModal('prayerModal'); });
     challengeBtn.addEventListener('click', loadChallenge);
 
+    // ----- Analytics / notes / TTS buttons (redirect) -----
+    if(analyticsBtn) {
+        analyticsBtn.addEventListener('click', function() { window.location.href = '/reader/reader_analytics.php?book_id=' + bookId; });
+    }
+    if(myNotesBtn) {
+        myNotesBtn.addEventListener('click', function() { window.location.href = '/reader/reader_notes.php?book_id=' + bookId; });
+    }
+    if(ttsBtn) {
+        // TTS is handled by reader_tts.php – we just need to trigger it
+        // The TTS toggle button is already bound in reader_tts.php.
+    }
+
+    // ----- Focus mode -----
     function toggleFocus() {
         focusMode = !focusMode;
         document.getElementById('reader-app').classList.toggle('focus-mode', focusMode);
@@ -911,54 +984,33 @@ html,body { height:100%; width:100%; overflow:hidden; }
     }
     focusBtn.addEventListener('click', toggleFocus);
 
+    // ----- Reset progress -----
     resetProgressBtn.addEventListener('click', function() {
         if (userId === 0) { alert('Please log in to reset progress.'); return; }
         if (confirm('Are you sure you want to reset your reading progress for this book? This cannot be undone.')) {
             const data = new FormData(); data.append('action', 'reset_progress'); data.append('book_id', bookId);
             const xhr = new XMLHttpRequest(); xhr.open('POST', '/reader/reader_ajax.php', true);
-            xhr.onload = function() { try { const res = JSON.parse(this.responseText); if (res.success) { alert('✅ Progress has been reset.'); location.reload(); } else { alert('Error: ' + (res.error || 'Could not reset progress.')); } } catch(e) { alert('Server error. Please try again.'); } }; xhr.send(data);
+            xhr.onload = function() {
+                try {
+                    const res = JSON.parse(this.responseText);
+                    if (res.success) { alert('✅ Progress has been reset.'); location.reload(); }
+                    else { alert('Error: ' + (res.error || 'Could not reset progress.')); }
+                } catch(e) { alert('Server error. Please try again.'); }
+            };
+            xhr.send(data);
         }
     });
 
+    // ----- Challenge (handled by reader_challenges.php) -----
     function loadChallenge() {
-        if (userId === 0) { alert('Please log in to view challenges.'); return; }
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', '/reader/reader_ajax.php?action=get_monthly_challenge&user_id=' + userId, true);
-        xhr.onload = function() {
-            try {
-                const data = JSON.parse(this.responseText);
-                if (data.success) {
-                    const widget = document.getElementById('challenge-widget');
-                    const percent = Math.min(100, Math.round((data.progress / data.target) * 100));
-                    widget.innerHTML = `
-                        <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
-                            <h4 style="margin:0;font-size:1.1rem;">📖 Monthly Challenge</h4>
-                            <button class="modal-close" onclick="document.getElementById('challenge-widget').classList.remove('visible'); overlay.classList.remove('active');">&times;</button>
-                        </div>
-                        <p style="margin:4px 0;font-size:0.95rem;color:var(--text-light);">${data.goal}</p>
-                        <div class="challenge-progress"><div class="bar" style="width:${percent}%;"></div></div>
-                        <div style="display:flex;justify-content:space-between;width:100%;font-size:0.9rem;">
-                            <span>${data.progress} / ${data.target} pages</span>
-                            <span>${percent}%</span>
-                        </div>
-                        <button class="note-submit" style="margin-top:8px;" onclick="updateChallenge()">📈 Log Progress</button>
-                    `;
-                    widget.classList.add('visible');
-                    overlay.classList.add('active');
-                } else { alert('No active challenge found. Start one today!'); }
-            } catch (e) { console.error('Challenge error:', e); alert('Could not load challenge.'); }
-        };
-        xhr.send();
-    }
-
-    function updateChallenge() {
-        const pagesRead = prompt('How many pages did you read today?');
-        if (pagesRead && parseInt(pagesRead) > 0) {
-            const data = new FormData(); data.append('action','update_challenge_progress'); data.append('user_id',userId); data.append('pages_read',pagesRead);
-            const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true); xhr.onload = function() { loadChallenge(); alert('✅ Updated!'); }; xhr.send(data);
+        if (window.readerChallenges) {
+            window.readerChallenges.openModal();
+        } else {
+            alert('Challenge system not loaded.');
         }
     }
 
+    // ----- Selection tooltip -----
     function getSelectedText() { const sel = window.getSelection(); return sel.toString().trim(); }
     function getSelectionRange() { const sel = window.getSelection(); return sel.rangeCount > 0 ? sel.getRangeAt(0) : null; }
 
@@ -976,25 +1028,33 @@ html,body { height:100%; width:100%; overflow:hidden; }
     document.addEventListener('click', function(e) {
         const tooltip = document.getElementById('highlight-tooltip');
         if (tooltip && !tooltip.contains(e.target)) { tooltip.classList.remove('visible'); }
-        if (tooltip && !tooltip.contains(e.target) && notesPanel && !notesPanel.contains(e.target)) { tooltip.classList.remove('visible'); notesPanel.style.display = 'none'; overlay.classList.remove('active'); }
+        if (tooltip && !tooltip.contains(e.target) && notesPanel && !notesPanel.contains(e.target)) { tooltip.classList.remove('visible'); notesPanel.classList.remove('visible'); overlay.classList.remove('active'); }
     });
 
-    document.addEventListener('mouseup', function(e) { if (getSelectedText().length > 0) { setTimeout(function() { showSelectionTooltip(e); }, 50); } });
-    document.addEventListener('touchend', function(e) { setTimeout(function() { showSelectionTooltip(e); }, 100); });
+    document.addEventListener('mouseup', function(e) {
+        if (getSelectedText().length > 0) {
+            setTimeout(function() { showSelectionTooltip(e); }, 50);
+        }
+    });
+    document.addEventListener('touchend', function(e) {
+        setTimeout(function() { showSelectionTooltip(e); }, 100);
+    });
 
     function initSelectionTooltip() {
         const tooltip = document.getElementById('highlight-tooltip');
         if (!tooltip) return;
         tooltip.innerHTML = `
             <div>
-                <div style="display:flex;gap:4px;">
+                <div style="display:flex;gap:4px; flex-wrap:wrap;">
                     <button class="highlight-color" data-color="yellow" style="background:#fff9c4;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
                     <button class="highlight-color" data-color="green" style="background:#c8e6c9;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
                     <button class="highlight-color" data-color="blue" style="background:#bbdefb;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
                     <button class="highlight-color" data-color="pink" style="background:#f8bbd0;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
+                    <button class="highlight-color" data-color="purple" style="background:#e8d5f5;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
                 </div>
-                <div style="display:flex;gap:4px;margin-top:4px;">
+                <div style="display:flex;gap:4px;margin-top:4px; flex-wrap:wrap;">
                     <button class="tooltip-action" data-action="copy"><i class="fas fa-copy"></i></button>
+                    <button class="tooltip-action" data-action="underline"><i class="fas fa-underline"></i></button>
                     <button class="tooltip-action" data-action="note"><i class="fas fa-pen"></i></button>
                     <button class="tooltip-action" data-action="share"><i class="fas fa-share-alt"></i></button>
                     <button class="tooltip-action" data-action="question"><i class="fas fa-question-circle"></i></button>
@@ -1014,22 +1074,95 @@ html,body { height:100%; width:100%; overflow:hidden; }
                 range.deleteContents(); range.insertNode(span);
                 tooltip.classList.remove('visible');
                 if (userId > 0) {
-                    const data = new FormData(); data.append('action','add_highlight'); data.append('book_id',bookId); data.append('chapter',currentPage); data.append('text',text); data.append('color',color);
+                    const data = new FormData();
+                    data.append('action','add_highlight');
+                    data.append('book_id',bookId);
+                    data.append('chapter',currentPage);
+                    data.append('text',text);
+                    data.append('color',color);
                     fetch('/reader/reader_ajax.php',{method:'POST',body:data});
                 }
+                if (readingMode === 'flip') applyHighlights(flipWrapper);
+                else applyHighlights(scrollContainer);
             });
         });
         tooltip.querySelectorAll('.tooltip-action').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                const action = this.dataset.action; const text = document.getElementById('highlight-tooltip').dataset.text;
+                const action = this.dataset.action;
+                const text = document.getElementById('highlight-tooltip').dataset.text;
                 switch(action) {
-                    case 'copy': navigator.clipboard.writeText(text).then(()=>{alert('✅ Copied!');}).catch(()=>{document.execCommand('copy');}); break;
+                    case 'copy':
+                        navigator.clipboard.writeText(text).then(()=>{alert('✅ Copied!');}).catch(()=>{document.execCommand('copy');});
+                        break;
+                    case 'underline':
+                        const range = savedRange; if (!range) return;
+                        const span = document.createElement('span');
+                        span.className = 'highlight-underline';
+                        span.textContent = text;
+                        range.deleteContents(); range.insertNode(span);
+                        tooltip.classList.remove('visible');
+                        if(userId > 0) {
+                            const data = new FormData();
+                            data.append('action','add_highlight');
+                            data.append('book_id',bookId);
+                            data.append('chapter',currentPage);
+                            data.append('text',text);
+                            data.append('color','underline');
+                            fetch('/reader/reader_ajax.php',{method:'POST',body:data});
+                        }
+                        break;
                     case 'note':
-                        if (groupId > 0) { const panel = document.getElementById('notes-panel'); panel.classList.add('visible'); overlay.classList.add('active'); loadNotes(); const nt = document.getElementById('noteText'); if (nt) { nt.value = '"' + text + '"\n\n'; nt.focus(); } }
-                        else { alert('You need to be in a reading group to add notes.'); } break;
-                    case 'share': document.getElementById('share-modal').classList.add('visible'); overlay.classList.add('active'); break;
-                    case 'question': if (groupId === 0) { alert('You need to be in a reading group.'); return; } const q = prompt('Ask a question about this text:\n\n"' + text + '"'); if (q) { /* TODO: send question via AJAX */ } break;
-                    case 'react': const picker = document.getElementById('reaction-picker'); if (picker) { picker.style.display = 'flex'; picker.dataset.text = text; } break;
+                        if (groupId > 0) {
+                            const highlightData = new FormData();
+                            highlightData.append('action','add_highlight');
+                            highlightData.append('book_id',bookId);
+                            highlightData.append('chapter',currentPage);
+                            highlightData.append('text',text);
+                            highlightData.append('color','yellow');
+                            fetch('/reader/reader_ajax.php',{method:'POST',body:highlightData})
+                            .then(r => r.json())
+                            .then(res => {
+                                if (res.success && res.id) {
+                                    noteHighlightId.value = res.id;
+                                } else {
+                                    noteHighlightId.value = 0;
+                                }
+                                notesPanel.classList.add('visible');
+                                overlay.classList.add('active');
+                                loadNotes();
+                                noteText.value = '"' + text + '"\n\n';
+                                noteText.focus();
+                            });
+                        } else { alert('You need to be in a reading group to add notes.'); }
+                        break;
+                    case 'share':
+                        window.currentQuote = text;
+                        const preview = document.getElementById('shareQuotePreview');
+                        const quoteSpan = document.getElementById('shareQuoteText');
+                        quoteSpan.textContent = text;
+                        preview.style.display = 'block';
+                        document.getElementById('share-modal').classList.add('visible');
+                        overlay.classList.add('active');
+                        break;
+                    case 'question':
+                        if (groupId === 0) { alert('You need to be in a reading group.'); return; }
+                        const q = prompt('Ask a question about this text:\n\n"' + text + '"');
+                        if (q) {
+                            const qData = new FormData();
+                            qData.append('action','add_reader_note');
+                            qData.append('group_id',groupId);
+                            qData.append('book_id',bookId);
+                            qData.append('chapter_index',currentPage);
+                            qData.append('text','❓ Question: ' + q);
+                            qData.append('is_private',0);
+                            fetch('/reader/reader_ajax.php',{method:'POST',body:qData});
+                            loadNotes();
+                        }
+                        break;
+                    case 'react':
+                        const picker = document.getElementById('reaction-picker');
+                        if (picker) { picker.style.display = 'flex'; picker.dataset.text = text; }
+                        break;
                 }
                 tooltip.classList.remove('visible');
             });
@@ -1037,9 +1170,11 @@ html,body { height:100%; width:100%; overflow:hidden; }
     }
     initSelectionTooltip();
 
+    // ----- Group Notes -----
     function loadNotes() {
         if (groupId === 0) return;
-        const xhr = new XMLHttpRequest(); xhr.open('GET','/reader/reader_ajax.php?action=get_notes&group_id='+groupId+'&book_id='+bookId+'&chapter='+currentPage,true);
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET','/reader/reader_ajax.php?action=get_notes&group_id='+groupId+'&book_id='+bookId+'&chapter='+currentPage,true);
         xhr.onload = function() {
             try {
                 const data = JSON.parse(this.responseText);
@@ -1049,8 +1184,11 @@ html,body { height:100%; width:100%; overflow:hidden; }
                     else {
                         data.notes.forEach(n => {
                             let rh = '';
-                            if (n.reactions && n.reactions.length > 0) { n.reactions.forEach(r => { rh += `<span class="reaction" onclick="reactNote(${n.id}, '${r.reaction_type}')">${r.reaction_type} ${r.count}</span>`; }); }
-                            const canReact = !n.is_private || n.user_id == userId; const isMyNote = n.user_id == userId;
+                            if (n.reactions && n.reactions.length > 0) {
+                                n.reactions.forEach(r => { rh += `<span class="reaction" onclick="reactNote(${n.id}, '${r.reaction_type}')">${r.reaction_type} ${r.count}</span>`; });
+                            }
+                            const canReact = !n.is_private || n.user_id == userId;
+                            const isMyNote = n.user_id == userId;
                             html += `<div class="note-card${n.is_private?' private':''}"><div class="note-author"><div class="note-avatar-placeholder">${(n.display_name||n.username).charAt(0).toUpperCase()}</div><div class="note-author-info"><strong>${n.display_name||n.username}</strong> <small>${timeAgo(n.created_at)}</small>${n.is_private ? '<span class="badge-private">🔒 Private</span>' : ''}</div></div><p class="note-text">${n.text}</p><div class="note-footer"><div class="note-reactions">${rh}${canReact ? `<button style="background:transparent;border:none;cursor:pointer;font-size:1.1rem;" onclick="showReactionPicker(${n.id}, event)">➕</button>` : ''}</div>${isMyNote ? `<button style="background:transparent;border:none;cursor:pointer;color:var(--text-light);" onclick="deleteNote(${n.id})">🗑️</button>` : ''}</div></div>`;
                         });
                     }
@@ -1062,57 +1200,143 @@ html,body { height:100%; width:100%; overflow:hidden; }
     }
 
     function timeAgo(timestamp) {
-        const diff = Date.now() - new Date(timestamp).getTime(); const secs = Math.floor(diff/1000);
-        if (secs<60) return 'just now'; if (secs<3600) return Math.floor(secs/60)+'m ago'; if (secs<86400) return Math.floor(secs/3600)+'h ago'; if (secs<604800) return Math.floor(secs/86400)+'d ago';
+        const diff = Date.now() - new Date(timestamp).getTime();
+        const secs = Math.floor(diff/1000);
+        if (secs<60) return 'just now';
+        if (secs<3600) return Math.floor(secs/60)+'m ago';
+        if (secs<86400) return Math.floor(secs/3600)+'h ago';
+        if (secs<604800) return Math.floor(secs/86400)+'d ago';
         return new Date(timestamp).toLocaleDateString();
     }
 
     resumeBtn.addEventListener('click',function() { resumePosition(); });
-    function resumePosition() { if (lastPage >= 1 && lastPage <= totalPages) { goToPage(lastPage); if (readingMode === 'scroll') { setTimeout(() => { const target = document.querySelector(`.page-content-inner[data-page="${lastPage}"]`); if (target) target.scrollIntoView({ block:'start' }); }, 100); } } }
+    function resumePosition() {
+        if (lastPage >= 1 && lastPage <= totalPages) {
+            goToPage(lastPage);
+            if (readingMode === 'scroll') {
+                setTimeout(() => {
+                    const target = document.querySelector(`.page-content-inner[data-page="${lastPage}"]`);
+                    if (target) target.scrollIntoView({ block:'start' });
+                }, 100);
+            }
+        }
+    }
 
     function share(platform) {
-        const url = window.location.origin+'/reader/reader.php?id='+bookId+'&chapter='+currentPage; const text = '📖 I\'m reading on AngelWrites!';
+        const url = window.location.origin+'/reader/reader.php?id='+bookId+'&chapter='+currentPage;
+        let text = '📖 I\'m reading on AngelWrites!';
+        if (window.currentQuote && window.currentQuote.trim() !== '') {
+            text = '"' + window.currentQuote + '" - Read on AngelWrites!';
+        }
         switch(platform) {
-            case 'facebook': window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url),'_blank'); break;
+            case 'facebook': window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url)+'&quote='+encodeURIComponent(text),'_blank'); break;
             case 'twitter': window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank'); break;
             case 'whatsapp': window.open('https://api.whatsapp.com/send?text='+encodeURIComponent(text+' '+url),'_blank'); break;
-            case 'copy': navigator.clipboard.writeText(url).then(()=>{alert('✅ Copied!');}).catch(()=>{ const ta=document.createElement('textarea'); ta.value=url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert('✅ Copied!'); }); break;
-        } closeShare();
+            case 'copy': navigator.clipboard.writeText(text + ' ' + url).then(()=>{alert('✅ Copied!');}).catch(()=>{ const ta=document.createElement('textarea'); ta.value=text+' '+url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert('✅ Copied!'); }); break;
+        }
+        window.currentQuote = null;
+        closeShare();
     }
     function closeShare() { closeModal('share-modal'); }
 
     notesBtn.addEventListener('click', function() {
         if (groupId === 0) { alert('You are not in a reading group for this book.'); return; }
         const panel = document.getElementById('notes-panel');
-        if (!panel.classList.contains('visible')) { panel.classList.add('visible'); overlay.classList.add('active'); loadNotes(); }
-        else { panel.classList.remove('visible'); overlay.classList.remove('active'); }
+        if (!panel.classList.contains('visible')) {
+            panel.classList.add('visible');
+            overlay.classList.add('active');
+            loadNotes();
+        } else {
+            panel.classList.remove('visible');
+            overlay.classList.remove('active');
+        }
     });
-    document.getElementById('notesClose').addEventListener('click', function() { document.getElementById('notes-panel').classList.remove('visible'); overlay.classList.remove('active'); });
+    document.getElementById('notesClose').addEventListener('click', function() {
+        document.getElementById('notes-panel').classList.remove('visible');
+        overlay.classList.remove('active');
+    });
 
-    function toggleNoteForm() { const form = document.getElementById('noteForm'); form.style.display = form.style.display === 'none' ? 'block' : 'none'; if (form.style.display === 'block') { document.getElementById('noteText').focus(); } }
-    function submitNote() {
-        const text = document.getElementById('noteText').value.trim(); const isPrivate = document.getElementById('notePrivate').checked ? 1 : 0;
-        if (!text) return alert('Please enter a note.');
-        const data = new FormData(); data.append('action','add_reader_note'); data.append('group_id',groupId); data.append('book_id',bookId); data.append('chapter_index',currentPage); data.append('text',text); data.append('is_private',isPrivate);
-        const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() {
-            try { const d = JSON.parse(this.responseText); if (d.success) { loadNotes(); document.getElementById('noteText').value = ''; document.getElementById('notePrivate').checked = false; document.getElementById('noteForm').style.display = 'none'; } else { alert('Error: ' + d.error); } } catch(e) { alert('Error submitting note.'); }
-        }; xhr.send(data);
+    function toggleNoteForm() {
+        const form = document.getElementById('noteForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        if (form.style.display === 'block') { document.getElementById('noteText').focus(); }
     }
-    function deleteNote(noteId) { if (!confirm('Delete this note?')) return; const data = new FormData(); data.append('action','delete_reader_note'); data.append('note_id',noteId); const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true); xhr.onload = function() { loadNotes(); }; xhr.send(data); }
-    function reactNote(noteId, reaction) { const data = new FormData(); data.append('action','toggle_note_reaction'); data.append('note_id',noteId); data.append('reaction_type',reaction); const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true); xhr.onload = function() { loadNotes(); document.getElementById('reaction-picker').style.display = 'none'; }; xhr.send(data); }
-    function showReactionPicker(noteId, event) { currentNoteId = noteId; const picker = document.getElementById('reaction-picker'); const btn = event.target.closest('button'); const rect = btn.getBoundingClientRect(); picker.style.top = (rect.top - 50) + 'px'; picker.style.left = (rect.left) + 'px'; picker.style.display = 'flex'; }
+    function submitNote() {
+        const text = document.getElementById('noteText').value.trim();
+        const isPrivate = document.getElementById('notePrivate').checked ? 1 : 0;
+        const highlightId = document.getElementById('noteHighlightId').value;
+        if (!text) return alert('Please enter a note.');
+        const data = new FormData();
+        data.append('action','add_reader_note');
+        data.append('group_id',groupId);
+        data.append('book_id',bookId);
+        data.append('chapter_index',currentPage);
+        data.append('text',text);
+        data.append('is_private',isPrivate);
+        if (highlightId > 0) data.append('highlight_id', highlightId);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.onload = function() {
+            try {
+                const d = JSON.parse(this.responseText);
+                if (d.success) {
+                    loadNotes();
+                    document.getElementById('noteText').value = '';
+                    document.getElementById('notePrivate').checked = false;
+                    document.getElementById('noteHighlightId').value = 0;
+                    document.getElementById('noteForm').style.display = 'none';
+                } else { alert('Error: ' + d.error); }
+            } catch(e) { alert('Error submitting note.'); }
+        };
+        xhr.send(data);
+    }
+    function deleteNote(noteId) {
+        if (!confirm('Delete this note?')) return;
+        const data = new FormData();
+        data.append('action','delete_reader_note');
+        data.append('note_id',noteId);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.onload = function() { loadNotes(); };
+        xhr.send(data);
+    }
+    function reactNote(noteId, reaction) {
+        const data = new FormData();
+        data.append('action','toggle_note_reaction');
+        data.append('note_id',noteId);
+        data.append('reaction_type',reaction);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.onload = function() { loadNotes(); document.getElementById('reaction-picker').style.display = 'none'; };
+        xhr.send(data);
+    }
+    function showReactionPicker(noteId, event) {
+        currentNoteId = noteId;
+        const picker = document.getElementById('reaction-picker');
+        const btn = event.target.closest('button');
+        const rect = btn.getBoundingClientRect();
+        picker.style.top = (rect.top - 50) + 'px';
+        picker.style.left = (rect.left) + 'px';
+        picker.style.display = 'flex';
+    }
 
+    // ----- Comments -----
     function loadComments() {
         if (userId === 0) return;
-        const formData = new FormData(); formData.append('action','get_book_comments'); formData.append('book_id',bookId); formData.append('page_num',currentPage);
+        const formData = new FormData();
+        formData.append('action','get_book_comments');
+        formData.append('book_id',bookId);
+        formData.append('page_num',currentPage);
         fetch('/reader/reader_ajax.php',{method:'POST',body:formData}).then(r=>r.json()).then(data=>{
             if (data.success) {
-                const list = document.getElementById('commentList'); list.innerHTML = '';
+                const list = document.getElementById('commentList');
+                list.innerHTML = '';
                 if (data.comments.length === 0) list.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px;">No comments on this page yet.</p>';
                 else {
                     data.comments.forEach(com=>{
-                        const isAdmin = com.is_admin_reply == 1; const authorName = isAdmin ? 'Angella (Admin)' : com.author_name; const badge = isAdmin ? '<span class="admin-badge">🛡️ Admin</span>' : '';
+                        const isAdmin = com.is_admin_reply == 1;
+                        const authorName = isAdmin ? 'Angella (Admin)' : com.author_name;
+                        const badge = isAdmin ? '<span class="admin-badge">🛡️ Admin</span>' : '';
                         list.innerHTML += `<div class="comment-item ${isAdmin?'admin':''}"><div class="comment-author"><i class="fas fa-user-circle"></i> ${authorName} ${badge}</div><div style="font-size:0.85rem;color:var(--text-light);">${timeAgo(com.created_at)}</div><div style="margin-top:4px;">${com.comment}</div></div>`;
                     });
                 }
@@ -1120,103 +1344,215 @@ html,body { height:100%; width:100%; overflow:hidden; }
         });
     }
     function submitComment() {
-        const text = document.getElementById('commentInput').value.trim(); if (!text) return alert('Please write a comment.');
-        const formData = new FormData(); formData.append('action','add_book_comment'); formData.append('book_id',bookId); formData.append('page_num',currentPage); formData.append('comment',text);
+        const text = document.getElementById('commentInput').value.trim();
+        if (!text) return alert('Please write a comment.');
+        const formData = new FormData();
+        formData.append('action','add_book_comment');
+        formData.append('book_id',bookId);
+        formData.append('page_num',currentPage);
+        formData.append('comment',text);
         fetch('/reader/reader_ajax.php',{method:'POST',body:formData}).then(r=>r.json()).then(data=>{
             if (data.success) { document.getElementById('commentInput').value = ''; loadComments(); } else { alert('Error: ' + (data.error || 'Failed to post comment.')); }
         });
     }
-    function closeComments() { closeModal('commentsModal'); }
 
-    function openModal(id) { const modal = document.getElementById(id); if (modal) { modal.style.display = ''; modal.classList.add('visible'); overlay.classList.add('active'); } }
-    function closeModal(id) { const modal = document.getElementById(id); if (modal) { modal.classList.remove('visible'); overlay.classList.remove('active'); } }
+    // ----- Modal utilities -----
+    function openModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) { modal.style.display = ''; modal.classList.add('visible'); overlay.classList.add('active'); }
+    }
+    function closeModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) { modal.classList.remove('visible'); overlay.classList.remove('active'); }
+    }
     function closeComments() { closeModal('commentsModal'); }
     function closePrayerModal() { closeModal('prayerModal'); }
-    function closeSearch() { closeModal('search-bar'); }
+    function closeSearch() { searchBar.classList.remove('visible'); overlay.classList.remove('active'); searchInput.value = ''; searchResults.innerHTML = ''; }
     function closeShare() { closeModal('share-modal'); }
     function closeErrorModal() { closeModal('errorModal'); }
     function closeSettings() { settingsPanel.classList.remove('open'); overlay.classList.remove('active'); }
 
     function closeAll() {
-        settingsPanel.classList.remove('open'); tocDrawer.classList.remove('open');
-        closeModal('share-modal'); closeModal('commentsModal'); closeModal('errorModal'); closeModal('prayerModal'); closeModal('notes-panel');
-        document.getElementById('challenge-widget').classList.remove('visible'); document.getElementById('search-bar').classList.remove('visible'); document.getElementById('reaction-picker').style.display = 'none';
+        settingsPanel.classList.remove('open');
+        tocDrawer.classList.remove('open');
+        closeModal('share-modal'); closeModal('commentsModal'); closeModal('errorModal'); closeModal('prayerModal');
+        document.getElementById('notes-panel').classList.remove('visible');
+        document.getElementById('challenge-widget').classList.remove('visible');
+        document.getElementById('search-bar').classList.remove('visible');
+        document.getElementById('reaction-picker').style.display = 'none';
+        overlay.classList.remove('active');
         if (focusMode) { toggleFocus(); }
     }
 
     backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
 
-    function openErrorModal() { errorReportBtn.click(); }
     function submitError() {
-        const page = parseInt(errorPageInput.value) || currentPage; const desc = errorText.value.trim(); const correction = errorCorrection.value.trim();
+        const page = parseInt(errorPageInput.value) || currentPage;
+        const desc = errorText.value.trim();
         if (!desc) { alert('Please describe the error.'); return; }
-        const data = new FormData(); data.append('action','submit_error_report'); data.append('book_id',bookId); data.append('page_num',page); data.append('description',desc); data.append('correction',correction);
-        const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() { try { const res = JSON.parse(this.responseText); if (res.success) { alert('✅ Error report submitted. Thank you!'); closeErrorModal(); } else { alert('Error: ' + (res.error || 'Could not submit report.')); } } catch(e) { alert('Server error. Please try again.'); } }; xhr.send(data);
+        const data = new FormData();
+        data.append('action','submit_error_report');
+        data.append('book_id',bookId);
+        data.append('page_num',page);
+        data.append('description',desc);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.onload = function() {
+            try {
+                const res = JSON.parse(this.responseText);
+                if (res.success) { alert('✅ Error report submitted. Thank you!'); closeErrorModal(); } else { alert('Error: ' + (res.error || 'Could not submit report.')); }
+            } catch(e) { alert('Server error. Please try again.'); }
+        };
+        xhr.send(data);
     }
 
-    function openPrayerModal() { prayerBtn.click(); }
     function submitPrayer() {
-        const text = prayerText.value.trim(); if (!text) { alert('Please write your prayer request.'); return; }
-        const data = new FormData(); data.append('action','submit_prayer_request'); data.append('book_id',bookId); data.append('text',text);
-        const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
-        xhr.onload = function() { try { const res = JSON.parse(this.responseText); if (res.success) { alert('✅ Prayer request submitted. We will pray for you.'); closePrayerModal(); } else { alert('Error: ' + (res.error || 'Could not submit prayer request.')); } } catch(e) { alert('Server error. Please try again.'); } }; xhr.send(data);
+        const text = prayerText.value.trim();
+        if (!text) { alert('Please write your prayer request.'); return; }
+        const data = new FormData();
+        data.append('action','submit_prayer_request');
+        data.append('book_id',bookId);
+        data.append('text',text);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST','/reader/reader_ajax.php',true);
+        xhr.onload = function() {
+            try {
+                const res = JSON.parse(this.responseText);
+                if (res.success) { alert('✅ Prayer request submitted. We will pray for you.'); closePrayerModal(); } else { alert('Error: ' + (res.error || 'Could not submit prayer request.')); }
+            } catch(e) { alert('Server error. Please try again.'); }
+        };
+        xhr.send(data);
     }
 
+    // ----- Export highlights -----
     exportHighlightsBtn.addEventListener('click', function() {
         if (userId === 0) { alert('Please log in to export your highlights.'); return; }
-        const xhr = new XMLHttpRequest(); xhr.open('GET','/reader/reader_ajax.php?action=get_highlights&book_id=' + bookId, true);
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET','/reader/reader_ajax.php?action=get_highlights&book_id=' + bookId, true);
         xhr.onload = function() {
             try {
                 const data = JSON.parse(this.responseText);
                 if (data.success && data.highlights.length > 0) {
-                    const exportData = { book: '<?php echo addslashes($book['title']); ?>', highlights: data.highlights.map(h => ({ chapter: h.chapter_index, text: h.text, color: h.color, note: h.note || '', created_at: h.created_at })) };
+                    const exportData = {
+                        book: '<?php echo addslashes($book['title']); ?>',
+                        highlights: data.highlights.map(h => ({
+                            chapter: h.chapter_index,
+                            text: h.text,
+                            color: h.color,
+                            note: h.note || '',
+                            created_at: h.created_at
+                        }))
+                    };
                     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'highlights_' + bookId + '.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); alert('✅ Highlights exported!');
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'highlights_' + bookId + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    alert('✅ Highlights exported!');
                 } else { alert('No highlights to export.'); }
             } catch(e) { alert('Error exporting highlights: ' + e.message); }
-        }; xhr.send();
+        };
+        xhr.send();
     });
 
-    searchBtn.addEventListener('click', toggleSearch);
-    function toggleSearch() {
+    // ----- Search -----
+    searchBtn.addEventListener('click', function() {
         searchBar.classList.toggle('visible');
-        if (searchBar.classList.contains('visible')) { searchInput.focus(); searchInput.value = ''; searchResults.innerHTML = ''; overlay.classList.add('active'); }
-        else { overlay.classList.remove('active'); }
-    }
-    function closeSearch() { searchBar.classList.remove('visible'); overlay.classList.remove('active'); searchInput.value = ''; searchResults.innerHTML = ''; }
+        if (searchBar.classList.contains('visible')) {
+            searchInput.focus(); searchInput.value = '';
+            searchResults.innerHTML = '';
+            overlay.classList.add('active');
+        } else { overlay.classList.remove('active'); }
+    });
 
     searchInput.addEventListener('input', function() {
-        const query = this.value.trim().toLowerCase(); if (query.length < 2) { searchResults.innerHTML = ''; return; }
+        const query = this.value.trim().toLowerCase();
+        if (query.length < 2) { searchResults.innerHTML = ''; return; }
         let results = [];
         pages.forEach((html, idx) => {
             const stripped = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
             if (stripped.includes(query)) {
-                const pageNum = idx + 1; const snippet = stripped.substring(Math.max(0, stripped.indexOf(query) - 60), Math.min(stripped.length, stripped.indexOf(query) + 120));
+                const pageNum = idx + 1;
+                const snippet = stripped.substring(Math.max(0, stripped.indexOf(query) - 60), Math.min(stripped.length, stripped.indexOf(query) + 120));
                 results.push({ page: pageNum, snippet: snippet.replace(query, '<strong>' + query + '</strong>') });
             }
         });
         if (results.length === 0) searchResults.innerHTML = '<p style="padding:8px;color:var(--text-light);">No results found.</p>';
-        else { let html = '<div style="font-weight:600;font-size:0.8rem;padding:4px 8px;">' + results.length + ' result(s)</div>'; results.forEach(r => { html += `<div class="search-result" onclick="goToPage(${r.page}); closeSearch();">Page ${r.page} … ${r.snippet}</div>`; }); searchResults.innerHTML = html; }
+        else {
+            let html = '<div style="font-weight:600;font-size:0.8rem;padding:4px 8px;">' + results.length + ' result(s)</div>';
+            results.forEach(r => { html += `<div class="search-result" onclick="goToPage(${r.page}); closeSearch();">Page ${r.page} … ${r.snippet}</div>`; });
+            searchResults.innerHTML = html;
+        }
     });
 
-    shareBtn.addEventListener('click', function() { openModal('share-modal'); });
+    // ----- Overlay closes all -----
     overlay.addEventListener('click', closeAll);
 
-    window.adjustFontSize = adjustFontSize; window.adjustLineHeight = adjustLineHeight; window.goToPage = goToPage; window.resumePosition = resumePosition; window.closeAll = closeAll;
-    window.share = share; window.closeShare = closeShare; window.loadChallenge = loadChallenge; window.updateChallenge = updateChallenge;
-    window.toggleNoteForm = toggleNoteForm; window.submitNote = submitNote; window.deleteNote = deleteNote; window.reactNote = reactNote; window.showReactionPicker = showReactionPicker;
-    window.loadComments = loadComments; window.submitComment = submitComment; window.closeComments = closeComments; window.openErrorModal = openErrorModal; window.closeErrorModal = closeErrorModal; window.submitError = submitError;
-    window.openPrayerModal = openPrayerModal; window.closePrayerModal = closePrayerModal; window.submitPrayer = submitPrayer; window.toggleSearch = toggleSearch; window.closeSearch = closeSearch;
-    window.openModal = openModal; window.closeModal = closeModal; window.toggleFocus = toggleFocus;
+    // ----- Expose globals -----
+    window.adjustFontSize = adjustFontSize;
+    window.adjustLineHeight = adjustLineHeight;
+    window.goToPage = goToPage;
+    window.resumePosition = resumePosition;
+    window.closeAll = closeAll;
+    window.share = share;
+    window.closeShare = closeShare;
+    window.loadChallenge = loadChallenge;
+    window.toggleNoteForm = toggleNoteForm;
+    window.submitNote = submitNote;
+    window.deleteNote = deleteNote;
+    window.reactNote = reactNote;
+    window.showReactionPicker = showReactionPicker;
+    window.loadComments = loadComments;
+    window.submitComment = submitComment;
+    window.closeComments = closeComments;
+    window.submitError = submitError;
+    window.submitPrayer = submitPrayer;
+    window.closeSearch = closeSearch;
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+    window.toggleFocus = toggleFocus;
 
-    totalPagesEl.textContent = totalPages; const savedMode = localStorage.getItem('reader_mode');
-    if (savedMode === 'flip') { readingMode = 'flip'; document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active'); document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active'); switchMode('flip'); }
-    else if (savedMode === 'scroll') { readingMode = 'scroll'; document.querySelector('#modeGroup [data-mode="flip"]').classList.remove('active'); document.querySelector('#modeGroup [data-mode="scroll"]').classList.add('active'); switchMode('scroll'); }
-    else { readingMode = 'flip'; localStorage.setItem('reader_mode', 'flip'); document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active'); document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active'); switchMode('flip'); }
-    goToPage(currentPage); loadBookmarkStatus();
-    if (userId > 0) { const data = new FormData(); data.append('action','start_session'); data.append('book_id',bookId); navigator.sendBeacon('/reader/reader_ajax.php',data); loadChallenge(); }
-    window.addEventListener('beforeunload',function() { if (userId > 0) { const data = new FormData(); data.append('action','end_session'); data.append('book_id',bookId); navigator.sendBeacon('/reader/reader_ajax.php',data); } });
+    // ----- Initialization -----
+    totalPagesEl.textContent = totalPages;
+    const savedMode = localStorage.getItem('reader_mode');
+    if (savedMode === 'flip') {
+        readingMode = 'flip';
+        document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active');
+        document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active');
+        switchMode('flip');
+    } else if (savedMode === 'scroll') {
+        readingMode = 'scroll';
+        document.querySelector('#modeGroup [data-mode="flip"]').classList.remove('active');
+        document.querySelector('#modeGroup [data-mode="scroll"]').classList.add('active');
+        switchMode('scroll');
+    } else {
+        readingMode = 'flip';
+        localStorage.setItem('reader_mode', 'flip');
+        document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active');
+        document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active');
+        switchMode('flip');
+    }
+    goToPage(currentPage);
+    loadBookmarkStatus();
+    if (userId > 0) {
+        const data = new FormData();
+        data.append('action','start_session');
+        data.append('book_id',bookId);
+        navigator.sendBeacon('/reader/reader_ajax.php',data);
+        loadChallenge();
+    }
+    window.addEventListener('beforeunload',function() {
+        if (userId > 0) {
+            const data = new FormData();
+            data.append('action','end_session');
+            data.append('book_id',bookId);
+            navigator.sendBeacon('/reader/reader_ajax.php',data);
+        }
+    });
 })();
 </script>
 </body>

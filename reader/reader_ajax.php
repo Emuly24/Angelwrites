@@ -1,21 +1,28 @@
 <?php
 // ============================================================
-//  READER_AJAX.PHP – Complete SQLite Version
+//  READER_AJAX.PHP – Complete AJAX Backend for the Reader
 //  All endpoints required by reader.php (fixed for compatibility)
 // ============================================================
 
-require_once '../includes/config.php';
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
-require_once '../includes/mail_helper.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/mail_helper.php';
+require_once __DIR__ . '/../includes/reader_functions.php'; // for time_ago, updateUserStats, etc.
 
 if (!isLoggedIn()) {
+    http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Not logged in.']);
     exit;
 }
 
 $user_id = $_SESSION['user_id'];
 $action = isset($_POST['action']) ? $_POST['action'] : '';
+
+// Allow GET for certain actions
+if (empty($action) && isset($_GET['action'])) {
+    $action = $_GET['action'];
+}
 
 if (empty($action)) {
     echo json_encode(['success' => false, 'error' => 'No action specified.']);
@@ -50,14 +57,29 @@ if ($action === 'save_position') {
         $stmt->execute([$user_id, $book_id, $offset, $chapter, $percent]);
     }
 
+    // Update streak and gamification
     updateReadingStreak($user_id);
     updateReadingSessionDuration($user_id, $book_id);
 
+    // Check milestones
     if ($percent >= 50 && $percent < 100) {
         checkMilestone($user_id, $book_id, 50);
     }
     if ($percent >= 100) {
         checkMilestone($user_id, $book_id, 100);
+        // Award XP for finishing the book
+        if (function_exists('updateUserStats')) {
+            updateUserStats($user_id, $book_id, 'book_finish', 1);
+        }
+    }
+
+    // Update circle position if member
+    $stmt = $db->prepare("SELECT id FROM reading_circles WHERE book_id = ? AND user_id = ?");
+    $stmt->execute([$book_id, $user_id]);
+    if ($stmt->fetch()) {
+        $position = 'Page ' . $chapter;
+        $stmt = $db->prepare("UPDATE reading_circles SET last_read_position = ?, updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND user_id = ?");
+        $stmt->execute([$position, $book_id, $user_id]);
     }
 
     echo json_encode(['success' => true]);
@@ -135,6 +157,12 @@ if ($action === 'add_highlight') {
 
     $stmt = $db->prepare("INSERT INTO highlights (user_id, book_id, chapter_index, paragraph_index, text, color, note) VALUES (?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$user_id, $book_id, $chapter, $paragraph, $text, $color, $note]);
+
+    // Award XP for adding a highlight
+    if (function_exists('updateUserStats')) {
+        updateUserStats($user_id, $book_id, 'highlight', 1);
+    }
+
     echo json_encode(['success' => true, 'highlight_id' => $db->lastInsertId()]);
     exit;
 }
@@ -157,10 +185,25 @@ if ($action === 'list_highlights') {
 }
 
 if ($action === 'get_highlights') {
-    $book_id = (int)$_POST['book_id'];
-    $chapter = isset($_POST['chapter']) ? (int)$_POST['chapter'] : 0;
-    $stmt = $db->prepare("SELECT paragraph_index, text, color, note FROM highlights WHERE user_id = ? AND book_id = ? AND chapter_index = ?");
-    $stmt->execute([$user_id, $book_id, $chapter]);
+    // Support both GET and POST (reader.php export uses GET)
+    $book_id = isset($_GET['book_id']) ? (int)$_GET['book_id'] : (isset($_POST['book_id']) ? (int)$_POST['book_id'] : 0);
+    $chapter = isset($_GET['chapter']) ? (int)$_GET['chapter'] : (isset($_POST['chapter']) ? (int)$_POST['chapter'] : 0);
+
+    if ($book_id === 0) {
+        echo json_encode(['success' => false, 'error' => 'Book ID required.']);
+        exit;
+    }
+
+    $sql = "SELECT chapter_index, paragraph_index, text, color, note FROM highlights WHERE user_id = ? AND book_id = ?";
+    $params = [$user_id, $book_id];
+    if ($chapter > 0) {
+        $sql .= " AND chapter_index = ?";
+        $params[] = $chapter;
+    }
+    $sql .= " ORDER BY chapter_index, created_at";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
     $highlights = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'highlights' => $highlights]);
     exit;
@@ -259,7 +302,7 @@ if ($action === 'report_typo') {
 }
 
 // ================================================================
-// 7. GOALS
+// 7. GOALS (legacy, may be used)
 // ================================================================
 if ($action === 'update_goal') {
     $goal_id = (int)$_POST['goal_id'];
@@ -330,7 +373,7 @@ if ($action === 'get_stats') {
 // 9. MONTHLY CHALLENGE
 // ================================================================
 if ($action === 'get_monthly_challenge') {
-    // Support both POST and GET (reader.php uses GET)
+    // Support both POST and GET
     $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : (isset($_GET['user_id']) ? (int)$_GET['user_id'] : $user_id);
     $month = date('m');
     $year = date('Y');
@@ -382,8 +425,13 @@ if ($action === 'update_challenge_progress') {
     $challenge = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($challenge && $challenge['progress'] >= $challenge['target']) {
+        $stmt = $db->prepare("UPDATE reading_challenges SET completed = 1 WHERE user_id = ? AND month = ? AND year = ?");
+        $stmt->execute([$user_id, $month, $year]);
         $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
         $stmt->execute([$user_id, 'monthly_challenge_completed']);
+        if (function_exists('updateUserStats')) {
+            updateUserStats($user_id, 0, 'challenge', 1);
+        }
     }
 
     echo json_encode(['success' => true]);
@@ -438,6 +486,7 @@ if ($action === 'add_reader_note') {
     $chapter = (int)$_POST['chapter_index'];
     $text = trim($_POST['text']);
     $is_private = isset($_POST['is_private']) ? 1 : 0;
+    $highlight_id = isset($_POST['highlight_id']) ? (int)$_POST['highlight_id'] : null;
 
     if (empty($text)) {
         echo json_encode(['success' => false, 'error' => 'Note text cannot be empty.']);
@@ -453,10 +502,15 @@ if ($action === 'add_reader_note') {
     }
 
     $stmt = $db->prepare("
-        INSERT INTO group_notes (group_id, user_id, book_id, chapter_index, text, is_private)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO group_notes (group_id, user_id, book_id, chapter_index, text, is_private, highlight_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$group_id, $user_id, $book_id, $chapter, $text, $is_private]);
+    $stmt->execute([$group_id, $user_id, $book_id, $chapter, $text, $is_private, $highlight_id]);
+
+    // Award XP for adding a note
+    if (function_exists('updateUserStats')) {
+        updateUserStats($user_id, $book_id, 'note', 1);
+    }
 
     echo json_encode(['success' => true]);
     exit;
@@ -547,7 +601,7 @@ if ($action === 'reset_progress') {
 // ================================================================
 // 12. SET READING STATUS
 // ================================================================
-if ($action === 'set_reading_status') {
+if ($action === 'set_reading_status' || $action === 'update_reading_status') {
     $book_id = (int)$_POST['book_id'];
     $status = $_POST['status'];
     $allowed = ['not_started', 'currently_reading', 'finished', 'want_to_read', 'dropped'];
@@ -612,17 +666,16 @@ if ($action === 'add_book_comment') {
 
     $stmt = $db->prepare("INSERT INTO book_comments (user_id, book_id, page_num, comment) VALUES (?, ?, ?, ?)");
     $stmt->execute([$user_id, $book_id, $page_num, $comment]);
-
     echo json_encode(['success' => true]);
     exit;
 }
 
 // ================================================================
-// 14. PRAYER REQUEST (fixed: accepts 'text' not 'request_text')
+// 14. PRAYER REQUEST
 // ================================================================
 if ($action === 'submit_prayer_request') {
     $book_id = (int)$_POST['book_id'];
-    $text = trim($_POST['text']); // reader.php sends 'text'
+    $text = trim($_POST['text']);
 
     if (empty($text)) {
         echo json_encode(['success' => false, 'error' => 'Prayer request cannot be empty.']);
@@ -653,12 +706,12 @@ if ($action === 'submit_prayer_request') {
 }
 
 // ================================================================
-// 15. BOOK ERROR REPORT (new endpoint: matches reader.php)
+// 15. BOOK ERROR REPORT
 // ================================================================
 if ($action === 'submit_error_report') {
     $book_id = (int)$_POST['book_id'];
     $page_num = (int)$_POST['page_num'];
-    $description = trim($_POST['description']);   // reader.php sends 'description'
+    $description = trim($_POST['description']);
     $correction = isset($_POST['correction']) ? trim($_POST['correction']) : '';
 
     if (empty($description)) {
@@ -688,7 +741,7 @@ if ($action === 'submit_error_report') {
     exit;
 }
 
-// Keep old endpoint for backward compatibility (if any)
+// Keep old endpoint for backward compatibility
 if ($action === 'report_book_error') {
     $book_id = (int)$_POST['book_id'];
     $page_num = (int)$_POST['page_num'];
@@ -764,6 +817,10 @@ function updateReadingStreak($user_id) {
         if ($current === 30) {
             $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
             $stmt->execute([$user_id, 'streak_30_days']);
+        }
+        if ($current === 365) {
+            $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
+            $stmt->execute([$user_id, 'streak_365_days']);
         }
     } else {
         $current = 1;
