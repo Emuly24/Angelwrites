@@ -6,7 +6,7 @@ require_once '../includes/auth.php';
 redirectIfNotAdmin();
 
 // ============================================================
-// 1. FETCH STATISTICS (all wrapped in try-catch)
+// 1. FETCH STATISTICS
 // ============================================================
 $stats = [];
 try { $stmt = $db->query("SELECT COUNT(*) FROM users"); $stats['total_users'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats users: " . $e->getMessage()); }
@@ -60,19 +60,23 @@ $pageTitle = 'Admin Dashboard';
 <?php require_once '../includes/header.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- ============================================================
+      ABSOLUTE LAYOUT BREAKER FOR SCROLLING
+      Forces the browser to scroll regardless of the outer wrapper.
+     ============================================================ -->
 <style>
+/* Override parent fixed heights safely */
+html { height: auto !important; min-height: 100vh !important; overflow-y: scroll !important; }
+body { height: auto !important; min-height: 100vh !important; overflow-y: auto !important; position: relative !important; }
+#wrapper, #page-wrapper, .wrapper, .container, .page-container, .main-content { height: auto !important; min-height: 100vh !important; overflow: visible !important; }
+#reader-app { height: auto !important; min-height: 100vh !important; }
+
 :root {
     --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9;
     --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
     --shadow: 0 4px 20px rgba(0,0,0,0.04);
 }
-body { 
-    background: var(--bg); 
-    font-family: 'Inter', sans-serif; 
-    min-height: 100vh; 
-    overflow-y: auto; 
-    color: #333; 
-}
+body { background: var(--bg); font-family: 'Inter', sans-serif; color: #333; }
 body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
 body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
@@ -464,5 +468,17 @@ function htmlspecialchars(str) {
         return m;
     });
 }
+
+// ============================================================
+// FORCE SCROLL UNLOCK (Prevents the page from cutting off)
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    document.documentElement.style.overflowY = 'scroll';
+    document.body.style.overflowY = 'auto';
+});
+window.addEventListener('load', function() {
+    document.documentElement.style.overflowY = 'scroll';
+    document.body.style.overflowY = 'auto';
+});
 </script>
 <?php require_once '../includes/footer.php'; ?>
