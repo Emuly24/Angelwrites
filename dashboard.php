@@ -14,7 +14,7 @@ if (isAdmin()) {
 $user_id = $_SESSION['user_id'];
 
 // ============================================================
-// 1. CSRF PROTECTION HELPER
+// 1. HELPER FUNCTIONS (CSRF, WebP, Rate Limit)
 // ============================================================
 if (!function_exists('generate_csrf_token')) {
     function generate_csrf_token() {
@@ -27,10 +27,6 @@ if (!function_exists('generate_csrf_token')) {
         return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
     }
 }
-
-// ============================================================
-// 2. WEBP IMAGE HELPER
-// ============================================================
 if (!function_exists('get_image_url')) {
     function get_image_url($path) {
         if (empty($path)) return '';
@@ -48,10 +44,6 @@ if (!function_exists('get_image_url')) {
         return $base . '/' . ltrim($path, '/');
     }
 }
-
-// ============================================================
-// 3. RATE LIMITING HELPER
-// ============================================================
 if (!function_exists('rate_limit')) {
     function rate_limit($key, $limit = 10, $window = 60) {
         $ip = $_SERVER['REMOTE_ADDR'];
@@ -80,14 +72,14 @@ if (!function_exists('rate_limit')) {
 }
 
 // ============================================================
-// 4. FETCH USER DATA
+// 2. FETCH USER DATA
 // ============================================================
 $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // ============================================================
-// 5. ADVANCED STATS
+// 3. ADVANCED STATS
 // ============================================================
 // Books finished
 $stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'finished'");
@@ -119,26 +111,26 @@ $stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $sessions_booked = $stmt->fetchColumn();
 
-// ===== READING STREAK =====
+// Reading streak
 $stmt = $db->prepare("SELECT current_streak, longest_streak FROM reading_streaks WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $streak = $stmt->fetch(PDO::FETCH_ASSOC);
 $current_streak = $streak['current_streak'] ?? 0;
 $longest_streak = $streak['longest_streak'] ?? 0;
 
-// ===== TOTAL READING TIME =====
+// Total reading time
 $stmt = $db->prepare("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions WHERE user_id = ? AND end_time IS NOT NULL");
 $stmt->execute([$user_id]);
 $total_seconds = $stmt->fetchColumn() ?? 0;
 $total_hours = floor($total_seconds / 3600);
 $total_minutes = floor(($total_seconds % 3600) / 60);
 
-// ===== ACHIEVEMENTS =====
+// Achievements
 $stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC");
 $stmt->execute([$user_id]);
 $achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== USER REPUTATION =====
+// User reputation
 $stmt = $db->prepare("SELECT points, level, badges FROM user_reputations WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $reputation = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -146,7 +138,7 @@ $rep_points = $reputation['points'] ?? 0;
 $rep_level = $reputation['level'] ?? 1;
 $badges = json_decode($reputation['badges'] ?? '[]', true);
 
-// ===== CURRENTLY READING BOOKS =====
+// Currently reading books
 $stmt = $db->prepare("
     SELECT b.*, rs.progress 
     FROM books b
@@ -157,7 +149,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $reading_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== RECENTLY FINISHED BOOKS =====
+// Recently finished books
 $stmt = $db->prepare("
     SELECT b.* FROM books b
     JOIN reading_status rs ON b.id = rs.book_id
@@ -168,7 +160,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $finished_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== RECENT POEMS =====
+// Recent poems
 $stmt = $db->prepare("
     SELECT p.* FROM poems p
     JOIN poem_reads pr ON p.id = pr.poem_id
@@ -179,7 +171,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== RECENT VIDEOS =====
+// Recent videos
 $stmt = $db->prepare("
     SELECT v.* FROM videos v
     JOIN video_watches vw ON v.id = vw.video_id
@@ -190,7 +182,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== RECENT BLOG POSTS =====
+// Recent blog posts
 $stmt = $db->prepare("
     SELECT bp.* FROM blog_posts bp
     JOIN blog_reads br ON bp.id = br.blog_post_id
@@ -201,7 +193,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $recent_blog = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== RECENT REFLECTIONS =====
+// Recent reflections
 $stmt = $db->prepare("
     SELECT r.* FROM reflections r
     JOIN reflection_reads rr ON r.id = rr.reflection_id
@@ -212,7 +204,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== UPCOMING SESSIONS =====
+// Upcoming sessions
 $stmt = $db->prepare("
     SELECT * FROM sessions 
     WHERE user_id = ? AND date >= date('now')
@@ -221,7 +213,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $upcoming_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== RECENT QUESTIONS =====
+// Recent questions
 $stmt = $db->prepare("
     SELECT q.*, COUNT(a.id) as answer_count 
     FROM questions q
@@ -234,7 +226,7 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $recent_questions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== NOTIFICATIONS =====
+// Notifications
 $stmt = $db->prepare("
     SELECT * FROM notifications 
     WHERE user_id = ? 
@@ -244,8 +236,13 @@ $stmt = $db->prepare("
 $stmt->execute([$user_id]);
 $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Unread notifications count (for badge)
+$stmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
+$stmt->execute([$user_id]);
+$unread_notifs = $stmt->fetchColumn();
+
 // ============================================================
-// 6. HANDLE MARK ALL NOTIFICATIONS AS READ (with CSRF)
+// 4. HANDLE MARK ALL NOTIFICATIONS AS READ (with CSRF)
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -262,7 +259,7 @@ $pageTitle = 'My Dashboard';
 <?php require_once 'includes/header.php'; ?>
 
 <style>
-/* ===== FULL USER DASHBOARD CSS ===== */
+/* ===== FULL USER DASHBOARD CSS (with Dark Mode & Mobile enhancements) ===== */
 :root {
     --rose: #DBA1A2;
     --rose-dark: #c08a8b;
@@ -280,10 +277,19 @@ $pageTitle = 'My Dashboard';
     --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
     --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
-
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; transition:background 0.3s, color 0.3s; }
+body.dark-mode {
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text: #e8dddd;
+    --text-light: #a08a8a;
+    --vanilla: #2c1e1e;
+    --fantasy: #2c1e1e;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
+}
 .rose-text { color:var(--rose); }
 
 /* ===== BUTTONS ===== */
@@ -300,8 +306,6 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
 .btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
 .btn-outline:hover { background:var(--rose); color:var(--white); }
-.btn-white { background:var(--white); color:var(--dark); border:2px solid var(--white); }
-.btn-white:hover { background:var(--vanilla); border-color:var(--vanilla); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
 .btn-danger { background:#e74c3c; color:white; border:2px solid #e74c3c; }
 .btn-danger:hover { background:#c0392b; border-color:#c0392b; }
@@ -309,7 +313,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .btn-success:hover { background:#218838; border-color:#218838; }
 
 /* ===== DASHBOARD PAGE ===== */
-.dashboard-page { padding:32px 0 60px; font-family:'Inter',sans-serif; }
+.dashboard-page { padding:32px 0 60px; }
 
 /* ===== HERO ===== */
 .dashboard-hero {
@@ -345,6 +349,20 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .profile-details .user-bio { color:var(--text-light); font-size:0.85rem; margin:4px 0 0; }
 .badge-container { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
 .badge-container .badge { background:var(--rose); color:white; padding:0 10px; border-radius:12px; font-size:0.7rem; font-weight:600; }
+
+/* Dark Mode Toggle Button */
+.dark-toggle-btn {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-light); font-size: 1.2rem; transition: color 0.2s;
+}
+.dark-toggle-btn:hover { color: var(--rose); }
+
+/* Notification Badge */
+.notif-badge {
+    position: absolute; top: -6px; right: -6px;
+    background: #e74c3c; color: white; border-radius: 50%;
+    padding: 2px 6px; font-size: 0.65rem; font-weight: 600;
+}
 
 /* ===== STATS ROW ===== */
 .stats-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:20px; }
@@ -575,39 +593,49 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
                         </div>
                     <?php endif; ?>
                 </div>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                    <button onclick="toggleDarkMode()" class="dark-toggle-btn"><i class="fas fa-moon"></i></button>
+                    <a href="notifications.php" class="btn btn-outline btn-sm" style="position:relative;">
+                        <i class="fas fa-bell"></i> Notifications
+                        <?php if ($unread_notifs > 0): ?>
+                            <span class="notif-badge"><?php echo $unread_notifs; ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <a href="profile.php" class="btn btn-outline btn-sm">Profile</a>
+                </div>
             </div>
         </div>
 
-        <!-- ===== STATS ROW ===== -->
+        <!-- ===== STATS ROW (with live IDs for AJAX) ===== -->
         <div class="stats-row">
             <div class="stat-card stat-reading">
                 <div class="stat-icon"><i class="fas fa-book"></i></div>
-                <div class="stat-number"><?php echo $books_reading; ?></div>
+                <div class="stat-number" id="stat_reading"><?php echo $books_reading; ?></div>
                 <div class="stat-label">Reading</div>
             </div>
             <div class="stat-card stat-finished">
                 <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="stat-number"><?php echo $books_finished; ?></div>
+                <div class="stat-number" id="stat_finished"><?php echo $books_finished; ?></div>
                 <div class="stat-label">Finished</div>
             </div>
             <div class="stat-card stat-poems">
                 <div class="stat-icon"><i class="fas fa-feather-alt"></i></div>
-                <div class="stat-number"><?php echo $poems_read; ?></div>
+                <div class="stat-number" id="stat_poems"><?php echo $poems_read; ?></div>
                 <div class="stat-label">Poems Read</div>
             </div>
             <div class="stat-card stat-videos">
                 <div class="stat-icon"><i class="fas fa-video"></i></div>
-                <div class="stat-number"><?php echo $videos_watched; ?></div>
+                <div class="stat-number" id="stat_videos"><?php echo $videos_watched; ?></div>
                 <div class="stat-label">Videos Watched</div>
             </div>
             <div class="stat-card stat-questions">
                 <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
-                <div class="stat-number"><?php echo $questions_asked; ?></div>
+                <div class="stat-number" id="stat_questions"><?php echo $questions_asked; ?></div>
                 <div class="stat-label">Questions</div>
             </div>
             <div class="stat-card stat-sessions">
                 <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
-                <div class="stat-number"><?php echo $sessions_booked; ?></div>
+                <div class="stat-number" id="stat_sessions"><?php echo $sessions_booked; ?></div>
                 <div class="stat-label">Sessions</div>
             </div>
         </div>
@@ -1027,5 +1055,36 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
         </div>
     </div>
 </div>
+
+<script>
+// ============================================================
+// 1. DARK MODE PERSISTENCE
+// ============================================================
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('userDarkMode', document.body.classList.contains('dark-mode') ? '1' : '0');
+}
+if (localStorage.getItem('userDarkMode') === '1') {
+    document.body.classList.add('dark-mode');
+}
+
+// ============================================================
+// 2. AJAX LIVE STATS REFRESH (Every 60 seconds)
+// ============================================================
+function refreshUserStats() {
+    fetch('ajax_user_stats.php')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('stat_reading').textContent = data.reading;
+            document.getElementById('stat_finished').textContent = data.finished;
+            document.getElementById('stat_poems').textContent = data.poems;
+            document.getElementById('stat_videos').textContent = data.videos;
+            document.getElementById('stat_questions').textContent = data.questions;
+            document.getElementById('stat_sessions').textContent = data.sessions;
+        })
+        .catch(err => console.error('Stats refresh failed:', err));
+}
+setInterval(refreshUserStats, 60000);
+</script>
 
 <?php require_once 'includes/footer.php'; ?>
