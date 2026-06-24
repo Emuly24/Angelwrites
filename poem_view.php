@@ -335,6 +335,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .poem-body p:last-child { margin-bottom: 0; }
 .poem-body br { display: block; content: ""; margin: 12px 0; }
 .poem-body img { max-width: 100%; height: auto; margin: 16px auto; display: block; border-radius: 8px; }
+
 .reviews-section { max-width: 700px; margin: 48px auto 0; }
 .reviews-section h3 { font-size: 1.4rem; margin-bottom: 16px; }
 .rating-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -344,8 +345,162 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .rating-score { font-weight: 700; font-size: 1.1rem; }
 .rating-count { color: var(--text-light); font-size: 0.9rem; }
 
-.reaction-particle{position:fixed;pointer-events:none;z-index:99999;font-size:2rem;animation:burst 1.6s cubic-bezier(.2,.8,.2,1.2) forwards}@keyframes burst{0%{opacity:1;transform:translate(0)scale(.5)}100%{opacity:0;transform:translate(var(--tx),var(--ty))scale(1.8)rotate(720deg)}}.reaction-btn:active{transform:scale(.85);transition:transform .1s}.reaction-btn.active{animation:pop-active .4s ease}@keyframes pop-active{0%{transform:scale(1)}50%{transform:scale(1.3);box-shadow:0 0 20px var(--rose)}100%{transform:scale(1)}}
+/* ============================================================
+   REACTION BUTTONS (New Modern Styling)
+   ============================================================ */
+.reaction-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 24px 0 32px;
+    padding: 12px 20px;
+    background: var(--vanilla);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+}
+.reaction-section > span {
+    font-weight: 600;
+    color: var(--text);
+    margin-right: 4px;
+}
+.reaction-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.reaction-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: var(--shadow);
+}
+.reaction-btn:hover {
+    background: var(--vanilla);
+    border-color: var(--rose);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+.reaction-btn.active {
+    background: var(--rose-light);
+    border-color: var(--rose);
+    color: var(--rose-dark);
+}
+.reaction-btn .count {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+.reaction-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 99999;
+    font-size: 2rem;
+    animation: burst 1.6s cubic-bezier(.2,.8,.2,1.2) forwards;
+}
+@keyframes burst {
+    0% { opacity: 1; transform: translate(0) scale(.5); }
+    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.8) rotate(720deg); }
+}
+.reaction-btn:active { transform: scale(.85); transition: transform .1s; }
+.reaction-btn.active { animation: pop-active .4s ease; }
+@keyframes pop-active {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); box-shadow: 0 0 20px var(--rose); }
+    100% { transform: scale(1); }
+}
 
+/* ============================================================
+   VOICE COMMENT RECORDER (New Modern Styling)
+   ============================================================ */
+.voice-comment-section {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+.voice-comment-section h4 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.recorder-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+#recordBtn {
+    padding: 8px 20px;
+    border-radius: 50px;
+    background: var(--rose);
+    color: white;
+    border: none;
+    transition: background 0.2s, transform 0.2s;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+#recordBtn:hover { background: var(--rose-dark); transform: translateY(-2px); }
+#recordBtn.btn-danger { background: #e74c3c; }
+#recordBtn.btn-danger:hover { background: #c0392b; }
+
+/* ============================================================
+   ADMIN REPLY SECTION (New Modern Styling)
+   ============================================================ */
+.admin-reply-container {
+    background: var(--vanilla);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 16px 0;
+    border: 1px solid var(--rose-light);
+    box-shadow: var(--shadow);
+}
+.admin-reply-container h4 {
+    font-size: 1rem;
+    margin: 0 0 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--rose-dark);
+}
+.admin-reply-form .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    resize: vertical;
+    min-height: 60px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    transition: border-color 0.2s;
+}
+.admin-reply-form .form-group textarea:focus {
+    outline: none;
+    border-color: var(--rose);
+    box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
+}
+.admin-reply-form .btn-primary {
+    margin-top: 8px;
+}
+
+/* ============================================================
+   COMMENT & REPLY FORM TWEAKS
+   ============================================================ */
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
 .reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
 .reply-link:hover { color: var(--rose-dark); }
@@ -447,6 +602,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         </div>
 
+        <!-- Styled Reaction Section -->
         <div class="reaction-section">
             <span>React to this poem:</span>
             <div class="reaction-buttons" data-target-type="poem" data-target-id="<?php echo $id; ?>">
@@ -508,6 +664,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                     </form>
                 </div>
 
+                <!-- Styled Voice Recorder -->
                 <div class="voice-comment-section">
                     <h4>🎙️ Record a Voice Comment</h4>
                     <div class="recorder-wrapper">
@@ -530,6 +687,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                 </div>
             <?php endif; ?>
 
+            <!-- Styled Admin Reply Section -->
             <?php if (isAdmin()): ?>
                 <div class="admin-reply-container">
                     <h4>🛡️ Angella's Reply</h4>

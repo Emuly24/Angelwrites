@@ -224,9 +224,12 @@ $pageTitle = 'Manage Books';
         <!-- ===== BOOK FORM ===== -->
         <div class="book-form-container" id="bookFormContainer" style="display: <?php echo ($edit_book || isset($_GET['edit'])) ? 'block' : 'none'; ?>;">
             <div class="card">
-                <div class="card-header">
-                    <h2 id="formTitle"><?php echo $edit_book ? 'Edit Book' : 'Add New Book'; ?></h2>
-                    <button type="button" class="btn btn-sm btn-outline" id="cancelForm"><i class="fas fa-times"></i> Close</button>
+                <div class="card-header" style="background: var(--vanilla); border-bottom: 1px solid var(--border);">
+                    <h2 id="formTitle" style="font-family:'Playfair Display'; color:var(--dark); margin:0;"><?php echo $edit_book ? 'Edit Book' : 'Add New Book'; ?></h2>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <button type="submit" form="bookForm" class="btn btn-primary btn-sm" style="background:var(--rose);color:#fff;border:none;"><i class="fas fa-save"></i> Save Book</button>
+                        <button type="button" class="btn btn-outline btn-sm" id="cancelForm"><i class="fas fa-times"></i> Close</button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data" class="admin-form" id="bookForm">
@@ -320,9 +323,10 @@ $pageTitle = 'Manage Books';
                             <?php endif; ?>
                         </div>
 
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Book</button>
-                            <button type="button" class="btn btn-outline" id="cancelFormBtn">Cancel</button>
+                        <div class="form-actions" style="display:none;">
+                            <!-- Hidden standard form actions, since we moved the button up to the header -->
+                            <button type="submit" class="btn btn-primary" style="display:none;"></button>
+                            <button type="button" class="btn btn-outline" id="cancelFormBtn" style="display:none;">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -363,15 +367,17 @@ $pageTitle = 'Manage Books';
                                     <tbody>
                                         <?php foreach ($books as $book): ?>
                                             <tr>
-                                                <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $book['id']; ?>"></td>
-                                                <td>
+                                                <td class="check-col" data-label="">
+                                                    <input type="checkbox" class="row-select styled-checkbox" value="<?php echo $book['id']; ?>">
+                                                </td>
+                                                <td class="cover-col" data-label="Cover">
                                                     <?php if ($book['cover_path']): ?>
                                                         <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" class="book-thumb">
                                                     <?php else: ?>
                                                         <div class="book-thumb-placeholder"><i class="fas fa-book"></i></div>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td>
+                                                <td data-label="Title">
                                                     <div class="book-title-cell">
                                                         <strong><?php echo htmlspecialchars($book['title']); ?></strong>
                                                         <?php if ($book['release_date']): ?>
@@ -385,8 +391,8 @@ $pageTitle = 'Manage Books';
                                                         <?php endif; ?>
                                                     </div>
                                                 </td>
-                                                <td><?php echo htmlspecialchars($book['author']); ?></td>
-                                                <td>
+                                                <td data-label="Author"><?php echo htmlspecialchars($book['author']); ?></td>
+                                                <td data-label="Price">
                                                     <?php if ($book['is_free']): ?>
                                                         <span class="badge free">Free</span>
                                                     <?php elseif ($book['is_sale']): ?>
@@ -395,26 +401,28 @@ $pageTitle = 'Manage Books';
                                                         <span class="badge">MWK <?php echo number_format($book['price'], 2); ?></span>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td>
+                                                <td data-label="File">
                                                     <?php if ($book['file_path']): ?>
                                                         <span class="status-badge available"><?php echo strtoupper($book['file_type'] ?? 'PDF'); ?></span>
                                                     <?php else: ?>
                                                         <span class="status-badge missing">No file</span>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td class="actions-cell">
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary action-btn" title="Edit">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-info action-btn" title="Process">
-                                                        <i class="fas fa-cogs"></i>
-                                                    </a>
-                                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary action-btn" target="_blank" title="View">
-                                                        <i class="fas fa-eye"></i>
-                                                    </a>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this book?');" title="Delete">
-                                                        <i class="fas fa-trash"></i>
-                                                    </a>
+                                                <td class="actions-col" data-label="Actions">
+                                                    <div class="actions-cell">
+                                                        <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary action-btn" title="Edit">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                        <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-info action-btn" title="Process">
+                                                            <i class="fas fa-cogs"></i>
+                                                        </a>
+                                                        <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary action-btn" target="_blank" title="View">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                        <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?delete=<?php echo $book['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this book?');" title="Delete">
+                                                            <i class="fas fa-trash"></i>
+                                                        </a>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -462,14 +470,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===== FORM TOGGLE =====
     const showAddBtn = document.getElementById('showAddForm');
     const formContainer = document.getElementById('bookFormContainer');
-    const cancelFormBtn = document.getElementById('cancelFormBtn');
+    const cancelFormBtn = document.getElementById('cancelForm');
     const cancelHeaderBtn = document.getElementById('cancelForm');
     const formTitle = document.getElementById('formTitle');
 
     function toggleForm(show) {
         formContainer.style.display = show ? 'block' : 'none';
         if (show) {
-            formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => {
+                formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
         } else {
             window.location.href = '<?php echo SITE_URL; ?>/admin/manage_books.php';
         }
@@ -750,9 +760,6 @@ document.addEventListener('DOMContentLoaded', function() {
 .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; }
 .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--rose); }
 
-.form-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
-.form-actions .btn { min-width: 120px; justify-content: center; }
-
 /* ===== CAMERA ===== */
 .camera-section { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: var(--fantasy); margin-top: 8px; }
 .camera-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
@@ -766,7 +773,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .captured-photo-container img { border: 3px solid var(--rose); border-radius: 12px; }
 .status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
 
-/* ===== TABLE ===== */
+/* ===== DESKTOP TABLE ===== */
 .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .admin-table thead { background: var(--vanilla); }
 .admin-table th { text-align: left; padding: 14px 20px; font-weight: 600; color: var(--text); border-bottom: 2px solid var(--border); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -808,16 +815,61 @@ document.addEventListener('DOMContentLoaded', function() {
 .empty-state h3 { font-size: 1.3rem; margin-bottom: 4px; color: var(--text); }
 .empty-state p { margin: 0; font-size: 0.95rem; }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 992px) {
+/* ============================================================
+   MOBILE RESPONSIVE OVERRIDE (Card Grid Layout)
+   Prevents Horizontal Scrolling & Stacks Table Rows on Mobile
+   ============================================================ */
+@media (max-width: 768px) {
     .admin-hero { flex-direction: column; text-align: center; align-items: center; }
     .admin-hero-actions { justify-content: center; }
     .admin-hero-content h1 { font-size: 1.6rem; }
-}
-@media (max-width: 768px) {
     .form-row { flex-direction: column; }
-    .admin-table th, .admin-table td { padding: 10px 12px; font-size: 0.8rem; }
-    .actions-cell { flex-wrap: wrap; }
+    
+    .table-responsive { border: none; box-shadow: none; border-radius: 0; overflow-x: visible; }
+    .admin-table, .admin-table thead, .admin-table tbody, .admin-table th, .admin-table td, .admin-table tr { display: block; }
+    .admin-table thead { display: none; } /* Hide header row on mobile */
+    
+    .admin-table tr {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 16px;
+        padding: 12px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .admin-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: none;
+        padding: 4px 0;
+        font-size: 0.85rem;
+        border-bottom: 1px solid var(--border);
+        text-align: right; /* align text to right to match label */
+        word-break: break-word;
+    }
+    .admin-table td:last-child { border-bottom: none; }
+    .admin-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-light);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        margin-right: 8px;
+        white-space: nowrap;
+    }
+    /* Specific column overrides for Mobile */
+    .admin-table .check-col { border-bottom: none; padding-bottom: 4px; margin-bottom: 2px; justify-content: flex-start; }
+    .admin-table .check-col::before { content: ''; display: none; }
+    .admin-table .cover-col { display: none; } /* Hide cover thumbnail on mobile */
+    .admin-table .actions-col { justify-content: flex-end; flex-wrap: wrap; gap: 4px; border-bottom: none; }
+    .admin-table .actions-col::before { align-self: flex-start; margin-top: 4px; }
+    .book-title-cell { text-align: right; flex: 1; }
+    .cell-meta { font-size: 0.7rem; }
+    .actions-cell { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 }
 </style>
 

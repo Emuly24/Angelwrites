@@ -2,6 +2,25 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 
+// ===== WEBP IMAGE HELPER (Copied from poem_view.php for Deep Enhancement) =====
+if (!function_exists('get_image_url')) {
+    function get_image_url($path) {
+        if (empty($path)) return '';
+        $base = rtrim(SITE_URL, '/');
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+        $webp_support = strpos($accept, 'image/webp') !== false;
+        $ext = pathinfo($path, PATHINFO_EXTENSION);
+        if ($webp_support && in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) {
+            $webp_path = preg_replace('/\.(jpg|jpeg|png|gif)$/', '.webp', $path);
+            $full_path = $_SERVER['DOCUMENT_ROOT'] . '/' . $webp_path;
+            if (file_exists($full_path)) {
+                return $base . '/' . $webp_path;
+            }
+        }
+        return $base . '/' . ltrim($path, '/');
+    }
+}
+
 // ===== PAGINATION =====
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 9;
@@ -50,35 +69,37 @@ $pageTitle = 'Poetry';
 
 <div class="poetry-page">
     <div class="container">
-        <!-- Page Header -->
-        <div class="poetry-header">
-            <div class="header-content">
+        <!-- ===== PAGE HERO (Unified design with Admin Dashboard) ===== -->
+        <div class="poetry-hero">
+            <div class="poetry-hero-content">
                 <h1>Poetry</h1>
                 <p>Words that speak to the soul — discover Angella's poetic collection.</p>
             </div>
-            <div class="header-decoration">
+            <div class="poetry-hero-decoration">
                 <span class="decoration-line"></span>
             </div>
         </div>
 
-        <!-- Search & Count -->
+        <!-- ===== SEARCH & COUNT ===== -->
         <div class="poetry-tools">
             <form method="GET" class="search-form">
                 <input type="text" name="search" placeholder="Search poems by title or theme..." value="<?php echo htmlspecialchars($search); ?>">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
-                <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
+                <?php if (!empty($search)): ?>
+                    <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
+                <?php endif; ?>
             </form>
             <div class="poem-count"><?php echo $total_poems; ?> poem<?php echo $total_poems != 1 ? 's' : ''; ?></div>
         </div>
 
-        <!-- Poem Grid -->
+        <!-- ===== POEM GRID ===== -->
         <?php if (count($poems) > 0): ?>
             <div class="poems-grid">
                 <?php foreach ($poems as $poem): ?>
                     <div class="poem-card">
                         <?php if ($poem['image_path']): ?>
                             <div class="poem-thumbnail">
-                                <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" loading="lazy">
+                                <img src="<?php echo get_image_url($poem['image_path']); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" loading="lazy">
                             </div>
                         <?php else: ?>
                             <div class="poem-thumbnail placeholder">
@@ -112,7 +133,7 @@ $pageTitle = 'Poetry';
                 <?php endforeach; ?>
             </div>
 
-            <!-- Pagination -->
+            <!-- ===== PAGINATION ===== -->
             <?php if ($total_pages > 1): ?>
                 <div class="pagination">
                     <?php if ($page > 1): ?>
@@ -134,9 +155,12 @@ $pageTitle = 'Poetry';
             <?php endif; ?>
         <?php else: ?>
             <div class="empty-state">
-                <i class="fas fa-pen-fancy" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
+                <i class="fas fa-pen-fancy empty-icon"></i>
                 <h3>No poems found</h3>
                 <p><?php echo $search ? 'Try adjusting your search.' : 'Check back soon for new poetry from Angella.'; ?></p>
+                <?php if ($search): ?>
+                    <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm">Clear Search</a>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
@@ -189,10 +213,14 @@ document.addEventListener('DOMContentLoaded', function() {
     --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
 }
 
-/* ===== TYPOGRAPHY ===== */
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
+/* ===== TYPOGRAPHY & LAYOUT ===== */
+* { box-sizing: border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); margin:0; padding:0; }
 h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
 .rose-text { color:var(--rose); }
+
+/* ===== PAGE WRAPPER (Ensures Footer sticks to bottom) ===== */
+.poetry-page { padding:32px 0 60px; display:flex; flex-direction:column; min-height:100vh; }
 
 /* ===== BUTTONS ===== */
 .btn {
@@ -210,14 +238,25 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
 
-/* ===== PAGE LAYOUT ===== */
-.poetry-page { padding:40px 0 80px; }
-
-/* ===== HEADER ===== */
-.poetry-header { text-align:center; margin-bottom:32px; position:relative; }
-.poetry-header h1 { font-size:2.8rem; margin-bottom:4px; }
-.poetry-header p { color:var(--text-light); font-size:1.15rem; max-width:600px; margin:0 auto; }
-.header-decoration { display:flex; justify-content:center; margin-top:12px; }
+/* ===== UNIFIED HERO (Matching Admin Dashboard Gradient) ===== */
+.poetry-hero {
+    background: linear-gradient(135deg, #fff, var(--rose-light));
+    border-radius: 20px;
+    padding: 28px 32px;
+    margin-bottom: 28px;
+    border: 1px solid var(--rose-light);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+.poetry-hero h1 { font-size:2.8rem; margin:0 0 4px 0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
+.poetry-hero p { color:var(--text-light); font-size:1.15rem; max-width:600px; margin:0 auto; }
+.poetry-hero-decoration { display:flex; justify-content:center; margin-top:12px; }
 .decoration-line { width:60px; height:3px; background:var(--rose); border-radius:4px; }
 
 /* ===== TOOLS ===== */
@@ -229,7 +268,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .poem-count { font-size:0.9rem; color:var(--text-light); font-weight:500; }
 
 /* ===== POEM GRID ===== */
-.poems-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:24px; }
+.poems-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:24px; }
 .poem-card {
     background:var(--card-bg); border-radius:20px; overflow:hidden;
     border:1px solid var(--border); box-shadow:var(--shadow);
@@ -282,6 +321,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .empty-state { text-align:center; padding:60px 20px; color:var(--text-light); }
 .empty-state h3 { font-size:1.4rem; margin-bottom:6px; color:var(--dark); }
 .empty-state p { font-size:0.95rem; }
+.empty-state .empty-icon { font-size:3rem; color:var(--rose); margin-bottom:16px; opacity:0.6; }
 
 /* ===== BACK TO TOP ===== */
 .back-to-top {
@@ -294,14 +334,15 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 
 /* ===== RESPONSIVE ===== */
 @media (max-width:768px) {
-    .poetry-header h1 { font-size:2.2rem; }
+    .poetry-hero h1 { font-size:2.2rem; }
     .poetry-tools { flex-direction:column; align-items:stretch; }
     .search-form { flex-direction:column; }
     .search-form input { width:100%; }
-    .poem-count { text-align:center; }
+    .poem-count { text-align:center; margin-top:4px; }
 }
 @media (max-width:480px) {
-    .poetry-header h1 { font-size:1.8rem; }
+    .poetry-hero { padding:20px; }
+    .poetry-hero h1 { font-size:1.8rem; }
     .poems-grid { grid-template-columns:1fr; }
     .poem-thumbnail { height:160px; }
     .poem-footer { flex-direction:column; align-items:flex-start; }
