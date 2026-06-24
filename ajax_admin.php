@@ -1,6 +1,8 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/db.php';
+// Added auth check just in case this file is ever accessed directly without the dashboard
+require_once 'includes/auth.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
@@ -25,8 +27,8 @@ if ($action === 'stats') {
 
     $stmt = $db->query("SELECT SUM(duration_seconds) FROM reading_sessions"); $stats['reading_hours'] = number_format(floor(($stmt->fetchColumn() ?? 0) / 3600));
 
-    header('Content-Type: application/json');
-    echo json_encode($stats);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($stats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
@@ -41,8 +43,8 @@ if ($action === 'active_chart') {
         $stmt->execute([$date]);
         $data[] = (int)$stmt->fetchColumn() ?? 0;
     }
-    header('Content-Type: application/json');
-    echo json_encode(['labels' => $labels, 'data' => $data]);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['labels' => $labels, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
@@ -55,56 +57,68 @@ if ($action === 'views_chart') {
     $stmt->execute(); $blog_views = (int)$stmt->fetchColumn() ?? 0;
     $stmt = $db->prepare("SELECT SUM(view_count) FROM videos WHERE DATE(created_at) >= DATE('now', '-7 days')");
     $stmt->execute(); $video_views = (int)$stmt->fetchColumn() ?? 0;
-    header('Content-Type: application/json');
-    echo json_encode(['labels' => ['Poems', 'Books', 'Blog', 'Videos'], 'data' => [$poem_views, $book_views, $blog_views, $video_views]]);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['labels' => ['Poems', 'Books', 'Blog', 'Videos'], 'data' => [$poem_views, $book_views, $blog_views, $video_views]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-// ===== 3. DEEP DIVE: View Details (New) =====
+// ===== 3. DEEP DIVE: View Details =====
 if ($action === 'get_view_details') {
-    $stmt = $db->prepare("
-        SELECT 
-            COALESCE(u.name, 'Guest') as viewer_name,
-            vl.target_type,
-            vl.target_id,
-            p.title as poem_title,
-            b.title as book_title,
-            vl.ip_address,
-            vl.viewed_at
-        FROM view_logs vl
-        LEFT JOIN users u ON vl.user_id = u.id
-        LEFT JOIN poems p ON (vl.target_type = 'poem' AND vl.target_id = p.id)
-        LEFT JOIN books b ON (vl.target_type = 'book' AND vl.target_id = b.id)
-        ORDER BY vl.viewed_at DESC LIMIT 30
-    ");
-    $stmt->execute();
-    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    header('Content-Type: application/json');
-    echo json_encode(['success' => true, 'logs' => $logs]);
+    try {
+        // Ensure view_logs table exists before querying, or return empty gracefully
+        $stmt = $db->prepare("
+            SELECT 
+                COALESCE(u.name, 'Guest') as viewer_name,
+                vl.target_type,
+                vl.target_id,
+                p.title as poem_title,
+                b.title as book_title,
+                vl.ip_address,
+                vl.viewed_at
+            FROM view_logs vl
+            LEFT JOIN users u ON vl.user_id = u.id
+            LEFT JOIN poems p ON (vl.target_type = 'poem' AND vl.target_id = p.id)
+            LEFT JOIN books b ON (vl.target_type = 'book' AND vl.target_id = b.id)
+            ORDER BY vl.viewed_at DESC LIMIT 30
+        ");
+        $stmt->execute();
+        $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'logs' => $logs], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    } catch (PDOException $e) {
+        // Gracefully fail if view_logs table is missing so the dashboard doesn't crash
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'View logs table not found. Please run the setup script.']);
+    }
     exit;
 }
 
-// ===== 4. DEEP DIVE: Reading Details (New) =====
+// ===== 4. DEEP DIVE: Reading Details =====
 if ($action === 'get_reading_details') {
-    $stmt = $db->prepare("
-        SELECT 
-            u.name as user_name,
-            u.email as user_email,
-            b.title as book_title,
-            rs.duration_seconds,
-            rs.start_time,
-            rs.end_time
-        FROM reading_sessions rs
-        JOIN users u ON rs.user_id = u.id
-        LEFT JOIN books b ON rs.book_id = b.id
-        ORDER BY rs.start_time DESC LIMIT 30
-    ");
-    $stmt->execute();
-    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    header('Content-Type: application/json');
-    echo json_encode(['success' => true, 'logs' => $logs]);
+    try {
+        $stmt = $db->prepare("
+            SELECT 
+                u.name as user_name,
+                u.email as user_email,
+                b.title as book_title,
+                rs.duration_seconds,
+                rs.start_time,
+                rs.end_time
+            FROM reading_sessions rs
+            JOIN users u ON rs.user_id = u.id
+            LEFT JOIN books b ON rs.book_id = b.id
+            ORDER BY rs.start_time DESC LIMIT 30
+        ");
+        $stmt->execute();
+        $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'logs' => $logs], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    } catch (PDOException $e) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'Reading sessions query failed.']);
+    }
     exit;
 }
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 echo json_encode(['error' => 'Invalid action']);
