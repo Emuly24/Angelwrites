@@ -5,10 +5,10 @@
 //  Returns an associative array for use in reader.php.
 // ============================================================
 
-require_once __DIR__ . '/../../includes/config.php';
-require_once __DIR__ . '/../../includes/db.php';
-require_once __DIR__ . '/../../includes/auth.php';
-require_once __DIR__ . '/../../includes/reader_functions.php'; // for detectChapters()
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/reader_functions.php'; // for detectChapters()
 
 $book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
