@@ -1,12 +1,12 @@
 <?php
+header('Content-Type: application/json; charset=utf-8');
 require_once 'includes/config.php';
 require_once 'includes/db.php';
-// Added auth check just in case this file is ever accessed directly without the dashboard
 require_once 'includes/auth.php';
 
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
-// ===== 1. STATS (Upgraded with real data) =====
+// ===== 1. STATS =====
 if ($action === 'stats') {
     $stats = [];
     $stmt = $db->query("SELECT COUNT(*) FROM users"); $stats['users'] = $stmt->fetchColumn();
@@ -16,61 +16,56 @@ if ($action === 'stats') {
     $stmt = $db->query("SELECT COUNT(*) FROM blog_posts"); $stats['posts'] = $stmt->fetchColumn();
     $stmt = $db->query("SELECT COUNT(*) FROM videos"); $stats['videos'] = $stmt->fetchColumn();
 
-    $stmt = $db->query("SELECT SUM(view_count) FROM poems"); $stats['poem_views'] = $stmt->fetchColumn() ?? 0;
-    $stmt = $db->query("SELECT SUM(view_count) FROM books"); $stats['book_views'] = $stmt->fetchColumn() ?? 0;
+    $stmt = $db->query("SELECT SUM(view_count) FROM poems"); $stats['poem_views'] = (int)$stmt->fetchColumn();
+    $stmt = $db->query("SELECT SUM(view_count) FROM books"); $stats['book_views'] = (int)$stmt->fetchColumn();
     $stats['total_views'] = number_format($stats['poem_views'] + $stats['book_views']);
 
-    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-1 day')"); $stats['active_today'] = $stmt->fetchColumn() ?? 0;
-    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-7 days')"); $stats['active_week'] = $stmt->fetchColumn() ?? 0;
-    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-30 days')"); $stats['active_month'] = $stmt->fetchColumn() ?? 0;
-    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-365 days')"); $stats['active_year'] = $stmt->fetchColumn() ?? 0;
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-1 day')"); $stats['active_today'] = (int)$stmt->fetchColumn();
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-7 days')"); $stats['active_week'] = (int)$stmt->fetchColumn();
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-30 days')"); $stats['active_month'] = (int)$stmt->fetchColumn();
+    $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-365 days')"); $stats['active_year'] = (int)$stmt->fetchColumn();
 
-    $stmt = $db->query("SELECT SUM(duration_seconds) FROM reading_sessions"); $stats['reading_hours'] = number_format(floor(($stmt->fetchColumn() ?? 0) / 3600));
+    $stmt = $db->query("SELECT SUM(duration_seconds) FROM reading_sessions"); 
+    $stats['reading_hours'] = number_format(floor(($stmt->fetchColumn() ?? 0) / 3600));
 
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($stats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode($stats, JSON_NUMERIC_CHECK | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
 // ===== 2. CHARTS =====
 if ($action === 'active_chart') {
     $labels = []; $data = [];
-    // Query actual user counts per day for the last 7 days
     for ($i = 6; $i >= 0; $i--) {
         $date = date('Y-m-d', strtotime("-$i days"));
         $labels[] = date('D', strtotime($date));
         $stmt = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE DATE(start_time) = ?");
         $stmt->execute([$date]);
-        $data[] = (int)$stmt->fetchColumn() ?? 0;
+        $data[] = (int)$stmt->fetchColumn();
     }
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['labels' => $labels, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode(['labels' => $labels, 'data' => $data]);
     exit;
 }
 
 if ($action === 'views_chart') {
     $stmt = $db->prepare("SELECT SUM(view_count) FROM poems WHERE DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $poem_views = (int)$stmt->fetchColumn() ?? 0;
+    $stmt->execute(); $poem_views = (int)$stmt->fetchColumn();
     $stmt = $db->prepare("SELECT SUM(view_count) FROM books WHERE DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $book_views = (int)$stmt->fetchColumn() ?? 0;
+    $stmt->execute(); $book_views = (int)$stmt->fetchColumn();
     $stmt = $db->prepare("SELECT COUNT(*) FROM reviews WHERE target_type='blog' AND DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $blog_views = (int)$stmt->fetchColumn() ?? 0;
+    $stmt->execute(); $blog_views = (int)$stmt->fetchColumn();
     $stmt = $db->prepare("SELECT SUM(view_count) FROM videos WHERE DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $video_views = (int)$stmt->fetchColumn() ?? 0;
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['labels' => ['Poems', 'Books', 'Blog', 'Videos'], 'data' => [$poem_views, $book_views, $blog_views, $video_views]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $stmt->execute(); $video_views = (int)$stmt->fetchColumn();
+    echo json_encode(['labels' => ['Poems', 'Books', 'Blog', 'Videos'], 'data' => [$poem_views, $book_views, $blog_views, $video_views]]);
     exit;
 }
 
 // ===== 3. DEEP DIVE: View Details =====
 if ($action === 'get_view_details') {
     try {
-        // Used COALESCE to ensure even missing poems/books titles return "Unknown"
         $stmt = $db->prepare("
             SELECT 
                 COALESCE(u.name, 'Guest') as viewer_name,
                 vl.target_type,
-                vl.target_id,
                 COALESCE(p.title, b.title, 'Unknown') as content_title,
                 vl.ip_address,
                 vl.viewed_at
@@ -82,12 +77,9 @@ if ($action === 'get_view_details') {
         ");
         $stmt->execute();
         $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => true, 'logs' => $logs], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    } catch (PDOException $e) {
-        // Gracefully fail if view_logs table is missing so the dashboard doesn't crash
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => false, 'error' => 'View logs table not found. Please run the setup script.']);
+        echo json_encode(['success' => true, 'logs' => $logs]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => 'View logs not found.']);
     }
     exit;
 }
@@ -110,14 +102,11 @@ if ($action === 'get_reading_details') {
         ");
         $stmt->execute();
         $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => true, 'logs' => $logs], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    } catch (PDOException $e) {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => false, 'error' => 'Reading sessions query failed.']);
+        echo json_encode(['success' => true, 'logs' => $logs]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => 'Session logs failed.']);
     }
     exit;
 }
 
-header('Content-Type: application/json; charset=utf-8');
 echo json_encode(['error' => 'Invalid action']);

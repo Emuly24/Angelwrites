@@ -61,13 +61,25 @@ $pageTitle = 'Admin Dashboard';
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ENSURE SCROLLING IS NEVER BLOCKED */
-html, body { overflow-y: auto !important; height: auto !important; }
+/* FORCE FIX FOR WRAPPER OVERFLOW ISSUES */
+html, body, .wrapper, #wrapper, #page-wrapper, .content-wrapper, .main-content, main, .container, .row, .col, .col-md-12 {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    display: block !important;
+    position: relative !important;
+}
+
+:root {
+    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9;
+    --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
+    --shadow: 0 4px 20px rgba(0,0,0,0.04);
+}
 body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #333; }
 body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
 body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
-
-:root { --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9; --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5; --shadow: 0 4px 20px rgba(0,0,0,0.04); }
 
 /* Hero */
 .admin-hero { background: linear-gradient(135deg, #fff, var(--rose-light)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--rose-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
@@ -112,19 +124,19 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .admin-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .admin-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .admin-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #333; transition: 0.2s; text-align: center; cursor: pointer; }
+.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #333; transition: 0.2s; text-align: center; }
 .admin-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
 .admin-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
 .admin-module-btn span { font-size: 0.75rem; font-weight: 500; }
 
-/* Quick Modal */
+/* Modals */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 9999; display: none; justify-content: center; align-items: center; }
 .modal-overlay.active { display: flex; }
 .modal-box { background: var(--card-bg); border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); border: 1px solid var(--rose-light); }
 .modal-box h2 { font-family: 'Playfair Display', serif; margin-top: 0; color: var(--rose-dark); }
 .modal-box .btn { width: 100%; justify-content: center; margin-bottom: 10px; }
 
-/* Stats Modal Override (Deep Dive) */
+/* Stats Modal Override */
 #statsModal .modal-box { max-width: 850px; max-height: 90vh; display: flex; flex-direction: column; }
 #statsModal table { width:100%; border-collapse:collapse; font-size:0.85rem; }
 #statsModal table th { background: var(--bg); padding:10px 12px; text-align:left; border-bottom:2px solid var(--border); position:sticky; top:0; z-index:1; }
@@ -314,7 +326,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 </div> <!-- End Container -->
 
 <script>
-// Dark mode will be triggered by global header, we just apply the class
+// Dark mode trigger
 if (localStorage.getItem('adminDarkMode') === '1') { document.body.classList.add('dark-mode'); }
 
 // Modal Functions
@@ -324,7 +336,7 @@ document.getElementById('quickModal').addEventListener('click', function(e) { if
 
 // Live Stats Polling
 function refreshStats() {
-    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=stats')
+    fetch('ajax_admin.php?action=stats')
         .then(res => res.json()).then(data => {
             ['users','books','poems','sessions','posts','videos'].forEach(k => {
                 document.getElementById('stat_'+k).textContent = data[k] ?? 0;
@@ -335,78 +347,67 @@ function refreshStats() {
             document.getElementById('active_month').textContent = data.active_month ?? 0;
             document.getElementById('active_year').textContent = data.active_year ?? 0;
             document.getElementById('reading_hours').textContent = data.reading_hours ?? 0;
-        }).catch(console.error);
+        })
+        .catch(err => console.warn("Stats poll failed:", err));
 }
 setInterval(refreshStats, 60000);
 
-// ============================================================
-// SMOOTH & SMART CHARTS (WITH SAFETY CHECKS)
-// ============================================================
+// SMOOTH & SMART CHARTS
 function initCharts() {
     const activeCtx = document.getElementById('activeChart');
     const viewsCtx = document.getElementById('viewsChart');
-    // Prevent rendering crash if canvas is missing
     if(!activeCtx || !viewsCtx) return; 
 
-    const gradientActive = activeCtx.getContext('2d').createLinearGradient(0,0,0,250);
-    gradientActive.addColorStop(0, '#DBA1A2'); gradientActive.addColorStop(1, '#e8c0c0');
-    
-    window.activeChart = new Chart(activeCtx, {
-        type: 'line', 
-        data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'Active Readers', data: [0,0,0,0,0,0,0], borderColor: '#DBA1A2', backgroundColor: gradientActive, fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#DBA1A2', pointRadius: 3 }] },
-        options: { 
-            responsive: true, maintainAspectRatio: false, 
-            animation: { duration: 1500, easing: 'easeOutQuart' },
-            plugins: { legend: { display: false } }, 
-            scales: { y: { beginAtZero: true } } 
-        }
-    });
-    
-    window.viewsChart = new Chart(viewsCtx, {
-        type: 'bar', 
-        data: { labels: ['Poems','Books','Blog','Videos'], datasets: [{ label: 'Views (7 days)', data: [0,0,0,0], backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], borderRadius: 6, borderSkipped: false }] },
-        options: { 
-            responsive: true, maintainAspectRatio: false, 
-            animation: { duration: 1500, easing: 'easeOutQuart' },
-            plugins: { legend: { display: false } }, 
-            scales: { y: { beginAtZero: true } } 
-        }
-    });
-    updateCharts();
-    setInterval(updateCharts, 60000);
+    try {
+        const gradientActive = activeCtx.getContext('2d').createLinearGradient(0,0,0,250);
+        gradientActive.addColorStop(0, '#DBA1A2'); gradientActive.addColorStop(1, '#e8c0c0');
+        
+        window.activeChart = new Chart(activeCtx, {
+            type: 'line', 
+            data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'Active Readers', data: [], borderColor: '#DBA1A2', backgroundColor: gradientActive, fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#DBA1A2', pointRadius: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+        
+        window.viewsChart = new Chart(viewsCtx, {
+            type: 'bar', 
+            data: { labels: ['Poems','Books','Blog','Videos'], datasets: [{ label: 'Views (7 days)', data: [], backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], borderRadius: 6, borderSkipped: false }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+        updateCharts();
+        setInterval(updateCharts, 60000);
+    } catch (error) {
+        console.error("Chart initialization failed:", error);
+    }
 }
 
 function updateCharts() {
-    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=active_chart')
+    fetch('ajax_admin.php?action=active_chart')
         .then(res => res.json()).then(data => {
             if(window.activeChart) {
-                // Ensure API returns data, else set to zeros
                 window.activeChart.data.labels = data.labels || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-                window.activeChart.data.datasets[0].data = data.data || [0,0,0,0,0,0,0];
+                window.activeChart.data.datasets[0].data = data.data || [];
                 window.activeChart.update();
             }
-        }).catch(console.error);
+        }).catch(console.warn);
         
-    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=views_chart')
+    fetch('ajax_admin.php?action=views_chart')
         .then(res => res.json()).then(data => {
             if(window.viewsChart) {
-                window.viewsChart.data.datasets[0].data = data.data || [0,0,0,0];
+                window.viewsChart.data.datasets[0].data = data.data || [];
                 window.viewsChart.update();
             }
-        }).catch(console.error);
+        }).catch(console.warn);
 }
 document.addEventListener('DOMContentLoaded', initCharts);
 
-// ============================================================
-// DEEP DIVE MODAL FUNCTIONS (Guest IP Attribution Added)
-// ============================================================
+// DEEP DIVE MODAL
 function openStatsModal(type) {
     document.getElementById('statsModal').classList.add('active');
     const body = document.getElementById('statsModalBody');
     const title = document.getElementById('statsModalTitle');
     body.innerHTML = '<p style="color:#999; text-align:center;">Fetching data...</p>';
 
-    const url = '<?php echo SITE_URL; ?>/ajax_admin.php?action=' + (type === 'views' ? 'get_view_details' : 'get_reading_details');
+    const url = 'ajax_admin.php?action=' + (type === 'views' ? 'get_view_details' : 'get_reading_details');
     title.textContent = type === 'views' ? '📊 Detailed Content Views' : '📖 Detailed Reading Sessions';
 
     fetch(url)
@@ -423,7 +424,6 @@ function openStatsModal(type) {
                     let subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${htmlspecialchars(row.target_type)}</span>`;
                     let viewer = htmlspecialchars(row.viewer_name);
                     if(viewer === 'Guest') {
-                        // IP Attribution for Guests
                         viewer = `<span style="color:#888;">Guest</span> <span style="font-size:0.75rem; color:#999;">(IP: ${htmlspecialchars(row.ip_address || 'N/A')})</span>`;
                     } else {
                         viewer = `<strong>${htmlspecialchars(row.viewer_name)}</strong>`;
@@ -439,8 +439,8 @@ function openStatsModal(type) {
             body.innerHTML = html;
         })
         .catch(err => {
-            body.innerHTML = '<p style="color:red; text-align:center;">Error loading data.</p>';
-            console.error(err);
+            body.innerHTML = '<p style="color:red; text-align:center;">Error loading data. Check console.</p>';
+            console.error("Deep dive error:", err);
         });
 }
 
@@ -454,11 +454,7 @@ document.getElementById('statsModal').addEventListener('click', function(e) {
 function htmlspecialchars(str) {
     if (!str) return '';
     return String(str).replace(/[&<>"]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        if (m === '"') return '&quot;';
-        return m;
+        if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; if (m === '"') return '&quot;'; return m;
     });
 }
 </script>
