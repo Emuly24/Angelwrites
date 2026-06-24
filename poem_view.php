@@ -342,14 +342,20 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .reaction-btn:hover { background: var(--rose-light); border-color: var(--rose); }
 .reaction-btn.active { background: var(--rose); color: #fff; border-color: var(--rose); }
 .reaction-btn .count { font-size: 0.8rem; font-weight: 600; }
-.reaction-particle{position:fixed;pointer-events:none;z-index:99999;font-size:2rem;animation:burst .9s cubic-bezier(.2,.8,.2,1.2) forwards}@keyframes burst{0%{opacity:1;transform:translate(0)scale(.5)}100%{opacity:0;transform:translate(var(--tx),var(--ty))scale(1.5)rotate(360deg)}}.reaction-btn:active{transform:scale(.85);transition:transform .1s}.reaction-btn.active{animation:pop-active .4s ease}@keyframes pop-active{0%{transform:scale(1)}50%{transform:scale(1.3);box-shadow:0 0 20px var(--rose)}100%{transform:scale(1)}}
+
+/* ===== UPDATED SPLASHY EFFECT (Longer delay, more particles) ===== */
+.reaction-particle{position:fixed;pointer-events:none;z-index:99999;font-size:2rem;animation:burst 1.6s cubic-bezier(.2,.8,.2,1.2) forwards}@keyframes burst{0%{opacity:1;transform:translate(0)scale(.5)}100%{opacity:0;transform:translate(var(--tx),var(--ty))scale(1.8)rotate(720deg)}}.reaction-btn:active{transform:scale(.85);transition:transform .1s}.reaction-btn.active{animation:pop-active .4s ease}@keyframes pop-active{0%{transform:scale(1)}50%{transform:scale(1.3);box-shadow:0 0 20px var(--rose)}100%{transform:scale(1)}}
+
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
 .reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
 .reply-link:hover { color: var(--rose-dark); }
 .private-badge { background: #ffd700; color: #333; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: 6px; }
-.tag-suggestions { position: absolute; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; z-index: 1000; min-width: 150px; box-shadow: var(--shadow); }
-.tag-suggestions div { padding: 6px 12px; cursor: pointer; font-size: 0.9rem; }
+
+/* ===== UPDATED TAG SUGGESTIONS (Bulletproof positioning) ===== */
+.tag-suggestions { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; z-index: 99999; min-width: 150px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 4px 0; }
+.tag-suggestions div { padding: 8px 16px; cursor: pointer; font-size: 0.95rem; color: var(--text); }
 .tag-suggestions div:hover { background: var(--vanilla); }
+
 .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .checkbox-group input[type="checkbox"] { accent-color: var(--rose); width: 16px; height: 16px; }
 .review-item { background: var(--card-bg); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); margin-bottom: 12px; }
@@ -534,33 +540,32 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 <!-- ================================================================ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== SPLASHY BURST FUNCTION (defined once) =====
+    // ===== UPDATED SPLASHY BURST FUNCTION (Exact emoji, more particles, longer life) =====
     function createReactionBurst(element, emoji) {
         const rect = element.getBoundingClientRect();
         const x = rect.left + rect.width / 2;
         const y = rect.top + rect.height / 2;
-        const count = 14;
-        const burstEmojis = [emoji, emoji, '✨', '🌟', '💫', '💖'];
-
+        const count = 30; // More splashes
+        // Use ONLY the exact clicked emoji
         for (let i = 0; i < count; i++) {
             const particle = document.createElement('div');
             particle.className = 'reaction-particle';
-            particle.textContent = burstEmojis[Math.floor(Math.random() * burstEmojis.length)];
+            particle.textContent = emoji; // Only the reaction symbol
             const angle = Math.random() * Math.PI * 2;
-            const distance = 60 + Math.random() * 120;
+            const distance = 80 + Math.random() * 150; // Fly farther
             const tx = Math.cos(angle) * distance;
-            const ty = Math.sin(angle) * distance - 30;
+            const ty = Math.sin(angle) * distance - 40;
             particle.style.left = x + 'px';
             particle.style.top = y + 'px';
             particle.style.setProperty('--tx', tx + 'px');
             particle.style.setProperty('--ty', ty + 'px');
-            particle.style.fontSize = (1.2 + Math.random() * 2) + 'rem';
+            particle.style.fontSize = (1.5 + Math.random() * 2.5) + 'rem';
             document.body.appendChild(particle);
-            setTimeout(() => particle.remove(), 1000);
+            setTimeout(() => particle.remove(), 1800); // Extended delay
         }
     }
 
-    // ===== REACTION TOGGLE (works for both poem and comments) =====
+    // ===== REACTION TOGGLE =====
     document.querySelectorAll('.reaction-buttons').forEach(container => {
         const targetType = container.dataset.targetType;
         const targetId = container.dataset.targetId;
@@ -581,12 +586,12 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(err => console.error('Error loading reactions:', err));
 
-        // Handle click events with splashy effect
+        // Handle click events
         buttons.forEach(btn => {
             btn.addEventListener('click', function() {
                 const reaction = this.dataset.reaction;
                 const emoji = this.textContent.trim().charAt(0);
-                createReactionBurst(this, emoji);
+                createReactionBurst(this, emoji); // Exact splash on click
 
                 fetch('ajax_toggle_reaction.php', {
                     method: 'POST',
@@ -611,13 +616,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ===== TAGGING AUTOCOMPLETE =====
+    // ===== FIXED TAGGING AUTOCOMPLETE (Bulletproof positioning) =====
     const commentText = document.getElementById('commentText');
     const suggestions = document.getElementById('tagSuggestions');
     let usersList = [];
     let tagTimer = null;
 
-    // Fetch users once (cached)
     fetch('ajax_get_users.php')
         .then(res => res.json())
         .then(data => usersList = data)
@@ -630,7 +634,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (atPos !== -1 && text.length > atPos + 1) {
             const query = text.substring(atPos + 1);
-            // Debounce to avoid excessive filtering
             tagTimer = setTimeout(() => {
                 const matches = usersList.filter(u => 
                     u.name.toLowerCase().startsWith(query.toLowerCase())
@@ -639,10 +642,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     suggestions.innerHTML = matches.map(u => 
                         `<div data-id="${u.id}" data-name="${u.name}">${u.name}</div>`
                     ).join('');
-                    suggestions.style.display = 'block';
+                    
+                    // Set position fixed relative to textarea
                     const rect = this.getBoundingClientRect();
-                    suggestions.style.top = (rect.bottom + window.scrollY) + 'px';
+                    suggestions.style.position = 'fixed';
+                    suggestions.style.top = rect.bottom + 'px';
                     suggestions.style.left = rect.left + 'px';
+                    suggestions.style.width = rect.width + 'px';
+                    suggestions.style.display = 'block';
                 } else {
                     suggestions.style.display = 'none';
                 }
@@ -661,6 +668,15 @@ document.addEventListener('DOMContentLoaded', function() {
             commentText.value = text.substring(0, atPos) + '@' + name + ' ';
             suggestions.style.display = 'none';
             commentText.focus();
+        }
+    });
+
+    // Close tagging dropdown if clicking outside
+    document.addEventListener('click', function(e) {
+        if (suggestions.style.display === 'block' && 
+            !suggestions.contains(e.target) && 
+            e.target !== commentText) {
+            suggestions.style.display = 'none';
         }
     });
 
