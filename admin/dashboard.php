@@ -6,7 +6,7 @@ require_once '../includes/auth.php';
 redirectIfNotAdmin();
 
 // ============================================================
-// 1. FETCH STATISTICS
+// 1. FETCH STATISTICS (same as before)
 // ============================================================
 $stats = [];
 
@@ -49,20 +49,16 @@ $stmt = $db->query("
 $stats['most_active_readers'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ============================================================
-// 2. FETCH TOP CONTENT (with thumbnails)
+// 2. FETCH TOP CONTENT (with thumbnails) – same as before
 // ============================================================
-// Top 5 poems (by view_count)
 $stmt = $db->prepare("SELECT id, title, image_path, view_count FROM poems ORDER BY view_count DESC LIMIT 5");
 $stmt->execute();
 $top_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Top 5 books (by view_count)
 $stmt = $db->prepare("SELECT id, title, cover_path, view_count FROM books ORDER BY view_count DESC LIMIT 5");
 $stmt->execute();
 $top_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Top 5 blog posts (by comment count or views – we'll use view_count if exists, else comment count)
-// We'll check if blog_posts has view_count; if not, use comments from reviews.
 $stmt = $db->prepare("
     SELECT bp.id, bp.title, bp.featured_image, 
            (SELECT COUNT(*) FROM reviews WHERE target_type='blog' AND target_id=bp.id) as comment_count
@@ -72,7 +68,6 @@ $stmt = $db->prepare("
 $stmt->execute();
 $top_blog = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Top 5 reflections (same as blog but category)
 $stmt = $db->prepare("
     SELECT bp.id, bp.title, bp.featured_image, 
            (SELECT COUNT(*) FROM reviews WHERE target_type='reflection' AND target_id=bp.id) as comment_count
@@ -83,7 +78,6 @@ $stmt = $db->prepare("
 $stmt->execute();
 $top_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Top 5 videos (by view_count or comment count)
 $stmt = $db->prepare("
     SELECT v.id, v.title, v.thumbnail, v.view_count
     FROM videos v
@@ -93,23 +87,7 @@ $stmt->execute();
 $top_videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ============================================================
-// 3. DAILY ACTIVE READERS DATA FOR CHART (last 7 days)
-// ============================================================
-$days = 7;
-$labels = [];
-$data = [];
-for ($i = $days - 1; $i >= 0; $i--) {
-    $date = date('Y-m-d', strtotime("-$i days"));
-    $labels[] = date('D', strtotime($date));
-    $stmt = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE date(start_time) = ?");
-    $stmt->execute([$date]);
-    $data[] = $stmt->fetchColumn() ?? 0;
-}
-$chart_labels = json_encode($labels);
-$chart_data = json_encode($data);
-
-// ============================================================
-// 4. RECENT ACTIVITY (for feed)
+// 3. RECENT ACTIVITY (for feed)
 // ============================================================
 $stmt = $db->prepare("
     SELECT u.name, u.profile_pic, 'comment' as type, r.comment as text, r.created_at 
@@ -157,8 +135,9 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
 .monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); }
 .monitor-card .sub { font-size: 0.85rem; color: #666; }
 
-/* --- CHART --- */
-.chart-container { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); margin-bottom: 24px; height: 250px; }
+/* --- CHART CONTAINERS --- */
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+.chart-container { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); height: 250px; }
 
 /* --- TOP CONTENT GRID WITH THUMBNAILS --- */
 .top-content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -198,6 +177,7 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
     .admin-module-grid { grid-template-columns: repeat(2, 1fr); }
     .monitoring-grid { grid-template-columns: 1fr 1fr; }
     .top-content-grid { grid-template-columns: 1fr 1fr; }
+    .chart-row { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
     .admin-stat-card .num { font-size: 1.4rem; }
@@ -264,9 +244,16 @@ body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --vanilla
         </div>
     </div>
 
-    <!-- Active Readers Chart (Last 7 days) -->
-    <div class="chart-container">
-        <canvas id="activeChart"></canvas>
+    <!-- Charts Row (Two Charts) -->
+    <div class="chart-row">
+        <!-- Active Readers Line Chart (Last 7 Days) -->
+        <div class="chart-container">
+            <canvas id="activeChart"></canvas>
+        </div>
+        <!-- Content Views Bar Chart (Last 7 Days) -->
+        <div class="chart-container">
+            <canvas id="viewsChart"></canvas>
+        </div>
     </div>
 
     <!-- Top Content with Thumbnails -->
@@ -511,21 +498,50 @@ function refreshActivity() {
 // ============================================================
 // 5. ACTIVE READERS CHART (Last 7 Days)
 // ============================================================
-document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('activeChart').getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 0, 250);
-    gradient.addColorStop(0, '#DBA1A2');
-    gradient.addColorStop(1, '#e8c0c0');
+// We'll render this chart with initial data from PHP, then update via AJAX if needed.
+// For now, we fetch data from a new endpoint `ajax_admin_monitoring.php` every 60 sec.
+function updateActiveChart() {
+    fetch('ajax_admin_monitoring.php?type=active')
+        .then(res => res.json())
+        .then(data => {
+            if (window.activeChart) {
+                window.activeChart.data.labels = data.labels;
+                window.activeChart.data.datasets[0].data = data.data;
+                window.activeChart.update();
+            }
+        })
+        .catch(err => console.error('Active chart update failed:', err));
+}
 
-    new Chart(ctx, {
+function updateViewsChart() {
+    fetch('ajax_admin_monitoring.php?type=views')
+        .then(res => res.json())
+        .then(data => {
+            if (window.viewsChart) {
+                window.viewsChart.data.labels = data.labels;
+                window.viewsChart.data.datasets[0].data = data.data;
+                window.viewsChart.update();
+            }
+        })
+        .catch(err => console.error('Views chart update failed:', err));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial active chart
+    const ctxActive = document.getElementById('activeChart').getContext('2d');
+    const gradientActive = ctxActive.createLinearGradient(0, 0, 0, 250);
+    gradientActive.addColorStop(0, '#DBA1A2');
+    gradientActive.addColorStop(1, '#e8c0c0');
+
+    window.activeChart = new Chart(ctxActive, {
         type: 'line',
         data: {
-            labels: <?php echo $chart_labels; ?>,
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
             datasets: [{
                 label: 'Active Readers',
-                data: <?php echo $chart_data; ?>,
+                data: [0,0,0,0,0,0,0],
                 borderColor: '#DBA1A2',
-                backgroundColor: gradient,
+                backgroundColor: gradientActive,
                 fill: true,
                 tension: 0.4,
                 borderWidth: 2,
@@ -536,8 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.y + ' active'; } } }
+                legend: { display: false }
             },
             scales: {
                 y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -545,6 +560,40 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // Initial views chart
+    const ctxViews = document.getElementById('viewsChart').getContext('2d');
+    window.viewsChart = new Chart(ctxViews, {
+        type: 'bar',
+        data: {
+            labels: ['Poems', 'Books', 'Blog', 'Videos'],
+            datasets: [{
+                label: 'Views (last 7 days)',
+                data: [0,0,0,0],
+                backgroundColor: ['#DBA1A2', '#c08a8b', '#e8c0c0', '#EFD8D6'],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Fetch initial data
+    updateActiveChart();
+    updateViewsChart();
+
+    // Auto-refresh charts every 60 seconds
+    setInterval(updateActiveChart, 60000);
+    setInterval(updateViewsChart, 60000);
 });
 </script>
 
