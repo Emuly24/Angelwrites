@@ -90,9 +90,18 @@ if (!$poem) {
 }
 
 // ============================================================
-// 6. UPDATE VIEW COUNT
+// 6. UPDATE VIEW COUNT & LOG DEEP DIVE STATS
 // ============================================================
 $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?")->execute([$id]);
+
+// Log the view for the Deep-Dive Modal (Guest IP & User ID tracking)
+try {
+    $user_id = isLoggedIn() ? $_SESSION['user_id'] : null;
+    $stmt = $db->prepare("INSERT INTO view_logs (target_type, target_id, user_id, ip_address) VALUES ('poem', ?, ?, ?)");
+    $stmt->execute([$id, $user_id, $_SERVER['REMOTE_ADDR']]);
+} catch (Exception $e) {
+    // Silently skip if the view_logs table hasn't been created yet
+}
 
 // ============================================================
 // 7. TRACK USER READ – Bulletproof Check-then-Insert
@@ -164,10 +173,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
 }
 
 // ============================================================
-// 10. FETCH COMMENTS (threaded) – WITH OLD COMMENTS FIX
+// 10. FETCH COMMENTS (threaded)
 // ============================================================
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
-$admin_id = 1; // change to your actual admin user ID
+$admin_id = 1;
 
 $stmt = $db->prepare("
     SELECT r.*, u.name AS author_name, u.profile_pic AS author_pic,
@@ -254,15 +263,12 @@ function render_comment($comment, $level = 0) {
 }
 
 // ============================================================
-// 11. COMMENT COUNTER
+// 11. COMMENT COUNTER & RATINGS
 // ============================================================
 $stmt = $db->prepare("SELECT COUNT(*) FROM reviews WHERE target_type='poem' AND target_id=? AND is_private=0 AND deleted_at IS NULL");
 $stmt->execute([$id]);
 $public_comment_count = $stmt->fetchColumn();
 
-// ============================================================
-// 12. FETCH RATINGS STATS
-// ============================================================
 $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type='poem' AND target_id=? AND is_private=0");
 $stmt->execute([$id]);
 $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -270,7 +276,7 @@ $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
 
 // ============================================================
-// 13. OUTPUT PAGE
+// 12. OUTPUT PAGE
 // ============================================================
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -337,7 +343,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .rating-score { font-weight: 700; font-size: 1.1rem; }
 .rating-count { color: var(--text-light); font-size: 0.9rem; }
 
-/* ===== UPDATED SPLASHY EFFECT (Longer delay, more particles, exact emoji) ===== */
 .reaction-particle{position:fixed;pointer-events:none;z-index:99999;font-size:2rem;animation:burst 1.6s cubic-bezier(.2,.8,.2,1.2) forwards}@keyframes burst{0%{opacity:1;transform:translate(0)scale(.5)}100%{opacity:0;transform:translate(var(--tx),var(--ty))scale(1.8)rotate(720deg)}}.reaction-btn:active{transform:scale(.85);transition:transform .1s}.reaction-btn.active{animation:pop-active .4s ease}@keyframes pop-active{0%{transform:scale(1)}50%{transform:scale(1.3);box-shadow:0 0 20px var(--rose)}100%{transform:scale(1)}}
 
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
@@ -465,12 +470,10 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                 <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
             </div>
 
-            <!-- Comment Counter -->
             <div style="font-size:0.9rem; color:var(--text-light); margin-bottom:12px;">
                 <i class="fas fa-comment"></i> <?php echo $public_comment_count; ?> public <?php echo $public_comment_count == 1 ? 'comment' : 'comments'; ?>
             </div>
 
-            <!-- Text Review Form -->
             <?php if (isLoggedIn()): ?>
                 <div class="review-form-container">
                     <h4>Write a Comment</h4>
@@ -504,7 +507,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                     </form>
                 </div>
 
-                <!-- ===== VOICE COMMENT SECTION (RESTORED) ===== -->
                 <div class="voice-comment-section">
                     <h4>🎙️ Record a Voice Comment</h4>
                     <div class="recorder-wrapper">
@@ -527,7 +529,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                 </div>
             <?php endif; ?>
 
-            <!-- ===== ADMIN REPLY SECTION (RESTORED) ===== -->
             <?php if (isAdmin()): ?>
                 <div class="admin-reply-container">
                     <h4>🛡️ Angella's Reply</h4>
@@ -658,49 +659,53 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => usersList = data)
         .catch(err => console.error('Failed to load users for tagging:', err));
 
-    commentText.addEventListener('input', function() {
-        clearTimeout(tagTimer);
-        const text = this.value;
-        const atPos = text.lastIndexOf('@');
-        
-        if (atPos !== -1 && text.length > atPos + 1) {
-            const query = text.substring(atPos + 1);
-            tagTimer = setTimeout(() => {
-                const matches = usersList.filter(u => 
-                    u.name.toLowerCase().startsWith(query.toLowerCase())
-                );
-                if (matches.length > 0) {
-                    suggestions.innerHTML = matches.map(u => 
-                        `<div data-id="${u.id}" data-name="${u.name}">${u.name}</div>`
-                    ).join('');
-                    const rect = this.getBoundingClientRect();
-                    suggestions.style.position = 'fixed';
-                    suggestions.style.top = rect.bottom + 'px';
-                    suggestions.style.left = rect.left + 'px';
-                    suggestions.style.width = rect.width + 'px';
-                    suggestions.style.display = 'block';
-                } else {
-                    suggestions.style.display = 'none';
-                }
-            }, 300);
-        } else {
-            suggestions.style.display = 'none';
-        }
-    });
-
-    suggestions.addEventListener('click', function(e) {
-        if (e.target.tagName === 'DIV') {
-            const name = e.target.dataset.name;
-            const text = commentText.value;
+    if(commentText) {
+        commentText.addEventListener('input', function() {
+            clearTimeout(tagTimer);
+            const text = this.value;
             const atPos = text.lastIndexOf('@');
-            commentText.value = text.substring(0, atPos) + '@' + name + ' ';
-            suggestions.style.display = 'none';
-            commentText.focus();
-        }
-    });
+            
+            if (atPos !== -1 && text.length > atPos + 1) {
+                const query = text.substring(atPos + 1);
+                tagTimer = setTimeout(() => {
+                    const matches = usersList.filter(u => 
+                        u.name.toLowerCase().startsWith(query.toLowerCase())
+                    );
+                    if (matches.length > 0) {
+                        suggestions.innerHTML = matches.map(u => 
+                            `<div data-id="${u.id}" data-name="${u.name}">${u.name}</div>`
+                        ).join('');
+                        const rect = this.getBoundingClientRect();
+                        suggestions.style.position = 'fixed';
+                        suggestions.style.top = rect.bottom + 'px';
+                        suggestions.style.left = rect.left + 'px';
+                        suggestions.style.width = rect.width + 'px';
+                        suggestions.style.display = 'block';
+                    } else {
+                        suggestions.style.display = 'none';
+                    }
+                }, 300);
+            } else {
+                suggestions.style.display = 'none';
+            }
+        });
+    }
+
+    if(suggestions) {
+        suggestions.addEventListener('click', function(e) {
+            if (e.target.tagName === 'DIV') {
+                const name = e.target.dataset.name;
+                const text = commentText.value;
+                const atPos = text.lastIndexOf('@');
+                commentText.value = text.substring(0, atPos) + '@' + name + ' ';
+                suggestions.style.display = 'none';
+                commentText.focus();
+            }
+        });
+    }
 
     document.addEventListener('click', function(e) {
-        if (suggestions.style.display === 'block' && 
+        if (suggestions && suggestions.style.display === 'block' && 
             !suggestions.contains(e.target) && 
             e.target !== commentText) {
             suggestions.style.display = 'none';
@@ -721,17 +726,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ===== VOICE RECORDER (RESTORED) =====
+    // ===== VOICE RECORDER =====
     const recordBtn = document.getElementById('recordBtn');
-    const recordingStatus = document.getElementById('recordingStatus');
-    const voiceForm = document.getElementById('voiceForm');
-    const voiceFileInput = document.getElementById('voiceFileInput');
-    const voicePreviewContainer = document.getElementById('voicePreviewContainer');
-    const voicePreview = document.getElementById('voicePreview');
-    let mediaRecorder = null;
-    let audioChunks = [];
-
     if (recordBtn) {
+        const recordingStatus = document.getElementById('recordingStatus');
+        const voiceForm = document.getElementById('voiceForm');
+        const voiceFileInput = document.getElementById('voiceFileInput');
+        const voicePreviewContainer = document.getElementById('voicePreviewContainer');
+        const voicePreview = document.getElementById('voicePreview');
+        let mediaRecorder = null;
+        let audioChunks = [];
+
         recordBtn.addEventListener('click', async function() {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
@@ -774,177 +779,179 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== AUDIO PLAYER =====
     const audio = document.getElementById('audioSource');
-    const playBtn = document.getElementById('playPauseBtn');
-    const playIcon = playBtn.querySelector('i');
-    const progressFill = document.getElementById('progressFill');
-    const progressBar = document.getElementById('progressBar');
-    const timeDisplay = document.getElementById('timeDisplay');
-    const muteBtn = document.getElementById('muteBtn');
-    const volumeSlider = document.getElementById('volumeSlider');
-    const canvas = document.getElementById('waveCanvas');
-    const ctx = canvas.getContext('2d');
-    let isPlaying = false;
-    let audioContext = null;
-    let analyser = null;
-    let source = null;
-    let animationId = null;
-    let dataArray = null;
+    if (audio) {
+        const playBtn = document.getElementById('playPauseBtn');
+        const playIcon = playBtn.querySelector('i');
+        const progressFill = document.getElementById('progressFill');
+        const progressBar = document.getElementById('progressBar');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const muteBtn = document.getElementById('muteBtn');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const canvas = document.getElementById('waveCanvas');
+        const ctx = canvas.getContext('2d');
+        let isPlaying = false;
+        let audioContext = null;
+        let analyser = null;
+        let source = null;
+        let animationId = null;
+        let dataArray = null;
 
-    function resizeCanvas() {
-        const rect = canvas.parentElement.getBoundingClientRect();
-        canvas.width = rect.width;
-        canvas.height = 100;
-    }
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    function initAudioContext() {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.8;
-            source = audioContext.createMediaElementSource(audio);
-            source.connect(analyser);
-            analyser.connect(audioContext.destination);
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = 100;
         }
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-    }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
 
-    function drawWave() {
-        if (!analyser) return;
-        animationId = requestAnimationFrame(drawWave);
-        analyser.getByteFrequencyData(dataArray);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const barCount = 64;
-        const barWidth = (canvas.width / barCount) * 0.6;
-        const gap = (canvas.width / barCount) * 0.4;
-        const halfHeight = canvas.height / 2;
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        gradient.addColorStop(0, '#DBA1A2');
-        gradient.addColorStop(0.5, '#e8c0c0');
-        gradient.addColorStop(1, '#DBA1A2');
-        ctx.fillStyle = gradient;
-        for (let i = 0; i < barCount; i++) {
-            const value = dataArray[i] / 255;
-            const barHeight = value * halfHeight * 1.5;
-            const x = i * (barWidth + gap) + gap / 2;
-            const y = halfHeight - barHeight / 2;
-            const radius = 4;
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + barWidth - radius, y);
-            ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
-            ctx.lineTo(x + barWidth, y + barHeight - radius);
-            ctx.quadraticCurveTo(x + barWidth, y + barHeight, x + barWidth - radius, y + barHeight);
-            ctx.lineTo(x + radius, y + barHeight);
-            ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - radius);
-            ctx.lineTo(x, y + radius);
-            ctx.quadraticCurveTo(x, y, x + radius, y);
-            ctx.closePath();
-            ctx.fill();
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.8;
+                source = audioContext.createMediaElementSource(audio);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
         }
-        const overlayGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        overlayGradient.addColorStop(0, 'rgba(219, 161, 162, 0.15)');
-        overlayGradient.addColorStop(0.5, 'rgba(219, 161, 162, 0)');
-        overlayGradient.addColorStop(1, 'rgba(219, 161, 162, 0.15)');
-        ctx.fillStyle = overlayGradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
 
-    function stopVisualizer() {
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
+        function drawWave() {
+            if (!analyser) return;
+            animationId = requestAnimationFrame(drawWave);
+            analyser.getByteFrequencyData(dataArray);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const barCount = 64;
+            const barWidth = (canvas.width / barCount) * 0.6;
+            const gap = (canvas.width / barCount) * 0.4;
+            const halfHeight = canvas.height / 2;
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            gradient.addColorStop(0, '#DBA1A2');
+            gradient.addColorStop(0.5, '#e8c0c0');
+            gradient.addColorStop(1, '#DBA1A2');
+            ctx.fillStyle = gradient;
+            for (let i = 0; i < barCount; i++) {
+                const value = dataArray[i] / 255;
+                const barHeight = value * halfHeight * 1.5;
+                const x = i * (barWidth + gap) + gap / 2;
+                const y = halfHeight - barHeight / 2;
+                const radius = 4;
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + barWidth - radius, y);
+                ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+                ctx.lineTo(x + barWidth, y + barHeight - radius);
+                ctx.quadraticCurveTo(x + barWidth, y + barHeight, x + barWidth - radius, y + barHeight);
+                ctx.lineTo(x + radius, y + barHeight);
+                ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.fill();
+            }
+            const overlayGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            overlayGradient.addColorStop(0, 'rgba(219, 161, 162, 0.15)');
+            overlayGradient.addColorStop(0.5, 'rgba(219, 161, 162, 0)');
+            overlayGradient.addColorStop(1, 'rgba(219, 161, 162, 0.15)');
+            ctx.fillStyle = overlayGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
 
-    playBtn.addEventListener('click', function() {
-        if (audio.paused) {
-            initAudioContext();
-            audio.play();
-            isPlaying = true;
-            playIcon.className = 'fas fa-pause';
-            if (!animationId) drawWave();
-        } else {
-            audio.pause();
+        function stopVisualizer() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        playBtn.addEventListener('click', function() {
+            if (audio.paused) {
+                initAudioContext();
+                audio.play();
+                isPlaying = true;
+                playIcon.className = 'fas fa-pause';
+                if (!animationId) drawWave();
+            } else {
+                audio.pause();
+                isPlaying = false;
+                playIcon.className = 'fas fa-play';
+                stopVisualizer();
+            }
+        });
+
+        audio.addEventListener('ended', function() {
             isPlaying = false;
             playIcon.className = 'fas fa-play';
             stopVisualizer();
+            progressFill.style.width = '0%';
+            updateTimeDisplay();
+        });
+
+        audio.addEventListener('timeupdate', function() {
+            const percent = (audio.currentTime / audio.duration) * 100;
+            progressFill.style.width = percent + '%';
+            updateTimeDisplay();
+        });
+
+        progressBar.addEventListener('click', function(e) {
+            const rect = this.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percent = x / rect.width;
+            audio.currentTime = percent * audio.duration;
+        });
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return mins + ':' + (secs < 10 ? '0' : '') + secs;
         }
-    });
 
-    audio.addEventListener('ended', function() {
-        isPlaying = false;
-        playIcon.className = 'fas fa-play';
-        stopVisualizer();
-        progressFill.style.width = '0%';
-        updateTimeDisplay();
-    });
+        function updateTimeDisplay() {
+            const current = formatTime(audio.currentTime || 0);
+            const total = formatTime(audio.duration || 0);
+            timeDisplay.textContent = current + ' / ' + total;
+        }
 
-    audio.addEventListener('timeupdate', function() {
-        const percent = (audio.currentTime / audio.duration) * 100;
-        progressFill.style.width = percent + '%';
-        updateTimeDisplay();
-    });
+        audio.addEventListener('loadedmetadata', updateTimeDisplay);
 
-    progressBar.addEventListener('click', function(e) {
-        const rect = this.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const percent = x / rect.width;
-        audio.currentTime = percent * audio.duration;
-    });
+        volumeSlider.addEventListener('input', function() {
+            audio.volume = this.value;
+            muteBtn.querySelector('i').className = this.value == 0 ? 'fas fa-volume-mute' : 'fas fa-volume-up';
+        });
 
-    function formatTime(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return mins + ':' + (secs < 10 ? '0' : '') + secs;
+        muteBtn.addEventListener('click', function() {
+            if (audio.volume > 0) {
+                audio.volume = 0;
+                volumeSlider.value = 0;
+                muteBtn.querySelector('i').className = 'fas fa-volume-mute';
+            } else {
+                audio.volume = 1;
+                volumeSlider.value = 1;
+                muteBtn.querySelector('i').className = 'fas fa-volume-up';
+            }
+        });
+
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && isPlaying && !animationId) {
+                drawWave();
+            }
+            if (document.hidden && animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (audioContext) {
+                audioContext.close();
+            }
+        });
     }
-
-    function updateTimeDisplay() {
-        const current = formatTime(audio.currentTime || 0);
-        const total = formatTime(audio.duration || 0);
-        timeDisplay.textContent = current + ' / ' + total;
-    }
-
-    audio.addEventListener('loadedmetadata', updateTimeDisplay);
-
-    volumeSlider.addEventListener('input', function() {
-        audio.volume = this.value;
-        muteBtn.querySelector('i').className = this.value == 0 ? 'fas fa-volume-mute' : 'fas fa-volume-up';
-    });
-
-    muteBtn.addEventListener('click', function() {
-        if (audio.volume > 0) {
-            audio.volume = 0;
-            volumeSlider.value = 0;
-            muteBtn.querySelector('i').className = 'fas fa-volume-mute';
-        } else {
-            audio.volume = 1;
-            volumeSlider.value = 1;
-            muteBtn.querySelector('i').className = 'fas fa-volume-up';
-        }
-    });
-
-    document.addEventListener('visibilitychange', function() {
-        if (!document.hidden && isPlaying && !animationId) {
-            drawWave();
-        }
-        if (document.hidden && animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
-        }
-    });
-
-    window.addEventListener('beforeunload', function() {
-        if (audioContext) {
-            audioContext.close();
-        }
-    });
 });
 </script>
 
