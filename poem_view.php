@@ -4,7 +4,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 // ============================================================
-// 1. CSRF PROTECTION HELPER (if not already defined)
+// 1. CSRF PROTECTION HELPER
 // ============================================================
 if (!function_exists('generate_csrf_token')) {
     function generate_csrf_token() {
@@ -70,36 +70,7 @@ if (!function_exists('rate_limit')) {
 }
 
 // ============================================================
-// 4. BACKGROUND IMAGE RESIZING HELPER (for admin uploads)
-// ============================================================
-if (!function_exists('resize_image')) {
-    function resize_image($source_path, $dest_path, $width, $height) {
-        $info = getimagesize($source_path);
-        list($src_w, $src_h) = $info;
-        $type = $info[2];
-        $src = null;
-        switch ($type) {
-            case IMAGETYPE_JPEG: $src = imagecreatefromjpeg($source_path); break;
-            case IMAGETYPE_PNG: $src = imagecreatefrompng($source_path); break;
-            case IMAGETYPE_GIF: $src = imagecreatefromgif($source_path); break;
-            default: return false;
-        }
-        $dst = imagecreatetruecolor($width, $height);
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $width, $height, $src_w, $src_h);
-        $ext = pathinfo($dest_path, PATHINFO_EXTENSION);
-        if ($ext === 'png') {
-            imagepng($dst, $dest_path, 9);
-        } else {
-            imagejpeg($dst, $dest_path, 85);
-        }
-        imagedestroy($src);
-        imagedestroy($dst);
-        return true;
-    }
-}
-
-// ============================================================
-// 5. GET POEM ID
+// 4. GET POEM ID
 // ============================================================
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if (!$id) {
@@ -108,7 +79,7 @@ if (!$id) {
 }
 
 // ============================================================
-// 6. FETCH POEM (with precomputed reading_time)
+// 5. FETCH POEM
 // ============================================================
 $stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
 $stmt->execute([$id]);
@@ -119,21 +90,35 @@ if (!$poem) {
 }
 
 // ============================================================
-// 7. UPDATE VIEW COUNT (atomic)
+// 6. UPDATE VIEW COUNT (atomic)
 // ============================================================
 $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?")->execute([$id]);
 
 // ============================================================
-// 8. TRACK USER READ (if logged in)
+// 7. TRACK USER READ – Bulletproof Check-then-Insert
 // ============================================================
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
-    $stmt = $db->prepare("INSERT IGNORE INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
-    $stmt->execute([$user_id, $id]);
+    $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    $user_exists = $stmt->fetchColumn();
+    if ($user_exists && $poem) {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ? AND poem_id = ?");
+        $stmt->execute([$user_id, $id]);
+        $already_read = $stmt->fetchColumn();
+        if (!$already_read) {
+            try {
+                $stmt = $db->prepare("INSERT INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
+                $stmt->execute([$user_id, $id]);
+            } catch (PDOException $e) {
+                error_log("Poem tracking failed: " . $e->getMessage());
+            }
+        }
+    }
 }
 
 // ============================================================
-// 9. OPEN GRAPH META (with cache‑busting image URL)
+// 8. OPEN GRAPH META
 // ============================================================
 $base_url = rtrim(SITE_URL, '/');
 $share_url = $base_url . '/poem_view.php?id=' . $id;
@@ -142,7 +127,7 @@ $og_desc = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']
 $og_image = $base_url . '/img/' . $id . '?v=' . time();
 
 // ============================================================
-// 10. HANDLE POST REQUESTS (Comment / Reply / Private) with CSRF
+// 9. HANDLE POST REQUESTS (Comment / Reply / Private) with CSRF
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -154,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     $comment = trim($_POST['comment']);
     $parent_id = isset($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
     $is_private = isset($_POST['is_private']) ? 1 : 0;
-    $target_user_id = $is_private ? 1 : null; // admin ID (Angella) - change to your admin user ID
+    $target_user_id = $is_private ? 1 : null; // admin ID (Angella)
 
     if (!empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, parent_id, is_private, target_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -180,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
 }
 
 // ============================================================
-// 11. FETCH COMMENTS (threaded) with permissions
+// 10. FETCH COMMENTS (threaded) with permissions
 // ============================================================
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
 $admin_id = 1; // change to your actual admin user ID
@@ -212,9 +197,8 @@ foreach ($comments_raw as $c) {
     }
 }
 
-// Helper to render nested comments
 function render_comment($comment, $level = 0) {
-    $id = $GLOBALS['id']; // poem ID
+    $id = $GLOBALS['id'];
     ?>
     <div class="review-item" style="margin-left:<?php echo $level*20; ?>px; border-left:<?php echo $level>0?'2px solid var(--rose)':'none'; ?>; padding-left:<?php echo $level>0?'12px':'0'; ?>;">
         <div class="review-header">
@@ -238,7 +222,6 @@ function render_comment($comment, $level = 0) {
             </div>
         <?php endif; ?>
         <div class="review-comment"><?php echo nl2br(htmlspecialchars($comment['comment'])); ?></div>
-        <!-- Reaction buttons for this comment -->
         <div class="reaction-buttons" data-target-type="comment" data-target-id="<?php echo $comment['id']; ?>">
             <button class="reaction-btn" data-reaction="like">👍 <span class="count"><?php echo $comment['likes']; ?></span></button>
             <button class="reaction-btn" data-reaction="love">❤️ <span class="count">0</span></button>
@@ -247,9 +230,7 @@ function render_comment($comment, $level = 0) {
             <button class="reaction-btn" data-reaction="sad">😢 <span class="count">0</span></button>
             <button class="reaction-btn" data-reaction="angry">😡 <span class="count">0</span></button>
         </div>
-        <!-- Reply link -->
         <div class="reply-link" data-comment-id="<?php echo $comment['id']; ?>">Reply</div>
-        <!-- Reply form (hidden) -->
         <div class="comment-reply-form" style="display:none;">
             <form method="POST" class="reply-form">
                 <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
@@ -261,7 +242,6 @@ function render_comment($comment, $level = 0) {
                 <button type="button" class="btn btn-sm btn-secondary cancel-reply">Cancel</button>
             </form>
         </div>
-        <!-- Render replies -->
         <?php if (!empty($comment['children'])): ?>
             <?php foreach ($comment['children'] as $child): ?>
                 <?php render_comment($child, $level + 1); ?>
@@ -272,7 +252,7 @@ function render_comment($comment, $level = 0) {
 }
 
 // ============================================================
-// 12. FETCH RATINGS STATS
+// 11. FETCH RATINGS STATS
 // ============================================================
 $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type='poem' AND target_id=? AND is_private=0");
 $stmt->execute([$id]);
@@ -281,7 +261,7 @@ $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
 $total_reviews = $rating_data['total'] ?? 0;
 
 // ============================================================
-// 13. OUTPUT PAGE
+// 12. OUTPUT PAGE
 // ============================================================
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -293,633 +273,23 @@ $total_reviews = $rating_data['total'] ?? 0;
 <meta property="og:url" content="<?php echo $share_url; ?>">
 <meta name="twitter:card" content="summary_large_image">
 
-<?php
-require_once 'includes/config.php';
-require_once 'includes/db.php';
-require_once 'includes/auth.php';
-
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-
-// 🔥 CRITICAL FIX: Catch database errors so the bot isn't redirected away
-$poem = null;
-try {
-    $stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
-    $stmt->execute([$id]);
-    $poem = $stmt->fetch(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // Silent fail to prevent redirects
-}
-
-// REMOVED: if (!$poem) { header('Location: ' . SITE_URL . '/poetry.php'); exit; }
-
-// ============================================================
-// 🚀 VIEW COUNTER & TRACKING (Only if poem exists)
-// ============================================================
-if ($poem) {
-    $stmt = $db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?");
-    $stmt->execute([$id]);
-    $poem['view_count'] = ($poem['view_count'] ?? 0) + 1;
-
-    if (isLoggedIn()) {
-        $user_id = $_SESSION['user_id'];
-        $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
-        $stmt->execute([$user_id]);
-        $user_exists = $stmt->fetchColumn();
-        if ($user_exists && $poem) {
-            $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ? AND poem_id = ?");
-            $stmt->execute([$user_id, $id]);
-            $already_read = $stmt->fetchColumn();
-            if (!$already_read) {
-                try {
-                    $stmt = $db->prepare("INSERT INTO poem_reads (user_id, poem_id) VALUES (?, ?)");
-                    $stmt->execute([$user_id, $id]);
-                } catch (PDOException $e) {
-                    error_log("Poem tracking failed: " . $e->getMessage());
-                }
-            }
-        }
-    }
-}
-
-// ============================================================
-// 🚀 SHARE & OG DATA (With Fallbacks for Bots)
-// ============================================================
-$base_url = rtrim((defined('SITE_URL') && !empty(SITE_URL) ? SITE_URL : 'https://angelwrites.gt.tc'), '/');
-$full_url = $base_url . '/poem_view.php?id=' . $id;
-
-// 🕒 CACHE BUSTER: Appends a timestamp to force WhatsApp to recrawl
-$cache_buster = '&_=' . time();
-$share_url = $full_url . $cache_buster;
-
-// Set safe fallbacks if database was blocked
-$poem_title = $poem ? $poem['title'] : 'A Poem on AngelWrites';
-$poem_intro = $poem ? ($poem['intro'] ?? strip_tags($poem['content'])) : 'Discover heartfelt poetry and reflections on AngelWrites.';
-$poem_image = $poem ? ltrim($poem['image_path'], '/') : 'assets/images/angelwrites-logo.png';
-
-$encoded_url = urlencode($share_url);
-$encoded_title = urlencode($poem_title);
-$wa_text = urlencode($poem_title . ' — read this poem on AngelWrites: ' . $share_url);
-$twitter_text = urlencode($poem_title . ' — a poem by Angella Bottoman');
-
-$pageTitle = htmlspecialchars($poem_title) . ' — Poetry';
-
-// 🖼️ OG Variables
-$og_title = htmlspecialchars($poem_title);
-$og_url = $full_url;
-$og_description = htmlspecialchars(substr($poem_intro, 0, 150));
-if (empty($og_description)) {
-    $og_description = 'Read this poem on AngelWrites.';
-}
-$og_image_width = 1200;
-$og_image_height = 630;
-
-// 🔥 INFINITYFREE BOT BYPASS: Use a clean URL (/img/22) with no extension.
-// The .htaccess rule RewriteRule ^img/([0-9]+)/?$ serve_og.php?id=$1 processes this.
-$og_image = $base_url . '/img/' . $id;
-
-// ===== HANDLE TEXT REVIEW =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && isLoggedIn()) {
-    $target_type = $_POST['target_type'];
-    $target_id = (int)$_POST['target_id'];
-    $rating = (int)$_POST['rating'];
-    $comment = trim($_POST['comment']);
-    if ($rating >= 1 && $rating <= 5 && !empty($comment)) {
-        $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$target_type, $target_id, $_SESSION['user_id'], $rating, $comment]);
-        header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
-        exit;
-    }
-}
-
-// ===== HANDLE VOICE COMMENT =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment']) && isLoggedIn()) {
-    $target_id = (int)$_POST['target_id'];
-    $rating = isset($_POST['rating']) ? (int)$_POST['rating'] : 0;
-    if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/uploads/voice_comments/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $filename = 'voice_' . time() . '.webm';
-        if (move_uploaded_file($_FILES['voice_file']['tmp_name'], $upload_dir . $filename)) {
-            $voice_path = 'assets/uploads/voice_comments/' . $filename;
-            $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, voice_path) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute(['poem', $target_id, $_SESSION['user_id'], $rating, '🎙️ Voice comment', $voice_path]);
-            header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
-            exit;
-        }
-    }
-}
-
-// ===== HANDLE ADMIN REPLY =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin_reply']) && isAdmin()) {
-    $target_id = (int)$_POST['target_id'];
-    $reply = trim($_POST['admin_reply']);
-    if (!empty($reply)) {
-        $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, comment, is_admin_reply) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute(['poem', $target_id, $_SESSION['user_id'], $reply, 1]);
-        header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
-        exit;
-    }
-}
-
-// ===== FETCH REVIEWS & RATINGS (Only if poem exists) =====
-$reviews = [];
-$avg_rating = 0;
-$total_reviews = 0;
-if ($poem) {
-    function readingTime($content) {
-        $word_count = str_word_count(strip_tags($content));
-        $minutes = ceil($word_count / 200);
-        return $minutes < 1 ? '1 min read' : $minutes . ' min read';
-    }
-
-    $stmt = $db->prepare("
-        SELECT r.*, u.name AS author_name 
-        FROM reviews r
-        JOIN users u ON r.user_id = u.id
-        WHERE r.target_type = 'poem' AND r.target_id = ?
-        ORDER BY r.created_at DESC
-    ");
-    $stmt->execute([$id]);
-    $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'poem' AND target_id = ?");
-    $stmt->execute([$id]);
-    $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
-    $total_reviews = $rating_data['total'] ?? 0;
-}
-?>
-<?php require_once 'includes/header.php'; ?>
-
-<!-- ===== READING PROGRESS BAR ===== -->
-<div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
-
-<div class="poem-view-page">
-    <div class="container">
-        <!-- Navigation -->
-        <div class="poem-nav">
-            <a href="<?php echo SITE_URL; ?>/poetry.php" class="back-link">
-                <i class="fas fa-arrow-left"></i> Back to Poetry
-            </a>
-        </div>
-
-        <?php if ($poem): ?>
-            <!-- Poem Header -->
-            <header class="poem-header">
-                <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
-                <div class="poem-meta">
-                    <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
-                    <span class="poem-views"><i class="fas fa-eye"></i> <?php echo number_format($poem['view_count'] ?? 1); ?> views</span>
-                    <span class="poem-reading-time"><i class="fas fa-clock"></i> <?php echo readingTime($poem['content']); ?></span>
-                </div>
-            </header>
-
-            <!-- 🚀 FIXED: Bulletproof IMG URL -->
-            <?php if ($poem['image_path']): ?>
-                <div class="poem-image-container">
-                    <img src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['image_path'], '/'); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
-                </div>
-            <?php endif; ?>
-
-            <!-- ===== ENHANCED AUDIO PLAYER WITH WAVE VISUALIZER ===== -->
-            <?php if ($poem['audio_path']): ?>
-                <div class="poem-audio-player">
-                    <div class="audio-label">
-                        <i class="fas fa-headphones"></i>
-                        <span>Listen to this poem</span>
-                    </div>
-                    <div id="customAudioPlayer">
-                        <canvas id="waveCanvas"></canvas>
-                        <!-- 🚀 FIXED: Bulletproof AUDIO URL -->
-                        <audio id="audioSource" src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($poem['audio_path'], '/'); ?>" preload="metadata"></audio>
-                        <div class="audio-controls-bar">
-                            <button id="playPauseBtn" class="play-btn" aria-label="Play">
-                                <i class="fas fa-play"></i>
-                            </button>
-                            <div class="progress-container">
-                                <div class="progress-bar" id="progressBar">
-                                    <div class="progress-fill" id="progressFill"></div>
-                                </div>
-                            </div>
-                            <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
-                            <div class="volume-control">
-                                <button id="muteBtn" aria-label="Mute"><i class="fas fa-volume-up"></i></button>
-                                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <!-- Poem Introduction -->
-            <?php if ($poem['intro']): ?>
-                <div class="poem-intro-section">
-                    <div class="intro-label">✧ Purpose of this poem</div>
-                    <div class="intro-body">
-                        <?php echo nl2br(htmlspecialchars($poem['intro'])); ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <!-- Poem Content -->
-            <div class="poem-content-section">
-                <div class="poem-body">
-                    <?php echo $poem['content']; ?>
-                </div>
-            </div>
-
-            <!-- ===== REVIEWS & COMMENTS ===== -->
-            <div class="reviews-section">
-                <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
-                
-                <div class="rating-summary">
-                    <div class="rating-stars">
-                        <?php for ($i = 1; $i <= 5; $i++): ?>
-                            <i class="fas fa-star <?php echo $i <= $avg_rating ? 'filled' : 'empty'; ?>"></i>
-                        <?php endfor; ?>
-                    </div>
-                    <span class="rating-score"><?php echo number_format($avg_rating, 1); ?> / 5</span>
-                    <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
-                </div>
-
-                <!-- Text Review Form -->
-                <?php if (isLoggedIn()): ?>
-                    <div class="review-form-container">
-                        <h4>Write a Text Review</h4>
-                        <form method="POST" class="review-form">
-                            <input type="hidden" name="target_type" value="poem">
-                            <input type="hidden" name="target_id" value="<?php echo $id; ?>">
-                            <div class="star-rating">
-                                <span>Your rating:</span>
-                                <div class="stars">
-                                    <input type="radio" name="rating" value="5" id="star5"><label for="star5"><i class="fas fa-star"></i></label>
-                                    <input type="radio" name="rating" value="4" id="star4"><label for="star4"><i class="fas fa-star"></i></label>
-                                    <input type="radio" name="rating" value="3" id="star3"><label for="star3"><i class="fas fa-star"></i></label>
-                                    <input type="radio" name="rating" value="2" id="star2"><label for="star2"><i class="fas fa-star"></i></label>
-                                    <input type="radio" name="rating" value="1" id="star1"><label for="star1"><i class="fas fa-star"></i></label>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <textarea name="comment" rows="3" placeholder="Share your thoughts about this poem..." required></textarea>
-                            </div>
-                            <button type="submit" name="submit_review" class="btn btn-primary">
-                                <i class="fas fa-paper-plane"></i> Submit Review
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Voice Comment Form -->
-                    <div class="voice-comment-section">
-                        <h4>🎙️ Record a Voice Comment</h4>
-                        <div class="recorder-wrapper">
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form method="POST" enctype="multipart/form-data" id="voiceForm" style="display:none; margin-top:10px;">
-                                <input type="hidden" name="submit_voice_comment" value="1">
-                                <input type="hidden" name="target_id" value="<?php echo $id; ?>">
-                                <input type="file" name="voice_file" id="voiceFileInput" accept="audio/webm" required>
-                                <button type="submit" class="btn btn-success btn-sm">Upload Voice Comment</button>
-                            </form>
-                            <div id="voicePreviewContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="voicePreview" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <div class="login-prompt">
-                        <p><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>">Login</a> to rate, review, or leave a voice comment.</p>
-                    </div>
-                <?php endif; ?>
-
-                <!-- Admin Reply Form -->
-                <?php if (isAdmin()): ?>
-                    <div class="admin-reply-container">
-                        <h4>🛡️ Angella's Reply</h4>
-                        <form method="POST" class="admin-reply-form">
-                            <input type="hidden" name="add_admin_reply" value="1">
-                            <input type="hidden" name="target_id" value="<?php echo $id; ?>">
-                            <div class="form-group">
-                                <textarea name="admin_reply" rows="3" placeholder="Reply to this poem directly..." required></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Post Reply</button>
-                        </form>
-                    </div>
-                <?php endif; ?>
-
-                <!-- Reviews List -->
-                <?php if (count($reviews) > 0): ?>
-                    <div class="reviews-list">
-                        <?php foreach ($reviews as $review): ?>
-                            <div class="review-item <?php echo $review['is_admin_reply'] ? 'admin-reply' : ''; ?>">
-                                <div class="review-header">
-                                    <span class="review-author">
-                                        <i class="fas fa-user-circle"></i>
-                                        <?php echo htmlspecialchars($review['author_name']); ?>
-                                        <?php if ($review['is_admin_reply']): ?>
-                                            <span class="admin-badge">🛡️ Angella</span>
-                                        <?php endif; ?>
-                                    </span>
-                                    <span class="review-date"><?php echo date('M j, Y', strtotime($review['created_at'])); ?></span>
-                                </div>
-                                <?php if ($review['rating'] > 0): ?>
-                                    <div class="review-rating">
-                                        <?php for ($i = 1; $i <= 5; $i++): ?>
-                                            <i class="fas fa-star <?php echo $i <= $review['rating'] ? 'filled' : 'empty'; ?>"></i>
-                                        <?php endfor; ?>
-                                    </div>
-                                <?php endif; ?>
-                                <div class="review-comment">
-                                    <?php if (!empty($review['voice_path'])): ?>
-                                        <div class="voice-comment-player">
-                                            <audio controls>
-                                                <source src="<?php echo rtrim(SITE_URL, '/') . '/' . ltrim($review['voice_path'], '/'); ?>" type="audio/webm">
-                                            </audio>
-                                        </div>
-                                    <?php else: ?>
-                                        <?php echo nl2br(htmlspecialchars($review['comment'])); ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        <?php else: ?>
-            <!-- If the poem is not found, show this instead of redirecting -->
-            <div class="poem-content-section">
-                <p style="text-align: center;">Poem not found. <a href="<?php echo SITE_URL; ?>/poetry.php">Browse all poems</a>.</p>
-            </div>
-        <?php endif; ?>
-
-        <!-- Poem Footer Actions -->
-        <div class="poem-footer-actions">
-            <div class="share-section">
-                <span>Share:</span>
-                <!-- UPDATED: Added &display=popup to prevent blank Facebook tab -->
-                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $encoded_url; ?>&display=popup" target="_blank" class="share-btn facebook">
-                    <i class="fab fa-facebook-f"></i>
-                </a>
-                <a href="https://twitter.com/intent/tweet?text=<?php echo $twitter_text; ?>&url=<?php echo $encoded_url; ?>" target="_blank" class="share-btn twitter">
-                    <i class="fab fa-twitter"></i>
-                </a>
-                <a href="https://api.whatsapp.com/send?text=<?php echo $wa_text; ?>" target="_blank" class="share-btn whatsapp">
-                    <i class="fab fa-whatsapp"></i>
-                </a>
-            </div>
-            <div class="reading-actions">
-                <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline">
-                    <i class="fas fa-list"></i> More Poems
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== BACK TO TOP BUTTON ===== -->
-<button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
-    <i class="fas fa-arrow-up"></i>
-</button>
-
-<!-- ===== JAVASCRIPT (Unchanged) ===== -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    window.addEventListener('scroll', function() {
-        const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercent = (scrollTop / docHeight) * 100;
-        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
-    });
-    const backToTopBtn = document.getElementById('backToTop');
-    window.addEventListener('scroll', function() {
-        if (window.scrollY > 400) {
-            backToTopBtn.style.display = 'flex';
-        } else {
-            backToTopBtn.style.display = 'none';
-        }
-    });
-    const recordBtn = document.getElementById('recordBtn');
-    const recordingStatus = document.getElementById('recordingStatus');
-    const voiceForm = document.getElementById('voiceForm');
-    const voiceFileInput = document.getElementById('voiceFileInput');
-    const voicePreviewContainer = document.getElementById('voicePreviewContainer');
-    const voicePreview = document.getElementById('voicePreview');
-    let mediaRecorder = null;
-    let audioChunks = [];
-    if (recordBtn) {
-        recordBtn.addEventListener('click', async function() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                recordingStatus.style.display = 'none';
-                recordBtn.textContent = '🎙️ Start Recording';
-                recordBtn.classList.remove('btn-danger');
-                recordBtn.classList.add('btn-secondary');
-                return;
-            }
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const file = new File([audioBlob], 'voice_comment.webm', { type: 'audio/webm' });
-                    const dt = new DataTransfer();
-                    dt.items.add(file);
-                    voiceFileInput.files = dt.files;
-                    const url = URL.createObjectURL(file);
-                    voicePreview.src = url;
-                    voicePreviewContainer.style.display = 'block';
-                    voiceForm.style.display = 'block';
-                    recordBtn.textContent = '🎙️ Record Again';
-                };
-                mediaRecorder.start();
-                recordingStatus.style.display = 'inline';
-                recordBtn.textContent = '⏹️ Stop Recording';
-                recordBtn.classList.remove('btn-secondary');
-                recordBtn.classList.add('btn-danger');
-            } catch (error) {
-                alert('Microphone access denied or not available.');
-                console.error('Recording error:', error);
-            }
-        });
-    }
-    const audio = document.getElementById('audioSource');
-    const playBtn = document.getElementById('playPauseBtn');
-    const playIcon = playBtn.querySelector('i');
-    const progressFill = document.getElementById('progressFill');
-    const progressBar = document.getElementById('progressBar');
-    const timeDisplay = document.getElementById('timeDisplay');
-    const muteBtn = document.getElementById('muteBtn');
-    const volumeSlider = document.getElementById('volumeSlider');
-    const canvas = document.getElementById('waveCanvas');
-    const ctx = canvas.getContext('2d');
-    let isPlaying = false;
-    let audioContext = null;
-    let analyser = null;
-    let source = null;
-    let animationId = null;
-    let dataArray = null;
-    function resizeCanvas() {
-        const rect = canvas.parentElement.getBoundingClientRect();
-        canvas.width = rect.width;
-        canvas.height = 100;
-    }
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    function initAudioContext() {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.8;
-            source = audioContext.createMediaElementSource(audio);
-            source.connect(analyser);
-            analyser.connect(audioContext.destination);
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-        }
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-    }
-    function drawWave() {
-        if (!analyser) return;
-        animationId = requestAnimationFrame(drawWave);
-        analyser.getByteFrequencyData(dataArray);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const barCount = 64;
-        const barWidth = (canvas.width / barCount) * 0.6;
-        const gap = (canvas.width / barCount) * 0.4;
-        const halfHeight = canvas.height / 2;
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        gradient.addColorStop(0, '#DBA1A2');
-        gradient.addColorStop(0.5, '#e8c0c0');
-        gradient.addColorStop(1, '#DBA1A2');
-        ctx.fillStyle = gradient;
-        for (let i = 0; i < barCount; i++) {
-            const value = dataArray[i] / 255;
-            const barHeight = value * halfHeight * 1.5;
-            const x = i * (barWidth + gap) + gap / 2;
-            const y = halfHeight - barHeight / 2;
-            const radius = 4;
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + barWidth - radius, y);
-            ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
-            ctx.lineTo(x + barWidth, y + barHeight - radius);
-            ctx.quadraticCurveTo(x + barWidth, y + barHeight, x + barWidth - radius, y + barHeight);
-            ctx.lineTo(x + radius, y + barHeight);
-            ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - radius);
-            ctx.lineTo(x, y + radius);
-            ctx.quadraticCurveTo(x, y, x + radius, y);
-            ctx.closePath();
-            ctx.fill();
-        }
-        const overlayGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        overlayGradient.addColorStop(0, 'rgba(219, 161, 162, 0.15)');
-        overlayGradient.addColorStop(0.5, 'rgba(219, 161, 162, 0)');
-        overlayGradient.addColorStop(1, 'rgba(219, 161, 162, 0.15)');
-        ctx.fillStyle = overlayGradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    function stopVisualizer() {
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
-        }
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-    playBtn.addEventListener('click', function() {
-        if (audio.paused) {
-            initAudioContext();
-            audio.play();
-            isPlaying = true;
-            playIcon.className = 'fas fa-pause';
-            if (!animationId) drawWave();
-        } else {
-            audio.pause();
-            isPlaying = false;
-            playIcon.className = 'fas fa-play';
-            stopVisualizer();
-        }
-    });
-    audio.addEventListener('ended', function() {
-        isPlaying = false;
-        playIcon.className = 'fas fa-play';
-        stopVisualizer();
-        progressFill.style.width = '0%';
-        updateTimeDisplay();
-    });
-    audio.addEventListener('timeupdate', function() {
-        const percent = (audio.currentTime / audio.duration) * 100;
-        progressFill.style.width = percent + '%';
-        updateTimeDisplay();
-    });
-    progressBar.addEventListener('click', function(e) {
-        const rect = this.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const percent = x / rect.width;
-        audio.currentTime = percent * audio.duration;
-    });
-    function formatTime(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return mins + ':' + (secs < 10 ? '0' : '') + secs;
-    }
-    function updateTimeDisplay() {
-        const current = formatTime(audio.currentTime || 0);
-        const total = formatTime(audio.duration || 0);
-        timeDisplay.textContent = current + ' / ' + total;
-    }
-    audio.addEventListener('loadedmetadata', updateTimeDisplay);
-    volumeSlider.addEventListener('input', function() {
-        audio.volume = this.value;
-        muteBtn.querySelector('i').className = this.value == 0 ? 'fas fa-volume-mute' : 'fas fa-volume-up';
-    });
-    muteBtn.addEventListener('click', function() {
-        if (audio.volume > 0) {
-            audio.volume = 0;
-            volumeSlider.value = 0;
-            muteBtn.querySelector('i').className = 'fas fa-volume-mute';
-        } else {
-            audio.volume = 1;
-            volumeSlider.value = 1;
-            muteBtn.querySelector('i').className = 'fas fa-volume-up';
-        }
-    });
-    document.addEventListener('visibilitychange', function() {
-        if (!document.hidden && isPlaying && !animationId) {
-            drawWave();
-        }
-        if (document.hidden && animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
-        }
-    });
-    window.addEventListener('beforeunload', function() {
-        if (audioContext) {
-            audioContext.close();
-        }
-    });
-});
-</script>
-
 <style>
-/* ===== DARK MODE SUPPORT ===== */
+/* FULL CSS – exactly as before */
 :root {
     --rose: #DBA1A2;
     --rose-dark: #c08a8b;
+    --rose-light: #e8c0c0;
     --vanilla: #EFD8D6;
     --fantasy: #F7F3ED;
+    --white: #ffffff;
     --dark: #2c1e1e;
     --text: #3d2e2e;
     --text-light: #6b5a5a;
     --bg: #F7F3ED;
     --card-bg: #ffffff;
     --border: #e5d5d5;
-    --shadow: 0 4px 16px rgba(44, 30, 30, 0.08);
-    --shadow-hover: 0 8px 30px rgba(44, 30, 30, 0.15);
+    --shadow: 0 4px 16px rgba(44,30,30,0.08);
+    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
     --input-bg: #ffffff;
 }
 body.dark-mode {
@@ -991,17 +361,22 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .review-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
 .review-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .review-form .btn { margin-top: 8px; }
-.voice-comment-section { margin-top: 20px; padding: 16px; background: var(--fantasy); border-radius: 12px; }
-.voice-comment-section h4 { margin-bottom: 12px; }
-.recorder-wrapper { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-#recordingStatus { font-weight: 600; }
-.recorder-wrapper .btn { padding: 8px 16px; }
-.admin-reply-container { background: var(--vanilla); border-radius: 12px; padding: 20px; border-left: 5px solid var(--rose); margin-top: 16px; }
-.admin-reply-container h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--dark); }
-.admin-reply-form textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: vertical; min-height: 60px; background: var(--input-bg); color: var(--text); }
-.admin-reply-form .btn { margin-top: 8px; }
-.reviews-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
-.review-item { background: var(--card-bg); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); }
+.reaction-section { text-align: center; margin: 20px 0; }
+.reaction-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.reaction-btn { background: none; border: 1px solid var(--border); cursor: pointer; font-size: 1.2rem; padding: 4px 10px; border-radius: 20px; transition: 0.2s; display: inline-flex; align-items: center; gap: 4px; }
+.reaction-btn:hover { background: var(--rose-light); border-color: var(--rose); }
+.reaction-btn.active { background: var(--rose); color: #fff; border-color: var(--rose); }
+.reaction-btn .count { font-size: 0.8rem; font-weight: 600; }
+.comment-reply-form { margin-left: 20px; margin-top: 8px; }
+.reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
+.reply-link:hover { color: var(--rose-dark); }
+.private-badge { background: #ffd700; color: #333; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: 6px; }
+.tag-suggestions { position: absolute; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; z-index: 1000; min-width: 150px; box-shadow: var(--shadow); }
+.tag-suggestions div { padding: 6px 12px; cursor: pointer; font-size: 0.9rem; }
+.tag-suggestions div:hover { background: var(--vanilla); }
+.checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.checkbox-group input[type="checkbox"] { accent-color: var(--rose); width: 16px; height: 16px; }
+.review-item { background: var(--card-bg); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); margin-bottom: 12px; }
 .review-item.admin-reply { background: var(--vanilla); border-left: 5px solid var(--rose); }
 .review-author { font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .review-author i { color: var(--rose); }
@@ -1033,19 +408,15 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
-<?php require_once 'includes/footer.php'; ?>
-
 <!-- ===== HTML CONTENT ===== -->
 <div class="poem-view-page">
     <div class="container">
-        <!-- Navigation -->
         <div class="poem-nav">
             <a href="<?php echo SITE_URL; ?>/poetry.php" class="back-link">
                 <i class="fas fa-arrow-left"></i> Back to Poetry
             </a>
         </div>
 
-        <!-- Poem Header -->
         <header class="poem-header">
             <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
             <div class="poem-meta">
@@ -1055,14 +426,12 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         </header>
 
-        <!-- Image with WebP support -->
         <?php if ($poem['image_path']): ?>
             <div class="poem-image-container">
                 <img src="<?php echo get_image_url($poem['image_path']); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image" loading="lazy">
             </div>
         <?php endif; ?>
 
-        <!-- Audio Player (unchanged) -->
         <?php if ($poem['audio_path']): ?>
             <div class="poem-audio-player">
                 <div class="audio-label">
@@ -1087,7 +456,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         <?php endif; ?>
 
-        <!-- Intro -->
         <?php if ($poem['intro']): ?>
             <div class="poem-intro-section">
                 <div class="intro-label">✧ Purpose of this poem</div>
@@ -1095,14 +463,12 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         <?php endif; ?>
 
-        <!-- Poem Content -->
         <div class="poem-content-section">
             <div class="poem-body">
                 <?php echo $poem['content']; ?>
             </div>
         </div>
 
-        <!-- ===== REACTIONS (for the poem itself) ===== -->
         <div class="reaction-section">
             <span>React to this poem:</span>
             <div class="reaction-buttons" data-target-type="poem" data-target-id="<?php echo $id; ?>">
@@ -1115,11 +481,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         </div>
 
-        <!-- ===== COMMENTS SECTION ===== -->
         <div class="reviews-section">
             <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
-
-            <!-- Rating summary -->
             <div class="rating-summary">
                 <div class="rating-stars">
                     <?php for ($i = 1; $i <= 5; $i++): ?>
@@ -1130,7 +493,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                 <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
             </div>
 
-            <!-- Comment Form with CSRF -->
             <?php if (isLoggedIn()): ?>
                 <div class="review-form-container">
                     <h4>Write a Comment</h4>
@@ -1169,7 +531,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                 </div>
             <?php endif; ?>
 
-            <!-- Comments List (threaded) -->
             <div class="reviews-list">
                 <?php foreach ($comments as $comment): ?>
                     <?php render_comment($comment); ?>
@@ -1177,7 +538,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         </div>
 
-        <!-- Footer Actions (Share) -->
         <div class="poem-footer-actions">
             <div class="share-section">
                 <span>Share:</span>
@@ -1192,11 +552,10 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     </div>
 </div>
 
-<!-- Back to Top -->
 <button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})"><i class="fas fa-arrow-up"></i></button>
 
 <!-- ================================================================ -->
-<!-- JAVASCRIPT (Reactions, Tagging, Reply toggle, Audio player, etc.) -->
+<!-- JAVASCRIPT – complete -->
 <!-- ================================================================ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -1293,7 +652,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // --- Audio player (original, kept) ---
+    // --- Audio player ---
     const audio = document.getElementById('audioSource');
     const playBtn = document.getElementById('playPauseBtn');
     const playIcon = playBtn.querySelector('i');
