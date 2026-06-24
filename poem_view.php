@@ -530,11 +530,37 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 <button id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})"><i class="fas fa-arrow-up"></i></button>
 
 <!-- ================================================================ -->
-<!-- COMPLETE JAVASCRIPT – Audio, Reactions, Tagging, Reply toggle     -->
+<!-- COMPLETE JAVASCRIPT – Audio, Reactions, Tagging, Reply toggle    -->
 <!-- ================================================================ -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Reaction toggle (AJAX) ---
+    // ===== SPLASHY BURST FUNCTION (defined once) =====
+    function createReactionBurst(element, emoji) {
+        const rect = element.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const count = 14;
+        const burstEmojis = [emoji, emoji, '✨', '🌟', '💫', '💖'];
+
+        for (let i = 0; i < count; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'reaction-particle';
+            particle.textContent = burstEmojis[Math.floor(Math.random() * burstEmojis.length)];
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 60 + Math.random() * 120;
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance - 30;
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            particle.style.setProperty('--tx', tx + 'px');
+            particle.style.setProperty('--ty', ty + 'px');
+            particle.style.fontSize = (1.2 + Math.random() * 2) + 'rem';
+            document.body.appendChild(particle);
+            setTimeout(() => particle.remove(), 1000);
+        }
+    }
+
+    // ===== REACTION TOGGLE (works for both poem and comments) =====
     document.querySelectorAll('.reaction-buttons').forEach(container => {
         const targetType = container.dataset.targetType;
         const targetId = container.dataset.targetId;
@@ -554,107 +580,79 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             })
             .catch(err => console.error('Error loading reactions:', err));
-        // --- SPLASHY BURST FUNCTION ---
-function createReactionBurst(element, emoji) {
-    const rect = element.getBoundingClientRect();
-    // Center of the button
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
-    const count = 14; // Number of particles to burst
 
-    // A mix of the main emoji + some sparkly friends
-    const burstEmojis = [emoji, emoji, '✨', '🌟', '💫', '💖'];
+        // Handle click events with splashy effect
+        buttons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const reaction = this.dataset.reaction;
+                const emoji = this.textContent.trim().charAt(0);
+                createReactionBurst(this, emoji);
 
-    for (let i = 0; i < count; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'reaction-particle';
-        // Randomly pick an emoji from our mix
-        particle.textContent = burstEmojis[Math.floor(Math.random() * burstEmojis.length)];
-        
-        // Randomize direction (full circle) and distance
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 60 + Math.random() * 120; 
-        const tx = Math.cos(angle) * distance;
-        const ty = Math.sin(angle) * distance - 30; 
-        
-        // Set position and random size
-        particle.style.left = x + 'px';
-        particle.style.top = y + 'px';
-        particle.style.setProperty('--tx', tx + 'px');
-        particle.style.setProperty('--ty', ty + 'px');
-        particle.style.fontSize = (1.2 + Math.random() * 2) + 'rem';
-
-        document.body.appendChild(particle);
-        
-        // Clean up the DOM after animation finishes
-        setTimeout(() => particle.remove(), 1000);
-    }
-}
-
-        // Handle click events
-        
-buttons.forEach(btn => {
-    btn.addEventListener('click', function() {
-        const reaction = this.dataset.reaction;
-        
-        // ===== SPLASHY EFFECT ON CLICK =====
-        const emoji = this.textContent.trim().charAt(0);
-        // Trigger the burst effect from the button's location
-        createReactionBurst(this, emoji);
-        // ======================================
-
-        fetch('ajax_toggle_reaction.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `target_type=${targetType}&target_id=${targetId}&reaction=${reaction}`
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                
-                if(data.error.includes('logged in')) {
-                   // Optional: redirect to login or just alert
-                   alert(data.error);
-                }
-                return;
-            }
-            const countSpan = this.querySelector('.count');
-            countSpan.textContent = data.count;
-            if (data.active) this.classList.add('active');
-            else this.classList.remove('active');
-        })
-        .catch(err => console.error('Error toggling reaction:', err));
+                fetch('ajax_toggle_reaction.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `target_type=${targetType}&target_id=${targetId}&reaction=${reaction}`
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        if (data.error.includes('logged in')) {
+                            alert(data.error);
+                        }
+                        return;
+                    }
+                    const countSpan = this.querySelector('.count');
+                    countSpan.textContent = data.count;
+                    if (data.active) this.classList.add('active');
+                    else this.classList.remove('active');
+                })
+                .catch(err => console.error('Error toggling reaction:', err));
+            });
+        });
     });
-});
-    // --- Tagging autocomplete ---
+
+    // ===== TAGGING AUTOCOMPLETE =====
     const commentText = document.getElementById('commentText');
     const suggestions = document.getElementById('tagSuggestions');
     let usersList = [];
+    let tagTimer = null;
 
+    // Fetch users once (cached)
     fetch('ajax_get_users.php')
         .then(res => res.json())
-        .then(data => usersList = data);
+        .then(data => usersList = data)
+        .catch(err => console.error('Failed to load users for tagging:', err));
 
     commentText.addEventListener('input', function() {
+        clearTimeout(tagTimer);
         const text = this.value;
         const atPos = text.lastIndexOf('@');
+        
         if (atPos !== -1 && text.length > atPos + 1) {
             const query = text.substring(atPos + 1);
-            const matches = usersList.filter(u => u.name.toLowerCase().startsWith(query.toLowerCase()));
-            if (matches.length > 0) {
-                suggestions.innerHTML = matches.map(u => `<div data-id="${u.id}" data-name="${u.name}">${u.name}</div>`).join('');
-                suggestions.style.display = 'block';
-                const rect = this.getBoundingClientRect();
-                suggestions.style.top = (rect.bottom + window.scrollY) + 'px';
-                suggestions.style.left = rect.left + 'px';
-            } else {
-                suggestions.style.display = 'none';
-            }
+            // Debounce to avoid excessive filtering
+            tagTimer = setTimeout(() => {
+                const matches = usersList.filter(u => 
+                    u.name.toLowerCase().startsWith(query.toLowerCase())
+                );
+                if (matches.length > 0) {
+                    suggestions.innerHTML = matches.map(u => 
+                        `<div data-id="${u.id}" data-name="${u.name}">${u.name}</div>`
+                    ).join('');
+                    suggestions.style.display = 'block';
+                    const rect = this.getBoundingClientRect();
+                    suggestions.style.top = (rect.bottom + window.scrollY) + 'px';
+                    suggestions.style.left = rect.left + 'px';
+                } else {
+                    suggestions.style.display = 'none';
+                }
+            }, 300);
         } else {
             suggestions.style.display = 'none';
         }
     });
 
+    // Click a suggestion to insert the tag
     suggestions.addEventListener('click', function(e) {
         if (e.target.tagName === 'DIV') {
             const name = e.target.dataset.name;
@@ -666,7 +664,7 @@ buttons.forEach(btn => {
         }
     });
 
-    // --- Reply toggle ---
+    // ===== REPLY TOGGLE =====
     document.querySelectorAll('.reply-link').forEach(link => {
         link.addEventListener('click', function() {
             const form = this.nextElementSibling;
@@ -680,7 +678,7 @@ buttons.forEach(btn => {
         });
     });
 
-    // --- Audio player ---
+    // ===== AUDIO PLAYER =====
     const audio = document.getElementById('audioSource');
     const playBtn = document.getElementById('playPauseBtn');
     const playIcon = playBtn.querySelector('i');
