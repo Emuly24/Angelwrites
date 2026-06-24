@@ -25,7 +25,7 @@ try { $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions W
 $stats['total_views'] = ($stats['poem_views'] ?? 0) + ($stats['book_views'] ?? 0);
 
 // ============================================================
-// 2. FETCH RECENT ITEMS (simplified for brevity)
+// 2. FETCH RECENT ITEMS
 // ============================================================
 try { $stmt = $db->prepare("SELECT s.*, u.name AS user_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date ASC LIMIT 5"); $stmt->execute(); $recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5"); $stmt->execute(); $recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
@@ -140,7 +140,6 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
         </div>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <span style="background:#28a745; color:white; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; animation:pulse 2s infinite;"><i class="fas fa-circle"></i> Live</span>
-            <!-- Theme toggle removed from here as header has it -->
             <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Quick Add</button>
         </div>
     </div>
@@ -311,7 +310,6 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
             </div>
         </div>
     </div>
-</div>
 
 <script>
 // Dark mode will be triggered by global header, we just apply the class
