@@ -65,21 +65,20 @@ if ($action === 'views_chart') {
 // ===== 3. DEEP DIVE: View Details =====
 if ($action === 'get_view_details') {
     try {
-        // Ensure view_logs table exists before querying, or return empty gracefully
+        // Used COALESCE to ensure even missing poems/books titles return "Unknown"
         $stmt = $db->prepare("
             SELECT 
                 COALESCE(u.name, 'Guest') as viewer_name,
                 vl.target_type,
                 vl.target_id,
-                p.title as poem_title,
-                b.title as book_title,
+                COALESCE(p.title, b.title, 'Unknown') as content_title,
                 vl.ip_address,
                 vl.viewed_at
             FROM view_logs vl
             LEFT JOIN users u ON vl.user_id = u.id
             LEFT JOIN poems p ON (vl.target_type = 'poem' AND vl.target_id = p.id)
             LEFT JOIN books b ON (vl.target_type = 'book' AND vl.target_id = b.id)
-            ORDER BY vl.viewed_at DESC LIMIT 30
+            ORDER BY vl.viewed_at DESC LIMIT 50
         ");
         $stmt->execute();
         $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -100,14 +99,14 @@ if ($action === 'get_reading_details') {
             SELECT 
                 u.name as user_name,
                 u.email as user_email,
-                b.title as book_title,
+                COALESCE(b.title, 'Unknown Book') as book_title,
                 rs.duration_seconds,
                 rs.start_time,
                 rs.end_time
             FROM reading_sessions rs
             JOIN users u ON rs.user_id = u.id
             LEFT JOIN books b ON rs.book_id = b.id
-            ORDER BY rs.start_time DESC LIMIT 30
+            ORDER BY rs.start_time DESC LIMIT 50
         ");
         $stmt->execute();
         $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);

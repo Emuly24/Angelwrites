@@ -61,14 +61,13 @@ $pageTitle = 'Admin Dashboard';
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-:root {
-    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9;
-    --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
-    --shadow: 0 4px 20px rgba(0,0,0,0.04);
-}
+/* ENSURE SCROLLING IS NEVER BLOCKED */
+html, body { overflow-y: auto !important; height: auto !important; }
 body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #333; }
 body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
 body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
+
+:root { --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9; --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5; --shadow: 0 4px 20px rgba(0,0,0,0.04); }
 
 /* Hero */
 .admin-hero { background: linear-gradient(135deg, #fff, var(--rose-light)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--rose-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
@@ -97,7 +96,8 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
 /* Monitoring Stats */
 .monitoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-.monitor-card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
+.monitor-card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); transition: 0.2s; }
+.monitor-card:hover { transform: translateY(-2px); border-color: var(--rose); }
 .monitor-card .title { font-size: 0.75rem; color: #888; text-transform: uppercase; }
 .monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); margin: 4px 0; }
 .monitor-card .sub { font-size: 0.75rem; color: #666; }
@@ -107,31 +107,33 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .top-content-card { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .top-content-card h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 
-/* Admin Modules - FIX FOR SCROLLING */
-.admin-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
+/* Admin Modules */
+.admin-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 80px; }
 .admin-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .admin-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .admin-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #333; transition: 0.2s; text-align: center; }
+.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #333; transition: 0.2s; text-align: center; cursor: pointer; }
 .admin-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
 .admin-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
 .admin-module-btn span { font-size: 0.75rem; font-weight: 500; }
 
-/* Modal */
+/* Quick Modal */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 9999; display: none; justify-content: center; align-items: center; }
 .modal-overlay.active { display: flex; }
 .modal-box { background: var(--card-bg); border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); border: 1px solid var(--rose-light); }
 .modal-box h2 { font-family: 'Playfair Display', serif; margin-top: 0; color: var(--rose-dark); }
 .modal-box .btn { width: 100%; justify-content: center; margin-bottom: 10px; }
 
-/* Stats Modal Override */
-#statsModal .modal-box { max-width: 800px; }
-#statsModal table { width:100%; border-collapse:collapse; font-size:0.9rem; }
-#statsModal table th { background: var(--vanilla); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border); }
-#statsModal table td { padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; }
+/* Stats Modal Override (Deep Dive) */
+#statsModal .modal-box { max-width: 850px; max-height: 90vh; display: flex; flex-direction: column; }
+#statsModal table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+#statsModal table th { background: var(--bg); padding:10px 12px; text-align:left; border-bottom:2px solid var(--border); position:sticky; top:0; z-index:1; }
+#statsModal table td { padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align: middle; }
+#statsModal table tr:hover { background: var(--rose-light); }
+#statsModalBody { max-height: 60vh; overflow-y: auto; }
 </style>
 
-<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 20px; min-height: 100vh;">
+<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 20px; overflow: visible !important; min-height: 100vh;">
     <!-- Hero -->
     <div class="admin-hero">
         <div>
@@ -207,11 +209,11 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <!-- Recent Content Grids -->
     <div style="margin-bottom: 20px;">
         <h3 style="font-family:'Playfair Display'; margin-bottom:12px;">📚 Recent Content</h3>
-        <div class="recent-grid">
-            <div class="recent-card"><h4>Books</h4><div class="recent-list"><?php foreach($recent_books as $b): ?><div class="recent-item"><span><?php echo htmlspecialchars($b['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($b['created_at'])); ?></span></div><?php endforeach; ?></div></div>
-            <div class="recent-card"><h4>Poems</h4><div class="recent-list"><?php foreach($recent_poems as $p): ?><div class="recent-item"><span><?php echo htmlspecialchars($p['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($p['created_at'])); ?></span></div><?php endforeach; ?></div></div>
-            <div class="recent-card"><h4>Blog</h4><div class="recent-list"><?php foreach($recent_posts as $p): ?><div class="recent-item"><span><?php echo htmlspecialchars($p['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($p['created_at'])); ?></span></div><?php endforeach; ?></div></div>
-            <div class="recent-card"><h4>Videos</h4><div class="recent-list"><?php foreach($recent_videos as $v): ?><div class="recent-item"><span><?php echo htmlspecialchars($v['title']); ?></span><span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($v['created_at'] ?? 'now')); ?></span></div><?php endforeach; ?></div></div>
+        <div class="recent-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+            <div class="recent-card" style="background:var(--card-bg); border-radius:16px; padding:16px; border:1px solid var(--border);"><h4 style="font-size:0.9rem; margin-bottom:8px;">Books</h4><div class="recent-list"><?php foreach($recent_books as $b): ?><div style="border-bottom:1px solid var(--border); padding:4px 0; font-size:0.85rem; display:flex; justify-content:space-between;"><span><?php echo htmlspecialchars($b['title']); ?></span><span style="color:#999;"><?php echo date('M j', strtotime($b['created_at'])); ?></span></div><?php endforeach; ?></div></div>
+            <div class="recent-card" style="background:var(--card-bg); border-radius:16px; padding:16px; border:1px solid var(--border);"><h4 style="font-size:0.9rem; margin-bottom:8px;">Poems</h4><div class="recent-list"><?php foreach($recent_poems as $p): ?><div style="border-bottom:1px solid var(--border); padding:4px 0; font-size:0.85rem; display:flex; justify-content:space-between;"><span><?php echo htmlspecialchars($p['title']); ?></span><span style="color:#999;"><?php echo date('M j', strtotime($p['created_at'])); ?></span></div><?php endforeach; ?></div></div>
+            <div class="recent-card" style="background:var(--card-bg); border-radius:16px; padding:16px; border:1px solid var(--border);"><h4 style="font-size:0.9rem; margin-bottom:8px;">Blog</h4><div class="recent-list"><?php foreach($recent_posts as $p): ?><div style="border-bottom:1px solid var(--border); padding:4px 0; font-size:0.85rem; display:flex; justify-content:space-between;"><span><?php echo htmlspecialchars($p['title']); ?></span><span style="color:#999;"><?php echo date('M j', strtotime($p['created_at'])); ?></span></div><?php endforeach; ?></div></div>
+            <div class="recent-card" style="background:var(--card-bg); border-radius:16px; padding:16px; border:1px solid var(--border);"><h4 style="font-size:0.9rem; margin-bottom:8px;">Videos</h4><div class="recent-list"><?php foreach($recent_videos as $v): ?><div style="border-bottom:1px solid var(--border); padding:4px 0; font-size:0.85rem; display:flex; justify-content:space-between;"><span><?php echo htmlspecialchars($v['title']); ?></span><span style="color:#999;"><?php echo date('M j', strtotime($v['created_at'] ?? 'now')); ?></span></div><?php endforeach; ?></div></div>
         </div>
     </div>
 
@@ -283,33 +285,33 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <!-- Quick Add Modal -->
     <div class="modal-overlay" id="quickModal">
         <div class="modal-box">
-        <h2>Quick Create</h2>
-        <p style="color:#666; margin-bottom: 16px;">Select what you want to add</p>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-            <a href="manage_books.php?action=new" class="btn btn-primary">+ New Book</a>
-            <a href="manage_poems.php?action=new" class="btn btn-primary">+ New Poem</a>
-            <a href="manage_blog.php?action=new" class="btn btn-primary">+ New Blog Post</a>
-            <a href="manage_videos.php?action=new" class="btn btn-primary">+ New Video</a>
-            <a href="reflection_editor.php" class="btn btn-primary">+ New Reflection</a>
-            <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New Newsletter</a>
-            
-            <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
+            <h2>Quick Create</h2>
+            <p style="color:#666; margin-bottom: 16px;">Select what you want to add</p>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <a href="manage_books.php?action=new" class="btn btn-primary">+ New Book</a>
+                <a href="manage_poems.php?action=new" class="btn btn-primary">+ New Poem</a>
+                <a href="manage_blog.php?action=new" class="btn btn-primary">+ New Blog Post</a>
+                <a href="manage_videos.php?action=new" class="btn btn-primary">+ New Video</a>
+                <a href="reflection_editor.php" class="btn btn-primary">+ New Reflection</a>
+                <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New Newsletter</a>
+                <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
+            </div>
         </div>
     </div>
-</div>
 
     <!-- Deep Dive Stats Modal -->
     <div id="statsModal" class="modal-overlay" style="z-index: 99999;">
         <div class="modal-box">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
                 <h2 id="statsModalTitle" style="font-family:'Playfair Display'; color: var(--rose-dark); margin:0;">Loading...</h2>
-                <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
+                <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:#999;">&times;</button>
             </div>
-            <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem;">
-                <p style="color:#999; text-align:center;">Loading data...</p>
+            <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem; padding-bottom:10px;">
+                <p style="color:#999; text-align:center;">Fetching data...</p>
             </div>
         </div>
     </div>
+</div> <!-- End Container -->
 
 <script>
 // Dark mode will be triggered by global header, we just apply the class
@@ -338,12 +340,18 @@ function refreshStats() {
 setInterval(refreshStats, 60000);
 
 // ============================================================
-// SMOOTH & SMART CHARTS
+// SMOOTH & SMART CHARTS (WITH SAFETY CHECKS)
 // ============================================================
 function initCharts() {
-    const gradientActive = document.getElementById('activeChart').getContext('2d').createLinearGradient(0,0,0,250);
+    const activeCtx = document.getElementById('activeChart');
+    const viewsCtx = document.getElementById('viewsChart');
+    // Prevent rendering crash if canvas is missing
+    if(!activeCtx || !viewsCtx) return; 
+
+    const gradientActive = activeCtx.getContext('2d').createLinearGradient(0,0,0,250);
     gradientActive.addColorStop(0, '#DBA1A2'); gradientActive.addColorStop(1, '#e8c0c0');
-    window.activeChart = new Chart(document.getElementById('activeChart'), {
+    
+    window.activeChart = new Chart(activeCtx, {
         type: 'line', 
         data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'Active Readers', data: [0,0,0,0,0,0,0], borderColor: '#DBA1A2', backgroundColor: gradientActive, fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#DBA1A2', pointRadius: 3 }] },
         options: { 
@@ -353,7 +361,8 @@ function initCharts() {
             scales: { y: { beginAtZero: true } } 
         }
     });
-    window.viewsChart = new Chart(document.getElementById('viewsChart'), {
+    
+    window.viewsChart = new Chart(viewsCtx, {
         type: 'bar', 
         data: { labels: ['Poems','Books','Blog','Videos'], datasets: [{ label: 'Views (7 days)', data: [0,0,0,0], backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], borderRadius: 6, borderSkipped: false }] },
         options: { 
@@ -369,14 +378,27 @@ function initCharts() {
 
 function updateCharts() {
     fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=active_chart')
-        .then(res => res.json()).then(data => { window.activeChart.data.labels = data.labels; window.activeChart.data.datasets[0].data = data.data; window.activeChart.update(); }).catch(console.error);
+        .then(res => res.json()).then(data => {
+            if(window.activeChart) {
+                // Ensure API returns data, else set to zeros
+                window.activeChart.data.labels = data.labels || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+                window.activeChart.data.datasets[0].data = data.data || [0,0,0,0,0,0,0];
+                window.activeChart.update();
+            }
+        }).catch(console.error);
+        
     fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=views_chart')
-        .then(res => res.json()).then(data => { window.viewsChart.data.datasets[0].data = data.data; window.viewsChart.update(); }).catch(console.error);
+        .then(res => res.json()).then(data => {
+            if(window.viewsChart) {
+                window.viewsChart.data.datasets[0].data = data.data || [0,0,0,0];
+                window.viewsChart.update();
+            }
+        }).catch(console.error);
 }
 document.addEventListener('DOMContentLoaded', initCharts);
 
 // ============================================================
-// DEEP DIVE MODAL FUNCTIONS
+// DEEP DIVE MODAL FUNCTIONS (Guest IP Attribution Added)
 // ============================================================
 function openStatsModal(type) {
     document.getElementById('statsModal').classList.add('active');
@@ -390,23 +412,26 @@ function openStatsModal(type) {
     fetch(url)
         .then(res => res.json())
         .then(data => {
-            if (!data.success || data.logs.length === 0) {
+            if (!data.success || !data.logs || data.logs.length === 0) {
                 body.innerHTML = '<p style="color:#999; text-align:center;">No data available yet.</p>';
                 return;
             }
             let html = '<table><thead><tr><th>Viewer / User</th><th>Content</th><th>Date & Time</th></tr></thead><tbody>';
             data.logs.forEach(row => {
                 if(type === 'views') {
-                    let titleCol = row.target_type === 'poem' ? htmlspecialchars(row.poem_title) : htmlspecialchars(row.book_title);
-                    let subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${row.target_type}</span>`;
+                    let titleCol = htmlspecialchars(row.content_title || 'Unknown');
+                    let subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${htmlspecialchars(row.target_type)}</span>`;
                     let viewer = htmlspecialchars(row.viewer_name);
                     if(viewer === 'Guest') {
-                        viewer = `<span style="color:#888;">Guest</span> <span style="font-size:0.75rem; color:#999;">(IP: ${htmlspecialchars(row.ip_address)})</span>`;
+                        // IP Attribution for Guests
+                        viewer = `<span style="color:#888;">Guest</span> <span style="font-size:0.75rem; color:#999;">(IP: ${htmlspecialchars(row.ip_address || 'N/A')})</span>`;
+                    } else {
+                        viewer = `<strong>${htmlspecialchars(row.viewer_name)}</strong>`;
                     }
                     html += `<tr><td>${viewer}</td><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#666;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
                 } else {
-                    let dur = Math.floor(row.duration_seconds / 60);
-                    let sec = row.duration_seconds % 60;
+                    let dur = Math.floor((row.duration_seconds || 0) / 60);
+                    let sec = (row.duration_seconds || 0) % 60;
                     html += `<tr><td><strong>${htmlspecialchars(row.user_name)}</strong> <span style="font-size:0.75rem; color:#999;">(${htmlspecialchars(row.user_email)})</span></td><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#666;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#eee; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
                 }
             });
