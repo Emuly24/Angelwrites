@@ -21,8 +21,19 @@ jobs:
           server-dir: /angelwrites.gt.tc/htdocs/
           exclude: |
             data/**
+            db/**
             .git/**
             .github/**
             .gitignore
             .env
             README.md
+            docs/**
+            tools/**
+            storage/**
+            *.sql
+            *.db
+            reset_admin.php
+            worker.php
+            update_schema.php
+            allow_url_fopen
+            CLAUDE.md
