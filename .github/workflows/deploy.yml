@@ -21,6 +21,7 @@ jobs:
           server-dir: /angelwrites.gt.tc/htdocs/
           exclude: |
             data/**
+            db/**
             .git/**
             .github/**
             .gitignore
