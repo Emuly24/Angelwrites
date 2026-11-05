@@ -12,6 +12,7 @@
  * @param int $seconds
  * @return string
  */
+if (!function_exists('formatDuration')) {
 function formatDuration($seconds) {
     if (!$seconds || $seconds < 0) return '0:00';
     $hours = floor($seconds / 3600);
@@ -22,6 +23,7 @@ function formatDuration($seconds) {
     } else {
         return sprintf('%d:%02d', $minutes, $secs);
     }
+}
 }
 
 /**
@@ -53,6 +55,7 @@ function sanitizeReaderText($text) {
  * @param string|int $timestamp MySQL datetime or Unix timestamp.
  * @return string
  */
+if (!function_exists('time_ago')) {
 function time_ago($timestamp) {
     if (is_numeric($timestamp)) {
         $time = $timestamp;
@@ -65,6 +68,7 @@ function time_ago($timestamp) {
     if ($diff < 86400) return floor($diff / 3600) . 'h ago';
     if ($diff < 604800) return floor($diff / 86400) . 'd ago';
     return date('M j, Y', $time);
+}
 }
 
 
@@ -247,10 +251,16 @@ function getReaderLevelLegacy($user_id) {
 function getReaderLevel($user_id) {
     global $db;
 
-    $stmt = $db->prepare("SELECT level, xp, xp_to_next FROM user_reputations WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $data = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$data) {
+    $data = false;
+    if ($user_id) {
+        $stmt = $db->prepare("SELECT level, xp, xp_to_next FROM user_reputations WHERE user_id = ?");
+        $stmt->execute([$user_id]);
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    if (!$data && !$user_id) {
+        // Guests have no reputation row; show level 1 without writing anything
+        $data = ['level' => 1, 'xp' => 0, 'xp_to_next' => 100];
+    } elseif (!$data) {
         // Initialize if not exists
         $stmt = $db->prepare("INSERT INTO user_reputations (user_id, level, xp, xp_to_next) VALUES (?, 1, 0, 100)");
         $stmt->execute([$user_id]);

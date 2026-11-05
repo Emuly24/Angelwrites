@@ -412,6 +412,7 @@ function formatActivity($activity) {
 }
 
 // ===== TIME AGO HELPER =====
+if (!function_exists('time_ago')) {
 function time_ago($timestamp) {
     $time = strtotime($timestamp);
     $diff = time() - $time;
@@ -422,4 +423,5 @@ function time_ago($timestamp) {
     if ($diff < 2592000) return floor($diff / 604800) . 'w ago';
     if ($diff < 31536000) return floor($diff / 2592000) . 'mo ago';
     return floor($diff / 31536000) . 'y ago';
+}
 }

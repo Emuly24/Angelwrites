@@ -7,7 +7,7 @@
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/reader_functions.php'; // for formatDuration
+require_once __DIR__ . '/reader_functions.php'; // for formatDuration
 
 redirectIfNotAdmin();
 
@@ -47,11 +47,11 @@ $stmt = $db->query("SELECT COUNT(*) FROM books");
 $total_books = $stmt->fetchColumn();
 
 // Total reading sessions
-$stmt = $db->query("SELECT COUNT(*) FROM reading_sessions $date_condition");
+$stmt = $db->query("SELECT COUNT(*) FROM reading_sessions WHERE 1=1 $date_condition");
 $total_sessions = $stmt->fetchColumn();
 
 // Total reading time (hours)
-$stmt = $db->query("SELECT SUM(duration_seconds) FROM reading_sessions $date_condition");
+$stmt = $db->query("SELECT SUM(duration_seconds) FROM reading_sessions WHERE 1=1 $date_condition");
 $total_seconds = $stmt->fetchColumn() ?? 0;
 $total_hours = floor($total_seconds / 3600);
 

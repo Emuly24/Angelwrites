@@ -146,8 +146,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                     $subject = "Verify your AngelWrites account";
                     $body = "Hello $first_name,\n\nYour verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not create an account, please ignore this email.\n\n— AngelWrites Team";
                     
-                    if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
-                        $success = true;
+                    // The account exists from this point on, so registration has succeeded even if
+                    // the email can't be sent; the success screen then points to "Request a new code".
+                    $mail_sent = sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+                    $success = true;
+                    if ($mail_sent) {
                         
                         // ===== SEND ADMIN NOTIFICATION =====
                         $admin_email = 'angelwrites@zohomail.com';
@@ -163,8 +166,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                         
                         // Set rate limit
                         file_put_contents($attempts_file, time());
-                    } else {
-                        $error = 'Unable to send verification email. Please try again later.';
                     }
                 } else {
                     $error = 'Something went wrong. Please try again.';
@@ -323,8 +324,13 @@ $pageTitle = 'Sign Up';
                         <h2>Account Created! 🎉</h2>
                         <p class="success-message">
                             Welcome to the AngelWrites community! 
+                            <?php if (!empty($mail_sent)): ?>
                             <strong>A 6-digit verification code has been sent to your email address.</strong>
                             Please check your inbox, enter the code on the verification page to activate your account.
+                            <?php else: ?>
+                            <strong>Your account is created, but we couldn't send the verification email just now.</strong>
+                            Please use <a href="<?php echo SITE_URL; ?>/resend_verification.php">Request a new code</a> in a few minutes.
+                            <?php endif; ?>
                         </p>
                         <div class="success-actions">
                             <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary btn-block">

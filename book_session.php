@@ -12,7 +12,7 @@ $success = '';
 $user_id = $_SESSION['user_id'];
 
 // Fetch user name for email
-$stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+$stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 $user_name = $user['name'] ?? 'A user';
