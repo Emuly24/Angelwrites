@@ -1,5 +1,13 @@
 # AngelWrites — Deep Scan Rollup
 
+> **Update after the production database check (`docs/PRODUCTION_SCHEMA.md`).** The schema you uploaded settles the [schema] questions, and it changes the ranking:
+> - **19 production tables have foreign keys pointing at an empty `users_old` table.** With foreign keys enforced on every request, questions, answers, poem comments, book reviews, sessions, library status and blog-post views (for members) all fail for every user, independent of email.
+> - `users.name` is nullable in production, so registration saves the account and then shows the SMTP dump (no `NOT NULL` fatal).
+> - Also failing in production: `reflections.php` (no `tags` column), every blog post page, group creation (`reading_groups.book_id NOT NULL`), session booking (`session_type` missing), the guest reader (visible fatal at the top) and admin reader analytics (`formatDuration()`).
+> - The data shows half of real signups are unverified, and no review, question, comment, booking, contact message, blog post or video has ever been saved.
+>
+> Theme 2 below now outranks theme 1; Phase 1 gains a database-repair step (section 5 of `PRODUCTION_SCHEMA.md`). Open question 3 is answered.
+
 Per-domain detail: `docs/deep-scan/01-…21-*.md`. Code-level inventory: `docs/AUDIT.md`. Method: the repo served with PHP 8.3 against two SQLite databases. **Env A** is exactly the schema the repo creates. **Env B** adds every table and column the code expects, plus seed data. Real Chromium walked the journeys at 1280/768/375 px.
 
 ## 1. Overall state
@@ -33,6 +41,7 @@ There are also real exposures:
 | # | Systemic cause | Domains touched | Count |
 |---|---|---|---|
 | 1 | **`sendEmail()` calls `die()` on SMTP failure** (60 call sites, 36 files). Action saved, user shown a crash with server paths; inside AJAX it also breaks the page's JS. | 1, 2, 3, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21 | **17** |
+| 2a | **Production foreign keys point at empty `users_old`** (19 tables). Every insert into questions, answers, reviews, sessions, reading_status/progress, blog_reads, notifications, prayer_requests, reflection_comments… fails. | 1, 9, 11, 12, 13, 14, 15, 18 | **8** |
 | 2 | **Schema drift:** code needs 86 tables; the repo creates 23; repo definitions conflict with inserts (`users.name NOT NULL`, `sessions.session_type`, `book_comments.page_num`). Production fixes must be manual on `data/site.db`. | Every domain except 17 | **20** |
 | 3 | **Reader include path** (`reader_ajax.php:11` → non-existent `includes/reader_functions.php`) kills every reader AJAX call; plus `reader.php:384` undefined `$tocEntries` fatal **before** any script reaches the browser. Downstream: no reading data anywhere. | 1, 11, 15, 19 | **4** |
 | 4 | **`time_ago()` problems:** declared twice (`reader/reader_functions.php:56`, `includes/reading_groups.php:415`), fatal wherever both load; missing where needed (`video_watch.php:129`). In `reader.php` the duplicate (`:500`) is now masked by the earlier `:384` fatal. | 1, 4, 6 | **3** |
@@ -84,9 +93,9 @@ There are also real exposures:
 4. Filter private Bible notes server-side; add a membership check to group writes.
 5. Stop telling buyers "Payment successful" (hide or disable the pay button) and remove the raw-file download link on `book.php`.
 
-**Phase 1 — Stop crash-after-success, and know the schema:**
+**Phase 1 — Stop crash-after-success, and repair the database:**
 1. Make `sendEmail()` return `false` and log instead of `die()`. This one function removes the visible failure from 17 domains.
-2. Download `data/site.db` and send me its schema. Then produce one consolidated list of manual table and column changes (domains 1–19 each list theirs).
+2. Repair the production database (`docs/PRODUCTION_SCHEMA.md` §5): repoint the 19 `users_old` foreign keys, add the missing tables and columns, relax the two NOT NULL traps. Back up the `.db`, `-wal` and `-shm` files first, and test on a copy.
 3. Registration: populate `users.name` (or rebuild the table manually).
 
 **Phase 2 — Small code fatals (mostly S each):**
@@ -108,7 +117,7 @@ There are also real exposures:
 
 1. **Does your InfinityFree plan allow outbound SMTP** (to `smtp.gmail.com:587`/`465`)? If not, email has to be dropped or moved to a service you trigger outside the server. This decides domains 10 and 16 and the admin notifications everywhere.
 2. **Is SQLite acceptable on InfinityFree's storage?** Locking errors already appear under bursts. Or do you want to move to their MySQL? That brings the 50k rows/table and no-remote-access limits into play and means rewriting 54 SQLite-only statements.
-3. **Can we start a fresh database, or must existing data be kept** (members, reviews, subscribers, "payments")? Can you download `data/site.db` over FTP so the real schema can replace guesswork?
+3. ~~Can you provide the real schema?~~ **Answered:** see `docs/PRODUCTION_SCHEMA.md`. Remaining: can the repair be applied to the live file during a quiet period, and are the 11 accounts and 3 subscribers to be kept as-is?
 4. **Which PHP version is your account on, and are errors displayed?** PHP 8 turns the reader's undefined variable into a fatal; displayed errors leak server paths.
 5. **Payments:** is a manual "send mobile money, admin confirms" flow acceptable? Are the "completed" rows already in `payments` genuine?
 6. **Licensing:** are you licensed to serve NIV, ESV, NASB, NKJV and AMP as downloadable files and on-site text?
