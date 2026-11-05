@@ -11,6 +11,7 @@
 | `admin/poem_editor.php` | 678 | Admin create/edit poem (rich text, image, audio) | Y |
 | `admin/preview_poem.php` | 528 | Admin preview with review handling | Y |
 | `admin/manage_poems.php` | 1089 | Admin list, bulk publish/draft/delete, image/audio upload | Y |
+| `ajax_get_users.php` | 53 | @-mention autocomplete used by the poem comment box | Y |
 
 ## User journeys
 
@@ -29,7 +30,8 @@
 1. Form with CSRF token, rating, comment, "private" checkbox, reply-to **[confirmed]**.
 2. Submit → comment saved, 302 back, comment visible to the member **[confirmed]**. **Works** (Env B).
 3. A `jobs` row is queued for "process_comment" (`:168`). **[silent] [confirmed]** The row's `status` is **NULL**, not `'pending'`, because the INSERT doesn't set it. `worker.php` only picks `status='pending'`, and there's no worker or cron anyway, so **the admin is never told about private comments**.
-4. Env A: the INSERT needs `reviews.parent_id/is_private/target_user_id/deleted_at`, which the repo's table lacks (AUDIT.md) **[schema]**.
+4. **@-mentions [wrong] [confirmed]:** typing `@` calls `ajax_get_users.php`, which lists members `WHERE name != ''`. Every self-registered member has a NULL `name` (domain 10), so **only seeded or admin-edited accounts can be mentioned**. Guests get `[]`. Mentions are meant to be handled by `worker.php` ("Notify tagged users… you can implement…", `worker.php:30-32`), which isn't implemented and never runs, so a mention notifies no one.
+5. Env A: the INSERT needs `reviews.parent_id/is_private/target_user_id/deleted_at`, which the repo's table lacks (AUDIT.md) **[schema]**.
 
 ### Journey 4: Member leaves a private message on a poem
 1. Ticks "private". Stored with `is_private = 1, target_user_id = 1` (hard-coded admin id, `:152`).
@@ -122,3 +124,4 @@
 | `admin/poem_editor.php` | COVERED | Journey 6 |
 | `admin/preview_poem.php` | COVERED | Journey 7 |
 | `admin/manage_poems.php` | COVERED | Journeys 6 (step 2), 8 |
+| `ajax_get_users.php` | COVERED | Journey 3 step 4 |

@@ -30,6 +30,7 @@
 | `reader/admin/reader_analytics.php` | 398 | Admin reader analytics | Y (journey here; the dashboard view is in domain 19) |
 | `reader/reader_analytics.php` | 436 | Second admin analytics page | Y (also domain 19) |
 | `reader/cron/reader_reminders.php` | 79 | Daily "you left off" email cron | Y |
+| `reader/assets/sw.js` | 41 | "Offline reading" service worker | Y |
 
 ## User journeys
 
@@ -120,7 +121,7 @@
 - **No loading, empty or error states.** E.g. a book with no processed content shows `1 / 0` and an empty frame, with no "This book isn't ready yet" message.
 - **Fragile page parsing.** `book_data.php:52` splits pages with `/<div class="page-content" …>(.*?)<\/div>/`. The first nested `</div>` in a page truncates that page silently. Today's extractor doesn't emit nested divs (`admin/process_book.php:1026-1033`), but the manual formatting tools in `process_book.php` (`:743`, `:791`, `:945`) rewrite `content_html` and could.
 - **Wrong group lookup.** `reader.php:46` looks up the member's group with `reading_groups.book_id`. Groups are stored as `content_type`/`content_id` (`includes/reading_groups.php:20`), so the reader never finds a member's group and group notes never appear. **[wrong] [inferred]**
-- **Dead code.** `reader_audio.php`, `reader_renderer.php`, `progress_tracking.php` and `reader/includes/auth_check.php` are not included by any file. Two different TTS implementations exist (`reader_tts.php` is used; `reader_audio.php` is orphaned).
+- **Dead code.** `reader_audio.php`, `reader_renderer.php`, `progress_tracking.php` and `reader/includes/auth_check.php` are not included by any file. `reader/assets/sw.js` ("offline reading") is never registered, and it would cache paths that don't exist (`/reader/reader/reader.php`, `/assets/js/reader.js`). Two different TTS implementations exist (`reader_tts.php` is used; `reader_audio.php` is orphaned).
 - **Request handling to fix.** `get_challenge_history` is sent by the challenges widget but has no handler in `reader_ajax.php`. The handler set has drifted from what the JS sends.
 
 ## Root causes
@@ -223,3 +224,4 @@
 | `reader/admin/reader_analytics.php` | COVERED | Journey 9 |
 | `reader/reader_analytics.php` | COVERED | Journey 5; Journey 9 |
 | `reader/cron/reader_reminders.php` | COVERED | Journey 8 |
+| `reader/assets/sw.js` | COVERED | Quality (dead code: never registered, wrong paths) |
