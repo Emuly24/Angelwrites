@@ -18,7 +18,7 @@ An earlier draft offered an "Option A", uploading a pre-repaired copy of the dat
 
 | File | What it is |
 |---|---|
-| `repair.sql` | The repair. Plain SQL, about 220 lines. It has no `BEGIN`/`COMMIT` of its own: DB Browser supplies the transaction, so nothing is saved until you press *Write Changes*, and *close without saving* undoes everything. |
+| `repair.sql` | The repair. Plain SQL, about 450 lines (mostly table definitions). It has no `BEGIN`/`COMMIT` of its own: DB Browser supplies the transaction, so nothing is saved until you press *Write Changes*, and *close without saving* undoes everything. |
 | `generate.py` | Regenerates `repair.sql` from a database file. Use it if the script stops with an error because the live database has changed shape since the snapshot. |
 | `verify.py` | The test harness used to prove the repair on copies of the database. |
 | `docs/PRODUCTION_SCHEMA.md` | What was wrong with the production database and why. |
