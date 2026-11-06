@@ -76,6 +76,7 @@ $stmt->execute($params);
 $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== READING TIME CALCULATION (for video duration) =====
+if (!function_exists('formatDuration')) {
 function formatDuration($seconds) {
     if (!$seconds) return '';
     $hours = floor($seconds / 3600);
@@ -86,6 +87,7 @@ function formatDuration($seconds) {
     } else {
         return sprintf('%d:%02d', $minutes, $secs);
     }
+}
 }
 
 $pageTitle = 'Videos';

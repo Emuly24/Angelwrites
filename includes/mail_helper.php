@@ -5,6 +5,13 @@ use PHPMailer\PHPMailer\Exception;
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/load_env.php';
 
+/**
+ * Send an email via SMTP.
+ *
+ * Returns true on success and false on failure. It never stops the page:
+ * callers have usually already saved the user's action, so a mail failure
+ * is logged and the request carries on.
+ */
 function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.gt.tc', $fromName = 'AngelWrites', $isHTML = true) {
     $mail = new PHPMailer(true);
     try {
@@ -15,6 +22,7 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         $mail->Password   = getenv('GMAIL_APP_PASSWORD');
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
+        $mail->Timeout    = 10; // PHPMailer's default is 300 s, longer than the host allows a request to run
         $mail->setFrom($fromEmail, $fromName);
         $mail->addAddress($to);
         $mail->Subject = $subject;
@@ -22,13 +30,8 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         $mail->isHTML($isHTML);
         $mail->send();
         return true;
-    } catch (Exception $e) {
-        // DIE WITH THE REAL ERROR
-        die('<div style="background:#fee2e2; color:#991b1b; padding:20px; border-radius:8px; max-width:600px; margin:40px auto;">' .
-            '<h3>🔥 SMTP Error</h3>' .
-            '<p><strong>Message:</strong> ' . $e->getMessage() . '</p>' .
-            '<p><strong>File:</strong> ' . $e->getFile() . '</p>' .
-            '<p><strong>Line:</strong> ' . $e->getLine() . '</p>' .
-            '</div>');
+    } catch (\Throwable $e) {
+        error_log('sendEmail failed (to: ' . $to . ', subject: ' . $subject . '): ' . $e->getMessage());
+        return false;
     }
 }

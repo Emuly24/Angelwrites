@@ -21,6 +21,9 @@ extract($bookData); // gives $book, $book_id, $pages, $total_pages, $chapterMap,
 // --- Load helper functions ---
 require_once __DIR__ . '/reader_functions.php';
 
+// --- Table of contents entries for the TOC drawer ---
+$tocEntries = buildTOC($pages, $chapterMap, $chapterTitles);
+
 // --- User progress (already extracted, but we need some variables for the UI) ---
 $last_offset = $user_progress['position_offset'] ?? 0;
 $last_chapter = $user_progress['position_section'] ?? 0;
@@ -88,7 +91,6 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip/dist/css/page-flip.browser.min.css">
 <style>
 /* ----- All styles remain the same as before (with the flip nav buttons restored) ----- */
 :root {
@@ -365,7 +367,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     <!-- Settings Panel -->
     <div id="settings-panel">
         <div class="settings-grid">
-            <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll">Scroll</button><button data-mode="flip" class="active">Page Flip</button></div></div>
+            <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll" class="active">Scroll</button><button data-mode="flip">Page Flip</button></div></div>
             <div class="settings-group"><label>Theme</label><div class="btn-group" id="themeGroup"><button data-theme="paper">Paper</button><button data-theme="light" class="active">Light</button><button data-theme="dark">Dark</button><button data-theme="sepia">Sepia</button></div></div>
             <div class="settings-group"><label>Font Size</label><div class="slider-group"><button onclick="adjustFontSize(-5)">A-</button><input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5"><button onclick="adjustFontSize(5)">A+</button><span id="fontSizeLabel">100%</span></div></div>
             <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option></select></div></div>
@@ -488,11 +490,13 @@ html,body { height:100%; width:100%; overflow:hidden; }
     <button id="exitFocusBtn" onclick="toggleFocus()"><i class="fas fa-compress"></i> Exit Focus</button>
 
     <!-- Overlay -->
+    <!-- Selection toolbar for highlights; filled in by initSelectionTooltip() -->
+    <div id="highlight-tooltip"></div>
     <div id="overlay"></div>
 </div>
 
 <!-- ====== Include all enhanced modules ====== -->
-<script src="https://unpkg.com/page-flip/dist/js/page-flip.browser.min.js"></script>
+<script src="https://unpkg.com/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
 <?php
 // Include TTS, sharing, challenges, and gamification toast
 require_once __DIR__ . '/reader_tts.php';
@@ -577,7 +581,8 @@ if (function_exists('renderAchievementToastJS')) {
     const ttsBtn = document.getElementById('ttsBtn');
 
     let currentPage = Math.min(lastPage, totalPages) || 1;
-    let readingMode = localStorage.getItem('reader_mode') || 'flip';
+    // Scroll is the default: in flip mode a mouse drag turns the page, so text can't be selected for highlighting.
+    let readingMode = localStorage.getItem('reader_mode') || 'scroll';
     let focusMode = false;
     let isBookmarked = false;
     let touchStartX = 0;
@@ -659,7 +664,7 @@ if (function_exists('renderAchievementToastJS')) {
 
         flipWrapper.innerHTML = flipPagesHTML.join('');
 
-        pageFlip = new StPageFlip(flipWrapper, {
+        pageFlip = new St.PageFlip(flipWrapper, {
             width: 450,
             height: 600,
             size: 'stretch',
@@ -1530,11 +1535,12 @@ if (function_exists('renderAchievementToastJS')) {
         document.querySelector('#modeGroup [data-mode="scroll"]').classList.add('active');
         switchMode('scroll');
     } else {
-        readingMode = 'flip';
-        localStorage.setItem('reader_mode', 'flip');
-        document.querySelector('#modeGroup [data-mode="scroll"]').classList.remove('active');
-        document.querySelector('#modeGroup [data-mode="flip"]').classList.add('active');
-        switchMode('flip');
+        // First visit: start in scroll mode so text can be selected and highlighted
+        readingMode = 'scroll';
+        localStorage.setItem('reader_mode', 'scroll');
+        document.querySelector('#modeGroup [data-mode="flip"]').classList.remove('active');
+        document.querySelector('#modeGroup [data-mode="scroll"]').classList.add('active');
+        switchMode('scroll');
     }
     goToPage(currentPage);
     loadBookmarkStatus();
