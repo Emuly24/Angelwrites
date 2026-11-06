@@ -47,6 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $error = 'No account found with that email address.';
         } elseif ($user['is_verified'] == 1) {
             $success = true;
+        } elseif ($user['verification_code'] === null || $user['verification_code'] === '') {
+            // F232: accounts created without a code (or whose code was cleared) could never
+            // verify and only saw "Invalid code". Point them to a new code instead.
+            $error = 'There is no active code for this account. Please press "Resend Code" below to get one.';
         } elseif ($user['verification_code'] !== $code) {
             $attempts++;
             file_put_contents($attempts_file, $attempts);
@@ -103,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
         } else {
             // Generate new 6-digit code
             $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+            $expiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // F232: was 15 minutes
             $stmt = $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?");
             $stmt->execute([$code, $expiry, $user['id']]);
 
@@ -119,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
             }
 
             $subject = "Your AngelWrites verification code";
-            $body = "Hello $greetingName,\n\nYour new verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.\n\n— AngelWrites Team";
+            $body = "Hello $greetingName,\n\nYour new verification code is: $code\n\nThis code will expire in 24 hours.\n\nIf you did not request this, please ignore this email.\n\n— AngelWrites Team";
 
             if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
                 $resend_success = true;
