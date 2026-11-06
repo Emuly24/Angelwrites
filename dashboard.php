@@ -371,7 +371,15 @@ function refreshStats() {
             document.getElementById('my_hours').textContent = data.my_reading_hours ?? 0;
         }).catch(console.error);
 }
-setInterval(refreshStats, 60000);
+// Q28: polling every 60 s (stats + 2 chart requests) cost ~4,300 requests a day per open tab,
+// even in a background tab. Now every 5 minutes, only while the tab is visible, and once on return.
+const AW_POLL_MS = 300000;
+let awLastPoll = Date.now();
+function awPoll() { awLastPoll = Date.now(); refreshStats(); if (window.activeChart) updateCharts(); }
+setInterval(function () { if (!document.hidden) awPoll(); }, AW_POLL_MS);
+document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && Date.now() - awLastPoll > 60000) awPoll();
+});
 
 // ============================================================
 // SMOOTH & SMART CHARTS
@@ -392,7 +400,7 @@ function initCharts() {
         options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } } }
     });
     updateCharts();
-    setInterval(updateCharts, 60000);
+    // Q28: chart refreshes now ride on awPoll() above (visible tab only, every 5 minutes).
 }
 
 function updateCharts() {
