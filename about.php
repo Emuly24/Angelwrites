@@ -20,31 +20,8 @@ if (!$about_content_json) {
     $about_content = json_decode($about_content_json, true) ?: [];
 }
 
-// ===== HANDLE CONTACT FORM SUBMISSION =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $message = trim($_POST['message']);
-    
-    if (empty($name) || empty($email) || empty($message)) {
-        $error = 'All fields are required.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Invalid email address.';
-    } else {
-        $stmt = $db->prepare("INSERT INTO contact_messages (name, email, message) VALUES (?, ?, ?)");
-        $stmt->execute([$name, $email, $message]);
-        
-        $admin_email = aw_admin_email();
-        $subject = '📩 New Contact Message from ' . $name;
-        $body = "<h2>New Contact Message</h2>";
-        $body .= "<p><strong>Name:</strong> $name</p>";
-        $body .= "<p><strong>Email:</strong> $email</p>";
-        $body .= "<p><strong>Message:</strong><br>" . nl2br(htmlspecialchars($message)) . "</p>";
-        sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
-        
-        $success = 'Message sent successfully!';
-    }
-}
+// Q39: this page had its own contact form (name, email, message) with no captcha or rate limit, a
+// second, weaker way into the same inbox as contact.php. It now links to the contact page instead.
 
 // F221: the About page used to load the visitor's reputation, achievements and reading streak
 // (unrelated to the page; a fatal for members on databases without those tables). Removed.
@@ -141,32 +118,11 @@ $pageTitle = 'About Angella Bottoman';
         <!-- ===== CONTACT FORM ===== -->
         <div class="contact-section">
             <div class="section-header">
-                <h2>Send a <span class="rose-text">Message</span></h2>
+                <h2>Get in <span class="rose-text">Touch</span></h2>
                 <p>Have a question or want to connect? Angella would love to hear from you.</p>
             </div>
-            <div class="contact-form-wrapper">
-                <?php if (isset($error)): ?>
-                    <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
-                <?php endif; ?>
-                <?php if (isset($success)): ?>
-                    <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-                <?php endif; ?>
-                
-                <form method="POST" class="contact-form">
-                    <div class="form-group">
-                        <label for="name">Your Name</label>
-                        <input type="text" id="name" name="name" placeholder="Enter your name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Email Address</label>
-                        <input type="email" id="email" name="email" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="message">Message</label>
-                        <textarea id="message" name="message" rows="4" placeholder="Write your message here..." required></textarea>
-                    </div>
-                    <button type="submit" name="send_message" class="btn btn-primary btn-block">Send Message</button>
-                </form>
+            <div class="contact-form-wrapper" style="text-align:center;">
+                <a href="<?php echo SITE_URL; ?>/contact.php" class="btn btn-primary">Send Angella a message</a>
             </div>
         </div>
 
