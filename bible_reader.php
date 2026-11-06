@@ -520,7 +520,9 @@ $pageTitle = 'Bible Reader';
                 if (data.success && data.data && data.data.length > 0) {
                     return data.data;
                 } else {
-                    return `[${version} ${book} ${chapter} not found]`;
+                    // F25: some translations on this site are incomplete (the ASV file stops at
+                    // Proverbs 28). Say so plainly instead of "[ASV Isaiah 1 not found]".
+                    return `${book} ${chapter} is not available in the ${version} text on this site. Please choose another version for this passage.`;
                 }
             })
             .catch(error => {
