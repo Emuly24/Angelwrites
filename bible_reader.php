@@ -354,6 +354,21 @@ function awToast(msg, type, html) {
     clearTimeout(box._t);
     box._t = setTimeout(function () { box.style.opacity = '0'; }, html ? 6000 : 3500);
 }
+// Q10: some translations carry translators' footnotes inline as {note} (330 verses in WEB, 9 in NIV),
+// which showed as raw braces in the middle of the verse. They become a small * that shows the note.
+function awVerseHtml(text) {
+    const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(text).replace(/\\/g, '').replace(/\{([^}]*)\}/g, function (m, note) {
+        return '<sup class="bible-fn" tabindex="0" role="button" title="' + esc(note) + '" aria-label="Footnote: ' + esc(note) + '" data-note="' + esc(note) + '" style="color:var(--rose-dark);cursor:pointer;padding:0 3px;">*</sup>';
+    });
+}
+document.addEventListener('click', function (e) {
+    const fn = e.target.closest && e.target.closest('.bible-fn');
+    if (fn) awToast(fn.dataset.note, 'info');
+});
+document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('bible-fn')) { e.preventDefault(); awToast(e.target.dataset.note, 'info'); }
+});
 // Q12: guests trying a member-only action got a technical alert (or a silent failure) and no way
 // to sign in. They now get a toast with Log in / Create account links that return to this page.
 function awGuestOnly(what) {
@@ -635,14 +650,14 @@ function awGuestOnly(what) {
                 getVerseText(version2, b, c, 0)
             ]).then(([data1, data2]) => {
                 if (Array.isArray(data1)) {
-                    textContainer1p.innerHTML = data1.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                    textContainer1p.innerHTML = data1.map(v => `<p>${v.verse}. ${awVerseHtml(v.text)}</p>`).join(''); // Q10
                     applyHighlights(textContainer1p);
                 } else {
                     textContainer1p.innerHTML = `<p>${data1}</p>`;
                 }
                 
                 if (Array.isArray(data2)) {
-                    textContainer2p.innerHTML = data2.map(v => `<p>${v.verse}. ${v.text}</p>`).join('');
+                    textContainer2p.innerHTML = data2.map(v => `<p>${v.verse}. ${awVerseHtml(v.text)}</p>`).join(''); // Q10
                     applyHighlights(textContainer2p);
                 } else {
                     textContainer2p.innerHTML = `<p>${data2}</p>`;
@@ -656,8 +671,7 @@ function awGuestOnly(what) {
             getVerseText(version1, b, c, 0).then(data => {
                 if (Array.isArray(data)) {
                     textContainer.innerHTML = data.map(v => {
-                        const cleanText = v.text.replace(/\\/g, '');
-                        return `<p>${v.verse}. ${cleanText}</p>`;
+                        return `<p>${v.verse}. ${awVerseHtml(v.text)}</p>`; // Q10 (also removes the stray backslashes, as before)
                     }).join('');
                     applyHighlights(textContainer);
                 } else {
