@@ -195,12 +195,10 @@ $stmt->execute([$post['id']]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH READING PROGRESS FOR THIS POST (user) =====
+// F143: blog posts have no book_id. SQLite silently resolved the subquery's book_id to the
+// outer reading_progress row, so members saw their progress in an unrelated book here.
+// Blog posts are not linked to books, so there is no progress to show.
 $reading_progress = null;
-if (isLoggedIn()) {
-    $stmt = $db->prepare("SELECT progress_percent FROM reading_progress WHERE user_id = ? AND book_id = (SELECT book_id FROM blog_posts WHERE id = ?)");
-    $stmt->execute([$_SESSION['user_id'], $post['id']]);
-    $reading_progress = $stmt->fetchColumn() ?? 0;
-}
 
 $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 ?>
