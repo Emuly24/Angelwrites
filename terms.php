@@ -20,8 +20,12 @@ if (!$terms_content) {
             ['heading' => '4. Community Guidelines', 'content' => 'You agree to treat other users with respect and refrain from posting any content that is harmful, abusive, or defamatory.'],
             ['heading' => '5. Session Bookings', 'content' => 'Session bookings are subject to availability. Cancellations must be made at least 24 hours in advance.'],
             ['heading' => '6. Privacy', 'content' => 'Your privacy is important to us. Please review our Privacy Policy for details on how we handle your data.'],
-            ['heading' => '7. Changes to Terms', 'content' => 'We reserve the right to update these terms at any time. Changes will be effective immediately upon posting.'],
-            ['heading' => '8. Contact', 'content' => 'If you have any questions about these Terms of Service, please contact us at angelwrites@zohomail.com.']
+            // F223 / D-L1: who runs the site, how book orders work (manual confirmation, COMMERCE) and
+            // which law applies were missing.
+            ['heading' => '7. Buying Books', 'content' => 'Paid books are ordered on the books page. You pay through your own mobile-money or bank service using the order reference you are given, and the book unlocks once we have confirmed that the payment arrived. A purchased book is for your personal use and may not be shared or resold. If a payment cannot be matched or a book you paid for cannot be delivered, contact us with your order reference.'],
+            ['heading' => '8. Changes to Terms', 'content' => 'We reserve the right to update these terms at any time. Changes will be effective immediately upon posting, and the date at the top of this page will be updated.'],
+            ['heading' => '9. Who We Are and Governing Law', 'content' => 'AngelWrites is run from Malawi. These terms are governed by the laws of Malawi.'],
+            ['heading' => '10. Contact', 'content' => 'If you have any questions about these Terms of Service, please contact us at angelwrites@zohomail.com.']
         ]
     ];
 } else {
