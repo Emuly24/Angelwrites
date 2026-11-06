@@ -68,9 +68,23 @@ $toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
 // --- Parse pages from processed HTML ---
 $pages = [];
 if ($has_processed && !empty($processed['content_html'])) {
-    preg_match_all('/<div class="page-content" data-page="(\d+)">(.*?)<\/div>/s', $processed['content_html'], $matches, PREG_SET_ORDER);
-    foreach ($matches as $match) {
-        $pages[] = $match[2];
+    // F20: the old regex ended each page at the first </div>, so a page containing a div was
+    // silently truncated. Each page now runs to its matching (balanced) closing </div>.
+    // Same opening tags as before; on the live book both methods give the same 141 pages.
+    $html = $processed['content_html'];
+    if (preg_match_all('/<div class="page-content" data-page="(\d+)">/', $html, $open, PREG_OFFSET_CAPTURE)) {
+        foreach ($open[0] as $o) {
+            $pos = $o[1] + strlen($o[0]);
+            $start = $pos;
+            $depth = 1;
+            while ($depth > 0 && preg_match('/<div\b|<\/div>/i', $html, $t, PREG_OFFSET_CAPTURE, $pos)) {
+                $depth += (stripos($t[0][0], '</') === 0) ? -1 : 1;
+                $pos = $t[0][1] + strlen($t[0][0]);
+                if ($depth === 0) {
+                    $pages[] = substr($html, $start, $t[0][1] - $start);
+                }
+            }
+        }
     }
 }
 $total_pages = count($pages);

@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
         unset($_FILES['live_comment_photo']);
     }
     if (!empty($_FILES['live_comment_photo']['name'])) {
-        $upload_dir = '../assets/uploads/comments/';
+        $upload_dir = __DIR__ . '/assets/uploads/comments/'; // F135: was '../assets/…' (outside the web root) while 'assets/uploads/comments/…' was stored
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $photo_filename = 'comment_' . time() . '.jpg';
         if (move_uploaded_file($_FILES['live_comment_photo']['tmp_name'], $upload_dir . $photo_filename)) {
@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment'
         $voice_ok = strncmp($head, "\x1A\x45\xDF\xA3", 4) === 0 || substr($head, 4, 4) === 'ftyp' || strncmp($head, 'OggS', 4) === 0;
     }
     if ($voice_ok) {
-        $upload_dir = '../assets/uploads/voice_comments/';
+        $upload_dir = __DIR__ . '/assets/uploads/voice_comments/'; // F135: was '../assets/…' (outside the web root) while 'assets/uploads/voice_comments/…' was stored
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $filename = 'voice_' . time() . '.webm';
         $target = $upload_dir . $filename;
@@ -204,12 +204,10 @@ $stmt->execute([$post['id']]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH READING PROGRESS FOR THIS POST (user) =====
+// F143: blog posts have no book_id. SQLite silently resolved the subquery's book_id to the
+// outer reading_progress row, so members saw their progress in an unrelated book here.
+// Blog posts are not linked to books, so there is no progress to show.
 $reading_progress = null;
-if (isLoggedIn()) {
-    $stmt = $db->prepare("SELECT progress_percent FROM reading_progress WHERE user_id = ? AND book_id = (SELECT book_id FROM blog_posts WHERE id = ?)");
-    $stmt->execute([$_SESSION['user_id'], $post['id']]);
-    $reading_progress = $stmt->fetchColumn() ?? 0;
-}
 
 $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 ?>

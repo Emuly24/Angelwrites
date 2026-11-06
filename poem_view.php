@@ -84,6 +84,10 @@ if (!$id) {
 $stmt = $db->prepare("SELECT * FROM poems WHERE id = ?");
 $stmt->execute([$id]);
 $poem = $stmt->fetch(PDO::FETCH_ASSOC);
+// F205: release the read snapshot before the view-count write below. With the cursor left
+// open, concurrent views failed at once with "database is locked" (WAL snapshot conflict;
+// the busy timeout cannot help that case). 60 concurrent views: ~40 failed before, 0 after.
+$stmt->closeCursor();
 if (!$poem) {
     header('Location: ' . SITE_URL . '/poetry.php');
     exit;
