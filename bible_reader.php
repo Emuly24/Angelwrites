@@ -717,7 +717,19 @@ $pageTitle = 'Bible Reader';
             alert('Please select a verse to highlight.');
             return;
         }
-        const key = `${book}-${chapter}-${verse}`;
+        // F27: highlight the verse the selection is in (it used the verse dropdown, so the
+        // wrong verse lit up), and save members' highlights on the server (all devices).
+        const selVerse = verseNumberFromRange(range) || verse;
+        if (userId > 0) {
+            const fd = new FormData();
+            fd.append('action', 'toggle_highlight');
+            fd.append('book', book);
+            fd.append('chapter', chapter);
+            fd.append('verse', selVerse);
+            fetch('/bible_reader_ajax.php', { method: 'POST', body: fd }).then(() => renderVerse());
+            return;
+        }
+        const key = `${book}-${chapter}-${selVerse}`;
         const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
         if (saved[key]) {
             delete saved[key];
