@@ -668,7 +668,35 @@ $pageTitle = 'Bible Reader';
     // ================================================================
     // 7. HIGHLIGHTS
     // ================================================================
+    // F28: verse number of the paragraph a selection starts in ("16. For God so loved…" → 16).
+    function verseNumberFromRange(range) {
+        if (!range) return 0;
+        let n = range.startContainer;
+        if (n && n.nodeType === 3) n = n.parentElement;
+        const p = n && n.closest ? n.closest('p') : null;
+        const m = p ? p.textContent.trim().match(/^(\d+)\./) : null;
+        return m ? parseInt(m[1], 10) : 0;
+    }
+
     function applyHighlights(container) {
+        // F28: members' highlights are stored on the server per verse; draw them on every load.
+        if (userId > 0) {
+            const hb = book, hc = chapter;
+            fetch(`/bible_reader_ajax.php?action=get_highlights&book=${encodeURIComponent(hb)}&chapter=${hc}`)
+                .then(r => r.json())
+                .then(d => {
+                    const map = {};
+                    (d.highlights || []).forEach(h => { map[h.verse] = h.color; });
+                    container.querySelectorAll('p').forEach(p => {
+                        const m = p.textContent.trim().match(/^(\d+)\./);
+                        const color = m ? map[m[1]] : null;
+                        p.classList.remove('highlighted', 'highlight-yellow', 'highlight-green', 'highlight-blue', 'highlight-pink');
+                        if (color) p.classList.add('highlighted', 'highlight-' + color);
+                    });
+                })
+                .catch(() => {});
+            return;
+        }
         const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
         const paragraphs = container.querySelectorAll('p');
         paragraphs.forEach(p => {
@@ -1197,6 +1225,7 @@ $pageTitle = 'Bible Reader';
                 formData.append('action', 'add_highlight');
                 formData.append('book', book);
                 formData.append('chapter', chapter);
+                formData.append('verse', verseNumberFromRange(selectedRange)); // F28: stored per verse
                 formData.append('text', selectedText);
                 formData.append('color', color);
                 fetch('/bible_reader_ajax.php', {
@@ -1231,6 +1260,7 @@ $pageTitle = 'Bible Reader';
             formData.append('action', 'add_highlight');
             formData.append('book', book);
             formData.append('chapter', chapter);
+            formData.append('verse', verseNumberFromRange(selectedRange)); // F28: stored per verse
             formData.append('text', selectedText);
             formData.append('color', 'yellow');
             formData.append('note', note);
@@ -1725,6 +1755,11 @@ body.dark-mode {
 .verse-content p { margin-bottom:12px; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s; }
 .verse-content p:hover { background:rgba(219,161,162,0.1); }
 .verse-content p.highlighted { background:#fff3b0; }
+/* F28: the colour classes the highlight picker applies had no styles */
+.verse-content .highlight-yellow { background:#fff3b0; }
+.verse-content .highlight-green { background:#d4f5d4; }
+.verse-content .highlight-blue { background:#d6e8ff; }
+.verse-content .highlight-pink { background:#fbd9e3; }
 .bible-chapter-nav-bottom { display:flex; justify-content:center; align-items:center; gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
 .bible-chapter-nav-bottom .btn { padding:6px 16px; font-size:0.85rem; }
 #bibleChapterDisplay { font-weight:600; color:var(--text); font-family:'Playfair Display',Georgia,serif; }

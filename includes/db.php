@@ -243,6 +243,23 @@ try {
     $db->exec('PRAGMA user_version = 1');
     } // end F205 run-once block
 
+    // F28: Bible highlights are stored per member and verse (the page posted add_highlight to a
+    // handler that did not exist). Schema version 2 adds the table once on existing databases.
+    if ($aw_schema_version < 2) {
+        $db->exec("CREATE TABLE IF NOT EXISTS bible_highlights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            book TEXT NOT NULL,
+            chapter INTEGER NOT NULL,
+            verse INTEGER NOT NULL,
+            color TEXT NOT NULL DEFAULT 'yellow',
+            note TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id, book, chapter, verse)
+        )");
+        $db->exec('PRAGMA user_version = 2');
+    }
+
 } catch (PDOException $e) {
     // Log error and show user-friendly message
     error_log('Database Error: ' . $e->getMessage());
