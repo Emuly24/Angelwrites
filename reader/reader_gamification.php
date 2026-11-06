@@ -27,15 +27,24 @@ function updateUserStats($user_id, $book_id = 0, $action = 'page_read', $amount 
     ];
     $xp = isset($xp_map[$action]) ? $xp_map[$action] * $amount : 0;
 
-    if ($xp > 0) {
-        $stmt = $db->prepare("UPDATE user_reputations SET xp = xp + ? WHERE user_id = ?");
-        $stmt->execute([$xp, $user_id]);
-        // Update level based on new XP
-        updateUserLevel($user_id);
-    }
+    // F9: members without a user_reputations row never gained XP (the UPDATE matched nothing),
+    // and a gamification error must never break the reader action that triggered it.
+    try {
+        if ($xp > 0) {
+            $stmt = $db->prepare("UPDATE user_reputations SET xp = xp + ? WHERE user_id = ?");
+            $stmt->execute([$xp, $user_id]);
+            if ($stmt->rowCount() === 0) {
+                $db->prepare("INSERT OR IGNORE INTO user_reputations (user_id, xp) VALUES (?, ?)")->execute([$user_id, $xp]);
+            }
+            // Update level based on new XP
+            updateUserLevel($user_id);
+        }
 
-    // Check achievements after any action
-    checkAchievements($user_id);
+        // Check achievements after any action
+        checkAchievements($user_id);
+    } catch (Throwable $e) {
+        error_log('updateUserStats: ' . $e->getMessage());
+    }
 }
 
 /**
@@ -228,6 +237,8 @@ function checkAchievements($user_id) {
  * @param int $user_id
  * @return array {level, name, xp, xp_to_next, next_level_name}
  */
+// F9: also defined in reader_functions.php; guarded so both files can be loaded together.
+if (!function_exists('getReaderLevel')) {
 function getReaderLevel($user_id) {
     global $db;
 
@@ -267,12 +278,15 @@ function getReaderLevel($user_id) {
     ];
 }
 
+} // end function_exists guard
 /**
  * Render the level badge HTML.
  *
  * @param int $user_id
  * @return string HTML for the badge.
  */
+// F9: also defined in reader_functions.php; guarded so both files can be loaded together.
+if (!function_exists('renderLevelBadge')) {
 function renderLevelBadge($user_id) {
     $level_data = getReaderLevel($user_id);
     $level = $level_data['level'];
@@ -280,6 +294,7 @@ function renderLevelBadge($user_id) {
     return '<span class="level-badge" title="' . htmlspecialchars($name) . '">🏆 Lv.' . $level . '</span>';
 }
 
+} // end function_exists guard
 /**
  * Render the achievements panel (for modal or sidebar).
  *

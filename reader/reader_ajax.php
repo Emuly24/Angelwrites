@@ -18,6 +18,9 @@ if (!isLoggedIn()) {
 
 $user_id = $_SESSION['user_id'];
 $action = isset($_POST['action']) ? $_POST['action'] : '';
+// F9: updateUserStats() (XP for highlights, notes, finished books, challenges) lives here; it
+// was never loaded, so every function_exists('updateUserStats') check below skipped it.
+require_once __DIR__ . '/reader_gamification.php';
 
 // Allow GET for certain actions
 if (empty($action) && isset($_GET['action'])) {
