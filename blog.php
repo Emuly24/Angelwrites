@@ -73,7 +73,9 @@ switch ($sort) {
         $sql .= " ORDER BY views DESC";
         break;
     case 'most_commented':
-        $sql .= " ORDER BY comment_count DESC";
+        // F142: blog_posts.comment_count is never written (always 0). Blog comments are stored in
+        // reflection_comments with reflection_id = the post id (see blog_post.php); count those.
+        $sql .= " ORDER BY (SELECT COUNT(*) FROM reflection_comments rc WHERE rc.reflection_id = blog_posts.id) DESC, created_at DESC";
         break;
     default:
         $sql .= " ORDER BY created_at DESC";
