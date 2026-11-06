@@ -39,6 +39,17 @@ $discussions = getGroupDiscussions($group_id);
 $progress = getGroupReadingProgress($group_id);
 $schedule = getGroupSchedule($group_id);
 $notes = getGroupNotes($group_id);
+// P15: discussions and notes were shown in full. Each tab is paged (10 at a time) with its own
+// parameter (dpage / npage), and the pager links reopen the same tab.
+require_once __DIR__ . '/includes/pagination.php';
+[$dpage, $dper] = aw_page(10, 'dpage');
+$discussions_total = count($discussions);
+[$dpage, $doffset] = aw_clamp($discussions_total, $dpage, $dper);
+$discussions = array_slice($discussions, $doffset, $dper);
+[$npage, $nper] = aw_page(10, 'npage');
+$notes_total = count($notes);
+[$npage, $noffset] = aw_clamp($notes_total, $npage, $nper);
+$notes = array_slice($notes, $noffset, $nper);
 $activity = getGroupActivity($group_id);
 
 // ===== DETERMINE CONTENT TYPE AND CHAPTERS =====
@@ -183,6 +194,7 @@ $pageTitle = htmlspecialchars($group['name']);
                             </details>
                         </div>
                     <?php endforeach; ?>
+                    <?php echo aw_pager($discussions_total, $dpage, $dper, 'tab-discussions', 'dpage'); // P15 ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -230,6 +242,7 @@ $pageTitle = htmlspecialchars($group['name']);
                             </div>
                         </div>
                     <?php endforeach; ?>
+                    <?php echo aw_pager($notes_total, $npage, $nper, 'tab-notes', 'npage'); // P15 ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -525,6 +538,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById('tab-' + this.dataset.tab).classList.add('active');
     });
 });
+// P15: a pager link such as ?npage=2#tab-notes reopens the tab it came from.
+(function () {
+    const m = location.hash.match(/^#tab-([a-z]+)$/);
+    const btn = m && document.querySelector('.tab-btn[data-tab="' + m[1] + '"]');
+    if (btn) btn.click();
+})();
 
 // ===== DISCUSSIONS =====
 function showCreateDiscussion() {
