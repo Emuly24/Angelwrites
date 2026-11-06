@@ -157,10 +157,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $scheduled_at = null;
                 $status = 'pending';
 
-                if (!empty($schedule)) {
-                    $scheduled_at = date('Y-m-d H:i:s', strtotime($schedule));
-                    if ($scheduled_at === false) {
+                // F171: date() never returns false, so an unparseable value was stored as 1970.
+                // Check strtotime() itself, and only use the field when "Schedule" is chosen
+                // (a value left in the hidden field no longer overrides "Send Now").
+                $wants_schedule = ($_POST['schedule_type'] ?? (empty($schedule) ? 'now' : 'later')) === 'later';
+                if ($wants_schedule) {
+                    $ts = $schedule !== '' ? strtotime($schedule) : false;
+                    if ($ts === false) {
                         $error = 'Invalid schedule date/time.';
+                    } else {
+                        $scheduled_at = date('Y-m-d H:i:s', $ts);
                     }
                 } else {
                     $status = 'processing'; // send immediately
