@@ -40,9 +40,9 @@
         document.body.style.overflow = '';
     }
 
-    if (hamburger) {
-        hamburger.addEventListener('click', toggleMenu);
-    }
+    // Item 6 (F198): includes/header.php already opens/closes the menu from the button's
+    // onclick (toggleMobileMenu). Binding toggleMenu here as well toggled it straight back
+    // shut, so a tap did nothing. The header's handler is the only one now.
 
     if (menuOverlay) {
         menuOverlay.addEventListener('click', closeMenu);

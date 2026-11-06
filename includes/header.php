@@ -112,6 +112,8 @@ if ($isLoggedIn) {
             display: block; object-fit: contain;
         }
         @media (max-width: 480px) { .logo-img { height: 120px !important; max-width: 90% !important; } }
+        /* Item 6 (F198): on phones the logo may shrink so the action icons and the menu button stay on screen */
+        @media (max-width: 480px) { .logo { flex-shrink: 1 !important; min-width: 0; } .logo-img { height: auto !important; max-height: 120px; } }
 
         /* ===== HAMBURGER ===== */
         .hamburger {
@@ -508,11 +510,14 @@ if ($isLoggedIn) {
 
             // Close all dropdowns on outside click
             document.addEventListener('click', function(e) {
-                if (!e.target.closest('.notification-wrapper')) {
-                    document.getElementById('notificationDropdown').classList.remove('open');
+                // Item 6 (F198): guests have neither dropdown; the null access threw on every click.
+                const notifDd = document.getElementById('notificationDropdown');
+                const userDd = document.getElementById('userDropdown');
+                if (notifDd && !e.target.closest('.notification-wrapper')) {
+                    notifDd.classList.remove('open');
                 }
-                if (!e.target.closest('.user-wrapper')) {
-                    document.getElementById('userDropdown').classList.remove('open');
+                if (userDd && !e.target.closest('.user-wrapper')) {
+                    userDd.classList.remove('open');
                 }
             });
         });
