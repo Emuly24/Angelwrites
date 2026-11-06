@@ -282,6 +282,10 @@ function aw_nl_send_batch(PDO $db, $queue_id, $batch = AW_NL_BATCH) {
             $log->execute([$queue_id, $email, 'skipped']);
             continue;
         }
+        if ($sub && empty($sub['unsubscribe_token'])) { // older rows have no token: give them one, so the email can be unsubscribed from
+            $sub['unsubscribe_token'] = bin2hex(random_bytes(32));
+            $db->prepare("UPDATE newsletter SET unsubscribe_token = ? WHERE id = ?")->execute([$sub['unsubscribe_token'], $sub['id']]);
+        }
         $sub = $sub ?: ['email' => $email, 'name' => '', 'unsubscribe_token' => ''];
         $msg = aw_nl_render($db, $q['subject'], $q['content'], $sub, ['queue_id' => $queue_id]);
         $ok = aw_nl_mail($email, $q['subject'], $msg['html'], $msg['text'], !empty($sub['unsubscribe_token']) ? aw_nl_unsubscribe_url($sub['unsubscribe_token']) : '', $files);
