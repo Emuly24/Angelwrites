@@ -46,6 +46,11 @@ $pageTitle = 'Books';
 
 <div class="books-page">
     <div class="container">
+        <?php if (($_GET['error'] ?? '') === 'not_purchased'): // F37 ?>
+            <div class="books-notice" role="alert" style="border:1px solid var(--rose, #DBA1A2);border-radius:10px;padding:12px 16px;margin:16px 0;">
+                🔒 That book has to be bought before it can be downloaded. Press <strong>Download</strong> on it below to order it; it unlocks once your payment is confirmed. Already paid? It unlocks as soon as we confirm the payment.
+            </div>
+        <?php endif; ?>
         <!-- ===== PAGE HEADER ===== -->
         <div class="books-header">
             <div class="books-header-content">
