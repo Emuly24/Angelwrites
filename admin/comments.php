@@ -222,12 +222,18 @@ if ($tab === 'books') {
 // Book reviews (reviews with target_type 'book', written on book.php) appeared in no admin
 // screen: the Poem Reviews tab is filtered to target_type = 'poem'.
 $book_reviews = [];
+require_once __DIR__ . '/../includes/pagination.php';
+$aw_total = 0;
+[$aw_page, $aw_per] = aw_page(20);
 if ($tab === 'book_reviews') {
+    // P16: was capped at the 200 newest reviews; 20 per page now.
+    $aw_total = (int)$db->query("SELECT COUNT(*) FROM reviews WHERE target_type = 'book' AND deleted_at IS NULL")->fetchColumn();
+    [$aw_page, $aw_off] = aw_clamp($aw_total, $aw_page, $aw_per);
     $book_reviews = $db->query("SELECT r.id, r.target_id, r.rating, r.comment, r.created_at,
                                        u.name AS author_name, u.username, u.email AS author_email, b.title AS book_title
                                 FROM reviews r JOIN users u ON u.id = r.user_id LEFT JOIN books b ON b.id = r.target_id
                                 WHERE r.target_type = 'book' AND r.deleted_at IS NULL
-                                ORDER BY r.created_at DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
+                                ORDER BY r.created_at DESC, r.id DESC LIMIT $aw_per OFFSET $aw_off")->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // ===== F158: BLOG AND VIDEO COMMENTS =====
@@ -238,7 +244,7 @@ if ($tab === 'blog_video') {
     foreach ($db->query("SELECT c.id, c.comment AS text, c.created_at, c.photo_path, c.voice_path, u.name, u.first_name, u.last_name, u.username,
                                 p.title AS on_title, p.slug AS on_slug
                          FROM reflection_comments c JOIN users u ON u.id = c.user_id LEFT JOIN blog_posts p ON p.id = c.reflection_id
-                         ORDER BY c.created_at DESC LIMIT 150")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                         ORDER BY c.created_at DESC")->fetchAll(PDO::FETCH_ASSOC) as $r) { // P16: no 150 cap; paged below
         $r['kind'] = 'blog';
         $other_comments[] = $r;
     }
@@ -246,12 +252,16 @@ if ($tab === 'blog_video') {
         foreach ($db->query("SELECT c.id, c.content AS text, c.created_at, NULL AS photo_path, NULL AS voice_path, u.name, u.first_name, u.last_name, u.username,
                                     v.title AS on_title, v.id AS on_video
                              FROM video_comments c JOIN users u ON u.id = c.user_id LEFT JOIN videos v ON v.id = c.video_id
-                             ORDER BY c.created_at DESC LIMIT 150")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                             ORDER BY c.created_at DESC")->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $r['kind'] = 'video';
             $other_comments[] = $r;
         }
     }
     usort($other_comments, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
+    // P16: the two lists were each cut at 150; the merged list is paged, 20 at a time.
+    $aw_total = count($other_comments);
+    [$aw_page, $aw_off] = aw_clamp($aw_total, $aw_page, $aw_per);
+    $other_comments = array_slice($other_comments, $aw_off, $aw_per);
 }
 
 // ============================================================
@@ -619,6 +629,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
                     </div>
                 </div>
             <?php endforeach; ?>
+            <?php if ($tab === 'book_reviews') echo aw_pager($aw_total, $aw_page, $aw_per); // P16 ?>
         </div>
 
         <!-- F158: Blog & Video Comments Tab -->
@@ -653,6 +664,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
                     </div>
                 </div>
             <?php endforeach; ?>
+            <?php if ($tab === 'blog_video') echo aw_pager($aw_total, $aw_page, $aw_per); // P16 ?>
         </div>
     </div>
 </div>
