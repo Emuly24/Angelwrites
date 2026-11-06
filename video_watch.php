@@ -114,8 +114,17 @@ $pageTitle = htmlspecialchars($video['title']);
                         <?php 
                         // Embed logic for YouTube/Vimeo
                         $embed_url = $video['video_url'];
-                        if (strpos($embed_url, 'watch?v=') !== false) {
-                            $embed_url = str_replace('watch?v=', 'embed/', $embed_url);
+                        // F67: only "watch?v=" links were turned into embeds; youtu.be/, /shorts/,
+                        // /embed/, m.youtube.com and "&t=" links did not play. Take the 11-character
+                        // video id from any of these (and a t= start time), plus vimeo.com/<id>.
+                        if (preg_match('~(?:youtube(?:-nocookie)?\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|live/|v/)|youtu\.be/)([A-Za-z0-9_-]{11})~', $embed_url, $yt)) {
+                            $start = 0;
+                            if (preg_match('~[?&#](?:t|start)=(?:(\d+)h)?(?:(\d+)m)?(\d+)s?~', $embed_url, $tm)) {
+                                $start = (int)($tm[1] ?? 0) * 3600 + (int)($tm[2] ?? 0) * 60 + (int)($tm[3] ?? 0);
+                            }
+                            $embed_url = 'https://www.youtube.com/embed/' . $yt[1] . ($start > 0 ? '?start=' . $start : '');
+                        } elseif (preg_match('~vimeo\.com/(?:video/)?(\d+)~', $embed_url, $vm)) {
+                            $embed_url = 'https://player.vimeo.com/video/' . $vm[1];
                         }
                         ?>
                         <div class="plyr__video-embed" id="player">
