@@ -694,8 +694,9 @@ if ($action === 'submit_prayer_request') {
         exit;
     }
 
-    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, book_id, request_text) VALUES (?, ?, ?)");
-    $stmt->execute([$user_id, $book_id, $text]);
+    // F233: request_type and message are required by the table and read by the admin screen.
+    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, book_id, request_type, message, request_text) VALUES (?, ?, 'prayer', ?, ?)");
+    $stmt->execute([$user_id, $book_id, $text, $text]);
 
     $stmt = $db->prepare("SELECT email FROM users WHERE id = ?");
     $stmt->execute([$user_id]);

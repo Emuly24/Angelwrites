@@ -276,6 +276,41 @@ try {
         $db->exec('PRAGMA user_version = 2');
     }
 
+    // F233: prayer_requests.reflection_id was NOT NULL (with a foreign key to blog_posts), so a
+    // prayer request sent from the book reader, which has no blog post, could never be saved.
+    // Schema version 3 rebuilds the table once with reflection_id nullable; rows are kept as they are.
+    if ($aw_schema_version < 3) {
+        try {
+            $db->exec('PRAGMA foreign_keys = OFF');
+            $db->exec('BEGIN IMMEDIATE');
+            if ((int)$db->query('PRAGMA user_version')->fetchColumn() < 3) {
+                $db->exec('CREATE TABLE prayer_requests_v3 (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    reflection_id INTEGER,
+                    request_type TEXT NOT NULL,
+                    message TEXT,
+                    status TEXT DEFAULT \'pending\',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "book_id" INTEGER, "request_text" TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    FOREIGN KEY (reflection_id) REFERENCES blog_posts (id) ON DELETE CASCADE
+                )');
+                $db->exec('INSERT INTO prayer_requests_v3 (id, user_id, reflection_id, request_type, message, status, created_at, book_id, request_text)
+                           SELECT id, user_id, reflection_id, request_type, message, status, created_at, book_id, request_text FROM prayer_requests');
+                $db->exec('DROP TABLE prayer_requests');
+                $db->exec('ALTER TABLE prayer_requests_v3 RENAME TO prayer_requests');
+                $db->exec('PRAGMA user_version = 3');
+            }
+            $db->exec('COMMIT');
+        } catch (PDOException $e) {
+            if ($db->inTransaction()) {
+                $db->exec('ROLLBACK');
+            }
+            error_log('F233 prayer_requests migration: ' . $e->getMessage());
+        }
+        $db->exec('PRAGMA foreign_keys = ON');
+    }
+
 } catch (PDOException $e) {
     // Log error and show user-friendly message
     error_log('Database Error: ' . $e->getMessage());

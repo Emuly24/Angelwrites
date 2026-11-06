@@ -591,7 +591,7 @@ return array (
   58 => 'CREATE TABLE IF NOT EXISTS "prayer_requests" (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    reflection_id INTEGER NOT NULL,
+    reflection_id INTEGER,
     request_type TEXT NOT NULL,
     message TEXT,
     status TEXT DEFAULT \'pending\',
