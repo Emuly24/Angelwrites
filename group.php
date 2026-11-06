@@ -161,8 +161,23 @@ $pageTitle = htmlspecialchars($group['name']);
                                     <?php endforeach; ?>
                                 </span>
                                 <span><?php echo $disc['reply_count']; ?> replies</span>
-                                <a href="discussion.php?id=<?php echo $disc['id']; ?>" class="btn btn-sm btn-outline">View</a>
                             </div>
+                            <?php // F43: "View" linked a missing discussion.php and replies could not be written. ?>
+                            <details class="discussion-thread">
+                                <summary class="btn btn-sm btn-outline">View &amp; reply</summary>
+                                <p class="discussion-full"><?php echo nl2br(htmlspecialchars($disc['content'])); ?></p>
+                                <?php foreach (getDiscussionReplies($disc['id']) as $rep): ?>
+                                    <div class="discussion-reply">
+                                        <strong><?php echo htmlspecialchars($rep['display_name'] ?: $rep['username']); ?></strong>
+                                        <small><?php echo time_ago($rep['created_at']); ?></small>
+                                        <p><?php echo nl2br(htmlspecialchars($rep['content'])); ?></p>
+                                    </div>
+                                <?php endforeach; ?>
+                                <form class="discussion-reply-form" onsubmit="submitReply(event, <?php echo (int)$disc['id']; ?>)">
+                                    <textarea name="content" rows="2" required placeholder="Write a reply…"></textarea>
+                                    <button type="submit" class="btn btn-sm btn-primary">Reply</button>
+                                </form>
+                            </details>
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -519,6 +534,17 @@ function submitDiscussion(e) {
             alert('Error: ' + data.error);
         }
     });
+}
+
+// F43: reply to a discussion
+function submitReply(e, discussionId) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    formData.append('action', 'add_reply');
+    formData.append('discussion_id', discussionId);
+    fetch('group_ajax.php', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => { if (data.success) { location.reload(); } else { alert('Error: ' + data.error); } });
 }
 
 // ===== NOTES =====

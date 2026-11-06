@@ -49,6 +49,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
+    // F43: replies to discussions (addDiscussionReply() existed but nothing called it)
+    if ($action === 'add_reply') {
+        $discussion_id = (int)($_POST['discussion_id'] ?? 0);
+        $content = trim($_POST['content'] ?? '');
+        $stmt = $db->prepare("SELECT group_id FROM group_discussions WHERE id = ?");
+        $stmt->execute([$discussion_id]);
+        $group_id = (int)$stmt->fetchColumn();
+        $stmt->closeCursor();
+        if (!$group_id || $content === '') {
+            echo json_encode(['success' => false, 'error' => 'Write a reply first.']);
+            exit;
+        }
+        s4_require_member($db, $group_id, $user_id);
+        $reply_id = addDiscussionReply($discussion_id, $user_id, $content);
+        echo json_encode(['success' => true, 'reply_id' => $reply_id]);
+        exit;
+    }
+
     if ($action === 'add_note') {
         $group_id = (int)$_POST['group_id'];
         s4_require_member($db, $group_id, $user_id);
