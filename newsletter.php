@@ -6,7 +6,9 @@ require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php'; // Now safely loaded after config
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
-if (isLoggedIn()) {
+// F163: only plain visits are redirected. A subscription POST (the footer form) is handled
+// for members too; it used to be redirected away before it was processed.
+if (isLoggedIn() && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     if (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
     } else {
