@@ -60,7 +60,12 @@ switch ($sort) {
         $sql .= " ORDER BY views DESC";
         break;
     case 'most_commented':
-        $sql .= " ORDER BY comment_count DESC";
+        // F63: videos has no comment_count column (fatal). Count video_comments instead; before
+        // the DB repair that table may be missing, so fall back to newest first.
+        $has_video_comments = (bool)$db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'video_comments'")->fetchColumn();
+        $sql .= $has_video_comments
+            ? " ORDER BY (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = videos.id) DESC, created_at DESC"
+            : " ORDER BY created_at DESC";
         break;
     default:
         $sql .= " ORDER BY created_at DESC";
