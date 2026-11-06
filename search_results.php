@@ -28,9 +28,12 @@ $like_terms = array_map(function($term) { return '%' . $term . '%'; }, $search_t
 function buildSearchWhere($columns, $like_terms) {
     $where_parts = [];
     $params = [];
+    // Item 5 (F53): one placeholder per column per term. The old code added one "?" per
+    // column but bound every term, so any multi-word query had more parameters than
+    // placeholders and failed. A row matches if any term appears in any column.
     foreach ($columns as $col) {
-        $where_parts[] = "$col LIKE ?";
         foreach ($like_terms as $term) {
+            $where_parts[] = "$col LIKE ?";
             $params[] = $term;
         }
     }
@@ -215,7 +218,8 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                             $link = SITE_URL . '/blog_post.php?slug=' . ($item['slug'] ?? $item['id']);
                             break;
                         case 'reflection':
-                            $link = SITE_URL . '/reflection.php?id=' . $item['id'];
+                            // Item 5 (F54): reflection.php does not exist; open the reflections list filtered to this one.
+                            $link = SITE_URL . '/reflections.php?search=' . urlencode($item['title']);
                             break;
                         case 'video':
                             $link = SITE_URL . '/video_watch.php?id=' . $item['id'];
