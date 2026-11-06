@@ -46,10 +46,8 @@ if ($isLoggedIn) {
     <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : 'AngelWrites — Christian writing and community platform by Angella Bottoman.'; ?>">
     <meta name="keywords" content="AngelWrites, Christian writing, faith, poetry, books, reflections, Angella Bottoman">
     <meta name="robots" content="index, follow">
-    <meta property="og:title" content="<?php echo htmlspecialchars(isset($pageTitle) ? $pageTitle . ' - ' . aw_site_name() : aw_site_name()); /* F191 */ ?>">
-    <meta property="og:description" content="AngelWrites — Christian writing and community platform by Angella Bottoman.">
-    <meta property="og:url" content="<?php echo SITE_URL . $_SERVER['REQUEST_URI']; ?>">
-    <meta name="twitter:card" content="summary_large_image">
+    <!-- Q32: og:title/description/url and twitter:card were printed here and again in the Open Graph
+         block below, so pages that set their own $og_* values were shadowed by these generic ones. -->
     
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
