@@ -19,11 +19,24 @@ if (isset($_SESSION['flash_message'])) {
 
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
+// F123: poems created by admin/poem_editor.php (11 of 13 in production) have no poem_status row,
+// so the UPDATE-only toggles changed nothing. Set the status, inserting the row when missing.
+// A poem with no row counts as published (that is how the public pages have always shown it).
+function aw_set_poem_status($db, array $ids, $status) {
+    $upd = $db->prepare("UPDATE poem_status SET status = ? WHERE poem_id = ?");
+    $ins = $db->prepare("INSERT INTO poem_status (poem_id, status) VALUES (?, ?)");
+    foreach ($ids as $pid) {
+        $upd->execute([$status, (int)$pid]);
+        if ($upd->rowCount() === 0) {
+            $ins->execute([(int)$pid, $status]);
+        }
+    }
+}
+
 // ===== HANDLE PUBLISH / UNPUBLISH =====
 if (isset($_GET['publish']) && is_numeric($_GET['publish'])) {
     $id = (int)$_GET['publish'];
-    $stmt = $db->prepare("UPDATE poem_status SET status = 'published' WHERE poem_id = ?");
-    $stmt->execute([$id]);
+    aw_set_poem_status($db, [$id], 'published');
     $_SESSION['flash_message'] = '✅ Poem published and is now live for all users!';
     $_SESSION['flash_type'] = 'success';
     header('Location: ' . SITE_URL . '/admin/manage_poems.php');
@@ -31,8 +44,7 @@ if (isset($_GET['publish']) && is_numeric($_GET['publish'])) {
 }
 if (isset($_GET['unpublish']) && is_numeric($_GET['unpublish'])) {
     $id = (int)$_GET['unpublish'];
-    $stmt = $db->prepare("UPDATE poem_status SET status = 'draft' WHERE poem_id = ?");
-    $stmt->execute([$id]);
+    aw_set_poem_status($db, [$id], 'draft');
     $_SESSION['flash_message'] = '🔒 Poem unpublished and reverted to draft.';
     $_SESSION['flash_type'] = 'success';
     header('Location: ' . SITE_URL . '/admin/manage_poems.php');
@@ -64,13 +76,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
                 $_SESSION['flash_type'] = 'error';
             }
         } elseif ($action === 'publish') {
-            $stmt = $db->prepare("UPDATE poem_status SET status = 'published' WHERE poem_id IN ($placeholders)");
-            $stmt->execute($ids);
+            aw_set_poem_status($db, $ids, 'published');
             $_SESSION['flash_message'] = count($ids) . ' poem(s) published successfully.';
             $_SESSION['flash_type'] = 'success';
         } elseif ($action === 'draft') {
-            $stmt = $db->prepare("UPDATE poem_status SET status = 'draft' WHERE poem_id IN ($placeholders)");
-            $stmt->execute($ids);
+            aw_set_poem_status($db, $ids, 'draft');
             $_SESSION['flash_message'] = count($ids) . ' poem(s) moved to draft.';
             $_SESSION['flash_type'] = 'success';
         }
@@ -207,7 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
 }
 
 // ===== FETCH POEMS WITH SEARCH (JOIN status) =====
-$sql = "SELECT p.*, COALESCE(s.status, 'draft') as status 
+$sql = "SELECT p.*, COALESCE(s.status, 'published') as status /* F123: no row = live on the site */ 
         FROM poems p 
         LEFT JOIN poem_status s ON p.id = s.poem_id";
 $params = [];
