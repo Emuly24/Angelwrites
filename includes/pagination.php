@@ -30,6 +30,7 @@ function aw_pager($total, $page, $per_page, $anchor = '') {
     }
     $page = min(max(1, (int)$page), $pages);
     $query = $_GET;
+    unset($query['msg'], $query['deleted'], $query['success'], $query['error']); // one-time notices
     $url = function ($p) use ($query, $anchor) {
         $query['page'] = $p;
         return '?' . htmlspecialchars(http_build_query($query)) . ($anchor !== '' ? '#' . rawurlencode($anchor) : '');
