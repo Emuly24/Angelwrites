@@ -1604,3 +1604,12 @@ button.password-toggle:focus-visible { outline:2px solid var(--rose); outline-of
 /* Q37: footer subscribe has an optional name field on its own line */
 .footer-newsletter-form { flex-wrap: wrap; }
 .footer-newsletter-form input[name="name"] { flex-basis: 100%; }
+
+/* ===== P1: SHARED PAGER (includes/pagination.php) ===== */
+.pagination.aw-pager { display:flex; justify-content:center; align-items:center; gap:6px; margin:28px 0 6px; flex-wrap:wrap; }
+.aw-pager .page-link { display:inline-flex; align-items:center; justify-content:center; min-width:40px; min-height:40px; padding:6px 12px; border:1px solid var(--border); border-radius:10px; background:var(--card-bg); color:var(--text); text-decoration:none; font-weight:600; transition:border-color 0.2s, transform 0.2s; }
+.aw-pager .page-link:hover { border-color:var(--rose); transform:translateY(-1px); }
+.aw-pager .page-link.active { background:var(--rose); color:#fff; border-color:var(--rose); }
+.aw-pager .page-link:focus-visible { outline:2px solid var(--rose); outline-offset:2px; }
+.aw-pager .page-gap { padding:0 4px; color:var(--text-light); }
+.aw-pager-info { text-align:center; font-size:0.85rem; color:var(--text-light); margin:0 0 20px; }
