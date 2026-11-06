@@ -32,6 +32,10 @@ if (isLoggedIn()) {
 }
 
 $error = '';
+// F102: message from social_login.php when Google sign-in is off or failed
+if (isset($_GET['social']) && $_GET['social'] === 'unavailable') {
+    $error = 'Google sign-in is not available right now. Please log in with your email or username.';
+}
 $success = '';
 $login_value = isset($_POST['login']) ? trim($_POST['login']) : '';
 
@@ -222,12 +226,14 @@ $pageTitle = 'Sign In';
                 </form>
 
                 <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
+                <?php if (getenv('SOCIAL_LOGIN_ENABLED') === '1'): // F102: off unless enabled (decision D-M3) ?>
                 <div class="social-login-section">
                     <p>Or continue with:</p>
                     <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
                         <i class="fab fa-google"></i> Google
                     </a>
                 </div>
+                <?php endif; ?>
 
                 <div class="auth-footer">
                     <p>Don't have an account? <a href="<?php echo SITE_URL; ?>/register.php">Sign up here</a></p>
