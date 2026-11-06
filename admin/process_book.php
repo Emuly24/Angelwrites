@@ -218,54 +218,68 @@ function extractPDF($file_path) {
     return '⚠️ PDF extraction failed. This PDF appears to be encrypted or uses an unsupported encoding.';
 }
 
+// R2: turn (X)HTML/Word XML into plain text with one blank line between paragraphs. The old DOCX
+// code stripped every tag except text runs, so paragraph breaks vanished and the whole book became
+// one run-on line (no chapters found, one "page"); the old EPUB code returned the raw XHTML (head,
+// tags and all) in manifest order, which the reader then showed as literal markup.
+function aw_markup_to_text($markup) {
+    $markup = preg_replace('#<(script|style|head)\b[^>]*>.*?</\1>#is', '', $markup);
+    $markup = preg_replace('#<w:tab\s*/>#i', "\t", $markup);
+    $markup = preg_replace('#<(w:br|br)\b[^>]*/?>#i', "\n", $markup);
+    $markup = preg_replace('#</(w:p|p|div|h[1-6]|li|blockquote|section|tr)>#i', "\n\n", $markup);
+    $text = html_entity_decode(strip_tags($markup), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace("/[ \t]+/u", ' ', $text);
+    $text = preg_replace("/ *\n */", "\n", $text);
+    $text = preg_replace("/\n{3,}/", "\n\n", $text);
+    return trim($text);
+}
+
 function extractDOCX($file_path) {
-    $zip = zip_open($file_path);
-    if (!$zip || is_numeric($zip)) return false;
-    $content = '';
-    while ($zip_entry = zip_read($zip)) {
-        if (zip_entry_name($zip_entry) == 'word/document.xml') {
-            if (zip_entry_open($zip, $zip_entry, "r")) {
-                $xml = zip_entry_read($zip_entry, zip_entry_filesize($zip_entry));
-                $xml = strip_tags($xml, '<w:t>');
-                $xml = str_replace(['<w:t>', '</w:t>'], '', $xml);
-                $content .= html_entity_decode($xml);
-                zip_entry_close($zip_entry);
-                break;
-            }
-        }
-    }
-    zip_close($zip);
-    return fixEncoding($content);
+    $zip = new ZipArchive();
+    if ($zip->open($file_path) !== true) return false;
+    $xml = $zip->getFromName('word/document.xml');
+    $zip->close();
+    if ($xml === false) return false;
+    return fixEncoding(aw_markup_to_text($xml));
 }
 
 function extractEPUB($file_path) {
     $zip = new ZipArchive();
-    if ($zip->open($file_path) !== TRUE) return false;
-    $html_content = '';
+    if ($zip->open($file_path) !== true) return false;
     $opf_path = null;
-    for ($i = 0; $i < $zip->numFiles; $i++) {
-        if (strpos($zip->getNameIndex($i), '.opf') !== false) {
-            $opf_path = $zip->getNameIndex($i);
-            break;
-        }
+    $container = $zip->getFromName('META-INF/container.xml');
+    if ($container && preg_match('/full-path="([^"]+)"/', $container, $m)) {
+        $opf_path = $m[1];
     }
-    if (!$opf_path) { $zip->close(); return false; }
-    $opf_xml = $zip->getFromName($opf_path);
-    $opf = simplexml_load_string($opf_xml);
-    $ns = $opf->getNamespaces(true);
-    $opf->registerXPathNamespace('opf', $ns[''] ?? 'http://www.idpf.org/2007/opf');
-    $items = $opf->xpath('//opf:manifest/opf:item[@media-type="application/xhtml+xml"]');
-    $base_dir = dirname($opf_path) . '/';
-    foreach ($items as $item) {
-        $href = (string)$item['href'];
-        $full_path = $base_dir . $href;
-        $content = $zip->getFromName($full_path);
-        if ($content) {
-            $html_content .= fixEncoding($content);
-        }
+    for ($i = 0; !$opf_path && $i < $zip->numFiles; $i++) {
+        if (substr($zip->getNameIndex($i), -4) === '.opf') $opf_path = $zip->getNameIndex($i);
+    }
+    $opf_xml = $opf_path ? $zip->getFromName($opf_path) : false;
+    if (!$opf_xml) { $zip->close(); return false; }
+    $opf = @simplexml_load_string($opf_xml);
+    if (!$opf) { $zip->close(); return false; }
+    $opf->registerXPathNamespace('opf', 'http://www.idpf.org/2007/opf');
+    $base_dir = (dirname($opf_path) === '.') ? '' : dirname($opf_path) . '/';
+    $manifest = [];
+    foreach ($opf->xpath('//opf:manifest/opf:item') ?: [] as $item) {
+        $manifest[(string)$item['id']] = ['href' => (string)$item['href'], 'type' => (string)$item['media-type']];
+    }
+    // Reading order is the spine; fall back to the manifest's XHTML items.
+    $order = [];
+    foreach ($opf->xpath('//opf:spine/opf:itemref') ?: [] as $ref) {
+        $id = (string)$ref['idref'];
+        if (isset($manifest[$id])) $order[] = $manifest[$id]['href'];
+    }
+    if (!$order) {
+        foreach ($manifest as $it) if ($it['type'] === 'application/xhtml+xml') $order[] = $it['href'];
+    }
+    $parts = [];
+    foreach ($order as $href) {
+        $content = $zip->getFromName($base_dir . rawurldecode($href));
+        if ($content !== false && trim($text = aw_markup_to_text($content)) !== '') $parts[] = $text;
     }
     $zip->close();
-    return $html_content;
+    return $parts ? fixEncoding(implode("\n\n", $parts)) : false;
 }
 
 function splitPagesByNumbers($text) {
