@@ -263,9 +263,9 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                         <div class="recorder-controls">
                             <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
                             <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
+                            <div id="recordingForm" style="display:none;"><!-- M3: was a nested <form>, which ended the page form early -->
                                 <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
+                            </div>
                             <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
                                 <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
                             </div>
@@ -328,6 +328,7 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
 </script>
 
 <!-- ===== RECORDER JAVASCRIPT (Camera, Audio, Video) ===== -->
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-media.js?v=1"></script><!-- M3: noise reduction + editor for recordings -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ============================================================
@@ -493,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                audioRecorder.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioRecorder.stream = await AWMedia.getStream({ audio: true }); // M3: noise reduction while recording
                 audioRecorder.mediaRecorder = new MediaRecorder(audioRecorder.stream);
                 audioRecorder.chunks = [];
 
@@ -501,54 +502,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     audioRecorder.chunks.push(event.data);
                 };
 
-                audioRecorder.mediaRecorder.onstop = () => {
-                    audioRecorder.blob = new Blob(audioRecorder.chunks, { type: 'audio/webm' });
-                    const url = URL.createObjectURL(audioRecorder.blob);
-                    audioPreviewRecorder.src = url;
+                audioRecorder.mediaRecorder.onstop = async () => {
+                    audioRecorder.stream.getTracks().forEach(t => t.stop()); // M3: release the microphone
+                    // M3: edit the recording, then put it straight into the form. "Use This" used to reload
+                    // the page, which threw the recording away; "Record Again" now replaces it instead.
+                    audioRecorder.blob = await AWMedia.review(new Blob(audioRecorder.chunks, { type: 'audio/webm' }), { kind: 'audio' });
+                    const dt = new DataTransfer();
+                    dt.items.add(new File([audioRecorder.blob], 'audio_recording.webm', { type: 'audio/webm' }));
+                    recordingInput.files = dt.files;
+                    audioPreviewRecorder.src = URL.createObjectURL(audioRecorder.blob);
                     audioPreviewRecorder.load();
                     audioPreviewRecorderContainer.style.display = 'block';
-
-                    document.querySelector('.recorder-controls').innerHTML = `
-                        <audio controls src="${url}" style="width:100%;"></audio>
-                        <div style="display:flex; gap:12px; margin-top:10px;">
-                            <button type="button" id="confirmAudioBtn" class="btn btn-success btn-sm">✅ Use This</button>
-                            <button type="button" id="retakeAudioBtn" class="btn btn-warning btn-sm">🔄 Retake</button>
-                        </div>
-                    `;
-
-                    document.getElementById('confirmAudioBtn').addEventListener('click', function() {
-                        const dt = new DataTransfer();
-                        dt.items.add(new File([audioRecorder.blob], 'audio_recording.webm', { type: 'audio/webm' }));
-                        recordingInput.files = dt.files;
-                        document.getElementById('recordingForm').style.display = 'block';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
-                            <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        `;
-                        location.reload();
-                    });
-
-                    document.getElementById('retakeAudioBtn').addEventListener('click', function() {
-                        audioRecorder.blob = null;
-                        audioPreviewRecorderContainer.style.display = 'none';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
-                            <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        `;
-                        location.reload();
-                    });
+                    AWMedia.attachEditButton(recordingInput, audioPreviewRecorder, 'audio', 'audio_recording.webm');
+                    recordBtn.textContent = '🎙️ Record Again';
                 };
 
                 audioRecorder.mediaRecorder.start();
