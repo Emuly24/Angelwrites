@@ -161,7 +161,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                         <div class="featured-grid">
                             <?php foreach ($featured_reflections as $fr): ?>
                                 <div class="featured-card">
-                                    <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $fr['id']; ?>">
+                                    <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($fr['slug']); /* F72 */ ?>">
                                         <div class="featured-card-content">
                                             <span class="featured-badge"><i class="fas fa-star"></i> Featured</span>
                                             <h4><?php echo htmlspecialchars($fr['title']); ?></h4>
@@ -196,7 +196,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                                         </span>
                                     </div>
                                     <h3>
-                                        <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>">
+                                        <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($reflection['slug']); /* F72 */ ?>">
                                             <?php echo htmlspecialchars($reflection['title']); ?>
                                         </a>
                                     </h3>
@@ -218,7 +218,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                                         </div>
                                         <div class="reflection-actions">
                                             <span class="comment-count"><i class="fas fa-comment"></i> <?php echo number_format($reflection['comment_count'] ?? 0); ?></span>
-                                            <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="read-more">
+                                            <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($reflection['slug']); /* F72 */ ?>" class="read-more">
                                                 Read <i class="fas fa-arrow-right"></i>
                                             </a>
                                         </div>
@@ -266,7 +266,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                         <ul class="recent-posts-list">
                             <?php foreach ($recent_reflections as $rr): ?>
                                 <li>
-                                    <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $rr['id']; ?>">
+                                    <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($rr['slug']); /* F72 */ ?>">
                                         <?php echo htmlspecialchars($rr['title']); ?>
                                     </a>
                                     <small><?php echo date('M j, Y', strtotime($rr['created_at'])); ?> • <?php echo $rr['comment_count'] ?? 0; ?> comments</small>
@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.length > 0) {
                     let html = '<ul>';
                     data.forEach(item => {
-                        html += '<li><a href="<?php echo SITE_URL; ?>/reflection.php?id=' + item.id + '">' + item.title + '</a></li>';
+                        html += '<li><a href="<?php echo SITE_URL; ?>/blog_post.php?slug=' + encodeURIComponent(item.slug || '') + '">' + item.title + '</a></li>'; // F72
                     });
                     html += '</ul>';
                     searchResults.innerHTML = html;

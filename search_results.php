@@ -255,8 +255,9 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                             $link = SITE_URL . '/blog_post.php?slug=' . ($item['slug'] ?? $item['id']);
                             break;
                         case 'reflection':
-                            // Item 5 (F54): reflection.php does not exist; open the reflections list filtered to this one.
-                            $link = SITE_URL . '/reflections.php?search=' . urlencode($item['title']);
+                            // F72: reflections are blog posts (F71); open the post itself. (Item 5 / F54 had
+                            // pointed at the filtered list while there was no detail page to open.)
+                            $link = SITE_URL . '/blog_post.php?slug=' . urlencode($item['slug']);
                             break;
                         case 'video':
                             $link = SITE_URL . '/video_watch.php?id=' . $item['id'];
