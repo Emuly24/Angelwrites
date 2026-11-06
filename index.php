@@ -11,9 +11,16 @@ $cacheFile = __DIR__ . '/cache/index.html';
 $cacheTime = 300; // 5 minutes
 
 // If user is not logged in, serve cached version if available
-if (!isLoggedIn()) {
+// F174: GET only. A guest POST (newsletter form with its CSRF token) was answered from the
+// cache and never reached its handler.
+if (!isLoggedIn() && $_SERVER['REQUEST_METHOD'] === 'GET') {
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime) {
-        readfile($cacheFile);
+        // F174: the cached page holds a placeholder instead of the CSRF token of whoever
+        // filled the cache; give this visitor their own session token.
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        echo str_replace('__AW_CSRF_TOKEN__', $_SESSION['csrf_token'], file_get_contents($cacheFile));
         exit;
     }
     ob_start();
@@ -1199,6 +1206,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================
 if ($doCache) {
     $content = ob_get_contents();
+    // F174: never store this visitor's CSRF token in the shared cache file.
+    if (!empty($_SESSION['csrf_token'])) {
+        $content = str_replace($_SESSION['csrf_token'], '__AW_CSRF_TOKEN__', $content);
+    }
     file_put_contents($cacheFile, $content);
     ob_end_flush();
 }
