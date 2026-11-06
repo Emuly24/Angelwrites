@@ -10,6 +10,9 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/reading_groups.php';
 
+// F12: every answer is JSON (errors were sent as text/html)
+header('Content-Type: application/json; charset=utf-8');
+
 if (!isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['error' => 'Not logged in.']);
@@ -153,6 +156,7 @@ $stmt->execute([$user_id]);
 $data['achievements'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ------------------------- Output JSON -------------------------
-header('Content-Type: application/json');
-echo json_encode($data);
+// F12: offer the export as a file download instead of raw JSON in the browser window
+header('Content-Disposition: attachment; filename="angelwrites-reading-data-book-' . $book_id . '-' . date('Y-m-d') . '.json"');
+echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 exit;
