@@ -4,6 +4,36 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php'; // Now safely loaded after config
+require_once 'includes/newsletter_optin.php';
+
+// ===== F176: CONFIRM A SUBSCRIPTION FROM THE EMAILED LINK =====
+if (isset($_GET['confirm'])) {
+    $stmt = $db->prepare("SELECT id, email, name, is_active FROM newsletter WHERE unsubscribe_token = ?");
+    $stmt->execute([trim((string)$_GET['confirm'])]);
+    $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$sub) {
+        $confirm_error = 'This confirmation link is not valid. Please subscribe again.';
+    } else {
+        if ($sub['is_active'] != 1) {
+            $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL WHERE id = ?")->execute([$sub['id']]);
+            sendEmail('angelwrites@zohomail.com', 'New Newsletter Subscriber (confirmed)',
+                "A subscriber confirmed their newsletter subscription.\n\nEmail: {$sub['email']}\nName: " . ($sub['name'] ?: 'Not provided'),
+                'angelwrites@zohomail.com', 'AngelWrites', false);
+        }
+        $confirm_success = 'Thank you! Your subscription is confirmed. You can unsubscribe at any time from the link in each newsletter.';
+    }
+    $pageTitle = 'Newsletter';
+    require_once 'includes/header.php';
+    echo '<div class="container" style="max-width:640px;margin:60px auto;padding:0 16px;">';
+    if (!empty($confirm_error)) {
+        echo '<div class="alert alert-error">' . htmlspecialchars($confirm_error) . '</div>';
+    } else {
+        echo '<div class="alert alert-success">' . htmlspecialchars($confirm_success) . '</div>';
+    }
+    echo '<p><a class="btn btn-primary" href="' . SITE_URL . '/index.php">Back to the homepage</a></p></div>';
+    require_once 'includes/footer.php';
+    exit;
+}
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 // F163: only plain visits are redirected. A subscription POST (the footer form) is handled
@@ -30,48 +60,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
-        // Check if email already exists
-        $stmt = $db->prepare("SELECT id, is_active, unsubscribe_token FROM newsletter WHERE email = ?");
-        $stmt->execute([$email]);
-        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($existing) {
-            if ($existing['is_active'] == 1) {
-                $error = 'This email is already subscribed.';
-            } else {
-                // Reactivate
-                $stmt = $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                $stmt->execute([$existing['id']]);
-                $success = 'Your subscription has been reactivated. Welcome back!';
-                
-                // ===== SEND REACTIVATION NOTIFICATION TO ADMIN =====
-                $admin_email = 'angelwrites@zohomail.com';
-                $admin_subject = 'Newsletter Subscription Reactivated';
-                $admin_body = "A user has reactivated their newsletter subscription.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
-                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
-            }
+        // F176: double opt-in; the address is activated from the emailed link (?confirm= handler above).
+        $optin = newsletter_request_optin($db, $email, $name);
+        if ($optin['ok']) {
+            $success = $optin['message'];
         } else {
-            // Generate unique unsubscribe token
-            $token = bin2hex(random_bytes(32));
-
-            // Insert new subscriber
-            $stmt = $db->prepare("INSERT INTO newsletter (email, name, is_active, unsubscribe_token) VALUES (?, ?, 1, ?)");
-            if ($stmt->execute([$email, $name, $token])) {
-                $success = 'Thank you for subscribing! You will receive updates from Angella.';
-                
-                // ===== SEND CONFIRMATION EMAIL TO USER =====
-                $user_subject = "Welcome to AngelWrites Newsletter!";
-                $user_body = "Hello " . ($name ?: 'Subscriber') . ",\n\nThank you for subscribing to the AngelWrites newsletter!\n\nYou will now receive updates about new books, poems, reflections, and community events.\n\nTo unsubscribe at any time, click here: " . SITE_URL . "/unsubscribe.php?token={$token}\n\nBlessings,\nAngella Bottoman\nAngelWrites";
-                sendEmail($email, $user_subject, $user_body, 'angelwrites@zohomail.com', 'AngelWrites');
-                
-                // ===== SEND ADMIN NOTIFICATION =====
-                $admin_email = 'angelwrites@zohomail.com';
-                $admin_subject = 'New Newsletter Subscriber';
-                $admin_body = "A new user has subscribed to the newsletter.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
-                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
-            } else {
-                $error = 'Something went wrong. Please try again.';
-            }
+            $error = $optin['message'];
         }
     }
 }

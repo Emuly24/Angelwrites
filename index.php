@@ -126,36 +126,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['newsletter_email'])) 
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $newsletter_error = 'Please enter a valid email address.';
         } else {
-            $stmt = $db->prepare("SELECT id, is_active, unsubscribe_token FROM newsletter WHERE email = ?");
-            $stmt->execute([$email]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($existing) {
-                if ($existing['is_active'] == 1) {
-                    $newsletter_error = 'This email is already subscribed.';
-                } else {
-                    $stmt = $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                    $stmt->execute([$existing['id']]);
-                    $newsletter_success = 'Your subscription has been reactivated. Welcome back!';
-                    
-                    $admin_email = 'angelwrites@zohomail.com';
-                    $subject = 'Newsletter Subscription Reactivated';
-                    $body = "A user has reactivated their newsletter subscription.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
-                    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
-                }
+            // F176: double opt-in (includes/newsletter_optin.php)
+            require_once 'includes/newsletter_optin.php';
+            $optin = newsletter_request_optin($db, $email, $name);
+            if ($optin['ok']) {
+                $newsletter_success = $optin['message'];
             } else {
-                $token = bin2hex(random_bytes(32));
-                $stmt = $db->prepare("INSERT INTO newsletter (email, name, is_active, unsubscribe_token) VALUES (?, ?, 1, ?)");
-                if ($stmt->execute([$email, $name, $token])) {
-                    $newsletter_success = 'Thank you for subscribing! You will receive updates from Angella.';
-                    
-                    $admin_email = 'angelwrites@zohomail.com';
-                    $subject = 'New Newsletter Subscriber';
-                    $body = "A new user has subscribed to the newsletter.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
-                    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
-                } else {
-                    $newsletter_error = 'Something went wrong. Please try again.';
-                }
+                $newsletter_error = $optin['message'];
             }
         }
     }
