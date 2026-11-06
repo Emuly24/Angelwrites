@@ -96,6 +96,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_book_review'])
     exit;
 }
 
+// ===== F158: DELETE A BLOG OR VIDEO COMMENT (POST + CSRF) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_other_comment'])) {
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $other_table = ($_POST['kind'] ?? '') === 'video' ? 'video_comments' : 'reflection_comments';
+    $db->prepare("DELETE FROM $other_table WHERE id = ?")->execute([(int)$_POST['comment_id']]);
+    header('Location: ' . SITE_URL . '/admin/comments.php?tab=blog_video');
+    exit;
+}
+
 // ============================================================
 // 4. DETERMINE ACTIVE TAB
 // ============================================================
@@ -219,6 +230,30 @@ if ($tab === 'book_reviews') {
                                 ORDER BY r.created_at DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// ===== F158: BLOG AND VIDEO COMMENTS =====
+// Comments on blog posts (reflection_comments) and videos (video_comments) could not be moderated
+// anywhere. Before the DB repair video_comments may be missing; that part is then skipped.
+$other_comments = [];
+if ($tab === 'blog_video') {
+    foreach ($db->query("SELECT c.id, c.comment AS text, c.created_at, c.photo_path, c.voice_path, u.name, u.first_name, u.last_name, u.username,
+                                p.title AS on_title, p.slug AS on_slug
+                         FROM reflection_comments c JOIN users u ON u.id = c.user_id LEFT JOIN blog_posts p ON p.id = c.reflection_id
+                         ORDER BY c.created_at DESC LIMIT 150")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $r['kind'] = 'blog';
+        $other_comments[] = $r;
+    }
+    if ($db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'video_comments'")->fetchColumn()) {
+        foreach ($db->query("SELECT c.id, c.content AS text, c.created_at, NULL AS photo_path, NULL AS voice_path, u.name, u.first_name, u.last_name, u.username,
+                                    v.title AS on_title, v.id AS on_video
+                             FROM video_comments c JOIN users u ON u.id = c.user_id LEFT JOIN videos v ON v.id = c.video_id
+                             ORDER BY c.created_at DESC LIMIT 150")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $r['kind'] = 'video';
+            $other_comments[] = $r;
+        }
+    }
+    usort($other_comments, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
+}
+
 // ============================================================
 // 7. FETCH REPLIES FOR POEM COMMENTS
 // ============================================================
@@ -324,6 +359,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
             <button class="tab-btn <?php echo $tab === 'poems' ? 'active' : ''; ?>" data-tab="poems">Poem Reviews</button>
             <button class="tab-btn <?php echo $tab === 'books' ? 'active' : ''; ?>" data-tab="books">Book Comments</button>
             <a class="tab-btn <?php echo $tab === 'book_reviews' ? 'active' : ''; ?>" href="?tab=book_reviews">Book Reviews</a><!-- F157 -->
+            <a class="tab-btn <?php echo $tab === 'blog_video' ? 'active' : ''; ?>" href="?tab=blog_video">Blog &amp; Video</a><!-- F158 -->
         </div>
 
         <!-- Poem Reviews Tab -->
@@ -579,6 +615,40 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
                             <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
                             <input type="hidden" name="review_id" value="<?php echo (int)$br['id']; ?>">
                             <button type="submit" name="delete_book_review" value="1" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- F158: Blog & Video Comments Tab -->
+        <div id="tab-blog_video" class="tab-content <?php echo $tab === 'blog_video' ? 'active' : ''; ?>">
+            <?php if ($tab === 'blog_video' && !$other_comments): ?>
+                <div class="empty-state"><i class="fas fa-comment-slash"></i><p>No blog or video comments yet.</p></div>
+            <?php endif; ?>
+            <?php foreach ($other_comments as $oc): ?>
+                <div class="comment-item">
+                    <div class="comment-header">
+                        <span class="comment-author"><i class="fas fa-user-circle"></i> <?php echo htmlspecialchars(awDisplayName($oc)); ?></span>
+                        <span class="comment-meta"><?php echo date('M j, Y g:i a', strtotime($oc['created_at'])); ?></span>
+                    </div>
+                    <div class="comment-poem">
+                        <?php if ($oc['kind'] === 'blog'): ?>
+                            Blog: <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode((string)$oc['on_slug']); ?>"><?php echo htmlspecialchars((string)$oc['on_title']); ?></a>
+                        <?php else: ?>
+                            Video: <a href="<?php echo SITE_URL; ?>/video_watch.php?id=<?php echo (int)$oc['on_video']; ?>"><?php echo htmlspecialchars((string)$oc['on_title']); ?></a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="comment-text"><?php echo nl2br(htmlspecialchars((string)$oc['text'])); ?>
+                        <?php if (!empty($oc['photo_path'])): ?><br><a href="<?php echo SITE_URL . '/' . htmlspecialchars($oc['photo_path']); ?>" target="_blank">photo</a><?php endif; ?>
+                        <?php if (!empty($oc['voice_path'])): ?><br><a href="<?php echo SITE_URL . '/' . htmlspecialchars($oc['voice_path']); ?>" target="_blank">voice</a><?php endif; ?>
+                    </div>
+                    <div class="comment-actions">
+                        <form method="POST" onsubmit="return confirm('Delete this comment permanently?');" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                            <input type="hidden" name="kind" value="<?php echo $oc['kind']; ?>">
+                            <input type="hidden" name="comment_id" value="<?php echo (int)$oc['id']; ?>">
+                            <button type="submit" name="delete_other_comment" value="1" class="btn btn-sm btn-danger">Delete</button>
                         </form>
                     </div>
                 </div>
