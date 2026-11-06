@@ -19,15 +19,6 @@ return array (
     details TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )',
-  2 => 'CREATE TABLE IF NOT EXISTS "activity_logs" (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            action TEXT NOT NULL,
-            details TEXT,
-            ip_address TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )',
   3 => 'CREATE TABLE IF NOT EXISTS answer_edit_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     answer_id INTEGER NOT NULL,
@@ -50,14 +41,6 @@ return array (
             FOREIGN KEY (question_id) REFERENCES questions (id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         )',
-  5 => 'CREATE TABLE IF NOT EXISTS batch_jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_ids TEXT NOT NULL,
-    status TEXT DEFAULT \'pending\',
-    progress INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME
-)',
   6 => 'CREATE TABLE IF NOT EXISTS bible_bookmarks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -130,13 +113,6 @@ return array (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 )',
-  13 => 'CREATE TABLE IF NOT EXISTS blog_categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    slug TEXT NOT NULL UNIQUE,
-    description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-)',
   14 => 'CREATE TABLE IF NOT EXISTS blog_posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -194,16 +170,6 @@ return array (
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         , published_version INTEGER DEFAULT 0, title TEXT, processing_status TEXT, reader_css TEXT, metadata_json TEXT, version INTEGER DEFAULT 1)',
-  20 => 'CREATE TABLE IF NOT EXISTS book_content_drafts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    content_html TEXT,
-    last_saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(book_id, user_id)
-)',
   21 => 'CREATE TABLE IF NOT EXISTS book_content_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER NOT NULL,
@@ -224,25 +190,6 @@ return array (
         correction TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )',
-  23 => 'CREATE TABLE IF NOT EXISTS "book_highlights" (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    book_id INTEGER NOT NULL,
-    highlight_text TEXT NOT NULL,
-    start_offset INTEGER DEFAULT 0,
-    end_offset INTEGER DEFAULT 0,
-    color TEXT DEFAULT \'#ffeb3b\',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    FOREIGN KEY (book_id) REFERENCES books (id) ON DELETE CASCADE
-)',
-  24 => 'CREATE TABLE IF NOT EXISTS book_processing_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            book_id INTEGER NOT NULL,
-            status TEXT,
-            message TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )',
   25 => 'CREATE TABLE IF NOT EXISTS book_processing_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER NOT NULL,
@@ -288,17 +235,6 @@ return array (
     UNIQUE (comment_id, user_id, reaction_type),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 )',
-  29 => 'CREATE TABLE IF NOT EXISTS "connections" (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sender_id INTEGER NOT NULL,
-        receiver_id INTEGER NOT NULL,
-        status TEXT DEFAULT \'pending\',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
-        FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE,
-        UNIQUE(sender_id, receiver_id)
-    )',
   30 => 'CREATE TABLE IF NOT EXISTS contact_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -450,15 +386,6 @@ return array (
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (book_id) REFERENCES books(id)
 )',
-  44 => 'CREATE TABLE IF NOT EXISTS "invites" (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sender_id INTEGER NOT NULL,
-        receiver_email TEXT NOT NULL,
-        message TEXT,
-        status TEXT DEFAULT \'pending\',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE
-    )',
   45 => 'CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_type TEXT NOT NULL,
@@ -467,24 +394,6 @@ return array (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     attempted_at TIMESTAMP
 )',
-  46 => 'CREATE TABLE IF NOT EXISTS media_files (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            model_type TEXT,
-            model_id INTEGER,
-            media_type TEXT,
-            file_path TEXT,
-            file_name TEXT,
-            file_size INTEGER,
-            mime_type TEXT,
-            is_featured INTEGER DEFAULT 0,
-            width INTEGER,
-            height INTEGER,
-            duration INTEGER,
-            alt_text TEXT,
-            caption TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )',
   47 => 'CREATE TABLE IF NOT EXISTS newsletter (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
@@ -629,12 +538,6 @@ return array (
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, status TEXT DEFAULT "pending",
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         )',
-  62 => 'CREATE TABLE IF NOT EXISTS rate_limits (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        action TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )',
   63 => 'CREATE TABLE IF NOT EXISTS reactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -763,15 +666,6 @@ return array (
     FOREIGN KEY (reflection_id) REFERENCES blog_posts (id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 )',
-  76 => 'CREATE TABLE IF NOT EXISTS "reflection_reads" (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        reflection_id INTEGER NOT NULL,
-        read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (reflection_id) REFERENCES reflections(id) ON DELETE CASCADE,
-        UNIQUE(user_id, reflection_id)
-    )',
   77 => 'CREATE TABLE IF NOT EXISTS reflections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -882,14 +776,6 @@ return array (
         reading_speed_wpm INTEGER DEFAULT 250,
         theme TEXT DEFAULT \'light\'
     )',
-  90 => 'CREATE TABLE IF NOT EXISTS "user_tags" (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        tag TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-        UNIQUE(user_id, tag)
-    )',
   91 => 'CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
@@ -972,8 +858,6 @@ return array (
   106 => 'CREATE INDEX IF NOT EXISTS idx_blog_reads_user ON blog_reads(user_id)',
   107 => 'CREATE INDEX IF NOT EXISTS idx_book_content_history_book_id ON book_content_history(book_id)',
   108 => 'CREATE INDEX IF NOT EXISTS idx_book_content_history_book_version ON book_content_history(book_id, version)',
-  109 => 'CREATE INDEX IF NOT EXISTS idx_book_highlights_book ON book_highlights(book_id)',
-  110 => 'CREATE INDEX IF NOT EXISTS idx_book_highlights_user ON book_highlights(user_id)',
   111 => 'CREATE INDEX IF NOT EXISTS idx_book_processing_queue_status ON book_processing_queue(status)',
   112 => 'CREATE INDEX IF NOT EXISTS idx_bookmarks_user_book ON bookmarks(user_id, book_id)',
   113 => 'CREATE INDEX IF NOT EXISTS idx_books_author ON books(author)',
@@ -1024,7 +908,6 @@ return array (
   158 => 'CREATE INDEX IF NOT EXISTS idx_reading_status_user ON reading_status(user_id)',
   159 => 'CREATE INDEX IF NOT EXISTS idx_reading_status_user_book ON reading_status(user_id, book_id)',
   160 => 'CREATE INDEX IF NOT EXISTS idx_reading_status_user_id ON reading_status(user_id)',
-  161 => 'CREATE INDEX IF NOT EXISTS idx_reflection_reads_user ON reflection_reads(user_id)',
   162 => 'CREATE INDEX IF NOT EXISTS idx_reviews_parent ON reviews(parent_id)',
   163 => 'CREATE INDEX IF NOT EXISTS idx_reviews_target ON reviews(target_type, target_id, created_at DESC)',
   164 => 'CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date)',
