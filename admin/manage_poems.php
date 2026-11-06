@@ -241,7 +241,15 @@ if (!empty($search)) {
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
-$sql .= " ORDER BY p.created_at DESC";
+// P8: all poems were listed on one page; 20 per page now.
+require_once __DIR__ . '/../includes/pagination.php';
+[$page, $per_page] = aw_page(20);
+$cst = $db->prepare("SELECT COUNT(*) FROM (" . $sql . ")");
+$cst->execute($params);
+$poems_total = (int)$cst->fetchColumn();
+[$page, $offset] = aw_clamp($poems_total, $page, $per_page);
+$sql .= " ORDER BY p.created_at DESC, p.id DESC LIMIT ? OFFSET ?";
+$params[] = $per_page; $params[] = $offset;
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -281,7 +289,7 @@ $pageTitle = 'Manage Poems';
         <!-- Poems Table -->
         <div class="card">
             <div class="card-header">
-                <h2>All Poems (<?php echo count($poems); ?>)</h2>
+                <h2>All Poems (<?php echo $poems_total; ?>)</h2>
                 <div class="card-header-actions">
                     <select id="bulkActionSelect" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.85rem;background:var(--card-bg);color:var(--text);">
                         <option value="">Bulk Actions</option>
@@ -293,7 +301,7 @@ $pageTitle = 'Manage Poems';
                 </div>
             </div>
             <div class="card-body">
-                <?php if (count($poems) > 0): ?>
+                <?php if ($poems_total > 0): ?>
                     <form method="POST" id="bulkForm">
                         <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
                         <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
@@ -382,6 +390,7 @@ $pageTitle = 'Manage Poems';
                                 </tbody>
                             </table>
                         </div>
+                <?php echo aw_pager($poems_total, $page, $per_page); // P8 ?>
                     </form>
                 <?php else: ?>
                     <p class="no-items" style="text-align:center;padding:40px;color:var(--text-light);">No poems yet. Click <strong>"Add New Poem"</strong> to get started.</p>
