@@ -88,6 +88,15 @@ $poem = $stmt->fetch(PDO::FETCH_ASSOC);
 // open, concurrent views failed at once with "database is locked" (WAL snapshot conflict;
 // the busy timeout cannot help that case). 60 concurrent views: ~40 failed before, 0 after.
 $stmt->closeCursor();
+// F122: a draft is visible to the admin only (it used to be public by direct link too).
+if ($poem && !isAdmin()) {
+    $ds = $db->prepare("SELECT 1 FROM poem_status WHERE poem_id = ? AND status = 'draft'");
+    $ds->execute([$id]);
+    if ($ds->fetchColumn()) {
+        $poem = false;
+    }
+    $ds->closeCursor();
+}
 if (!$poem) {
     header('Location: ' . SITE_URL . '/poetry.php');
     exit;

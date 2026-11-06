@@ -30,10 +30,11 @@ $offset = ($page - 1) * $limit;
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // ===== FETCH TOTAL POEMS =====
-$count_sql = "SELECT COUNT(*) FROM poems";
+// F122: drafts are not public (poems marked draft in admin were listed here).
+$count_sql = "SELECT COUNT(*) FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')";
 $count_params = [];
 if ($search) {
-    $count_sql .= " WHERE title LIKE ? OR intro LIKE ? OR content LIKE ?";
+    $count_sql .= " AND (title LIKE ? OR intro LIKE ? OR content LIKE ?)";
     $count_params[] = "%$search%";
     $count_params[] = "%$search%";
     $count_params[] = "%$search%";
@@ -44,10 +45,10 @@ $total_poems = $stmt->fetchColumn();
 $total_pages = ceil($total_poems / $limit);
 
 // ===== FETCH POEMS =====
-$sql = "SELECT * FROM poems";
+$sql = "SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')"; // F122
 $params = [];
 if ($search) {
-    $sql .= " WHERE title LIKE ? OR intro LIKE ? OR content LIKE ?";
+    $sql .= " AND (title LIKE ? OR intro LIKE ? OR content LIKE ?)";
     $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";

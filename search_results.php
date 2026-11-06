@@ -53,9 +53,10 @@ if ($type === 'all' || $type === 'books') {
 if ($type === 'all' || $type === 'poems') {
     $search_configs[] = [
         'type' => 'poem',
-        'table' => 'poems',
+        // F122: drafts are not searchable
+        'table' => "(SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')) poems",
         'columns' => ['title', 'intro', 'content'],
-        'select' => "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt, 0 as comment_count, 0 as likes, 0 as loves, 0 as prays FROM poems"
+        'select' => "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt, 0 as comment_count, 0 as likes, 0 as loves, 0 as prays FROM (SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')) poems"
     ];
 }
 if ($type === 'all' || $type === 'blog') {
