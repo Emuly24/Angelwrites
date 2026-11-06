@@ -1575,3 +1575,21 @@ input:focus, textarea:focus, select:focus {
 #tocBackToTop:hover {
     background: var(--rose-dark);
 }
+
+/* ===== Q52: TAP TARGETS ON PHONES =====
+   Pages had 15-40 controls smaller than 32 px each at phone width. These shared rules make the common
+   small controls at least 44 px tall (and wide where they are icon-sized). Page styles that set their
+   own sizes still apply on wider screens. */
+@media (max-width: 768px) {
+    .btn-sm, .page-link, .reaction-btn, .footer-newsletter-form button { min-height: 44px; min-width: 44px; }
+    .btn-sm, .page-link { display: inline-flex; align-items: center; justify-content: center; }
+    .footer-legal a { display: inline-block; padding: 14px 4px; }
+    input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+    select { min-height: 44px; }
+    .user-wrapper { min-height: 44px; display: inline-flex; align-items: center; }
+    .read-more, .toggle-desc-btn { min-height: 44px; display: inline-flex; align-items: center; }
+    .result-content h3 a, .poem-card-content h3 a, .poem-card-content h2 a { display: inline-block; padding: 8px 0; }
+    .bible-reader-header-right button, .bible-toc-close { min-width: 44px; min-height: 44px; }
+    input[type="text"], input[type="search"], input[type="email"], input[type="tel"], input[type="password"], input[type="number"] { min-height: 44px; }
+}
+

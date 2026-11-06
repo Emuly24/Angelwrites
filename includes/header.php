@@ -244,12 +244,12 @@ if ($isLoggedIn) {
         /* ===== MOBILE FIXES (extra) ===== */
         @media (max-width: 768px) {
             .nav-actions { gap: 4px; }
-            .nav-action-icon { width: 32px; height: 32px; font-size: 0.9rem; }
+            .nav-action-icon { width: 44px; height: 44px; font-size: 0.9rem; } /* Q52: was 32 px */
             .notification-dropdown { width: 240px; }
         }
         @media (max-width: 480px) {
             .nav-actions { gap: 4px; }
-            .nav-action-icon { width: 28px; height: 28px; font-size: 0.8rem; }
+            .nav-action-icon { width: 36px; height: 36px; font-size: 0.85rem; } /* Q52: was 28 px (36 keeps room for the logo) */
             .hamburger { width: 24px; height: 18px; }
             .user-wrapper span { display: none; } /* hide username on tiny screens to prevent overflow */
         }
