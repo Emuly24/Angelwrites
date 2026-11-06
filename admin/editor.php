@@ -622,6 +622,46 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // ============================================================
+    // CAM1: a photo or video captured with "New post from camera" on Manage Blog arrives here
+    // ============================================================
+    if (new URLSearchParams(location.search).get('camera') === '1' && window.AWMedia) {
+        AWMedia.handoffTake('blog-camera').then(function (file) {
+            if (!file) return;
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            let target;
+            if (file.type.indexOf('video/') === 0) {
+                videoRecordingInput.files = dt.files;
+                if (videoPreview) {
+                    videoPreview.srcObject = null;
+                    videoPreview.src = URL.createObjectURL(file);
+                    videoPreview.load();
+                    videoPreview.style.display = 'block';
+                    AWMedia.attachEditButton(videoRecordingInput, videoPreview, 'video', 'video_recording.webm');
+                }
+                videoPreviewContainer.style.display = 'block';
+                target = videoPreviewContainer;
+            } else {
+                livePhotoInput.files = dt.files;
+                capturedPhotoPreview.src = URL.createObjectURL(file);
+                capturedPhotoContainer.style.display = 'block';
+                cameraStatus.textContent = '✅ Photo from the camera will be the featured image';
+                cameraStatus.style.color = '#2ecc71';
+                target = capturedPhotoContainer;
+            }
+            const note = document.createElement('div');
+            note.className = 'alert alert-success';
+            note.setAttribute('role', 'status');
+            note.textContent = file.type.indexOf('video/') === 0
+                ? '🎥 Your video is attached to this post. Add a title and text, then save.'
+                : '📷 Your photo is set as the featured image. Add a title and text, then save.';
+            const form = document.getElementById('editorForm');
+            form.parentNode.insertBefore(note, form);
+            if (target && target.scrollIntoView) target.scrollIntoView({ block: 'center' });
+        });
+    }
 });
 </script>
 

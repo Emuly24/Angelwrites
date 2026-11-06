@@ -790,5 +790,43 @@
         });
     }
 
-    window.AWMedia = { getStream: getStream, review: review, attachEditButton: attachEditButton, pickMime: pickMime };
+    // CAM1: hand a captured file to another page of the site (e.g. Manage Blog -> Blog Editor).
+    // Recordings are too big for a URL or sessionStorage, so they wait in this browser's IndexedDB
+    // until the other page takes them (taking deletes them; anything older than a day is dropped).
+    function idb() {
+        return new Promise(function (res, rej) {
+            if (!window.indexedDB) { rej(new Error('IndexedDB is not available')); return; }
+            var r = indexedDB.open('aw-media', 1);
+            r.onupgradeneeded = function () { r.result.createObjectStore('handoff'); };
+            r.onsuccess = function () { res(r.result); };
+            r.onerror = function () { rej(r.error); };
+        });
+    }
+    function handoffPut(key, file) {
+        return idb().then(function (db) {
+            return new Promise(function (res, rej) {
+                var tx = db.transaction('handoff', 'readwrite');
+                tx.objectStore('handoff').put({ blob: file, name: file.name, type: file.type, at: Date.now() }, key);
+                tx.oncomplete = function () { db.close(); res(); };
+                tx.onerror = function () { db.close(); rej(tx.error); };
+            });
+        });
+    }
+    function handoffTake(key) {
+        return idb().then(function (db) {
+            return new Promise(function (res) {
+                var tx = db.transaction('handoff', 'readwrite'), store = tx.objectStore('handoff'), out = null;
+                var g = store.get(key);
+                g.onsuccess = function () {
+                    var v = g.result;
+                    if (v && Date.now() - v.at < 86400000) out = new File([v.blob], v.name, { type: v.type });
+                    store.delete(key);
+                };
+                tx.oncomplete = function () { db.close(); res(out); };
+                tx.onerror = function () { db.close(); res(null); };
+            });
+        }).catch(function () { return null; });
+    }
+
+    window.AWMedia = { getStream: getStream, review: review, attachEditButton: attachEditButton, pickMime: pickMime, handoffPut: handoffPut, handoffTake: handoffTake };
 })();

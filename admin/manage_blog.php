@@ -89,8 +89,8 @@ $pageTitle = 'Manage Blog';
                 <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
                     <i class="fas fa-moon"></i>
                 </button>
-                <button id="openCameraBtn" class="btn btn-secondary">
-                    <i class="fas fa-camera"></i> Capture Image
+                <button id="openCameraBtn" class="btn btn-secondary" title="Take a photo or record a video, then write the post around it">
+                    <i class="fas fa-camera"></i> New post from camera
                 </button>
                 <a href="<?php echo SITE_URL; ?>/admin/editor.php?type=blog" class="btn btn-primary">
                     <i class="fas fa-plus"></i> New Post
@@ -598,7 +598,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const executeBulkBtn = document.getElementById('executeBulkAction');
     const bulkActionSelect = document.getElementById('bulkActionSelect');
 
-    selectAllRows.addEventListener('change', function() {
+    // CAM1: with no posts there is no table, and the missing checkbox stopped this whole script
+    // (so the camera never opened).
+    if (selectAllRows) selectAllRows.addEventListener('change', function() {
         rowCheckboxes.forEach(cb => cb.checked = this.checked);
         updateBulkButton();
     });
@@ -606,10 +608,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateBulkButton() {
         const checked = document.querySelectorAll('.row-select:checked').length;
-        executeBulkBtn.disabled = (checked === 0);
+        if (executeBulkBtn) executeBulkBtn.disabled = (checked === 0);
     }
 
-    executeBulkBtn.addEventListener('click', function() {
+    if (executeBulkBtn) executeBulkBtn.addEventListener('click', function() {
         const action = bulkActionSelect.value;
         const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
         if (!action || ids.length === 0) {
@@ -853,22 +855,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ===== CONFIRM MEDIA =====
+    // CAM1: this page has no post form, so the capture used to go into an input nothing ever sent.
+    // It now opens the Blog Editor with the photo as the featured image or the video attached.
     function confirmMedia() {
+        let file = null;
         if (currentMode === 'photo' && capturedBlob) {
-            const file = new File([capturedBlob], 'captured_image.jpg', { type: 'image/jpeg' });
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            liveThumbnailInput.files = dt.files;
-            closeCamera();
-            alert('✅ Image captured and ready for upload!');
+            file = new File([capturedBlob], 'live_photo.jpg', { type: 'image/jpeg' });
         } else if (currentMode === 'video' && recordedBlob) {
-            const file = new File([recordedBlob], 'captured_video.webm', { type: 'video/webm' });
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            liveThumbnailInput.files = dt.files;
-            closeCamera();
-            alert('✅ Video captured and ready for upload!');
+            file = new File([recordedBlob], 'video_recording.webm', { type: 'video/webm' });
         }
+        if (!file) return;
+        confirmBtn.disabled = true;
+        cameraStatus.textContent = 'Opening the Blog Editor…';
+        AWMedia.handoffPut('blog-camera', file).then(function () {
+            closeCamera();
+            window.location.href = '<?php echo SITE_URL; ?>/admin/editor.php?type=blog&camera=1';
+        }).catch(function () {
+            confirmBtn.disabled = false;
+            cameraStatus.textContent = '❌ Could not pass the capture to the editor';
+            alert('This browser could not pass the capture to the Blog Editor. Please open New Post and use its camera or recorder instead.');
+        });
     }
 
     // ===== EVENT LISTENERS =====
