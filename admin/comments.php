@@ -91,6 +91,11 @@ if (isset($_GET['delete_comment'])) {
 // ============================================================
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'poems';
 
+// F160: both tabs' markup is on the page, but each list was only fetched for its own tab, so the
+// other one raised "Undefined variable" warnings. Both dropdown lists are always loaded.
+$poems_list = $db->query("SELECT id, title FROM poems ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
+$books_list = $db->query("SELECT id, title FROM books ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
+
 // ============================================================
 // 5. FETCH POEM REVIEWS (if tab = poems)
 // ============================================================
@@ -137,9 +142,6 @@ if ($tab === 'poems') {
     $stmt->execute(array_slice($params, 0, -2));
     $poem_total = $stmt->fetchColumn();
 
-    // Fetch poem list for dropdown
-    $stmt = $db->query("SELECT id, title FROM poems ORDER BY title");
-    $poems_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // ============================================================
@@ -187,9 +189,6 @@ if ($tab === 'books') {
     $stmt->execute(array_slice($params, 0, -2));
     $book_total = $stmt->fetchColumn();
 
-    // Fetch books list for dropdown
-    $stmt = $db->query("SELECT id, title FROM books ORDER BY title");
-    $books_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // ============================================================
