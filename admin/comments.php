@@ -86,6 +86,16 @@ if (isset($_GET['delete_comment'])) {
     exit;
 }
 
+// ===== F157: DELETE A BOOK REVIEW (POST + CSRF) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_book_review'])) {
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+    $db->prepare("UPDATE reviews SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND target_type = 'book'")->execute([(int)$_POST['review_id']]);
+    header('Location: ' . SITE_URL . '/admin/comments.php?tab=book_reviews');
+    exit;
+}
+
 // ============================================================
 // 4. DETERMINE ACTIVE TAB
 // ============================================================
@@ -197,6 +207,18 @@ if ($tab === 'books') {
 
 }
 
+// ===== F157: BOOK REVIEWS =====
+// Book reviews (reviews with target_type 'book', written on book.php) appeared in no admin
+// screen: the Poem Reviews tab is filtered to target_type = 'poem'.
+$book_reviews = [];
+if ($tab === 'book_reviews') {
+    $book_reviews = $db->query("SELECT r.id, r.target_id, r.rating, r.comment, r.created_at,
+                                       u.name AS author_name, u.username, u.email AS author_email, b.title AS book_title
+                                FROM reviews r JOIN users u ON u.id = r.user_id LEFT JOIN books b ON b.id = r.target_id
+                                WHERE r.target_type = 'book' AND r.deleted_at IS NULL
+                                ORDER BY r.created_at DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // ============================================================
 // 7. FETCH REPLIES FOR POEM COMMENTS
 // ============================================================
@@ -301,6 +323,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
         <div class="tab-nav">
             <button class="tab-btn <?php echo $tab === 'poems' ? 'active' : ''; ?>" data-tab="poems">Poem Reviews</button>
             <button class="tab-btn <?php echo $tab === 'books' ? 'active' : ''; ?>" data-tab="books">Book Comments</button>
+            <a class="tab-btn <?php echo $tab === 'book_reviews' ? 'active' : ''; ?>" href="?tab=book_reviews">Book Reviews</a><!-- F157 -->
         </div>
 
         <!-- Poem Reviews Tab -->
@@ -534,6 +557,32 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
+        </div>
+
+        <!-- F157: Book Reviews Tab -->
+        <div id="tab-book_reviews" class="tab-content <?php echo $tab === 'book_reviews' ? 'active' : ''; ?>">
+            <?php if ($tab === 'book_reviews' && !$book_reviews): ?>
+                <div class="empty-state"><i class="fas fa-comment-slash"></i><p>No book reviews yet.</p></div>
+            <?php endif; ?>
+            <?php foreach ($book_reviews as $br): ?>
+                <div class="comment-item">
+                    <div class="comment-header">
+                        <span class="comment-author"><i class="fas fa-user-circle"></i> <?php echo htmlspecialchars(awDisplayName($br)); ?>
+                            <span class="comment-meta">(<?php echo htmlspecialchars($br['author_email']); ?>)</span></span>
+                        <span class="comment-meta"><?php echo date('M j, Y g:i a', strtotime($br['created_at'])); ?></span>
+                    </div>
+                    <div class="comment-poem">Book: <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$br['target_id']; ?>"><?php echo htmlspecialchars($br['book_title'] ?? ''); ?></a>
+                        · <?php echo str_repeat('★', max(0, min(5, (int)$br['rating']))); ?></div>
+                    <div class="comment-text"><?php echo nl2br(htmlspecialchars($br['comment'])); ?></div>
+                    <div class="comment-actions">
+                        <form method="POST" onsubmit="return confirm('Delete this review?');" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+                            <input type="hidden" name="review_id" value="<?php echo (int)$br['id']; ?>">
+                            <button type="submit" name="delete_book_review" value="1" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
     </div>
 </div>

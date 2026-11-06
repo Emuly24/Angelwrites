@@ -70,14 +70,14 @@ try {
                    (SELECT COUNT(*) FROM review_reactions WHERE review_id = r.id AND reaction_type = 'pray') as prays
             FROM reviews r
             JOIN users u ON r.user_id = u.id
-            WHERE r.target_type = 'book' AND r.target_id = ?
+            WHERE r.target_type = 'book' AND r.target_id = ? AND r.deleted_at IS NULL -- F157: reviews deleted by the admin
             ORDER BY r.created_at DESC
         ");
         $stmt->execute([$book_id]);
         $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Average rating
-        $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'book' AND target_id = ?");
+        $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'book' AND target_id = ? AND deleted_at IS NULL"); // F157
         $stmt->execute([$book_id]);
         $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
         $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
