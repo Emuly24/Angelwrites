@@ -123,8 +123,26 @@ if ($sort === 'newest') {
     usort($results, function($a, $b) { return strtotime($b['created_at']) - strtotime($a['created_at']); });
 } elseif ($sort === 'oldest') {
     usort($results, function($a, $b) { return strtotime($a['created_at']) - strtotime($b['created_at']); });
-} elseif ($sort === 'most_commented') {
-    usort($results, function($a, $b) { return ($b['comment_count'] ?? 0) - ($a['comment_count'] ?? 0); });
+} else {
+    // F59: "Relevance" was the default but did nothing (results stayed in fetch order).
+    // Score = term matches in the title × 3 + matches in the other text; ties go to the newest.
+    // ("Most commented" is removed: no comment counts exist across content types; see Q36.)
+    $score = function ($item) use ($search_terms) {
+        $title = mb_strtolower((string)($item['title'] ?? ''));
+        $body = mb_strtolower(strip_tags(($item['description'] ?? '') . ' ' . ($item['excerpt'] ?? '') . ' ' . ($item['content'] ?? '')));
+        $n = 0;
+        foreach ($search_terms as $t) {
+            $t = mb_strtolower($t);
+            if ($t === '') continue;
+            $n += 3 * mb_substr_count($title, $t) + mb_substr_count($body, $t);
+        }
+        return $n;
+    };
+    foreach ($results as &$r) { $r['_score'] = $score($r); }
+    unset($r);
+    usort($results, function ($a, $b) {
+        return ($b['_score'] <=> $a['_score']) ?: (strtotime($b['created_at']) <=> strtotime($a['created_at']));
+    });
 }
 
 // F58: page the merged, sorted list: 12 results per page in total.
@@ -188,7 +206,6 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                         <option value="relevance" <?php echo $sort === 'relevance' ? 'selected' : ''; ?>>Relevance</option>
                         <option value="newest" <?php echo $sort === 'newest' ? 'selected' : ''; ?>>Newest</option>
                         <option value="oldest" <?php echo $sort === 'oldest' ? 'selected' : ''; ?>>Oldest</option>
-                        <option value="most_commented" <?php echo $sort === 'most_commented' ? 'selected' : ''; ?>>Most commented</option>
                     </select>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm">Apply Filters</button>
