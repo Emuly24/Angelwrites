@@ -114,6 +114,9 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 .theme-light { --bg: #F7F3ED; --card-bg: #ffffff; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
 .theme-dark { --bg: #1a1212; --card-bg: #2c1e1e; --text: #e8dddd; --border: #4a3a3a; --input-bg: #2c1e1e; }
 .theme-sepia { --bg: #fbf3e9; --card-bg: #fdf5ec; --text: #4a3d36; --border: #d9c9b8; --input-bg: #fdf5ec; }
+/* R12: announcements for screen readers only; a clear focus ring for keyboard users */
+.aw-sr-only { position:absolute!important; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+#reader-app :focus-visible { outline:3px solid var(--rose-dark); outline-offset:2px; }
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; width:100%; overflow:hidden; }
 #reader-app { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; transition:background var(--transition), color var(--transition); }
@@ -331,6 +334,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 </head>
 <body>
 <div id="reader-app">
+    <div id="awPageAnnounce" class="aw-sr-only" aria-live="polite" aria-atomic="true"></div><!-- R12 -->
 <?php if (!empty($preview_version)): ?>
     <!-- R5: draft preview banner (admin only) -->
     <div id="previewBanner" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff3cd;color:#5c4400;border-top:2px solid #e0b100;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;">
@@ -855,7 +859,12 @@ if (function_exists('renderAchievementToastJS')) {
         chapterInfoEl.textContent = `📖 ${getChapterTitle(ch)}`;
         remainingInfoEl.textContent = `⏳ ${getRemainingPagesInChapter(page)} pages remaining • ${estimateTimeRemaining(page)} min left`;
         markToc(page);
+        // R12: tell screen-reader users where they are after a page turn (not on start-up).
+        const ann = document.getElementById('awPageAnnounce');
+        if (ann && awAnnounceReady) ann.textContent = `Page ${page} of ${totalPages}. ${getChapterTitle(ch)}.`;
     }
+    var awAnnounceReady = false;
+    window.addEventListener('load', () => setTimeout(() => { awAnnounceReady = true; }, 1000));
 
     // R11: "Reading together" – the group's next chapter, its due date and a link to discuss it.
     function awFmtDate(d) { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? d : x.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
