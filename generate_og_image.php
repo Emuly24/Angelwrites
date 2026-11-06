@@ -24,6 +24,13 @@ if (!in_array($ext, $allowed_extensions)) {
 
 $base_dir = __DIR__;
 $full_file_path = $base_dir . '/' . $src;
+// S13 (F201): only images inside assets/ may be read; "../" or symlinks pointing
+// elsewhere fall through to the generated fallback image below.
+$assets_root = realpath($base_dir . '/assets');
+$real_path = realpath($full_file_path);
+if ($assets_root === false || $real_path === false || strpos($real_path, $assets_root . DIRECTORY_SEPARATOR) !== 0) {
+    $full_file_path = '';
+}
 $logo_fallback = $base_dir . '/assets/images/angelwrites-logo.png';
 $border_color = '#DBA1A2';
 $target_width = 1200;
