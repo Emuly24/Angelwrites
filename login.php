@@ -6,12 +6,23 @@ require_once 'includes/mail_helper.php';
 
 // ===== CAPTURE REDIRECT URL (if present) =====
 $redirect = isset($_GET['redirect']) ? trim($_GET['redirect']) : '';
+// F38: accept a same-site path ("/download.php?book_id=1", as download.php sends) as well as
+// an absolute SITE_URL link. The old prefix test ignored relative paths (members landed on
+// the dashboard) and also accepted look-alike hosts such as SITE_URL . '.evil.example'.
+$redirect_target = '';
+if ($redirect !== '' && !preg_match('/[\\\x00-\x1f\x7f]/', $redirect)) {
+    if ($redirect[0] === '/' && substr($redirect, 0, 2) !== '//') {
+        $redirect_target = SITE_URL . $redirect;
+    } elseif (strpos($redirect, SITE_URL . '/') === 0) {
+        $redirect_target = $redirect;
+    }
+}
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
     // If already logged in, obey the redirect or default dashboard
-    if (!empty($redirect) && strpos($redirect, SITE_URL) === 0) {
-        header('Location: ' . $redirect);
+    if ($redirect_target !== '') {
+        header('Location: ' . $redirect_target);
     } elseif (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
     } else {
@@ -115,8 +126,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
 
                 // ===== 🚀 REDIRECT LOGIC =====
                 // If a valid redirect URL was passed, send them there; otherwise go to dashboard
-                if (!empty($redirect) && strpos($redirect, SITE_URL) === 0) {
-                    header('Location: ' . $redirect);
+                if ($redirect_target !== '') {
+                    header('Location: ' . $redirect_target);
                 } elseif ($user['role'] === 'admin') {
                     header('Location: ' . SITE_URL . '/admin/dashboard.php');
                 } else {
