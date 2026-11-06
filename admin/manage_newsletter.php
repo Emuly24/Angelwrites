@@ -371,6 +371,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Segment deleted.';
     }
 
+    // ====== F172: SEND QUEUED NOW (this host has no cron) ======
+    // Scheduled newsletters wait in the queue until the admin presses "Send queued now" on or
+    // after their date. The oldest due row is moved to 'processing' and sent through the paged
+    // sender; when it finishes, the button sends the next due row.
+    if ($action === 'send_due') {
+        $stmt = $db->prepare("SELECT id FROM email_queue WHERE status = 'pending' AND scheduled_at <= ? ORDER BY scheduled_at ASC LIMIT 1");
+        $stmt->execute([date('Y-m-d H:i:s')]);
+        $due_id = $stmt->fetchColumn();
+        if (!$due_id) {
+            $success = 'Nothing is due yet. Scheduled newsletters can be sent on or after their date.';
+        } else {
+            $db->prepare("UPDATE email_queue SET status = 'processing' WHERE id = ?")->execute([$due_id]);
+            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . (int)$due_id);
+            exit;
+        }
+    }
+
     // ====== F170: RESUME A STUCK SEND / RETRY FAILED RECIPIENTS ======
     // A send interrupted mid-way (closed tab, timeout) stays 'processing'; "Resume" continues it
     // through the paged sender. "Retry failed" forgets only the failed attempts, sets the row
