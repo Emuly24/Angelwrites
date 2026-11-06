@@ -181,17 +181,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
             }
         }
 
-        $payload = json_encode([
-            'comment_id' => $comment_id,
-            'poem_id' => $target_id,
-            'comment_text' => $comment,
-            'author_id' => $_SESSION['user_id'],
-            'is_private' => $is_private,
-            'parent_id' => $parent_id,
-            'poem_title' => $poem['title']
-        ]);
-        $stmt = $db->prepare("INSERT INTO jobs (job_type, payload) VALUES ('process_comment', ?)");
-        $stmt->execute([$payload]);
+        // F125: comments were queued as 'process_comment' jobs (NULL status) that nothing ever
+        // processed (the only worker, worker.php, is gone), so the admin was never told, not even
+        // about private messages. Tell the admin now: an email and a bell notification.
+        require_once __DIR__ . '/includes/notifications.php';
+        require_once __DIR__ . '/includes/mail_helper.php';
+        $from_name = awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']);
+        $what = $is_private ? 'Private message' : ($parent_id ? 'Reply' : 'Comment');
+        sendEmail('angelwrites@zohomail.com', "$what on \"{$poem['title']}\" from $from_name",
+            "$what from $from_name on the poem \"{$poem['title']}\":\n\n$comment\n\nView: " . SITE_URL . '/poem_view.php?id=' . $target_id,
+            'angelwrites@zohomail.com', 'AngelWrites', false);
+        foreach ($db->query("SELECT id FROM users WHERE role = 'admin'")->fetchAll(PDO::FETCH_COLUMN) as $admin_uid) {
+            if ((int)$admin_uid !== (int)$_SESSION['user_id']) {
+                awNotify($db, $admin_uid, $is_private ? 'private_message' : 'poem_comment', "$what on \"" . mb_substr($poem['title'], 0, 60) . '"',
+                    $from_name . ': ' . mb_substr($comment, 0, 120), SITE_URL . '/poem_view.php?id=' . $target_id);
+            }
+        }
 
         header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
         exit;
