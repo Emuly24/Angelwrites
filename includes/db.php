@@ -206,35 +206,9 @@ try {
         $db->exec($sql);
     }
     
-    // ===== CHECK AND CREATE DEFAULT ADMIN (optional) =====
-    // Check if there are any users
-    $stmt = $db->query("SELECT COUNT(*) FROM users");
-    $userCount = $stmt->fetchColumn();
-    
-    if ($userCount == 0) {
-        // No users exist – create a default admin account
-        // You can change this email/password or comment out this section
-        $defaultAdmin = [
-            'name' => 'Angella Bottoman',
-            'email' => 'admin@angelawrites.com',
-            'password' => password_hash('ChangeMe123!', PASSWORD_DEFAULT),
-            'role' => 'admin'
-        ];
-        $stmt = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$defaultAdmin['name'], $defaultAdmin['email'], $defaultAdmin['password'], $defaultAdmin['role']]);
-        
-        // Also create a sample reader account for testing
-        $sampleReader = [
-            'name' => 'Test Reader',
-            'email' => 'reader@example.com',
-            'password' => password_hash('Reader123!', PASSWORD_DEFAULT),
-            'role' => 'reader'
-        ];
-        $stmt = $db->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$sampleReader['name'], $sampleReader['email'], $sampleReader['password'], $sampleReader['role']]);
-    }
-    
-    
+    // S6 (F108): no seed accounts. A default admin and test reader with fixed passwords
+    // used to be created here whenever users was empty (known credentials on a fresh DB).
+
     // ===== INDEXES FOR PERFORMANCE =====
     $indexes = [
         "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
