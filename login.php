@@ -166,14 +166,8 @@ $pageTitle = 'Sign In';
 
 <div class="auth-page">
     <div class="container">
-        <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
-
-        <!-- ===== READING PROGRESS BAR ===== -->
-        <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
-
+        <!-- Q26: a page-only dark-mode button (its own 'loginTheme' setting, separate from the site theme)
+             and a reading progress bar on a one-screen form were left over here; removed. -->
         <div class="auth-wrapper">
             <div class="auth-card">
                 <div class="auth-header">
@@ -247,29 +241,6 @@ $pageTitle = 'Sign In';
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== THEME TOGGLE =====
-    const themeToggle = document.getElementById('themeToggle');
-    const currentTheme = localStorage.getItem('loginTheme') || 'light';
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-    }
-
-    window.toggleTheme = function() {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('loginTheme', isDark ? 'dark' : 'light');
-        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-    };
-
-    // ===== READING PROGRESS BAR =====
-    window.addEventListener('scroll', function() {
-        const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercent = (scrollTop / docHeight) * 100;
-        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
-    });
-
     // ===== PASSWORD TOGGLE =====
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
