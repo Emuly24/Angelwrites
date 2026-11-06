@@ -14,6 +14,8 @@ function aw_housekeeping(PDO $db) {
             "DELETE FROM remember_tokens WHERE expires_at < datetime('now')",
             // finished background jobs (nothing reads them)
             "DELETE FROM jobs WHERE COALESCE(status, '') != 'pending' AND created_at < datetime('now', '-30 days')",
+            // Q17: group activity feeds show the latest entries; keep a year of history
+            "DELETE FROM group_activity_log WHERE created_at < datetime('now', '-365 days')",
             // IP addresses are only needed for recent abuse checks; the view counts stay
             "UPDATE view_logs SET ip_address = NULL WHERE ip_address IS NOT NULL AND viewed_at < datetime('now', '-90 days')",
         ];
