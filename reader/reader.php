@@ -319,6 +319,25 @@ html,body { height:100%; width:100%; overflow:hidden; }
 </head>
 <body>
 <div id="reader-app">
+<?php if (!empty($preview_version)): ?>
+    <!-- R5: draft preview banner (admin only) -->
+    <div id="previewBanner" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff3cd;color:#5c4400;border-top:2px solid #e0b100;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;">
+        <strong>Preview of draft version <?php echo (int)$preview_version; ?></strong>
+        <span><?php echo $live_version ? 'Members currently read version ' . (int)$live_version . '.' : 'Members cannot read this book yet.'; ?> Nothing is saved while previewing.</span>
+        <span style="flex:1"></span>
+        <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo (int)$book_id; ?>" style="color:#5c4400;min-height:40px;display:inline-flex;align-items:center;">Back to processing</a>
+        <button type="button" id="previewPublish" style="background:#2e7d32;color:#fff;border:0;border-radius:8px;padding:8px 14px;min-height:40px;cursor:pointer;">Publish this version</button>
+    </div>
+    <script>
+    document.getElementById('previewPublish').addEventListener('click', function () {
+        if (!confirm('Publish version <?php echo (int)$preview_version; ?>? Members will read it from now on.')) return;
+        const fd = new FormData(); fd.append('action', 'publish_version'); fd.append('version', '<?php echo (int)$preview_version; ?>');
+        fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo (int)$book_id; ?>', { method: 'POST', body: fd })
+            .then(r => r.json()).then(d => { alert(d.success ? d.message : (d.error || 'Could not publish.')); if (d.success) location.href = '<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$book_id; ?>'; })
+            .catch(() => alert('Could not publish. Please try again from the processing page.'));
+    });
+    </script>
+<?php endif; ?>
     <div id="toolbar">
         <div class="toolbar-left">
             <a id="backBtn" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book_id; ?>" aria-label="Back to the book page"><i class="fas fa-arrow-left" aria-hidden="true"></i></a><!-- Q3: a real link (was a JS button) -->
@@ -551,7 +570,8 @@ if (function_exists('renderAchievementToastJS')) {
     const pages = <?php echo json_encode($pages); ?>;
     const totalPages = pages.length;
     const bookId = <?php echo $book_id; ?>;
-    const userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
+    // R5: while the admin previews a draft, nothing is saved (position, session, bookmarks...).
+    const userId = <?php echo (isLoggedIn() && empty($preview_version)) ? $_SESSION['user_id'] : 0; ?>;
     // Q7: guest-only actions showed a bare alert; offer to log in and come back to this book.
     function awNeedLogin(what) {
         if (confirm('Please log in to ' + what.replace(/\.$/, '') + '.\n\nGo to the login page now? You will come back to this book.')) {

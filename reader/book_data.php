@@ -52,15 +52,34 @@ if (empty($book['is_free'])) {
     }
 }
 
+// R5: the admin can open a draft version in the real reader before publishing it
+// (reader.php?id=N&preview=V). Nothing is counted or saved while previewing.
+$preview_version = 0;
+if (isAdmin() && !empty($_GET['preview'])) {
+    $pv = $db->prepare("SELECT version FROM book_content_history WHERE book_id = ? AND version = ?");
+    $pv->execute([$book_id, (int)$_GET['preview']]);
+    $preview_version = (int)$pv->fetchColumn();
+}
+
 // --- Increment view count ---
-$stmt = $db->prepare("UPDATE books SET view_count = view_count + 1 WHERE id = ?");
-$stmt->execute([$book_id]);
+if (!$preview_version) {
+    $stmt = $db->prepare("UPDATE books SET view_count = view_count + 1 WHERE id = ?");
+    $stmt->execute([$book_id]);
+}
 
 // --- Fetch processed content ---
 $stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
 $stmt->execute([$book_id]);
 $processed = $stmt->fetch(PDO::FETCH_ASSOC);
 $has_processed = !empty($processed) && $processed['is_processed'] == 1;
+$live_version = $has_processed ? (int)($processed['published_version'] ?? 0) : 0;
+if ($preview_version) {
+    $pv = $db->prepare("SELECT content_html, toc_json FROM book_content_history WHERE book_id = ? AND version = ?");
+    $pv->execute([$book_id, $preview_version]);
+    $draft = $pv->fetch(PDO::FETCH_ASSOC);
+    $processed = array_merge($processed ?: [], ['content_html' => $draft['content_html'], 'toc_json' => $draft['toc_json'], 'is_processed' => 1]);
+    $has_processed = true;
+}
 
 // --- Parse TOC if available ---
 $toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
@@ -144,4 +163,6 @@ return [
 
     // Misc
     'view_count' => $book['view_count'] + 1,
+    'preview_version' => $preview_version, // R5
+    'live_version' => $live_version,
 ];

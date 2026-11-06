@@ -1685,6 +1685,7 @@ if (isset($_POST['action'])) {
             $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' . htmlspecialchars($version['note'] ?? '—') . '</td>';
             $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">';
             $html .= '<button class="btn btn-sm btn-info" onclick="previewVersion(' . $version['version'] . ')">👁️ Preview</button> ';
+            $html .= '<a class="btn btn-sm btn-info" target="_blank" href="' . SITE_URL . '/reader/reader.php?id=' . (int)$book_id . '&preview=' . (int)$version['version'] . '">📖 Open in reader</a> '; // R5
             if (!$is_published) {
                 $html .= '<button class="btn btn-sm btn-success" onclick="publishVersion(' . $version['version'] . ')">📢 Publish</button> ';
                 $html .= '<button class="btn btn-sm btn-danger" onclick="deleteVersion(' . $version['version'] . ')">🗑 Delete</button>';
