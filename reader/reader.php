@@ -108,8 +108,8 @@ html,body { height:100%; width:100%; overflow:hidden; }
 #toolbar { flex-shrink:0; height:var(--toolbar-height); min-height:var(--toolbar-height); display:flex; justify-content:space-between; align-items:center; padding:0 20px; background:var(--card-bg); border-bottom:1px solid var(--border); box-shadow:var(--shadow); z-index:20; }
 .toolbar-left { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
 .toolbar-left .title { font-family:'Playfair Display',Georgia,serif; font-weight:700; font-size:1.15rem; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dark); }
-.toolbar-left button { background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-light); width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:color var(--transition); }
-.toolbar-left button:hover { color:var(--rose); background:rgba(219,161,162,0.1); }
+.toolbar-left button, .toolbar-left a#backBtn { text-decoration:none; background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-light); width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:color var(--transition); }
+.toolbar-left button:hover, .toolbar-left a#backBtn:hover { color:var(--rose); background:rgba(219,161,162,0.1); }
 .toolbar-center { display:flex; align-items:center; gap:16px; font-size:0.95rem; color:var(--text-light); flex-wrap:wrap; justify-content:center; }
 .progress-ring { position:relative; width:36px; height:36px; }
 .progress-ring svg { width:100%; height:100%; transform:rotate(-90deg); }
@@ -307,7 +307,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 <div id="reader-app">
     <div id="toolbar">
         <div class="toolbar-left">
-            <button id="backBtn" aria-label="Back"><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
+            <a id="backBtn" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book_id; ?>" aria-label="Back to the book page"><i class="fas fa-arrow-left" aria-hidden="true"></i></a><!-- Q3: a real link (was a JS button) -->
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
             <?php echo renderStreakBadge($streak_days); ?>
             <?php echo renderLevelBadge($user_id ?? 0); ?>
@@ -1428,7 +1428,6 @@ if (function_exists('renderAchievementToastJS')) {
         if (focusMode) { toggleFocus(); }
     }
 
-    backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
 
     function submitError() {
         const page = parseInt(errorPageInput.value) || currentPage;
