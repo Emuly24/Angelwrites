@@ -11,9 +11,9 @@ require_once '../includes/reading_groups.php';
 
 redirectIfNotAdmin();
 
-$pageTitle = 'Manage Reading Groups';
-require_once '../includes/header.php';
-
+// F47: the POST actions below answer the page's fetch() calls with JSON; they used to run after
+// header.php had already printed the page, so the JSON was appended to ~21 KB of HTML and the
+// page's JavaScript failed (although the change had been made). They now run first.
 // ===== HANDLE POST ACTIONS =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $db->exec("DELETE FROM group_notes WHERE group_id = $group_id");
         $db->exec("DELETE FROM group_discussions WHERE group_id = $group_id");
         $db->exec("DELETE FROM group_schedules WHERE group_id = $group_id");
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -34,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $user_id = (int)$_POST['user_id'];
         $stmt = $db->prepare("DELETE FROM group_members WHERE group_id = ? AND user_id = ?");
         $stmt->execute([$group_id, $user_id]);
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -44,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $role = $_POST['role'];
         $stmt = $db->prepare("UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?");
         $stmt->execute([$role, $group_id, $user_id]);
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -54,10 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $description = trim($_POST['description']);
         $stmt = $db->prepare("UPDATE reading_groups SET name = ?, description = ? WHERE id = ?");
         $stmt->execute([$name, $description, $group_id]);
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
 }
+
+$pageTitle = 'Manage Reading Groups';
+require_once '../includes/header.php';
 
 // ===== FETCH ALL GROUPS WITH CONTENT AND STATS =====
 $groups = [];
