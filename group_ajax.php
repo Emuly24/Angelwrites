@@ -70,8 +70,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($action === 'add_note') {
         $group_id = (int)$_POST['group_id'];
         s4_require_member($db, $group_id, $user_id);
-        $book_id = (int)$_POST['book_id'];
-        $text = trim($_POST['text']);
+        // F50: group.php no longer sends book_id (warning printed before the JSON); the note's
+        // content is the group's own content.
+        $cstmt = $db->prepare("SELECT content_id FROM reading_groups WHERE id = ?");
+        $cstmt->execute([$group_id]);
+        $book_id = (int)$cstmt->fetchColumn();
+        $cstmt->closeCursor();
+        $text = trim($_POST['text'] ?? '');
         $chapter_index = isset($_POST['chapter_index']) && $_POST['chapter_index'] !== '' ? (int)$_POST['chapter_index'] : null;
         $is_private = isset($_POST['is_private']) ? 1 : 0;
         if (empty($text)) {
