@@ -94,11 +94,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     
     if ($rating >= 1 && $rating <= 5 && !empty($comment)) {
         try {
-            $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute(['book', $book_id, $_SESSION['user_id'], $rating, $comment]);
+            // F93: one review per member and book. A member could post any number of reviews of
+            // the same book (each counted in the average); a second submission now updates theirs.
+            $ex = $db->prepare("SELECT id FROM reviews WHERE target_type = 'book' AND target_id = ? AND user_id = ?
+                                AND parent_id IS NULL AND deleted_at IS NULL ORDER BY id LIMIT 1");
+            $ex->execute([$book_id, $_SESSION['user_id']]);
+            $existing_review = $ex->fetchColumn();
+            $ex->closeCursor();
+            if ($existing_review) {
+                $db->prepare("UPDATE reviews SET rating = ?, comment = ? WHERE id = ?")->execute([$rating, $comment, $existing_review]);
+            } else {
+                $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute(['book', $book_id, $_SESSION['user_id'], $rating, $comment]);
+            }
             
-            // Award reputation points (if function exists)
-            if (function_exists('awardReputation')) {
+            // Award reputation points (if function exists) – first review only (F93)
+            if (!$existing_review && function_exists('awardReputation')) {
                 awardReputation($_SESSION['user_id'], 3, 'Reviewed a book');
             }
             
