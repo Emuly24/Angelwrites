@@ -342,6 +342,12 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                         <span class="answers-count"><i class="fas fa-comments"></i> <?php echo number_format($single_question['answers_count'] ?? 0); ?></span>
                     </div>
                     <div class="question-body"><?php echo nl2br(htmlspecialchars($single_question['body'])); ?></div>
+                    <?php if ($user_id && (int)$single_question['user_id'] === (int)$user_id): // F149: the edit/delete pages existed but nothing linked to them ?>
+                        <div class="question-owner-actions" style="margin-top:12px;display:flex;gap:8px;">
+                            <a href="<?php echo SITE_URL; ?>/community_edit.php?id=<?php echo (int)$single_question['id']; ?>" class="btn btn-sm btn-outline">✏️ Edit question</a>
+                            <a href="<?php echo SITE_URL; ?>/community_delete.php?id=<?php echo (int)$single_question['id']; ?>" class="btn btn-sm btn-danger">🗑️ Delete</a>
+                        </div>
+                    <?php endif; ?>
                     <?php
                     $stmt = $db->prepare("
                         SELECT t.name FROM tags t
