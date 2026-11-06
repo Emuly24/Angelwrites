@@ -20,11 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($action === 'delete_group') {
         $group_id = (int)$_POST['group_id'];
-        $db->exec("DELETE FROM reading_groups WHERE id = $group_id");
-        $db->exec("DELETE FROM group_members WHERE group_id = $group_id");
-        $db->exec("DELETE FROM group_notes WHERE group_id = $group_id");
-        $db->exec("DELETE FROM group_discussions WHERE group_id = $group_id");
-        $db->exec("DELETE FROM group_schedules WHERE group_id = $group_id");
+        // F214: prepared statements instead of SQL built by string concatenation (the value was
+        // int-cast, so not exploitable, but fragile); child rows first, in one transaction.
+        $db->beginTransaction();
+        foreach (['group_members', 'group_notes', 'group_discussions', 'group_schedules'] as $child) {
+            $db->prepare("DELETE FROM $child WHERE group_id = ?")->execute([$group_id]);
+        }
+        $db->prepare("DELETE FROM reading_groups WHERE id = ?")->execute([$group_id]);
+        $db->commit();
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
