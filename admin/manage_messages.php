@@ -163,7 +163,9 @@ $pageTitle = 'Manage Messages';
                                             <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $message['id']; ?>"></td>
                                             <td><span class="user-id"><?php echo $message['id']; ?></span></td>
                                             <td><strong><?php echo htmlspecialchars($message['name']); ?></strong></td>
-                                            <td><?php echo htmlspecialchars($message['email']); ?></td>
+                                            <td><?php // F181: reply by email (there was no reply action) ?>
+                                                <a href="mailto:<?php echo htmlspecialchars($message['email']); ?>?subject=<?php echo rawurlencode('Re: ' . ($message['subject'] ?: 'Your message to AngelWrites')); ?>" title="Reply by email"><i class="fas fa-reply"></i> <?php echo htmlspecialchars($message['email']); ?></a>
+                                            </td>
                                             <td><?php echo htmlspecialchars($message['subject'] ?: 'No Subject'); ?></td>
                                             <td><div class="msg-preview"><?php echo htmlspecialchars(substr($message['message'], 0, 60)); ?>...</div></td>
                                             <td><?php echo date('M j, Y', strtotime($message['created_at'])); ?></td>
