@@ -10,7 +10,7 @@ $success = '';
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'contact_submit_' . $ip;
-$limit_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$limit_file = aw_ratelimit_file($limit_key) /* Q49 */;
 if (file_exists($limit_file) && (time() - filemtime($limit_file) < 300)) {
     $error = 'Please wait 5 minutes before sending another message.';
 }

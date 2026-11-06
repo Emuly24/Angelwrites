@@ -22,7 +22,7 @@ $resend_success = false;
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'verify_attempts_' . $ip;
-$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$attempts_file = aw_ratelimit_file($limit_key) /* Q49 */;
 $attempts = 0;
 // F104: the counter never expired, so five wrong codes locked that address out for good while
 // the message promised 15 minutes. A counter last written 15+ minutes ago is discarded.

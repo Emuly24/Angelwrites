@@ -17,6 +17,10 @@ function aw_housekeeping(PDO $db) {
             // IP addresses are only needed for recent abuse checks; the view counts stay
             "UPDATE view_logs SET ip_address = NULL WHERE ip_address IS NOT NULL AND viewed_at < datetime('now', '-90 days')",
         ];
+        // Q49: rate-limit counters older than a day have expired
+        foreach (glob(__DIR__ . '/../data/ratelimit/*.tmp') ?: [] as $f) {
+            if (@filemtime($f) < time() - 86400) @unlink($f);
+        }
         foreach ($steps as $sql) {
             try {
                 $db->exec($sql);

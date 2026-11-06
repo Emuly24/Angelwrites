@@ -46,7 +46,7 @@ if (!function_exists('rate_limit')) {
     function rate_limit($key, $limit = 10, $window = 60) {
         $ip = $_SERVER['REMOTE_ADDR'];
         $cache_key = 'rate_limit_' . md5($ip . '_' . $key);
-        $file = sys_get_temp_dir() . '/' . $cache_key . '.txt';
+        $file = aw_ratelimit_file($cache_key) /* Q49 */;
         $current = time();
         if (file_exists($file)) {
             $data = file_get_contents($file);

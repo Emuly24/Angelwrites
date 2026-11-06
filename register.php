@@ -20,7 +20,7 @@ $success = false;
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'register_attempts_' . $ip;
-$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$attempts_file = aw_ratelimit_file($limit_key) /* Q49 */;
 if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
     $error = 'Please wait 5 minutes before trying to register again.';
 }

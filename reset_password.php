@@ -22,7 +22,7 @@ $step = 1; // 1 = request code, 2 = verify and reset
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'reset_password_attempts_' . $ip;
-$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$attempts_file = aw_ratelimit_file($limit_key) /* Q49 */;
 $attempts = 0;
 $last_attempt = 0;
 
