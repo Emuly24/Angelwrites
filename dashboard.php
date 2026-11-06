@@ -201,8 +201,18 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars(awDisplayName($user)); /* F100 */ ?></span></h1>
             <div class="sub">Your personal dashboard – track your reading journey.</div>
             <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <span style="background: #f1c40f; color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo $stats['current_streak']; ?> Day Streak</span>
-                <span style="background: var(--bg); color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🏆 Level <?php echo $stats['level']; ?> (<?php echo $stats['points']; ?> pts)</span>
+                <?php
+                // Q30: the streak and level badges sat at the top of every dashboard, but nothing fills
+                // user_reputations.points (the reader adds to xp), so everyone saw "Level 1 (0 pts)" and
+                // usually "0 Day Streak". Each badge now only shows when it has something real to say.
+                $aw_level = (int)($stats['level'] ?? 1); $aw_points = (int)($stats['points'] ?? 0);
+                ?>
+                <?php if ((int)$stats['current_streak'] > 0): ?>
+                <span style="background: #f1c40f; color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo (int)$stats['current_streak']; ?> Day Streak</span>
+                <?php endif; ?>
+                <?php if ($aw_level > 1 || $aw_points > 0): ?>
+                <span style="background: var(--bg); color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🏆 Level <?php echo $aw_level; ?><?php echo $aw_points > 0 ? ' (' . $aw_points . ' pts)' : ''; ?></span>
+                <?php endif; ?>
             </div>
         </div>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
