@@ -83,6 +83,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // ===== STANDARD COVER UPLOAD =====
+        // S8 (F39): this folder is public, so only real images (≤ 5 MB) are accepted as covers.
+        if (empty($error) && !empty($_FILES['cover']['name'])) {
+            $cover_ext = strtolower(pathinfo($_FILES['cover']['name'], PATHINFO_EXTENSION));
+            if (!in_array($cover_ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
+                || $_FILES['cover']['size'] > 5 * 1024 * 1024
+                || @getimagesize($_FILES['cover']['tmp_name']) === false) {
+                $error = 'Cover must be a JPG, PNG, GIF or WebP image of at most 5 MB.';
+            }
+        }
         if (empty($error) && !empty($_FILES['cover']['name'])) {
             $upload_dir = '../assets/uploads/books/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -95,7 +104,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // ===== BOOK FILE UPLOAD =====
-        if (!empty($_FILES['book_file']['name'])) {
+        // S8 (F39): only book formats (≤ 50 MB); anything else (e.g. .php) is refused before
+        // it reaches the public folder.
+        if (empty($error) && !empty($_FILES['book_file']['name'])) {
+            $book_ext = strtolower(pathinfo($_FILES['book_file']['name'], PATHINFO_EXTENSION));
+            if (!in_array($book_ext, ['pdf', 'epub', 'doc', 'docx'], true)) {
+                $error = 'Book file must be PDF, EPUB, DOC or DOCX.';
+            } elseif ($_FILES['book_file']['size'] > 50 * 1024 * 1024) {
+                $error = 'Book file is larger than 50 MB.';
+            }
+        }
+        if (empty($error) && !empty($_FILES['book_file']['name'])) {
             $upload_dir = '../assets/uploads/books/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
             $file_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['book_file']['name']);
