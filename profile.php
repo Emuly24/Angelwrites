@@ -90,7 +90,12 @@ $rep_level = $rep['level'] ?? 1;
 
 // ===== UPDATE PROFILE =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
-    $name = trim($_POST['name']);
+    // Q31: sign-up asks for first and last name but this form edited a single "name", so the two
+    // could disagree (and first_name/last_name were never updated). It now edits first and last name
+    // and keeps "name" as the two together.
+    $first_name = trim((string)($_POST['first_name'] ?? ''));
+    $last_name = trim((string)($_POST['last_name'] ?? ''));
+    $name = trim($first_name . ' ' . $last_name);
     $email = trim($_POST['email']);
     $username = trim($_POST['username']);
     $gender = $_POST['gender'] ?? '';
@@ -144,8 +149,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         }
     }
 
-    if (empty($name) || empty($email) || empty($username)) {
-        $error = 'Name, email, and username are required.';
+    if ($first_name === '' || $last_name === '' || empty($email) || empty($username)) {
+        $error = 'First name, last name, email and username are required.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
@@ -163,12 +168,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             } else {
                 $stmt = $db->prepare("
                     UPDATE users SET 
-                        name = ?, email = ?, username = ?, gender = ?, country = ?, contact_number = ?, bio = ?, profile_pic = ?, updated_at = CURRENT_TIMESTAMP
+                        name = ?, first_name = ?, last_name = ?, email = ?, username = ?, gender = ?, country = ?, contact_number = ?, bio = ?, profile_pic = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ");
                 // S5 (F115): the email column keeps the current address; a new address only
                 // takes effect after the code sent to it is confirmed (handler above).
-                $stmt->execute([$name, $user['email'], $username, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
+                $stmt->execute([$name, $first_name, $last_name, $user['email'], $username, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
                 $_SESSION['name'] = $name;
                 $success = 'Profile updated successfully!';
 
@@ -312,9 +317,20 @@ $pageTitle = 'My Profile';
                     <input type="hidden" name="update_profile" value="1">
                     <input type="hidden" id="croppedImageData" name="cropped_image_data" value="">
                     
+                    <?php
+                    // Q31: older accounts may only have "name"; split it once to prefill the two fields.
+                    $aw_fn = (string)($user['first_name'] ?? ''); $aw_ln = (string)($user['last_name'] ?? '');
+                    if ($aw_fn === '' && $aw_ln === '' && trim((string)($user['name'] ?? '')) !== '') {
+                        $aw_parts = preg_split('/\s+/', trim($user['name']), 2); $aw_fn = $aw_parts[0]; $aw_ln = $aw_parts[1] ?? '';
+                    }
+                    ?>
                     <div class="form-group">
-                        <label for="name">Full Name</label>
-                        <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($user['name']); ?>" required>
+                        <label for="first_name">First Name</label>
+                        <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($aw_fn); ?>" autocomplete="given-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name</label>
+                        <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($aw_ln); ?>" autocomplete="family-name" required>
                     </div>
                     
                     <div class="form-group">
