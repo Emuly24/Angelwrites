@@ -1592,6 +1592,19 @@ $pageTitle = 'Bible Reader';
     // ================================================================
     // 34. INITIAL LOAD
     // ================================================================
+    // F29: open the passage named in the link (?book=John&chapter=3&verse=16, as built by the
+    // share buttons); the page used to ignore it and always open the default passage.
+    (function applyLinkedPassage() {
+        const q = new URLSearchParams(window.location.search);
+        const qb = q.get('book');
+        if (!qb || !BOOKS.includes(qb)) return;
+        book = qb;
+        const maxCh = CHAPTER_COUNTS[qb] || 21;
+        const qc = parseInt(q.get('chapter'), 10);
+        chapter = (qc >= 1 && qc <= maxCh) ? qc : 1;
+        const qv = parseInt(q.get('verse'), 10);
+        verse = qv >= 1 ? qv : 1;
+    })();
     populateBooks();
     populateChapters();
     populateVerses();
