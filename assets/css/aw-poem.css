@@ -39,6 +39,10 @@
 .aw-epigraph::before { content: '✧'; display: block; color: var(--aw-accent); font-size: 1.1rem; margin-bottom: 8px; }
 .aw-epigraph-label { font: 600 .7rem/1 'Inter', sans-serif; letter-spacing: .22em; text-transform: uppercase; color: var(--aw-accent-dark); margin-bottom: 10px; }
 .aw-epigraph p { font-family: var(--aw-poem-font); font-style: italic; font-size: 1.15rem; line-height: 1.7; color: var(--aw-soft); margin: 0; }
+.aw-epigraph p + p { margin-top: .7em; }
+.aw-epigraph.is-long { max-width: 660px; padding: 22px 26px; border-radius: 18px; background: var(--card-bg, #fff); border: 1px solid var(--aw-line); }
+.aw-epigraph.is-long p { text-align: left; font-style: normal; font-size: 1.12rem; line-height: 1.75; color: var(--text, #3d2e2e); }
+.aw-epigraph.is-long p:first-of-type { font-style: italic; }
 
 /* ---------- player (only rendered when a recording exists) ---------- */
 .aw-player { display: flex; align-items: center; gap: 16px; padding: 14px 18px; margin: 0 auto 22px; border-radius: 18px; background: var(--card-bg, #fff); border: 1px solid var(--aw-line); box-shadow: var(--shadow, 0 4px 16px rgba(44,30,30,.08)); }

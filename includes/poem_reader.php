@@ -272,7 +272,13 @@ function aw_poem_reader(array $poem, $db = null, array $opts = []) {
     if ($hasAudio) $h .= '<span><i class="fas fa-headphones" aria-hidden="true"></i>Recorded reading</span>';
     $h .= '</div></div></header>';
     if (trim((string)($poem['intro'] ?? '')) !== '') {
-        $h .= '<section class="aw-epigraph"><div class="aw-epigraph-label">Purpose of this poem</div><p>' . nl2br(htmlspecialchars($poem['intro'])) . '</p></section>';
+        // A short purpose reads as a centred epigraph; a long one (often several paragraphs) as prose.
+        $intro = trim(str_replace("\r", '', (string)$poem['intro']));
+        $long = mb_strlen($intro) > 220;
+        $paras = preg_split('/\n\s*\n|(?<=[.!?”"])\n/u', $intro);
+        $h .= '<section class="aw-epigraph' . ($long ? ' is-long' : '') . '"><div class="aw-epigraph-label">Purpose of this poem</div>';
+        foreach ($paras as $para) if (trim($para) !== '') $h .= '<p>' . nl2br(htmlspecialchars(trim($para))) . '</p>';
+        $h .= '</section>';
     }
     $h .= aw_poem_player($poem);
     $h .= aw_poem_toolbar();
