@@ -285,16 +285,24 @@ $pageTitle = htmlspecialchars($video['title']);
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ===== INITIALIZE PLYR PLAYER =====
-    const player = new Plyr('#player', {
-        controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
-        settings: ['speed', 'quality']
-    });
+    // Q19: if the Plyr script did not load (CDN blocked or slow), `new Plyr` threw and the reaction and
+    // share buttons below were never wired up. The plain embedded video works without it.
+    if (window.Plyr) {
+        try {
+            new Plyr('#player', {
+                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
+                settings: ['speed', 'quality']
+            });
+        } catch (e) { console.warn('Plyr:', e); }
+    }
 
     // ===== REACTIONS (F66: like / love / pray) =====
     document.querySelectorAll('.reaction-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
             if (!<?php echo isLoggedIn() ? 'true' : 'false'; ?>) {
-                alert('Please login to react to this video.');
+                if (confirm('Please log in to react to this video. Go to the login page now? You will come back here.')) {
+                    location.href = '<?php echo SITE_URL; ?>/login.php?redirect=' + encodeURIComponent(location.pathname + location.search);
+                }
                 return;
             }
             fetch('', {
