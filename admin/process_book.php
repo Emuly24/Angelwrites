@@ -1073,8 +1073,11 @@ if (isset($_POST['extract'])) {
             $stmt->execute([$html_content, $book_id]);
         }
         
+        // F89: a processed book leaves the queue
+        $db->prepare("UPDATE book_processing_queue SET status = 'complete', progress = 100, updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]);
         echo json_encode(['success' => true, 'message' => "✅ Extracted version $next_version created. Published version remains v$published_version."]);
     } else {
+        $db->prepare("UPDATE book_processing_queue SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]); // F89
         $error_msg = $raw_text ?: 'Failed to extract content from the file.';
         echo json_encode(['success' => false, 'error' => $error_msg]);
     }
@@ -1116,7 +1119,20 @@ if (isset($_POST['queue_book'])) {
     header('Content-Type: application/json');
     ob_clean();
     addToQueue($book_id);
-    echo json_encode(['success' => true, 'message' => '✅ Book added to processing queue.']);
+    // F89: nothing ever processed the queue (no cron or worker on this host), yet this said
+    // "added" as if it would happen. Say how it gets processed (decision D-A1).
+    echo json_encode(['success' => true, 'message' => '✅ Book added to the queue. There is no automatic processing on this host: press "Process next queued book" (or Extract & Parse) to process it.']);
+    exit;
+}
+
+// --- F89: NEXT QUEUED BOOK (the page then runs the normal extraction for it) ---
+if (isset($_POST['next_queued'])) {
+    header('Content-Type: application/json');
+    ob_clean();
+    $nq = $db->query("SELECT q.book_id, b.title FROM book_processing_queue q JOIN books b ON b.id = q.book_id
+                      WHERE q.status = 'pending' ORDER BY q.created_at ASC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    echo json_encode($nq ? ['success' => true, 'book_id' => (int)$nq['book_id'], 'title' => $nq['title']]
+                         : ['success' => false, 'error' => 'The processing queue is empty.']);
     exit;
 }
 
@@ -1932,6 +1948,9 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
                 <button onclick="queueBook()" class="btn btn-secondary btn-large">
                     <i class="fas fa-clock"></i> Add to Processing Queue
                 </button>
+                <button onclick="processNextQueued()" class="btn btn-secondary btn-large"><!-- F89 -->
+                    <i class="fas fa-play"></i> Process next queued book
+                </button>
                 <div id="extract-status" style="display:none;padding:12px;border-radius:8px;margin-top:12px;background:#f8f9fa;"></div>
             </div>
         </div>
@@ -2230,6 +2249,30 @@ function queueBook() {
             statusDiv.style.background = '#f8d7da';
         }
     });
+}
+
+// F89: process the oldest queued book now (there is no background worker)
+function processNextQueued() {
+    const statusDiv = document.getElementById('extract-status');
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '⏳ Finding the next queued book...';
+    const fd = new FormData();
+    fd.append('next_queued', '1');
+    fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(next => {
+            if (!next.success) { statusDiv.innerHTML = 'ℹ️ ' + next.error; return; }
+            statusDiv.innerHTML = '⏳ Processing "' + next.title + '"...';
+            const ex = new FormData();
+            ex.append('extract', '1');
+            return fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=' + next.book_id, { method: 'POST', body: ex })
+                .then(r => r.json())
+                .then(data => {
+                    statusDiv.innerHTML = (data.success ? '✅ "' + next.title + '": ' + data.message : '❌ "' + next.title + '": ' + (data.error || 'Unknown error'));
+                    statusDiv.style.background = data.success ? '#d4edda' : '#f8d7da';
+                });
+        })
+        .catch(err => { statusDiv.innerHTML = '❌ ' + err.message; });
 }
 
 function uploadCover() {
