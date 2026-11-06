@@ -169,7 +169,8 @@ function extractPDF($file_path) {
     if (function_exists('exec')) {
         $txt_path = dirname($file_path) . '/' . pathinfo($file_path, PATHINFO_FILENAME) . '.txt';
         $pdftotext_path = defined('PDFTOTEXT_PATH') ? PDFTOTEXT_PATH : 'pdftotext';
-        exec("$pdftotext_path -layout -enc UTF-8 '$file_path' '$txt_path' 2>&1", $output, $return_var);
+        // S13 (F92): quote every argument; a path containing ' broke out of the old quoting.
+        exec(escapeshellcmd($pdftotext_path) . ' -layout -enc UTF-8 ' . escapeshellarg($file_path) . ' ' . escapeshellarg($txt_path) . ' 2>&1', $output, $return_var);
         if ($return_var === 0 && file_exists($txt_path)) {
             $text = file_get_contents($txt_path);
             @unlink($txt_path);

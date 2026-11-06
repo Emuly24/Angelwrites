@@ -2,11 +2,16 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/csrf.php';
 
 redirectIfNotLoggedIn();
 $user_id = $_SESSION['user_id'];
 $answer_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $confirmed = isset($_GET['confirm']) ? (int)$_GET['confirm'] : 0;
+// S9: the confirm link must carry the session CSRF token.
+if ($confirmed === 1 && !validate_csrf_token($_GET['csrf'] ?? '')) {
+    $confirmed = 0;
+}
 
 $stmt = $db->prepare("SELECT * FROM answers WHERE id = ? AND user_id = ?");
 $stmt->execute([$answer_id, $user_id]);
@@ -55,7 +60,7 @@ $pageTitle = 'Delete Answer';
             </div>
             
             <div class="delete-actions">
-                <a href="<?php echo SITE_URL; ?>/community_answer_delete.php?id=<?php echo $answer_id; ?>&confirm=1" class="btn btn-danger btn-large" onclick="return confirm('Are you absolutely sure you want to delete this answer?');">
+                <a href="<?php echo SITE_URL; ?>/community_answer_delete.php?id=<?php echo $answer_id; ?>&confirm=1&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-danger btn-large" onclick="return confirm('Are you absolutely sure you want to delete this answer?');">
                     <i class="fas fa-trash-alt"></i> Yes, Delete Answer
                 </a>
                 <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $answer['question_id']; ?>" class="btn btn-outline btn-large">

@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/csrf.php';
 
 // Only logged-in users can cancel sessions
 redirectIfNotLoggedIn();
@@ -10,6 +11,10 @@ redirectIfNotLoggedIn();
 $user_id = $_SESSION['user_id'];
 $session_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $confirmed = isset($_GET['confirm']) ? (int)$_GET['confirm'] : 0;
+// S9: the confirm link must carry the session CSRF token.
+if ($confirmed === 1 && !validate_csrf_token($_GET['csrf'] ?? '')) {
+    $confirmed = 0;
+}
 $error = '';
 $success = '';
 
@@ -101,7 +106,7 @@ $pageTitle = 'Cancel Session';
             </div>
 
             <div class="cancel-actions">
-                <a href="<?php echo SITE_URL; ?>/session_cancel.php?id=<?php echo $session_id; ?>&confirm=1" class="btn btn-danger btn-large" onclick="return confirm('Are you absolutely sure you want to cancel this session?');">
+                <a href="<?php echo SITE_URL; ?>/session_cancel.php?id=<?php echo $session_id; ?>&confirm=1&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-danger btn-large" onclick="return confirm('Are you absolutely sure you want to cancel this session?');">
                     <i class="fas fa-times-circle"></i> Yes, Cancel Session
                 </a>
                 <a href="<?php echo SITE_URL; ?>/book_session.php" class="btn btn-outline btn-large">

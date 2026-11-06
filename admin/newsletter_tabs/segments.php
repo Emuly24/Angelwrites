@@ -1,3 +1,4 @@
+<?php if (!defined('AW_NEWSLETTER_ADMIN')) { http_response_code(403); exit('Access denied.'); } // S13 (F175): admin/manage_newsletter.php only ?>
 <div class="card">
     <div class="card-header">
         <h2>🏷️ Subscriber Segments</h2>

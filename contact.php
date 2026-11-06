@@ -22,13 +22,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $message = trim($_POST['message']);
 
     // ===== SIMPLE MATH CAPTCHA =====
-    $captcha_result = isset($_POST['captcha_result']) ? (int)$_POST['captcha_result'] : 0;
-    $captcha_expected = isset($_POST['captcha_expected']) ? (int)$_POST['captcha_expected'] : 0;
-    if ($captcha_result !== $captcha_expected) {
+    // S11 (F179): the expected answer lives in the session, not in a hidden form field,
+    // and a wrong or missing answer stops the submission.
+    $captcha_result = isset($_POST['captcha_result']) && $_POST['captcha_result'] !== '' ? (int)$_POST['captcha_result'] : null;
+    $captcha_expected = $_SESSION['contact_captcha'] ?? null;
+    unset($_SESSION['contact_captcha']);
+    if ($captcha_expected === null || $captcha_result !== $captcha_expected) {
         $error = 'Please solve the math puzzle correctly.';
     }
 
-    if (empty($name)) {
+    if ($error) {
+        // captcha failed: nothing is saved or sent
+    } elseif (empty($name)) {
         $error = 'Please enter your name.';
     } elseif (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
@@ -49,11 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $admin_body .= "To manage this message, login to your admin panel.\n";
             sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites', false);
             
-            // ===== USER CONFIRMATION EMAIL =====
-            $user_subject = "Thank you for contacting AngelWrites";
-            $user_body = "Hello $name,\n\nThank you for reaching out. We have received your message and will respond as soon as possible.\n\nBlessings,\nAngella Bottoman\nAngelWrites";
-            sendEmail($email, $user_subject, $user_body, 'angelwrites@zohomail.com', 'AngelWrites', false);
-            
+            // S11 (F180): no confirmation copy is emailed to the address the visitor typed;
+            // that made the form a relay to any address. The success message below confirms receipt.
+
             $success = 'Your message has been sent! Thank you for reaching out.';
             file_put_contents($limit_file, time());
         } else {
@@ -66,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
 $captcha_num1 = random_int(1, 10);
 $captcha_num2 = random_int(1, 10);
 $captcha_expected = $captcha_num1 + $captcha_num2;
+$_SESSION['contact_captcha'] = $captcha_expected; // S11: checked server-side on submit
 
 $pageTitle = 'Contact';
 ?>
@@ -121,7 +125,6 @@ $pageTitle = 'Contact';
                         <div class="captcha-wrapper">
                             <span class="captcha-question"><?php echo $captcha_num1; ?> + <?php echo $captcha_num2; ?> =</span>
                             <input type="number" id="captcha_result" name="captcha_result" placeholder="?" required>
-                            <input type="hidden" name="captcha_expected" value="<?php echo $captcha_expected; ?>">
                         </div>
                     </div>
                     

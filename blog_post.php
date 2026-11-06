@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/csrf.php';
 
 // ===== FETCH POST =====
 $slug = isset($_GET['slug']) ? trim($_GET['slug']) : '';
@@ -30,6 +31,14 @@ if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
     $stmt = $db->prepare("INSERT OR IGNORE INTO blog_reads (user_id, blog_post_id) VALUES (?, ?)");
     $stmt->execute([$user_id, $post['id']]);
+}
+
+// ===== S9: CSRF check for the four POST handlers below =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && (isset($_POST['add_comment']) || isset($_POST['submit_voice_comment']) || isset($_POST['request_prayer']) || isset($_POST['add_admin_reply']))
+    && !validate_csrf_token($_POST['csrf_token'] ?? '')) {
+    http_response_code(400);
+    exit('This form has expired. Please go back, reload the page and try again.');
 }
 
 // ===== HANDLE COMMENT SUBMISSION (with live photo) =====
@@ -250,6 +259,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
             <div class="reflection-actions">
                 <form method="POST" class="prayer-form">
                     <input type="hidden" name="request_prayer" value="1">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                     <input type="hidden" name="reflection_id" value="<?php echo $post['id']; ?>">
                     <button type="submit" class="btn btn-secondary">
                         <i class="fas fa-hands-praying"></i> Request Prayer
@@ -359,6 +369,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                     <!-- Text Comment with Live Photo -->
                     <form method="POST" enctype="multipart/form-data" class="comment-form">
                         <input type="hidden" name="add_comment" value="1">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                         <input type="hidden" name="reflection_id" value="<?php echo $post['id']; ?>">
                         <div class="form-group">
                             <textarea name="comment" rows="3" placeholder="Share your thoughts about this reflection..." required></textarea>
@@ -406,6 +417,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                         <span id="recordingStatus" style="display:none;">🔴 Recording...</span>
                         <form method="POST" enctype="multipart/form-data" id="voiceForm" style="display:none;">
                             <input type="hidden" name="submit_voice_comment" value="1">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                             <input type="hidden" name="reflection_id" value="<?php echo $post['id']; ?>">
                             <input type="file" name="voice_file" id="voiceFileInput" accept="audio/webm" required>
                             <button type="submit" class="btn btn-success">Upload Voice</button>
@@ -424,6 +436,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                     <h4>🛡️ Angella's Reply</h4>
                     <form method="POST" class="admin-reply-form">
                         <input type="hidden" name="add_admin_reply" value="1">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                         <input type="hidden" name="reflection_id" value="<?php echo $post['id']; ?>">
                         <div class="form-group">
                             <textarea name="admin_reply" rows="3" placeholder="Reply to this post directly..." required></textarea>
