@@ -1101,6 +1101,7 @@ if (isset($_POST['extract'])) {
         echo json_encode(['success' => false, 'error' => 'Book file not found.']);
         exit;
     }
+    $aw_t0 = microtime(true); // R4
     $raw_text = extractRawText($file_path);
     if ($raw_text && strpos($raw_text, '⚠️') !== 0) {
         $raw_text = fixEncoding($raw_text);
@@ -1155,10 +1156,34 @@ if (isset($_POST['extract'])) {
         
         // F89: a processed book leaves the queue
         $db->prepare("UPDATE book_processing_queue SET status = 'complete', progress = 100, updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]);
-        echo json_encode(['success' => true, 'version' => $next_version, 'message' => "✅ Draft version $next_version created. " . ($published_version ? "Members still read v$published_version until you publish." : 'Nothing is shown to members until you publish.')]);
+        // R4: say what was produced and flag likely problems, instead of a bare "done".
+        $aw_words = str_word_count(strip_tags($html_content));
+        $aw_chapters = substr_count($html_content, 'class="chapter-heading"');
+        $aw_biggest = 0;
+        foreach ($pages as $aw_pg) $aw_biggest = max($aw_biggest, str_word_count($aw_pg));
+        $aw_warn = [];
+        $aw_size_mb = filesize($file_path) / 1048576;
+        if ($aw_words < 300 || ($aw_size_mb > 1 && $aw_words / $aw_size_mb < 200)) {
+            $aw_warn[] = "Very little text was found ($aw_words words). If this is a scanned PDF (pictures of pages), it has no text to extract; upload a PDF with selectable text, a DOCX or an EPUB.";
+        }
+        if (count($pages) <= 1) $aw_warn[] = 'Everything is on one page. Choose a page length other than Automatic and extract again.';
+        if ($aw_biggest > 1500) $aw_warn[] = "One page has $aw_biggest words; members will scroll a long way. Try a shorter page length.";
+        if ($aw_chapters === 0) $aw_warn[] = 'No chapter headings were found (lines starting "Chapter 1", "Chapter II"...). The contents list will only show sections such as Preface or Introduction.';
+        $aw_summary = ['pages' => count($pages), 'words' => $aw_words, 'chapters' => $aw_chapters, 'seconds' => round(microtime(true) - $aw_t0, 1), 'page_length' => $page_mode];
+        echo json_encode(['success' => true, 'version' => $next_version, 'summary' => $aw_summary, 'warnings' => $aw_warn, 'message' => "✅ Draft version $next_version created. " . ($published_version ? "Members still read v$published_version until you publish." : 'Nothing is shown to members until you publish.')]);
     } else {
         $db->prepare("UPDATE book_processing_queue SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]); // F89
-        $error_msg = $raw_text ?: 'Failed to extract content from the file.';
+        // R4: say why, in terms the admin can act on.
+        $aw_ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+        if ($raw_text) {
+            $error_msg = $raw_text;
+        } elseif ($aw_ext === 'doc') {
+            $error_msg = 'Old Word .doc files cannot be read. Open the file in Word or LibreOffice, save it as .docx, upload it again and extract.';
+        } elseif (!in_array($aw_ext, ['pdf', 'docx', 'epub'], true)) {
+            $error_msg = 'Only PDF, DOCX and EPUB files can be turned into reader pages. This file is .' . $aw_ext . '.';
+        } else {
+            $error_msg = 'The ' . strtoupper($aw_ext) . ' file could not be read (it may be damaged or password-protected). Try saving it again from the original program and re-uploading it.';
+        }
         echo json_encode(['success' => false, 'error' => $error_msg]);
     }
     exit;
@@ -2290,7 +2315,9 @@ tinymce.init({
 function extractAndParse() {
     const statusDiv = document.getElementById('extract-status');
     statusDiv.style.display = 'block';
-    statusDiv.innerHTML = '⏳ Extracting and parsing content...';
+    statusDiv.innerHTML = '⏳ Extracting and parsing content… <span id="awElapsed">0</span> s (large books can take a minute; keep this page open)';
+    const awStart = Date.now();
+    window.awTimer = setInterval(() => { const e = document.getElementById('awElapsed'); if (e) e.textContent = Math.round((Date.now() - awStart) / 1000); }, 1000); // R4
     statusDiv.style.background = '#e9ecef';
     statusDiv.style.color = '#333';
     const formData = new FormData();
@@ -2302,11 +2329,21 @@ function extractAndParse() {
     })
     .then(response => response.json())
     .then(data => {
+        clearInterval(window.awTimer); // R4
         if (data.success) {
-            statusDiv.innerHTML = '✅ ' + data.message;
-            statusDiv.style.background = '#d4edda';
+            // R4: show what was produced, any warnings, and the next steps (the page no longer reloads by itself).
+            const sm = data.summary || {};
+            const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+            let html = '<strong>' + esc(data.message) + '</strong><br>'
+                + esc((sm.pages ?? '?') + ' pages · ' + (sm.words ?? '?').toLocaleString() + ' words · ' + (sm.chapters ?? '?') + ' chapters · ' + (sm.seconds ?? '?') + ' s');
+            (data.warnings || []).forEach(w => { html += '<div style="margin-top:6px;color:#856404;">⚠️ ' + esc(w) + '</div>'; });
+            html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
+                + '<a class="btn btn-sm btn-info" target="_blank" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$book_id; ?>&preview=' + data.version + '">👁️ Preview in the reader</a>'
+                + '<button class="btn btn-sm btn-success" onclick="publishVersion(' + data.version + ')">📢 Publish this version</button>'
+                + '<button class="btn btn-sm btn-outline" onclick="location.reload()">Refresh page</button></div>';
+            statusDiv.innerHTML = html;
+            statusDiv.style.background = (data.warnings || []).length ? '#fff3cd' : '#d4edda';
             statusDiv.style.color = '#155724';
-            setTimeout(() => location.reload(), 2000);
         } else {
             statusDiv.innerHTML = '❌ ' + (data.error || 'Unknown error');
             statusDiv.style.background = '#f8d7da';
@@ -2314,7 +2351,8 @@ function extractAndParse() {
         }
     })
     .catch(error => {
-        statusDiv.innerHTML = '❌ Network or JSON error: ' + error.message;
+        clearInterval(window.awTimer);
+        statusDiv.innerHTML = '❌ The server did not answer properly (it may have run out of time on a very large file). Try a smaller file or try again. (' + error.message + ')';
         statusDiv.style.background = '#f8d7da';
         statusDiv.style.color = '#721c24';
         console.error('Fetch error:', error);
