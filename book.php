@@ -5,8 +5,11 @@ require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
 
 // ===== ERROR HANDLING =====
+// S7 (F88, F211): errors are logged, never printed to visitors (they leaked server paths
+// and corrupted this page's JSON responses).
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
 // ===== GET BOOK ID =====
 $book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
