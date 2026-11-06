@@ -232,6 +232,15 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .toc-list li { padding:2px 0; }
 .toc-list a { color:var(--text); text-decoration:none; display:block; padding:6px 8px; border-radius:6px; transition:all var(--transition); }
 .toc-list a:hover { background:rgba(219,161,162,0.1); color:var(--rose); }
+/* R7: contents show page numbers, where you are and what you have read */
+.toc-list a { display:flex!important; align-items:baseline; gap:8px; }
+.toc-title { flex:1; }
+.toc-page { font-size:0.8rem; color:var(--text-light); white-space:nowrap; }
+.toc-mark { width:1.1em; flex:none; color:var(--rose); }
+.toc-list a.toc-done .toc-mark::before { content:'✓'; }
+.toc-list a.toc-current { background:rgba(219,161,162,0.15); font-weight:600; }
+.toc-list a.toc-current .toc-mark::before { content:'▸'; }
+.toc-summary { font-size:0.85rem; color:var(--text-light); margin:0 0 10px; }
 .toc-empty { text-align:center; color:var(--text-light); padding:40px 0; }
 #challenge-widget { display:none; margin:8px 16px; padding:12px 16px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); z-index:100001!important; }
 #challenge-widget h4 { margin:0 0 4px; font-size:1rem; }
@@ -433,9 +442,10 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
         <div class="toc-body" id="tocBody">
             <?php if (count($tocEntries) > 0): ?>
+            <p class="toc-summary" id="tocSummary"></p>
             <ul class="toc-list">
                 <?php foreach ($tocEntries as $entry): ?>
-                <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
+                <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><span class="toc-mark" aria-hidden="true"></span><span class="toc-title"><?php echo htmlspecialchars($entry['title']); ?></span><span class="toc-page">p. <?php echo (int)($entry['page'] ?? 1); ?></span></a></li>
                 <?php endforeach; ?>
             </ul>
             <?php else: ?>
@@ -783,6 +793,25 @@ if (function_exists('renderAchievementToastJS')) {
         const ch = getChapterForPage(page);
         chapterInfoEl.textContent = `📖 ${getChapterTitle(ch)}`;
         remainingInfoEl.textContent = `⏳ ${getRemainingPagesInChapter(page)} pages remaining • ${estimateTimeRemaining(page)} min left`;
+        markToc(page);
+    }
+
+    // R7: mark the current chapter and the chapters already read in the contents.
+    var furthestPage = 0; // var: markToc can run before this line during start-up
+    function markToc(page) {
+        furthestPage = Math.max(furthestPage || 0, parseInt(lastPage) || 0, page);
+        const links = Array.from(document.querySelectorAll('.toc-link'));
+        let current = null;
+        links.forEach(l => { if (parseInt(l.dataset.chapter) <= page) current = l; });
+        links.forEach((l, i) => {
+            const start = parseInt(l.dataset.chapter);
+            const next = links[i + 1] ? parseInt(links[i + 1].dataset.chapter) : totalPages + 1;
+            l.classList.toggle('toc-current', l === current);
+            l.classList.toggle('toc-done', l !== current && next - 1 <= furthestPage);
+            if (l === current) l.setAttribute('aria-current', 'true'); else l.removeAttribute('aria-current');
+        });
+        const sum = document.getElementById('tocSummary');
+        if (sum) sum.textContent = `Page ${page} of ${totalPages} · ${Math.round(page / totalPages * 100)}% read`;
     }
 
     function goToPage(pageNum) {
@@ -1039,7 +1068,7 @@ if (function_exists('renderAchievementToastJS')) {
         if (awPhone.matches && e.target.closest('.sidebar-btn')) sidebar.classList.remove('open');
     });
     settingsBtn.addEventListener('click',function() { settingsPanel.classList.toggle('open'); overlay.classList.toggle('active',settingsPanel.classList.contains('open')); });
-    tocBtn.addEventListener('click', function() { tocDrawer.classList.toggle('open'); overlay.classList.toggle('active', tocDrawer.classList.contains('open')); });
+    tocBtn.addEventListener('click', function() { markToc(currentPage || 1); const cur = document.querySelector('.toc-link.toc-current'); tocDrawer.classList.toggle('open'); if (cur) cur.scrollIntoView({ block: 'center' }); overlay.classList.toggle('active', tocDrawer.classList.contains('open')); });
     tocClose.addEventListener('click', function() { tocDrawer.classList.remove('open'); overlay.classList.remove('active'); });
     shareBtn.addEventListener('click', function() {
         const preview = document.getElementById('shareQuotePreview');
