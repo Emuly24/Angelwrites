@@ -41,6 +41,21 @@ if (!$phone_number || strlen($phone_number) < 10) {
     exit;
 }
 
+// F35: the amount used to be whatever the browser sent, so a member could "pay" MWK 1 for any
+// book. It is now the book's price from the database; the posted amount is ignored.
+$stmt = $db->prepare("SELECT id, title, price, is_free FROM books WHERE id = ?");
+$stmt->execute([$book_id]);
+$book = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$book) {
+    echo json_encode(['success' => false, 'error' => 'Book not found']);
+    exit;
+}
+if (!empty($book['is_free'])) {
+    echo json_encode(['success' => false, 'error' => 'This book is free; no payment is needed.']);
+    exit;
+}
+$amount = aw_book_price($book);
+
 if ($amount <= 0) {
     echo json_encode(['success' => false, 'error' => 'Invalid amount']);
     exit;

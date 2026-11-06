@@ -8,3 +8,8 @@
 function aw_payment_instructions() {
     return trim((string)aw_setting('payment_instructions', ''));
 }
+
+// F35: the price a member is charged for a book, from the database (never from the browser).
+function aw_book_price(array $book) {
+    return round((float)($book['price'] ?? 0), 2);
+}
