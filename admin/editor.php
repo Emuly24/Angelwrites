@@ -130,28 +130,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ===== NEWSLETTER BROADCAST (using Zoho SMTP) =====
         if (isset($_POST['send_newsletter'])) {
             $subject = $title;
-            $full_message = "<html><body>";
-            $full_message .= "<h2>$title</h2>";
+            $full_message = "<h2>$title</h2>";
             if (!empty($intro)) $full_message .= "<p><em>$intro</em></p>";
             $full_message .= "<div>" . nl2br($content) . "</div>";
-            // F141: the real unsubscribe flow is unsubscribe.php?token=<subscriber token>;
-            // newsletter.php has no unsubscribe handler.
-            $full_message .= "<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"" . SITE_URL . "/unsubscribe.php?token=[TOKEN]\">click here</a>.</p>";
-            $full_message .= "</body></html>";
 
-            $stmt = $db->prepare("SELECT email, unsubscribe_token FROM newsletter WHERE is_active = 1");
+            // F140: the broadcast used to mail every subscriber inside this request (0.5 s
+            // sleep each), which runs past the host's execution limit. It is now queued and
+            // sent in pages by admin/manage_newsletter.php (newsletter_send_batch), which also
+            // appends each subscriber's unsubscribe.php?token= link (F141).
+            $stmt = $db->prepare("SELECT email FROM newsletter WHERE is_active = 1");
             $stmt->execute();
-            $subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            $sent_count = 0;
-            foreach ($subscribers as $sub) {
-                $personalized_message = str_replace('[TOKEN]', $sub['unsubscribe_token'], $full_message);
-                if (sendEmail($sub['email'], $subject, $personalized_message, 'no-reply@angelwrites.gt.tc', SITE_NAME . ' Blog')) {
-                    $sent_count++;
-                }
-                usleep(500000);
+            $broadcast_recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            if ($broadcast_recipients) {
+                $stmt = $db->prepare("INSERT INTO email_queue (subject, content, recipient_emails, send_to_type, scheduled_at, status, attempt_count) VALUES (?, ?, ?, 'all', ?, 'processing', 0)");
+                $stmt->execute([$subject, $full_message, implode(',', $broadcast_recipients), date('Y-m-d H:i:s')]);
+                header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . (int)$db->lastInsertId());
+                exit;
             }
-            $success .= " Broadcast sent to $sent_count subscribers.";
         }
 
         if ($action === 'save_and_continue') {
