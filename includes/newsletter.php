@@ -400,3 +400,32 @@ function aw_nl_status(array $sub) {
     if ((int)$sub['is_active'] === 1) return 'active';
     return empty($sub['unsubscribed_at']) ? 'pending' : 'unsubscribed';
 }
+
+/**
+ * N8: an announcement for a new blog post or reflection: its image, title, a short excerpt and a
+ * "Read" button (clicks are tracked like any link). Returns the campaign id, or 0 when there are no
+ * active subscribers.
+ */
+function aw_nl_announce_post(PDO $db, array $post, $label = 'Read the full post') {
+    $base = rtrim(SITE_URL, '/');
+    $url = $base . '/blog_post.php?slug=' . urlencode((string)$post['slug']);
+    $excerpt = trim((string)($post['excerpt'] ?? ''));
+    if ($excerpt === '') {
+        $words = preg_split('/\s+/u', trim(html_entity_decode(strip_tags((string)($post['content'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $excerpt = implode(' ', array_slice($words, 0, 60)) . (count($words) > 60 ? '…' : '');
+    }
+    $e = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+    $html = '<p>Dear {{first_name}},</p>';
+    if (!empty($post['featured_image'])) {
+        $html .= '<p><a href="' . $e($url) . '"><img src="' . $e($base . '/' . ltrim($post['featured_image'], '/')) . '" alt="" width="536" style="width:100%;max-width:536px;height:auto;border-radius:12px;display:block;"></a></p>';
+    }
+    $html .= '<h2 style="font:700 21px/1.3 Georgia,serif;color:#2c1e1e;margin:18px 0 8px;">' . $e($post['title']) . '</h2>'
+        . '<p style="font-style:italic;color:#6b5a5a;">' . $e($excerpt) . '</p>'
+        . '<p><a href="' . $e($url) . '" style="display:inline-block;background:#DBA1A2;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-family:Arial,sans-serif;">' . $e($label) . ' →</a></p>'
+        . '<p>With love,<br>Angella</p>';
+    $recipients = aw_nl_resolve($db, 'all');
+    if (!$recipients) return 0;
+    $qid = aw_nl_queue($db, $post['title'], $html, $recipients, 'all');
+    aw_nl_audit($db, 'announce_post', '"' . $post['title'] . '" to ' . count($recipients));
+    return $qid;
+}
