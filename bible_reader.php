@@ -87,9 +87,6 @@ $pageTitle = 'Bible Reader';
                             <button class="bible-theme-btn" data-theme="dark"><span class="color-preview dark"></span> Dark</button>
                             <button class="bible-theme-btn" data-theme="sepia"><span class="color-preview sepia"></span> Sepia</button>
                         </div>
-                        <div class="bible-theme-extra">
-                            <label><input type="checkbox" id="bibleAutoTheme"> Auto‑theme (time of day)</label>
-                        </div>
                     </div>
                     <!-- Font -->
                     <div class="bible-setting-group">
@@ -516,14 +513,59 @@ function awGuestOnly(what) {
     // ================================================================
     // 3. STATE
     // ================================================================
-    let currentTheme = localStorage.getItem('bibleTheme') || 'light';
-    let currentFont = localStorage.getItem('bibleFont') || 'serif';
-    let fontSize = parseInt(localStorage.getItem('bibleFontSize')) || 100;
-    let lineHeight = parseInt(localStorage.getItem('bibleLineHeight')) || 180;
-    let letterSpacing = parseInt(localStorage.getItem('bibleLetterSpacing')) || 0;
-    let readingMode = localStorage.getItem('bibleReadingMode') || 'scroll';
+    // Q13: the reader's settings were six separate localStorage keys and its theme setting was
+    // never applied (no handlers), so it could disagree with the site's light/dark choice. Settings
+    // now live in one 'bibleSettings' object (old keys are read once and removed). Light/Dark set the
+    // site theme itself; Paper/Sepia only tint the Bible text.
+    const awBible = (function () {
+        let st = {};
+        try { st = JSON.parse(localStorage.getItem('bibleSettings') || 'null') || {}; } catch (e) { st = {}; }
+        const old = { tint: 'bibleTheme', font: 'bibleFont', fontSize: 'bibleFontSize', lineHeight: 'bibleLineHeight', letterSpacing: 'bibleLetterSpacing', readingMode: 'bibleReadingMode' };
+        try {
+            Object.keys(old).forEach(function (k) {
+                const v = localStorage.getItem(old[k]);
+                if (v !== null && st[k] === undefined) st[k] = v;
+                localStorage.removeItem(old[k]);
+            });
+            if (st.tint !== 'paper' && st.tint !== 'sepia') st.tint = '';
+            localStorage.setItem('bibleSettings', JSON.stringify(st));
+        } catch (e) {}
+        return {
+            get: function (k, d) { return st[k] !== undefined && st[k] !== '' ? st[k] : d; },
+            set: function (k, v) { st[k] = v; try { localStorage.setItem('bibleSettings', JSON.stringify(st)); } catch (e) {} }
+        };
+    })();
+    function awSiteTheme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+    function awSetSiteTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+        try { localStorage.setItem('angelwrites_theme', theme); } catch (e) {}
+    }
+    function awApplyBibleTheme() {
+        const tint = awBible.get('tint', '');
+        const box = document.getElementById('bibleReaderContainer');
+        if (box) { box.classList.remove('bible-tint-paper', 'bible-tint-sepia'); if (tint) box.classList.add('bible-tint-' + tint); }
+        const active = tint || awSiteTheme();
+        document.querySelectorAll('.bible-theme-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.theme === active); });
+    }
+    document.querySelectorAll('.bible-theme-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+            const t = this.dataset.theme;
+            if (t === 'light' || t === 'dark') { awSetSiteTheme(t); awBible.set('tint', ''); } else { awBible.set('tint', t); }
+            awApplyBibleTheme();
+        });
+    });
+    if (themeToggleBtn) themeToggleBtn.addEventListener('click', function () {
+        awSetSiteTheme(awSiteTheme() === 'dark' ? 'light' : 'dark'); awBible.set('tint', ''); awApplyBibleTheme();
+    });
+    awApplyBibleTheme();
+
+    let currentFont = awBible.get('font', 'serif');
+    let fontSize = parseInt(awBible.get('fontSize', 100)) || 100;
+    let lineHeight = parseInt(awBible.get('lineHeight', 180)) || 180;
+    let letterSpacing = parseInt(awBible.get('letterSpacing', 0)) || 0;
+    let readingMode = awBible.get('readingMode', 'scroll');
     let focusMode = false;
-    let autoTheme = false;
     let scrollTimeout;
     let selectedText = '';
     let selectedRange = null;
@@ -955,7 +997,7 @@ function awGuestOnly(what) {
     function applyFont(font) {
         currentFont = font;
         reader.setAttribute('data-font', font);
-        localStorage.setItem('bibleFont', font);
+        awBible.set('font', font);
         document.querySelectorAll('.bible-font-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.bible-font-btn[data-font="${font}"]`)?.classList.add('active');
     }
@@ -977,7 +1019,7 @@ function awGuestOnly(what) {
         if (textContainer2p) textContainer2p.style.fontSize = fontSize + '%';
         document.getElementById('bibleSizeLabel').textContent = fontSize + '%';
         document.getElementById('bibleSizeSlider').value = fontSize;
-        localStorage.setItem('bibleFontSize', fontSize);
+        awBible.set('fontSize', fontSize);
     }
 
     document.getElementById('bibleSizeSlider').addEventListener('input', function() {
@@ -997,7 +1039,7 @@ function awGuestOnly(what) {
         if (textContainer2p) textContainer2p.style.lineHeight = lineHeight / 100;
         document.getElementById('bibleLineLabel').textContent = (lineHeight / 100).toFixed(1);
         document.getElementById('bibleLineSlider').value = lineHeight;
-        localStorage.setItem('bibleLineHeight', lineHeight);
+        awBible.set('lineHeight', lineHeight);
     }
 
     document.getElementById('bibleLineSlider').addEventListener('input', function() {
@@ -1017,7 +1059,7 @@ function awGuestOnly(what) {
         if (textContainer2p) textContainer2p.style.letterSpacing = letterSpacing + 'px';
         document.getElementById('bibleSpacingLabel').textContent = letterSpacing;
         document.getElementById('bibleSpacingSlider').value = letterSpacing;
-        localStorage.setItem('bibleLetterSpacing', letterSpacing);
+        awBible.set('letterSpacing', letterSpacing);
     }
 
     document.getElementById('bibleSpacingSlider').addEventListener('input', function() {
@@ -1033,7 +1075,7 @@ function awGuestOnly(what) {
     function applyReadingMode(mode) {
         readingMode = mode;
         reader.setAttribute('data-mode', mode);
-        localStorage.setItem('bibleReadingMode', mode);
+        awBible.set('readingMode', mode);
         document.querySelectorAll('.bible-mode-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.bible-mode-btn[data-mode="${mode}"]`)?.classList.add('active');
     }
@@ -1921,6 +1963,10 @@ body.dark-mode {
     .bible-toc-drawer { width:280px; right:-280px; }
     .bible-search-bar { width:260px; right:8px; }
 }
+
+/* Q13: Paper / Sepia tint only the Bible text area; Light / Dark follow the site theme */
+.bible-tint-paper .bible-verse-content, .bible-tint-paper [id^="bibleVerseContent"] { background:#fbf7ee; color:#2b2620; }
+.bible-tint-sepia .bible-verse-content, .bible-tint-sepia [id^="bibleVerseContent"] { background:#f1e3c8; color:#3b2f22; }
 </style>
 
 <?php require_once 'includes/footer.php'; ?>
