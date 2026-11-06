@@ -4,6 +4,13 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
+// Item 2 (F190): admin only. Guests could read stats, visitor IPs and reader names/emails.
+if (!isAdmin()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Admin access required.']);
+    exit;
+}
+
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 // ============================================================
