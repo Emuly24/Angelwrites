@@ -37,7 +37,9 @@ $target_type = $_GET['target_type'] ?? '';
 $target_id = (int)$_GET['target_id'] ?? 0;
 if (!$target_type || !$target_id) { exit('[]'); }
 
-$reactions = ['like','love','laugh','wow','sad','angry'];
+// Q33: poems used six reactions (like/love/laugh/wow/sad/angry) while videos, blog comments and posts
+// use like / love / pray. Poems now use the same three (only like and love had ever been used).
+$reactions = ['like','love','pray'];
 $result = [];
 
 foreach ($reactions as $r) {
