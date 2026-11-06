@@ -62,17 +62,19 @@ if ($type === 'all' || $type === 'poems') {
 if ($type === 'all' || $type === 'blog') {
     $search_configs[] = [
         'type' => 'blog',
-        'table' => 'blog_posts',
+        // F71: reflection posts are listed as reflections below; leave them out here (no duplicates)
+        'table' => "(SELECT * FROM blog_posts WHERE COALESCE(category, '') != 'Christian Reflections') blog_posts",
         'columns' => ['title', 'content', 'excerpt', 'category'],
-        'select' => "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published'"
+        'select' => "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM (SELECT * FROM blog_posts WHERE COALESCE(category, '') != 'Christian Reflections') blog_posts WHERE status = 'published'"
     ];
 }
 if ($type === 'all' || $type === 'reflections') {
     $search_configs[] = [
         'type' => 'reflection',
-        'table' => 'reflections',
+        // F71: reflections are blog_posts with category 'Christian Reflections' (see reflections.php)
+        'table' => "(SELECT id, title, content, excerpt, featured_image AS image_path, created_at, updated_at, views, tags, slug, featured, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published' AND category = 'Christian Reflections') reflections",
         'columns' => ['title', 'content', 'excerpt'],
-        'select' => "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM reflections"
+        'select' => "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM (SELECT id, title, content, excerpt, featured_image AS image_path, created_at, updated_at, views, tags, slug, featured, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published' AND category = 'Christian Reflections') reflections"
     ];
 }
 if ($type === 'all' || $type === 'videos') {
