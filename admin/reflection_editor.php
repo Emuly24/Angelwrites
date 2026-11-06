@@ -5,6 +5,33 @@ require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
+require_once __DIR__ . '/../includes/newsletter.php'; // RF3: CSRF helpers and "send to subscribers"
+
+// RF3: a readable, unique address for every reflection (two reflections with the same title used to
+// share one slug, so one could not be opened; a title in other scripts gave the slug "-").
+function aw_refl_slug(PDO $db, $title, $except_id = 0) {
+    $t = function_exists('iconv') ? (string)@iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string)$title) : (string)$title;
+    $base = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($t)), '-');
+    $base = $base !== '' ? mb_substr($base, 0, 80) : 'reflection';
+    $slug = $base; $n = 2;
+    $st = $db->prepare("SELECT 1 FROM blog_posts WHERE slug = ? AND id != ?");
+    while (true) {
+        $st->execute([$slug, (int)$except_id]);
+        if (!$st->fetchColumn()) return $slug;
+        $slug = $base . '-' . $n++;
+    }
+}
+// RF3: only real images (checked by content, saved with the matching extension); any file used to be
+// saved with its own extension (e.g. .php) under assets/uploads/blog/.
+function aw_refl_save_image($tmp, $prefix) {
+    $info = @getimagesize($tmp);
+    $ext = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'][$info[2] ?? 0] ?? null;
+    if (!$ext) return null;
+    $dir = __DIR__ . '/../assets/uploads/blog/';
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $name = $prefix . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    return move_uploaded_file($tmp, $dir . $name) ? 'assets/uploads/blog/' . $name : null;
+}
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $error = '';
@@ -17,6 +44,7 @@ $category = 'Christian Reflections';
 $tags = '';
 $status = 'draft';
 $featured_image = '';
+$featured = 0;
 
 if ($id > 0) {
     $stmt = $db->prepare("SELECT * FROM blog_posts WHERE id = ?");
@@ -30,6 +58,7 @@ if ($id > 0) {
         $tags = $post['tags'] ?? '';
         $status = $post['status'] ?? 'draft';
         $featured_image = $post['featured_image'] ?? '';
+        $featured = (int)($post['featured'] ?? 0);
     } else {
         $error = 'Post not found.';
     }
@@ -46,12 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
     $error = 'The save was larger than this host accepts (' . round($aw_post_limit / 1048576, 1) . ' MB, usually because of a recording), so nothing arrived. Your text was kept on this device: press "Restore my text", then save without the recording or with a shorter one.';
     $aw_restore_draft = true;
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    aw_csrf_require(); // RF3
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
     $content = trim($_POST['content']);
     $category = trim($_POST['category'] ?? 'Christian Reflections');
     $tags = trim($_POST['tags'] ?? '');
-    $status = trim($_POST['status'] ?? 'draft');
+    $status = in_array($_POST['status'] ?? '', ['draft', 'published', 'archived'], true) ? $_POST['status'] : 'draft';
+    $featured = !empty($_POST['featured']) ? 1 : 0;
     $action = $_POST['action'] ?? 'save';
 
     $uploaded_featured_image = $featured_image;
@@ -60,11 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
     if (!empty($_FILES['live_photo']['name'])) {
         $upload_dir = '../assets/uploads/blog/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $photo_filename = 'live_' . time() . '.jpg';
-        if (move_uploaded_file($_FILES['live_photo']['tmp_name'], $upload_dir . $photo_filename)) {
-            $uploaded_featured_image = 'assets/uploads/blog/' . $photo_filename;
+        if ($saved = aw_refl_save_image($_FILES['live_photo']['tmp_name'], 'live_')) {
+            $uploaded_featured_image = $saved;
         } else {
-            $error = 'Failed to upload captured photo.';
+            $error = 'The captured photo could not be saved as an image.';
         }
     }
 
@@ -72,11 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
     if (empty($error) && !empty($_FILES['featured_image']['name'])) {
         $upload_dir = '../assets/uploads/blog/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $feat_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['featured_image']['name']);
-        if (move_uploaded_file($_FILES['featured_image']['tmp_name'], $upload_dir . $feat_filename)) {
-            $uploaded_featured_image = 'assets/uploads/blog/' . $feat_filename;
+        if ($saved = aw_refl_save_image($_FILES['featured_image']['tmp_name'], 'feat_')) {
+            $uploaded_featured_image = $saved;
         } else {
-            $error = 'Failed to upload featured image.';
+            $error = 'The featured image must be a JPG, PNG, GIF or WebP picture.';
         }
     }
 
@@ -106,17 +135,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
         }
     }
 
-    if (empty($title) || empty($content)) {
+    // Tags: trimmed, no duplicates, comma-separated.
+    $tags = implode(', ', array_values(array_unique(array_filter(array_map(function ($t) { return mb_substr(trim($t), 0, 40); }, explode(',', $tags))))));
+    if (!empty($error)) {
+        // keep the form as typed and show the error
+    } elseif (empty($title) || empty($content)) {
         $error = 'Title and content are required.';
     } else {
         if ($id > 0) {
-            $stmt = $db->prepare("UPDATE blog_posts SET title = ?, content = ?, excerpt = ?, category = ?, tags = ?, status = ?, featured_image = ? WHERE id = ?");
-            $stmt->execute([$title, $content, $intro, $category, $tags, $status, $uploaded_featured_image, $id]);
+            // The address stays the same after the first save (links already shared keep working);
+            // a reflection saved before RF3 with an empty or duplicate slug gets a proper one.
+            $cur = $db->prepare("SELECT slug FROM blog_posts WHERE id = ?");
+            $cur->execute([$id]);
+            $slug = (string)$cur->fetchColumn();
+            $dup = $db->prepare("SELECT 1 FROM blog_posts WHERE slug = ? AND id != ?");
+            $dup->execute([$slug, $id]);
+            if (trim($slug, '-') === '' || $dup->fetchColumn()) $slug = aw_refl_slug($db, $title, $id);
+            $stmt = $db->prepare("UPDATE blog_posts SET title = ?, slug = ?, content = ?, excerpt = ?, category = ?, tags = ?, status = ?, featured_image = ?, featured = ?, updated_at = CURRENT_TIMESTAMP, published_at = CASE WHEN ? = 'published' THEN COALESCE(published_at, CURRENT_TIMESTAMP) ELSE published_at END WHERE id = ?");
+            $stmt->execute([$title, $slug, $content, $intro, $category, $tags, $status, $uploaded_featured_image, $featured, $status, $id]);
             $success = 'Reflection updated successfully!';
         } else {
-            $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title)));
-            $stmt = $db->prepare("INSERT INTO blog_posts (title, slug, content, excerpt, category, tags, status, featured_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$title, $slug, $content, $intro, $category, $tags, $status, $uploaded_featured_image]);
+            $slug = aw_refl_slug($db, $title);
+            $stmt = $db->prepare("INSERT INTO blog_posts (title, slug, content, excerpt, category, tags, status, featured_image, featured, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'published' THEN CURRENT_TIMESTAMP END)");
+            $stmt->execute([$title, $slug, $content, $intro, $category, $tags, $status, $uploaded_featured_image, $featured, $status]);
             $id = $db->lastInsertId();
             $success = 'Reflection created successfully!';
 
@@ -127,6 +168,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
             sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
         }
 
+        // RF3: "Save & Send to Newsletter" announces a published reflection to every active subscriber.
+        if ($action === 'save_and_send') {
+            $ps = $db->prepare("SELECT * FROM blog_posts WHERE id = ?");
+            $ps->execute([$id]);
+            $saved_post = $ps->fetch(PDO::FETCH_ASSOC);
+            if ($saved_post && $saved_post['status'] === 'published' && ($qid = aw_nl_announce_post($db, $saved_post, 'Read the reflection'))) {
+                header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . $qid);
+                exit;
+            }
+            $_SESSION['aw_refl_flash'] = ['error', $saved_post && $saved_post['status'] === 'published' ? 'Saved. There are no active subscribers to send it to yet.' : 'Saved as a draft, so it was not sent. Set the status to Published and press "Save & Send" again.'];
+            header('Location: ' . SITE_URL . '/admin/manage_reflections.php');
+            exit;
+        }
         if ($action === 'save_and_continue') {
             header('Location: ' . SITE_URL . '/admin/reflection_editor.php?id=' . $id);
             exit;
@@ -164,6 +218,7 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
 
         <form method="POST" id="editorForm" class="admin-form" enctype="multipart/form-data">
             <input type="hidden" name="action" id="formAction" value="save">
+            <?php echo aw_csrf_field(); // RF3 ?>
 
             <div class="card">
                 <div class="card-body">
@@ -196,6 +251,9 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                                 <option value="published" <?php echo $status === 'published' ? 'selected' : ''; ?>>Published</option>
                                 <option value="archived" <?php echo $status === 'archived' ? 'selected' : ''; ?>>Archived</option>
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-weight:400;"><input type="checkbox" name="featured" value="1" <?php echo $featured ? 'checked' : ''; ?>> ★ Feature at the top of the Reflections page</label>
                         </div>
                     </div>
 
@@ -294,6 +352,9 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                         <button type="submit" class="btn btn-primary">Save Reflection</button>
                         <button type="button" class="btn btn-secondary" onclick="document.getElementById('formAction').value='save_and_continue'; document.getElementById('editorForm').submit();">
                             Save & Continue
+                        </button>
+                        <button type="button" class="btn btn-outline" title="Publishes nothing by itself: set the status to Published first" onclick="if (document.getElementById('status').value !== 'published' && !confirm('The status is not Published, so this will only save. Continue?')) return; if (window.tinymce) tinymce.triggerSave(); document.getElementById('formAction').value='save_and_send'; document.getElementById('editorForm').submit();">
+                            📨 Save &amp; Send to Newsletter
                         </button>
                     </div>
                 </div>
