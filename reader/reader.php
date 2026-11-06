@@ -275,6 +275,10 @@ html,body { height:100%; width:100%; overflow:hidden; }
     .sidebar-separator { width:100%!important; }
     #page-viewport { margin-left:0!important; }
     #backBtn, #sidebarToggle { width:44px!important; height:44px!important; }
+    /* Q2: hover tooltips never show on touch screens, so the selection actions show their names */
+    #highlight-tooltip { flex-wrap:wrap; max-width:92vw; }
+    #highlight-tooltip .tooltip-action { min-height:40px; }
+    #highlight-tooltip .tooltip-action::after { content:attr(title); font-size:0.75rem; }
     .toolbar-left .streak-badge, .toolbar-left .level-badge { display:none!important; }
     .page-content-wrapper { padding:6px!important; margin-bottom:20px!important; }
     .page-content-inner { padding:16px!important; min-height:300px!important; font-size:95%!important; }
@@ -303,7 +307,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 <div id="reader-app">
     <div id="toolbar">
         <div class="toolbar-left">
-            <button id="backBtn"><i class="fas fa-arrow-left"></i></button>
+            <button id="backBtn" aria-label="Back"><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
             <?php echo renderStreakBadge($streak_days); ?>
             <?php echo renderLevelBadge($user_id ?? 0); ?>
@@ -325,31 +329,31 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <span id="remainingInfo"></span>
         </div>
         <div class="toolbar-right">
-            <button id="sidebarToggle"><i class="fas fa-bars"></i></button>
+            <button id="sidebarToggle" aria-label="Reader tools" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i></button>
         </div>
     </div>
 
     <div id="sidebar">
-        <button class="sidebar-btn" id="searchBtn" title="Search"><i class="fas fa-search"></i></button>
-        <button class="sidebar-btn" id="bookmarkBtn" title="Bookmark"><i class="fas fa-bookmark"></i></button>
-        <button class="sidebar-btn" id="tocBtn" title="Table of Contents"><i class="fas fa-list-ul"></i></button>
-        <button class="sidebar-btn" id="notesBtn" title="Group Notes"><i class="fas fa-sticky-note"></i></button>
-        <button class="sidebar-btn" id="settingsBtn" title="Settings"><i class="fas fa-cog"></i></button>
-        <button class="sidebar-btn" id="focusBtn" title="Focus Mode"><i class="fas fa-expand"></i></button>
+        <button class="sidebar-btn" id="searchBtn" title="Search" aria-label="Search"><i class="fas fa-search" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="bookmarkBtn" title="Bookmark" aria-label="Bookmark"><i class="fas fa-bookmark" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="tocBtn" title="Table of Contents" aria-label="Table of Contents"><i class="fas fa-list-ul" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="notesBtn" title="Group Notes" aria-label="Group Notes"><i class="fas fa-sticky-note" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="settingsBtn" title="Settings" aria-label="Settings"><i class="fas fa-cog" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="focusBtn" title="Focus Mode" aria-label="Focus Mode"><i class="fas fa-expand" aria-hidden="true"></i></button>
         <hr class="sidebar-separator">
-        <button class="sidebar-btn" id="commentsBtn" title="Comments"><i class="fas fa-comments"></i></button>
-        <button class="sidebar-btn" id="errorReportBtn" title="Report Error"><i class="fas fa-exclamation-triangle"></i></button>
-        <button class="sidebar-btn" id="prayerBtn" title="Prayer Request"><i class="fas fa-hands-praying"></i></button>
+        <button class="sidebar-btn" id="commentsBtn" title="Comments" aria-label="Comments"><i class="fas fa-comments" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="errorReportBtn" title="Report Error" aria-label="Report Error"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="prayerBtn" title="Prayer Request" aria-label="Prayer Request"><i class="fas fa-hands-praying" aria-hidden="true"></i></button>
         <hr class="sidebar-separator">
-        <button class="sidebar-btn" id="analyticsBtn" title="Analytics"><i class="fas fa-chart-pie"></i></button>
-        <button class="sidebar-btn" id="myNotesBtn" title="My Personal Notes"><i class="fas fa-pen-fancy"></i></button>
-        <button class="sidebar-btn" id="ttsBtn" title="Text to Speech"><i class="fas fa-volume-up"></i></button>
+        <button class="sidebar-btn" id="analyticsBtn" title="Analytics" aria-label="Analytics"><i class="fas fa-chart-pie" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="myNotesBtn" title="My Personal Notes" aria-label="My Personal Notes"><i class="fas fa-pen-fancy" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="ttsBtn" title="Text to Speech" aria-label="Text to Speech"><i class="fas fa-volume-up" aria-hidden="true"></i></button>
         <hr class="sidebar-separator">
-        <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights"><i class="fas fa-file-export"></i></button>
-        <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress"><i class="fas fa-undo-alt"></i></button>
-        <button class="sidebar-btn" id="resumeBtn" title="Resume Position"><i class="fas fa-history"></i></button>
-        <button class="sidebar-btn" id="challengeBtn" title="Challenge"><i class="fas fa-trophy"></i></button>
-        <button class="sidebar-btn" id="shareBtn" title="Share"><i class="fas fa-share-alt"></i></button>
+        <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights" aria-label="Export Highlights"><i class="fas fa-file-export" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress" aria-label="Reset Progress"><i class="fas fa-undo-alt" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="resumeBtn" title="Resume Position" aria-label="Resume Position"><i class="fas fa-history" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="challengeBtn" title="Challenge" aria-label="Challenge"><i class="fas fa-trophy" aria-hidden="true"></i></button>
+        <button class="sidebar-btn" id="shareBtn" title="Share" aria-label="Share"><i class="fas fa-share-alt" aria-hidden="true"></i></button>
     </div>
 
     <div id="page-viewport">
@@ -368,10 +372,10 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <div id="flip-book-wrapper"></div>
             <!-- Flip navigation buttons (restored) -->
             <div class="flip-nav-btn-wrapper" id="flipPrevBtnWrapper">
-                <button class="aw-nav-btn" id="flipPrevBtn"><i class="fas fa-chevron-left"></i></button>
+                <button class="aw-nav-btn" id="flipPrevBtn" aria-label="Previous page"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
             </div>
             <div class="flip-nav-btn-wrapper" id="flipNextBtnWrapper">
-                <button class="aw-nav-btn" id="flipNextBtn"><i class="fas fa-chevron-right"></i></button>
+                <button class="aw-nav-btn" id="flipNextBtn" aria-label="Next page"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
@@ -392,7 +396,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     <div id="toc-drawer">
         <div class="toc-header">
             <h3>Table of Contents</h3>
-            <button class="toc-close" id="tocClose">&times;</button>
+            <button class="toc-close" id="tocClose" aria-label="Close">&times;</button>
         </div>
         <div class="toc-body" id="tocBody">
             <?php if (count($tocEntries) > 0): ?>
@@ -409,7 +413,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 
     <!-- Group Notes Panel -->
     <div id="notes-panel" class="modal-wrapper">
-        <button class="modal-close" id="notesClose">&times;</button>
+        <button class="modal-close" id="notesClose" aria-label="Close">&times;</button>
         <div class="notes-header">
             <h3 style="margin:0;font-size:1.2rem;">📝 Group Notes</h3>
             <button class="note-submit" id="addNoteBtn" style="padding:6px 16px;font-size:0.85rem;">+ Add Note</button>
@@ -430,7 +434,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 
     <!-- Share Modal -->
     <div id="share-modal" class="modal-wrapper">
-        <button class="modal-close" onclick="closeModal('share-modal')">&times;</button>
+        <button class="modal-close" onclick="closeModal(\'share-modal\')" aria-label="Close">&times;</button>
         <h3><i class="fas fa-share-alt" style="color:var(--rose);"></i> Share</h3>
         <div id="shareQuotePreview">“<span id="shareQuoteText"></span>”</div>
         <div style="display:flex;flex-direction:column;margin-top:8px;">
@@ -456,7 +460,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 
     <!-- Comments Modal -->
     <div id="commentsModal" class="modal-wrapper">
-        <button class="modal-close" onclick="closeModal('commentsModal')">&times;</button>
+        <button class="modal-close" onclick="closeModal(\'commentsModal\')" aria-label="Close">&times;</button>
         <h3><i class="fas fa-comments" style="color:var(--rose);"></i> Comments</h3>
         <div id="commentList" style="margin:12px 0;max-height:200px;overflow-y:auto;"></div>
         <textarea id="commentInput" rows="3" placeholder="Write a comment..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);margin-bottom:8px;"></textarea>
@@ -465,7 +469,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 
     <!-- Error Report Modal -->
     <div id="errorModal" class="modal-wrapper">
-        <button class="modal-close" onclick="closeModal('errorModal')">&times;</button>
+        <button class="modal-close" onclick="closeModal(\'errorModal\')" aria-label="Close">&times;</button>
         <h3><i class="fas fa-exclamation-triangle" style="color:var(--rose);"></i> Report Error</h3>
         <div style="margin:12px 0;">
             <label style="font-weight:600;font-size:0.9rem;">Page number:</label>
@@ -480,7 +484,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 
     <!-- Prayer Request Modal -->
     <div id="prayerModal" class="modal-wrapper">
-        <button class="modal-close" onclick="closeModal('prayerModal')">&times;</button>
+        <button class="modal-close" onclick="closeModal(\'prayerModal\')" aria-label="Close">&times;</button>
         <h3><i class="fas fa-hands-praying" style="color:var(--rose);"></i> Prayer Request</h3>
         <div style="margin:12px 0;">
             <label style="font-weight:600;font-size:0.9rem;">Your prayer request:</label>
@@ -493,7 +497,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     <div id="search-bar">
         <div class="search-header">
             <input type="text" id="searchInput" placeholder="Search in book...">
-            <button onclick="closeSearch()">×</button>
+            <button onclick="closeSearch()" aria-label="Close search">×</button>
         </div>
         <div id="searchResults"></div>
     </div>
@@ -1093,12 +1097,12 @@ if (function_exists('renderAchievementToastJS')) {
                     <button class="highlight-color" data-color="purple" style="background:#e8d5f5;border-radius:50%;width:24px;height:24px;border:2px solid var(--border);cursor:pointer;"></button>
                 </div>
                 <div style="display:flex;gap:4px;margin-top:4px; flex-wrap:wrap;">
-                    <button class="tooltip-action" data-action="copy"><i class="fas fa-copy"></i></button>
-                    <button class="tooltip-action" data-action="underline"><i class="fas fa-underline"></i></button>
-                    <button class="tooltip-action" data-action="note"><i class="fas fa-pen"></i></button>
-                    <button class="tooltip-action" data-action="share"><i class="fas fa-share-alt"></i></button>
-                    <button class="tooltip-action" data-action="question"><i class="fas fa-question-circle"></i></button>
-                    <button class="tooltip-action" data-action="react"><i class="fas fa-smile"></i></button>
+                    <button class="tooltip-action" data-action="copy" aria-label="Copy" title="Copy"><i class="fas fa-copy" aria-hidden="true"></i></button>
+                    <button class="tooltip-action" data-action="underline" aria-label="Highlight" title="Highlight"><i class="fas fa-underline" aria-hidden="true"></i></button>
+                    <button class="tooltip-action" data-action="note" aria-label="Add note" title="Add note"><i class="fas fa-pen" aria-hidden="true"></i></button>
+                    <button class="tooltip-action" data-action="share" aria-label="Share" title="Share"><i class="fas fa-share-alt" aria-hidden="true"></i></button>
+                    <button class="tooltip-action" data-action="question" aria-label="Ask a question" title="Ask a question"><i class="fas fa-question-circle" aria-hidden="true"></i></button>
+                    <button class="tooltip-action" data-action="react" aria-label="React" title="React"><i class="fas fa-smile" aria-hidden="true"></i></button>
                 </div>
             </div>
         `;
