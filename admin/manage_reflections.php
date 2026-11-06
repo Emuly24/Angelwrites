@@ -28,7 +28,15 @@ if (!empty($search)) {
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
-$sql .= " ORDER BY created_at DESC";
+// P10: all reflections were listed on one page; 20 per page now.
+require_once __DIR__ . '/../includes/pagination.php';
+[$page, $per_page] = aw_page(20);
+$cst = $db->prepare("SELECT COUNT(*) FROM (" . $sql . ")");
+$cst->execute($params);
+$reflections_total = (int)$cst->fetchColumn();
+[$page, $offset] = aw_clamp($reflections_total, $page, $per_page);
+$sql .= " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?";
+$params[] = $per_page; $params[] = $offset;
 
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
@@ -72,7 +80,7 @@ $pageTitle = 'Manage Reflections';
 
         <div class="card">
             <div class="card-header">
-                <h2>All Reflections (<?php echo count($reflections); ?>)</h2>
+                <h2>All Reflections (<?php echo $reflections_total; ?>)</h2>
                 <div class="card-header-actions">
                     <select id="bulkActionSelect" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);font-size:0.85rem;">
                         <option value="">Bulk Actions</option>
@@ -82,7 +90,7 @@ $pageTitle = 'Manage Reflections';
                 </div>
             </div>
             <div class="card-body">
-                <?php if (count($reflections) > 0): ?>
+                <?php if ($reflections_total > 0): ?>
                     <form method="POST" id="bulkForm">
                         <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
                         <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
@@ -131,6 +139,7 @@ $pageTitle = 'Manage Reflections';
                                 </tbody>
                             </table>
                         </div>
+                <?php echo aw_pager($reflections_total, $page, $per_page); // P10 ?>
                     </form>
                 <?php else: ?>
                     <p class="no-items">No reflections yet. Click "New Reflection" to get started.</p>
