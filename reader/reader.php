@@ -286,6 +286,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
     .flip-page-custom { padding:10px!important; }
 }
 </style>
+<?php if (!empty($processed['reader_css'])): // F90: the per-book CSS saved in admin/process_book.php was never applied ?>
+<style id="book-reader-css"><?php echo str_ireplace('</style', '', (string)$processed['reader_css']); ?></style>
+<?php endif; ?>
 </head>
 <body>
 <div id="reader-app">
