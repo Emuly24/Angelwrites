@@ -365,32 +365,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Segment deleted.';
     }
 
-    // ====== RESEND FAILED ======
+    // ====== F170: RESUME A STUCK SEND / RETRY FAILED RECIPIENTS ======
+    // A send interrupted mid-way (closed tab, timeout) stays 'processing'; "Resume" continues it
+    // through the paged sender. "Retry failed" forgets only the failed attempts, sets the row
+    // back to 'processing' and re-sends to those recipients; addresses already sent are kept.
     if ($action === 'resend_failed') {
         $queue_id = (int)$_POST['queue_id'];
-        $stmt = $db->prepare("SELECT * FROM email_queue WHERE id = ? AND status = 'failed'");
+        $stmt = $db->prepare("SELECT id FROM email_queue WHERE id = ? AND status IN ('failed', 'sent')");
         $stmt->execute([$queue_id]);
-        $q = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$q) {
+        if (!$stmt->fetchColumn()) {
             $error = 'Failed email not found.';
         } else {
-            $recipients = explode(',', $q['recipient_emails']);
-            $sent = 0;
-            $failed = 0;
-            foreach ($recipients as $email) {
-                $email = trim($email);
-                if (sendEmail($email, $q['subject'], $q['content'], 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
-                    $sent++;
-                    $stmt = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, 'sent')");
-                    $stmt->execute([$queue_id, $email]);
-                } else {
-                    $failed++;
-                }
-                usleep(500000);
-            }
-            $stmt = $db->prepare("UPDATE email_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?");
-            $stmt->execute([$failed > 0 ? "Resent: $sent, Failed: $failed" : null, $queue_id]);
-            $success = "Resent: $sent, Failed: $failed.";
+            $db->prepare("DELETE FROM newsletter_stats WHERE email_queue_id = ? AND status = 'failed'")->execute([$queue_id]);
+            $db->prepare("DELETE FROM newsletter_archive WHERE email_queue_id = ?")->execute([$queue_id]);
+            $db->prepare("UPDATE email_queue SET status = 'processing', last_error = NULL WHERE id = ?")->execute([$queue_id]);
+            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . $queue_id);
+            exit;
         }
     }
 }
