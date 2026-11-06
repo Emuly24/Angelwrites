@@ -323,25 +323,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const emailStatus = document.getElementById('emailStatus');
     let emailTimer;
 
-    emailInput.addEventListener('input', function() {
-        clearTimeout(emailTimer);
-        const email = this.value.trim();
-        if (email.length > 0 && email.includes('@')) {
-            emailTimer = setTimeout(() => {
-                fetch('<?php echo SITE_URL; ?>/check_email.php?email=' + encodeURIComponent(email))
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.available) {
-                            emailStatus.textContent = '⚠️ Email not registered';
-                            emailStatus.className = 'field-status info';
-                        } else {
-                            emailStatus.textContent = '✅ Email found';
-                            emailStatus.className = 'field-status success';
-                        }
-                    });
-            }, 500);
-        }
-    });
+    // F237: this used to say "Email found" / "Email not registered" as you typed, which would tell
+    // anyone whether an address has an account. The reset request answers the same way either way.
 });
 </script>
 
