@@ -8,6 +8,37 @@ redirectIfNotAdmin();
 
 $error = '';
 $success = '';
+
+// Q35: the answers to a question could not be seen or moderated from the admin side. The admin can
+// now open a question's answers here and delete single answers (POST with CSRF token).
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$aw_csrf = $_SESSION['csrf_token'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_answer'])) {
+    if (!hash_equals($aw_csrf, (string)($_POST['csrf_token'] ?? ''))) {
+        http_response_code(400);
+        exit('Invalid request.');
+    }
+    $aw_aid = (int)$_POST['delete_answer'];
+    $aw_qid = (int)($_POST['question_id'] ?? 0);
+    $db->prepare("DELETE FROM answers WHERE id = ?")->execute([$aw_aid]);
+    header('Location: ' . SITE_URL . '/admin/manage_questions.php?answers=' . $aw_qid . '&deleted=1');
+    exit;
+}
+$aw_answers_q = null;
+$aw_answers = [];
+if (isset($_GET['answers'])) {
+    $st = $db->prepare("SELECT id, title FROM questions WHERE id = ?");
+    $st->execute([(int)$_GET['answers']]);
+    $aw_answers_q = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($aw_answers_q) {
+        $st = $db->prepare("SELECT a.id, a.body, a.created_at, a.is_accepted, u.name, u.first_name, u.last_name, u.username
+                            FROM answers a LEFT JOIN users u ON u.id = a.user_id WHERE a.question_id = ? ORDER BY a.created_at");
+        $st->execute([$aw_answers_q['id']]);
+        $aw_answers = $st->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $status_filter = isset($_GET['status']) ? trim($_GET['status']) : '';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -148,6 +179,7 @@ $pageTitle = 'Manage Questions';
         <div class="admin-header">
             <h1>Community Q&A Management</h1>
             <div class="admin-actions">
+                <a href="<?php echo SITE_URL; ?>/admin/manage_community.php" class="btn btn-outline">⚖️ Reports</a><!-- Q35 -->
                 <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
                     <i class="fas fa-moon"></i>
                 </button>
@@ -156,6 +188,28 @@ $pageTitle = 'Manage Questions';
                 </a>
             </div>
         </div>
+
+        <?php if ($aw_answers_q): ?>
+            <!-- Q35: answers to one question -->
+            <div class="admin-card" style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">
+                <h2 style="margin-top:0;">Answers to “<?php echo htmlspecialchars($aw_answers_q['title']); ?>” (<?php echo count($aw_answers); ?>)</h2>
+                <p><a href="<?php echo SITE_URL; ?>/admin/manage_questions.php">Close</a> · <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo (int)$aw_answers_q['id']; ?>" target="_blank">Open on the site</a></p>
+                <?php if (!empty($_GET['deleted'])): ?><p>Answer deleted.</p><?php endif; ?>
+                <?php if (!$aw_answers): ?><p>No answers yet.</p><?php endif; ?>
+                <?php foreach ($aw_answers as $ans): ?>
+                    <div style="border-top:1px solid var(--border);padding:8px 0;">
+                        <strong><?php echo htmlspecialchars($ans['username'] !== null ? awDisplayName($ans) : 'Deleted member'); ?></strong>
+                        <small><?php echo date('M j, Y g:i a', strtotime($ans['created_at'])); ?><?php echo !empty($ans['is_accepted']) ? ' · ✅ accepted' : ''; ?></small>
+                        <p style="margin:6px 0;"><?php echo nl2br(htmlspecialchars(mb_substr(strip_tags((string)$ans['body']), 0, 600))); ?></p>
+                        <form method="POST" onsubmit="return confirm('Delete this answer?');">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($aw_csrf); ?>">
+                            <input type="hidden" name="question_id" value="<?php echo (int)$aw_answers_q['id']; ?>">
+                            <button type="submit" name="delete_answer" value="<?php echo (int)$ans['id']; ?>" class="btn btn-sm btn-danger">Delete answer</button>
+                        </form>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
 
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
@@ -236,6 +290,7 @@ $pageTitle = 'Manage Questions';
                                                 <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo $q['id']; ?>" class="btn btn-sm btn-primary" target="_blank">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php?answers=<?php echo (int)$q['id']; ?>" class="btn btn-sm btn-outline" title="See answers">💬 <?php echo (int)$q['answer_count']; ?></a><!-- Q35 -->
                                                 <?php if (!$q['is_answered']): ?>
                                                     <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php?answer=<?php echo $q['id']; ?>" class="btn btn-sm btn-success" onclick="return confirm('Mark this question as answered?');">
                                                         <i class="fas fa-check"></i>

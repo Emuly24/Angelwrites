@@ -212,7 +212,8 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <h3>👥 Community & Users</h3>
             <div class="admin-module-grid">
                 <a href="manage_users.php" class="admin-module-btn"><i class="fas fa-users"></i><span>Manage Users</span></a>
-                <a href="manage_community.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&A</span></a>
+                <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a><!-- Q35: was the reports screen -->
+                <a href="manage_community.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Community Reports</span></a>
                 <a href="manage_groups.php" class="admin-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
                 <a href="manage_sessions.php" class="admin-module-btn"><i class="fas fa-calendar-check"></i><span>Booked Sessions</span></a>
             </div>
