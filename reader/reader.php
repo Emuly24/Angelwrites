@@ -861,9 +861,9 @@ if (function_exists('renderAchievementToastJS')) {
         markToc(page);
         // R12: tell screen-reader users where they are after a page turn (not on start-up).
         const ann = document.getElementById('awPageAnnounce');
-        if (ann && awAnnounceReady) ann.textContent = `Page ${page} of ${totalPages}. ${getChapterTitle(ch)}.`;
+        if (ann && awAnnounceReady && page !== awAnnounced) { awAnnounced = page; ann.textContent = `Page ${page} of ${totalPages}. ${getChapterTitle(ch)}.`; }
     }
-    var awAnnounceReady = false;
+    var awAnnounceReady = false, awAnnounced = 0; // announce a page once, when it changes
     window.addEventListener('load', () => setTimeout(() => { awAnnounceReady = true; }, 1000));
 
     // R11: "Reading together" – the group's next chapter, its due date and a link to discuss it.
