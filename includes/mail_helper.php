@@ -37,6 +37,15 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         if (!empty($aw_extra[6]) && is_file($aw_extra[6])) {
             $mail->addAttachment($aw_extra[6], !empty($aw_extra[7]) ? $aw_extra[7] : basename($aw_extra[6]));
         }
+        // E1: every email uses the AngelWrites layout (logo, fonts, colours, Angella's signature) with a
+        // plain-text part, in UTF-8 (the default was Latin-1, which garbled ’ é …). A 9th argument
+        // ['signature' => false] leaves the signature out; mail to the admin gets a website footer.
+        require_once __DIR__ . '/email_template.php';
+        [$aw_html, $aw_text] = aw_email_brand($subject, $message, $isHTML, array_merge(['to' => $to], (array)($aw_extra[8] ?? [])));
+        $mail->CharSet = 'UTF-8';
+        $mail->isHTML(true);
+        $mail->Body    = $aw_html;
+        $mail->AltBody = $aw_text;
         $mail->send();
         return true;
     } catch (Exception $e) {
