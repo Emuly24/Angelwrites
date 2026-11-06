@@ -44,7 +44,7 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
         <div class="accessibility-content">
             <section class="a11y-section">
                 <h2>Our Commitment</h2>
-                <p>AngelWrites strives to ensure that our website is accessible to people of all abilities. We continuously work to improve the user experience for everyone by following the <strong>Web Content Accessibility Guidelines (WCAG) 2.1 Level AA</strong> standards.</p>
+                <p>AngelWrites strives to ensure that our website is accessible to people of all abilities. We are working towards the <strong>Web Content Accessibility Guidelines (WCAG) 2.1 Level AA</strong>. The site does not fully meet that standard yet; the known gaps are listed below.</p><!-- F224 -->
                 <p>We believe that everyone should have equal access to Christian writing, poetry, reflections, and community resources.</p>
             </section>
 
@@ -59,7 +59,7 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-universal-access"></i></div>
                         <h3>Screen Reader Support</h3>
-                        <p>Proper heading structure, ARIA labels, and descriptive text ensure compatibility with screen readers like JAWS, NVDA, and VoiceOver.</p>
+                        <p>We use headings and labels so pages can be read with screen readers such as JAWS, NVDA and VoiceOver. Some controls are not labelled yet (see Known Limitations).</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-text-height"></i></div>
@@ -74,20 +74,24 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-image"></i></div>
                         <h3>Alternative Text</h3>
-                        <p>All images include descriptive alternative text (alt text) for users who rely on screen readers.</p>
+                        <p>Book covers and most content images have alternative text (alt text). Some decorative and member-uploaded images do not yet.</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-video"></i></div>
                         <h3>Captions & Transcripts</h3>
-                        <p>Videos on AngelWrites include captions and transcripts where available.</p>
+                        <p>Videos do not have captions or transcripts yet. If you need one, contact us and we will provide a transcript.</p>
                     </div>
                 </div>
             </section>
 
             <section class="a11y-section">
                 <h2>Known Limitations</h2>
-                <p>We are actively working to improve the following areas:</p>
+                <p>We know of the following problems and are working on them:</p>
                 <ul>
+                    <li><strong>Colour contrast:</strong> some light pink text and buttons may not have enough contrast. The High Contrast Mode above helps.</li>
+                    <li><strong>Unlabelled controls:</strong> some icon-only buttons (for example reactions and some reader tools) have no text label for screen readers.</li>
+                    <li><strong>Images and video:</strong> not every image has alt text, and videos have no captions or transcripts yet.</li>
+                    <li><strong>Pop-ups and forms:</strong> some pop-up windows (such as the book order form) do not yet move keyboard focus or announce themselves to screen readers.</li>
                     <li><strong>Some older PDF documents</strong> may not be fully screen-reader accessible. We are updating these as we identify them.</li>
                     <li><strong>Third-party integrations</strong> (e.g., Google OAuth, YouTube embeds) may have their own accessibility limitations.</li>
                     <li><strong>Interactive features</strong> in the Bible reader and poem viewer are being tested for full keyboard navigation.</li>
@@ -114,7 +118,7 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
 
             <section class="a11y-section">
                 <h2>Compliance & Standards</h2>
-                <p>AngelWrites is committed to meeting the <a href="https://www.w3.org/TR/WCAG21/" target="_blank">WCAG 2.1 Level AA</a> standards. We conduct regular audits and user testing to ensure ongoing compliance.</p>
+                <p>AngelWrites <strong>partially conforms</strong> to <a href="https://www.w3.org/TR/WCAG21/" target="_blank" rel="noopener">WCAG 2.1 Level AA</a>: some parts of the site do not yet meet the standard (see Known Limitations). This statement is based on our own review of the site; it has not been independently audited.</p><!-- F224 -->
                 <p>This accessibility statement was last updated on <strong>6 November 2026</strong><!-- F222: a fixed date (it used to print today's date on every visit) -->.</p>
             </section>
         </div>
