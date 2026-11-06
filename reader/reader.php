@@ -855,18 +855,20 @@ if (function_exists('renderAchievementToastJS')) {
 
     function loadBookmarkStatus() {
         if (userId === 0) return;
-        const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',false);
-        const fd = new FormData(); fd.append('action','list_bookmarks'); fd.append('book_id',bookId); xhr.send(fd);
-        try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success) {
+        // Q4: this was a synchronous XMLHttpRequest, which froze the whole page (scrolling, taps) until
+        // the server answered. It is now asynchronous; the icon updates when the answer arrives.
+        const fd = new FormData(); fd.append('action','list_bookmarks'); fd.append('book_id',bookId);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
                 let exists = false;
                 data.bookmarks.forEach(b => { if (b.chapter_index == currentPage) exists = true; });
                 isBookmarked = exists;
                 bookmarkBtn.querySelector('i').className = exists ? 'fas fa-bookmark' : 'far fa-bookmark';
                 bookmarkBtn.style.color = exists ? 'var(--rose)' : '#555';
-            }
-        } catch(e) {}
+            })
+            .catch(() => {});
     }
 
     // ----- TOC -----
