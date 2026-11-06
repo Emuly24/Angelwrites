@@ -257,16 +257,25 @@ html,body { height:100%; width:100%; overflow:hidden; }
     :root { --toolbar-height:50px; --sidebar-width:40px; --sidebar-btn-size:32px; --flip-nav-btn-size:32px; }
     #toolbar { height:var(--toolbar-height)!important; min-height:var(--toolbar-height)!important; padding:0 8px!important; }
     .toolbar-left { gap:4px!important; flex-wrap:nowrap!important; }
-    .toolbar-left .title { max-width:none!important; min-width:0!important; flex:0 1 auto!important; font-size:0.75rem!important; }
+    .toolbar-left { flex:1 1 0%!important; min-width:0!important; }
+    .toolbar-left .title { max-width:none!important; min-width:0!important; flex:1 1 0%!important; font-size:0.8rem!important; } /* Q1: shrinks first */
+    .toolbar-center { flex-shrink:0!important; white-space:nowrap!important; }
     #backBtn { flex-shrink:0!important; font-size:1rem!important; width:32px!important; height:32px!important; padding:0!important; }
     #readingStatus { font-size:0.65rem!important; padding:2px 10px 2px 6px!important; max-width:60px!important; background-size:10px!important; background-position:right 4px center!important; }
     .toolbar-center { font-size:0.7rem!important; gap:6px!important; }
     #chapterInfo, #remainingInfo { display:none!important; }
     .progress-ring { width:28px!important; height:28px!important; }
     #pageNum, #totalPages { font-size:0.7rem!important; }
-    #sidebar { width:var(--sidebar-width)!important; padding:4px 0!important; }
-    .sidebar-btn { width:var(--sidebar-btn-size)!important; height:var(--sidebar-btn-size)!important; font-size:0.8rem!important; }
-    #page-viewport { margin-left:var(--sidebar-width)!important; }
+    /* Q1: on phones the 20-tool sidebar no longer sits permanently beside the text. It starts hidden;
+       the menu button slides it in over the page with each tool's name, and choosing a tool closes it. */
+    #sidebar { width:220px!important; padding:8px!important; align-items:stretch!important; transform:translateX(-100%); box-shadow:4px 0 20px rgba(0,0,0,0.15); z-index:40!important; }
+    #sidebar.open { transform:translateX(0)!important; }
+    .sidebar-btn { width:100%!important; height:44px!important; font-size:0.95rem!important; justify-content:flex-start!important; gap:12px; padding:0 12px!important; }
+    .sidebar-btn::after { content:attr(title); font-size:0.9rem; color:var(--text); }
+    .sidebar-separator { width:100%!important; }
+    #page-viewport { margin-left:0!important; }
+    #backBtn, #sidebarToggle { width:44px!important; height:44px!important; }
+    .toolbar-left .streak-badge, .toolbar-left .level-badge { display:none!important; }
     .page-content-wrapper { padding:6px!important; margin-bottom:20px!important; }
     .page-content-inner { padding:16px!important; min-height:300px!important; font-size:95%!important; }
     #flip-container { padding:0 5px!important; }
@@ -281,7 +290,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     #toc-drawer.open { right:0!important; }
 }
 @media (max-width:480px) {
-    .toolbar-left .title { font-size:0.7rem!important; max-width:50px!important; flex:0 1 auto!important; }
+    .toolbar-left .title { font-size:0.75rem!important; max-width:none!important; flex:1 1 0%!important; } /* Q1: was clipped to 50 px */
     .page-content-inner { padding:12px!important; }
     .flip-page-custom { padding:10px!important; }
 }
@@ -965,7 +974,15 @@ if (function_exists('renderAchievementToastJS')) {
     });
 
     // ----- Sidebar toggles -----
-    sidebarToggle.addEventListener('click',function() { sidebar.classList.toggle('closed'); });
+    // Q1: on phones the sidebar is an overlay opened with the menu button and closed after a choice.
+    const awPhone = window.matchMedia('(max-width: 768px)');
+    sidebarToggle.addEventListener('click',function() {
+        if (awPhone.matches) sidebar.classList.toggle('open'); else sidebar.classList.toggle('closed');
+        sidebarToggle.setAttribute('aria-expanded', String(awPhone.matches ? sidebar.classList.contains('open') : !sidebar.classList.contains('closed')));
+    });
+    sidebar.addEventListener('click', function (e) {
+        if (awPhone.matches && e.target.closest('.sidebar-btn')) sidebar.classList.remove('open');
+    });
     settingsBtn.addEventListener('click',function() { settingsPanel.classList.toggle('open'); overlay.classList.toggle('active',settingsPanel.classList.contains('open')); });
     tocBtn.addEventListener('click', function() { tocDrawer.classList.toggle('open'); overlay.classList.toggle('active', tocDrawer.classList.contains('open')); });
     tocClose.addEventListener('click', function() { tocDrawer.classList.remove('open'); overlay.classList.remove('active'); });
