@@ -127,6 +127,8 @@ if ($tab === 'poems') {
         $sql .= " AND r.is_private = ?";
         $params[] = $filter_private;
     }
+    $count_base_sql = $sql;      // F215: same filters, before ORDER/LIMIT
+    $count_base_params = $params;
     $sql .= " ORDER BY r.created_at DESC LIMIT ? OFFSET ?";
     $params[] = $poem_limit;
     $params[] = $poem_offset;
@@ -136,10 +138,11 @@ if ($tab === 'poems') {
     $poem_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Count total for pagination
-    $count_sql = str_replace("ORDER BY r.created_at DESC LIMIT ? OFFSET ?", "", $sql);
-    $count_sql = preg_replace('/^SELECT r\..*?FROM/', 'SELECT COUNT(*) FROM', $count_sql);
-    $stmt = $db->prepare($count_sql);
-    $stmt->execute(array_slice($params, 0, -2));
+    // F215: the count was derived with str_replace/preg_replace on the SELECT text; the
+    // pattern '^SELECT' never matched (the SQL starts with a newline), so the "count" was the
+    // first row's id. Count the same filtered query instead.
+    $stmt = $db->prepare("SELECT COUNT(*) FROM (" . $count_base_sql . ")");
+    $stmt->execute($count_base_params);
     $poem_total = $stmt->fetchColumn();
 
 }
@@ -174,6 +177,8 @@ if ($tab === 'books') {
         $sql .= " AND bc.resolved = ?";
         $params[] = $filter_resolved;
     }
+    $count_base_sql = $sql;      // F215: same filters, before ORDER/LIMIT
+    $count_base_params = $params;
     $sql .= " ORDER BY bc.created_at DESC LIMIT ? OFFSET ?";
     $params[] = $book_limit;
     $params[] = $book_offset;
@@ -183,10 +188,11 @@ if ($tab === 'books') {
     $book_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Count total for pagination
-    $count_sql = str_replace("ORDER BY bc.created_at DESC LIMIT ? OFFSET ?", "", $sql);
-    $count_sql = preg_replace('/^SELECT bc\..*?FROM/', 'SELECT COUNT(*) FROM', $count_sql);
-    $stmt = $db->prepare($count_sql);
-    $stmt->execute(array_slice($params, 0, -2));
+    // F215: the count was derived with str_replace/preg_replace on the SELECT text; the
+    // pattern '^SELECT' never matched (the SQL starts with a newline), so the "count" was the
+    // first row's id. Count the same filtered query instead.
+    $stmt = $db->prepare("SELECT COUNT(*) FROM (" . $count_base_sql . ")");
+    $stmt->execute($count_base_params);
     $book_total = $stmt->fetchColumn();
 
 }
