@@ -56,13 +56,22 @@ if (isLoggedIn()) {
 
 // ===== HANDLE AJAX LIKES =====
 if (isset($_POST['action']) && $_POST['action'] === 'react' && isLoggedIn()) {
-    $type = $_POST['type']; // 'like' or 'dislike'
-    // Just a simplified endpoint for demo. Actual Logic should handle upserts.
-    $stmt = $db->prepare("DELETE FROM video_reactions WHERE video_id = ? AND user_id = ?");
+    $type = (string)($_POST['type'] ?? '');
+    // F61: the INSERT used MySQL's ON DUPLICATE KEY UPDATE, a syntax error on SQLite, so every
+    // reaction fatalled. One reaction per member and video (UNIQUE in the table): replace it, or
+    // remove it when the same button is pressed again. The table only accepts like/love/pray.
+    if (!in_array($type, ['like', 'love', 'pray'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Unknown reaction.']);
+        exit;
+    }
+    $stmt = $db->prepare("SELECT reaction_type FROM video_reactions WHERE video_id = ? AND user_id = ?");
     $stmt->execute([$id, $_SESSION['user_id']]);
-    
-    $stmt = $db->prepare("INSERT INTO video_reactions (video_id, user_id, reaction_type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE reaction_type = VALUES(reaction_type)");
-    $stmt->execute([$id, $_SESSION['user_id'], $type]);
+    $prev = $stmt->fetchColumn();
+    $stmt->closeCursor();
+    $db->prepare("DELETE FROM video_reactions WHERE video_id = ? AND user_id = ?")->execute([$id, $_SESSION['user_id']]);
+    if ($prev !== $type) {
+        $db->prepare("INSERT INTO video_reactions (video_id, user_id, reaction_type) VALUES (?, ?, ?)")->execute([$id, $_SESSION['user_id'], $type]);
+    }
     
     $stmt = $db->prepare("SELECT COUNT(CASE WHEN reaction_type='like' THEN 1 END) as likes, COUNT(CASE WHEN reaction_type='dislike' THEN 1 END) as dislikes FROM video_reactions WHERE video_id = ?");
     $stmt->execute([$id]);
