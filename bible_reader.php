@@ -186,11 +186,10 @@ $pageTitle = 'Bible Reader';
 
             <!-- ===== REACTION PICKER ===== -->
             <div id="bibleReactionPicker" style="display:none; position:fixed; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:6px 10px; box-shadow:var(--shadow-hover); z-index:50;">
-                <button class="reaction-option" data-reaction="👍">👍</button>
-                <button class="reaction-option" data-reaction="❤️">❤️</button>
-                <button class="reaction-option" data-reaction="🙏">🙏</button>
-                <button class="reaction-option" data-reaction="🤔">🤔</button>
-                <button class="reaction-option" data-reaction="📖">📖</button>
+                <!-- Q36: the same three reactions as the rest of the site (like / love / pray) -->
+                <button class="reaction-option" data-reaction="👍" aria-label="Like">👍</button>
+                <button class="reaction-option" data-reaction="❤️" aria-label="Love">❤️</button>
+                <button class="reaction-option" data-reaction="🙏" aria-label="Pray">🙏</button>
             </div>
 
             <!-- ===== CHALLENGE WIDGET ===== -->

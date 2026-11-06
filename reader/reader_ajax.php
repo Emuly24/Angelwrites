@@ -536,7 +536,13 @@ if ($action === 'delete_reader_note') {
 
 if ($action === 'add_reader_reaction') {
     $note_id = (int)$_POST['note_id'];
-    $reaction_type = $_POST['reaction_type'];
+    // Q36: same three reactions as toggle_note_reaction below.
+    $reaction_type = (string)($_POST['reaction_type'] ?? '');
+    $reaction_type = ['like' => '👍', 'love' => '❤️', 'pray' => '🙏'][$reaction_type] ?? $reaction_type;
+    if (!in_array($reaction_type, ['👍', '❤️', '🙏'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid reaction.']);
+        exit;
+    }
 
     // Verify group membership via the note's group
     $stmt = $db->prepare("SELECT group_id FROM group_notes WHERE id = ?");
@@ -565,7 +571,13 @@ if ($action === 'add_reader_reaction') {
 
 if ($action === 'toggle_note_reaction') {
     $note_id = (int)$_POST['note_id'];
-    $reaction_type = $_POST['reaction_type'];
+    // Q36: only the site's three reactions (like / love / pray), as emoji; names are accepted too.
+    $reaction_type = (string)($_POST['reaction_type'] ?? '');
+    $reaction_type = ['like' => '👍', 'love' => '❤️', 'pray' => '🙏'][$reaction_type] ?? $reaction_type;
+    if (!in_array($reaction_type, ['👍', '❤️', '🙏'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid reaction.']);
+        exit;
+    }
 
     // Verify group membership via the note's group
     $stmt = $db->prepare("SELECT group_id FROM group_notes WHERE id = ?");
