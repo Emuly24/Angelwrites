@@ -35,7 +35,10 @@ function isAdmin() {
  */
 function redirectIfNotLoggedIn() {
     if (!isLoggedIn()) {
-        header('Location: ' . SITE_URL . '/login.php');
+        // F103: pass the page the visitor asked for, so login.php returns them there (only for
+        // GET; a POST cannot be replayed after login).
+        $back = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' ? ($_SERVER['REQUEST_URI'] ?? '') : '';
+        header('Location: ' . SITE_URL . '/login.php' . ($back !== '' ? '?redirect=' . urlencode($back) : ''));
         exit;
     }
 }
