@@ -59,9 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
-            // ===== BYPASS VERIFICATION FOR ADMIN & TEST USER =====
-            $is_exempt = ($user['username'] === 'admin' || $user['username'] === 'Test User');
-            if (!$is_exempt && $user['is_verified'] == 0) {
+            // S6 (F109): no username is exempt from email verification. (Usernames "admin" and
+            // "Test User" used to skip it.) The live admin account must have is_verified = 1
+            // before this deploys; see the fix/security PR.
+            if ($user['is_verified'] == 0) {
                 $error = 'Please verify your email address before logging in. <a href="resend_verification.php">Resend verification email</a>';
             }
 
