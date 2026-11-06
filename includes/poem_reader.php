@@ -260,9 +260,15 @@ function aw_poem_reader(array $poem, $db = null, array $opts = []) {
     if ($img !== '') $imgUrl = function_exists('get_image_url') ? get_image_url($img) : rtrim(SITE_URL, '/') . '/' . ltrim($img, '/');
     $hasAudio = aw_poem_audio_url($poem) !== '';
     $h = '<div class="aw-reader" data-title="' . htmlspecialchars($title) . '">';
-    $h .= '<header class="aw-hero' . ($imgUrl ? ' has-img' : '') . '">';
-    // A missing image falls back to the plain gradient hero instead of a broken image.
-    if ($imgUrl) $h .= '<img class="aw-hero-img" src="' . htmlspecialchars($imgUrl) . '" alt="" fetchpriority="high" onerror="this.parentNode.classList.remove(\'has-img\');this.remove()">';
+    // V6: the cover is shown as a framed picture beside the title (above it on phones), over a soft
+    // blurred wash of the same image. If the image cannot load, the hero falls back to the gradient.
+    $h .= '<header class="aw-hero' . ($imgUrl ? ' has-cover' : '') . '">';
+    if ($imgUrl) {
+        $u = htmlspecialchars($imgUrl);
+        $h .= '<div class="aw-hero-wash" style="background-image:url(\'' . $u . '\')" aria-hidden="true"></div>';
+        $h .= '<figure class="aw-cover"><img src="' . $u . '" alt="Cover image for ' . htmlspecialchars($title) . '" fetchpriority="high"'
+            . ' onerror="var h=this.closest(\'.aw-hero\');h.classList.remove(\'has-cover\');h.querySelector(\'.aw-hero-wash\').remove();this.parentNode.remove()"></figure>';
+    }
     $h .= '<div class="aw-hero-text"><div class="aw-hero-kicker">A poem by Angella Bottoman</div>';
     $h .= '<h1>' . htmlspecialchars($title) . '</h1><div class="aw-meta">';
     if (!empty($poem['created_at'])) $h .= '<span><i class="far fa-calendar" aria-hidden="true"></i>' . date('F j, Y', strtotime($poem['created_at'])) . '</span>';
