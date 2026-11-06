@@ -160,7 +160,7 @@ $pageTitle = htmlspecialchars($group['name']);
                                     <?php
                                     $reactions = getReactions('discussion', $disc['id']);
                                     foreach ($reactions as $reaction): ?>
-                                        <span class="reaction"><?php echo $reaction['reaction_type']; ?> <?php echo $reaction['count']; ?></span>
+                                        <span class="reaction"><?php echo htmlspecialchars((string)$reaction['reaction_type']); ?> <?php echo (int)$reaction['count']; ?></span><!-- F238 -->
                                     <?php endforeach; ?>
                                 </span>
                                 <span><?php echo $disc['reply_count']; ?> replies</span>
@@ -221,7 +221,7 @@ $pageTitle = htmlspecialchars($group['name']);
                                     <?php
                                     $reactions = getReactions('note', $note['id']);
                                     foreach ($reactions as $reaction): ?>
-                                        <span class="reaction"><?php echo $reaction['reaction_type']; ?> <?php echo $reaction['count']; ?></span>
+                                        <span class="reaction"><?php echo htmlspecialchars((string)$reaction['reaction_type']); ?> <?php echo (int)$reaction['count']; ?></span><!-- F238 -->
                                     <?php endforeach; ?>
                                 </span>
                                 <?php if ($note['user_id'] == $user_id || $is_admin): ?>
