@@ -51,7 +51,7 @@ if (isLoggedIn()) {
     // Reading status
     $stmt = $db->prepare("SELECT status FROM reading_status WHERE user_id = ? AND book_id = ?");
     $stmt->execute([$user_id, $book_id]);
-    $reading_status = $stmt->fetchColumn() ?: 'not_started';
+    $reading_status = str_replace(' ', '_', (string)($stmt->fetchColumn() ?: 'not_started')); // F112: stored as 'currently reading'
 
     // Reading speed
     $stmt = $db->prepare("SELECT reading_speed_wpm FROM user_settings WHERE user_id = ?");

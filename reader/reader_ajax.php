@@ -612,6 +612,15 @@ if ($action === 'set_reading_status' || $action === 'update_reading_status') {
         echo json_encode(['success' => false, 'error' => 'Invalid status.']);
         exit;
     }
+    // F112: library.php, dashboard.php and ajax_user.php store and count 'currently reading' /
+    // 'want to read'; the reader wrote 'currently_reading' / 'want_to_read', so books set in the
+    // reader never appeared in the library. Store the library's words; "not started" = no row.
+    if ($status === 'not_started') {
+        $db->prepare("DELETE FROM reading_status WHERE user_id = ? AND book_id = ?")->execute([$user_id, $book_id]);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    $status = str_replace('_', ' ', $status);
 
     $stmt = $db->prepare("SELECT id FROM reading_status WHERE user_id = ? AND book_id = ?");
     $stmt->execute([$user_id, $book_id]);
@@ -631,7 +640,7 @@ if ($action === 'get_reading_status') {
     $stmt = $db->prepare("SELECT status FROM reading_status WHERE user_id = ? AND book_id = ?");
     $stmt->execute([$user_id, $book_id]);
     $status = $stmt->fetchColumn();
-    echo json_encode(['success' => true, 'status' => $status ?: 'not_started']);
+    echo json_encode(['success' => true, 'status' => $status ? str_replace(' ', '_', $status) : 'not_started']); // F112
     exit;
 }
 
