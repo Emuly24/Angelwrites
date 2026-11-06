@@ -94,7 +94,7 @@ $pageTitle = 'Books';
         <?php if (count($books) > 0): ?>
             <div class="books-grid">
                 <?php foreach ($books as $book): ?>
-                    <div class="book-card">
+                    <div class="book-card" id="book-<?php echo (int)$book['id']; ?>">
                         <!-- Cover Wrapper -->
                         <div class="book-cover-wrapper">
                             <?php if ($book['cover_path']): ?>
