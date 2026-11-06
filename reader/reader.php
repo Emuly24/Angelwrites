@@ -240,6 +240,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .toc-list a.toc-done .toc-mark::before { content:'✓'; }
 .toc-list a.toc-current { background:rgba(219,161,162,0.15); font-weight:600; }
 .toc-list a.toc-current .toc-mark::before { content:'▸'; }
+.toc-group { border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin:0 0 12px; font-size:0.9rem; background:rgba(219,161,162,0.06); }
+.toc-group a { color:var(--rose); }
+.toc-due { font-size:0.75rem; color:var(--rose); white-space:nowrap; }
 .toc-summary { font-size:0.85rem; color:var(--text-light); margin:0 0 10px; }
 .toc-empty { text-align:center; color:var(--text-light); padding:40px 0; }
 #challenge-widget { display:none; margin:8px 16px; padding:12px 16px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); z-index:100001!important; }
@@ -443,6 +446,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <div class="toc-body" id="tocBody">
             <?php if (count($tocEntries) > 0): ?>
             <p class="toc-summary" id="tocSummary"></p>
+            <div class="toc-group" id="tocGroup" hidden></div>
             <ul class="toc-list">
                 <?php foreach ($tocEntries as $entry): ?>
                 <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><span class="toc-mark" aria-hidden="true"></span><span class="toc-title"><?php echo htmlspecialchars($entry['title']); ?></span><span class="toc-page">p. <?php echo (int)($entry['page'] ?? 1); ?></span></a></li>
@@ -589,6 +593,24 @@ if (function_exists('renderAchievementToastJS')) {
         }
     }
     const groupId = <?php echo $group_id ? (int)$group_id : 0; ?>;
+    // R11: the member's reading group schedule for this book (chapter + due date), shown in the contents.
+    const groupPlan = <?php
+        $aw_plan = null;
+        if ($group_id) {
+            try {
+                $gs = $db->prepare("SELECT name FROM reading_groups WHERE id = ?");
+                $gs->execute([$group_id]);
+                $aw_plan = ['group' => (string)$gs->fetchColumn(), 'url' => SITE_URL . '/group.php?id=' . (int)$group_id, 'items' => []];
+                $gs = $db->prepare("SELECT chapter_index, due_date FROM group_schedules WHERE group_id = ? ORDER BY due_date, chapter_index");
+                $gs->execute([$group_id]);
+                foreach ($gs->fetchAll(PDO::FETCH_ASSOC) as $it) {
+                    $ch = (int)$it['chapter_index'] + 1; // stored from 0, shown from 1 (as in group.php)
+                    $aw_plan['items'][] = ['chapter' => $ch, 'title' => $chapterTitles[$ch] ?? ('Chapter ' . $ch), 'page' => $chapterMap[$ch][0] ?? null, 'due' => $it['due_date']];
+                }
+            } catch (PDOException $e) { $aw_plan = null; }
+        }
+        echo json_encode($aw_plan, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
     // R9: settings saved with the account are applied before the reader reads its settings, so they
@@ -834,6 +856,33 @@ if (function_exists('renderAchievementToastJS')) {
         remainingInfoEl.textContent = `⏳ ${getRemainingPagesInChapter(page)} pages remaining • ${estimateTimeRemaining(page)} min left`;
         markToc(page);
     }
+
+    // R11: "Reading together" – the group's next chapter, its due date and a link to discuss it.
+    function awFmtDate(d) { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? d : x.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+    function renderGroupPlan() {
+        const box = document.getElementById('tocGroup');
+        if (!box || !groupPlan) return;
+        const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const today = new Date().toISOString().slice(0, 10);
+        const next = groupPlan.items.find(i => i.due >= today);
+        let html = '<strong>👥 ' + esc(groupPlan.group) + '</strong><br>';
+        if (next) {
+            html += 'Read ' + (next.page ? '<a href="#" data-goto="' + next.page + '">' + esc(next.title) + '</a>' : esc(next.title)) + ' by <strong>' + esc(awFmtDate(next.due)) + '</strong>';
+        } else if (groupPlan.items.length) {
+            html += 'All scheduled chapters are past their dates.';
+        } else {
+            html += 'Your group has no reading schedule yet.';
+        }
+        html += '<br><a href="' + esc(groupPlan.url) + '#tab-discussions">💬 Discuss this chapter with your group</a> · <a href="' + esc(groupPlan.url) + '#tab-schedule">📅 Schedule</a>';
+        box.innerHTML = html; box.hidden = false;
+        box.querySelectorAll('[data-goto]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); goToPage(parseInt(a.dataset.goto)); tocDrawer.classList.remove('open'); overlay.classList.remove('active'); }));
+        groupPlan.items.forEach(i => {
+            if (!i.page) return;
+            const link = Array.from(document.querySelectorAll('.toc-link[data-chapter="' + i.page + '"]')).pop();
+            if (link && !link.querySelector('.toc-due')) { const d = document.createElement('span'); d.className = 'toc-due'; d.textContent = 'due ' + awFmtDate(i.due); link.insertBefore(d, link.querySelector('.toc-page')); }
+        });
+    }
+    document.addEventListener('DOMContentLoaded', renderGroupPlan);
 
     // R7: mark the current chapter and the chapters already read in the contents.
     var furthestPage = 0; // var: markToc can run before this line during start-up
