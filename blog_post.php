@@ -804,6 +804,11 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     .cta-form input { min-width: unset; }
     .cta-form .btn { width: 100%; }
 }
+
+/* Q34: tap targets at least 44 px on phones */
+@media (max-width:768px) {
+    .back-link, .reaction-btn, .camera-controls .btn, #themeToggle, .blog-post-page .btn-sm { min-height:44px; min-width:44px; display:inline-flex; align-items:center; justify-content:center; }
+}
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

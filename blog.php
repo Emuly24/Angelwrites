@@ -106,7 +106,9 @@ function readingTime($content) {
     return $minutes < 1 ? '1 min read' : $minutes . ' min read';
 }
 
-$pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog' : 'Blog — Christian Reflections';
+// Q34: the blog was titled "Christian Reflections", which is also the name of the separate
+// Reflections page and of the category that marks a post as a reflection. It is now "Blog".
+$pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog' : 'Blog'; // escaped: the header prints $pageTitle into <title> as is
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -117,8 +119,8 @@ $pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog'
     <div class="container">
         <!-- Page Header -->
         <div class="blog-header">
-            <h1>Christian Reflections</h1>
-            <p>Faith, hope, and encouragement for everyday life — written by Angella.</p>
+            <h1><?php echo $category_filter ? htmlspecialchars($category_filter) : 'Blog'; ?></h1>
+            <p>Faith, hope, and encouragement for everyday life — written by Angella.<?php if ($category_filter === 'Christian Reflections'): ?> Reflections also have <a href="<?php echo SITE_URL; ?>/reflections.php">their own page</a>.<?php endif; ?></p>
         </div>
 
         <!-- Search Bar -->
@@ -623,6 +625,14 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 
 @media (max-width: 480px) {
     .post-meta { flex-direction: column; align-items: flex-start; gap: 4px; }
+}
+
+/* Q34: tap targets at least 44 px on phones */
+@media (max-width:768px) {
+    .category-link, .blog-page .btn-sm, .blog-page .page-link, #sortSelect, .reaction-btn, .read-more { min-height:44px; display:inline-flex; align-items:center; justify-content:center; }
+    .reaction-btn, #viewToggle, #themeToggle { min-width:44px; }
+    .recent-posts-list a, .categories-list a { display:inline-flex; align-items:center; min-height:44px; min-width:44px; }
+    .post-card-content h2 a, .post-card-content h3 a { display:block; min-height:44px; }
 }
 </style>
 
