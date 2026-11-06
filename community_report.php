@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+header('Content-Type: application/json; charset=utf-8'); // F152
 
 if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'error' => 'Please login to report.']);
@@ -9,9 +10,11 @@ if (!isLoggedIn()) {
 }
 
 $user_id = $_SESSION['user_id'];
-$target_type = $_POST['target_type'];
-$target_id = (int)$_POST['target_id'];
-$reason = $_POST['reason'];
+// F152: unguarded reads printed "Undefined array key" warnings before the JSON when a field was
+// missing, which broke the report modal's response parsing.
+$target_type = (string)($_POST['target_type'] ?? '');
+$target_id = (int)($_POST['target_id'] ?? 0);
+$reason = (string)($_POST['reason'] ?? '');
 $details = trim($_POST['details'] ?? '');
 
 if (!in_array($target_type, ['question', 'answer'])) {
