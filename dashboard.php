@@ -65,7 +65,7 @@ try { $stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?
 try { $stmt = $db->prepare("SELECT COUNT(*) FROM questions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['questions_asked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['sessions_booked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
 // Streak & Rep
-try { $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['current_streak'] = $stmt->fetchColumn() ?? 0; } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['current_streak'] = (int)$stmt->fetchColumn(); /* F118: false (no row) printed as blank */ } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT points, level FROM user_reputations WHERE user_id = ?"); $stmt->execute([$user_id]); $rep = $stmt->fetch(PDO::FETCH_ASSOC); $stats['points'] = $rep['points'] ?? 0; $stats['level'] = $rep['level'] ?? 1; } catch (Exception $e) {}
 
 // My total view counts
