@@ -554,6 +554,7 @@ $pageTitle = 'Manage Poems';
 
 <!-- ===== TINYMCE & JAVASCRIPT ===== -->
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-media.js?v=1"></script><!-- M5: noise reduction + editor for camera recordings -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let editorInitialized = false;
@@ -785,7 +786,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 audio: currentMode === 'video' 
             };
             
-            cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+            cameraStream = await AWMedia.getStream(constraints); // M5: noise reduction while recording
             cameraPreview.srcObject = cameraStream;
             cameraStatus.textContent = currentMode === 'photo' ? 'Ready' : 'Ready to record';
         } catch (error) { cameraStatus.textContent = '❌ Camera access denied: ' + error.message; }
@@ -817,12 +818,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!cameraStream) return;
         recordedChunks = []; mediaRecorder = new MediaRecorder(cameraStream);
         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-        mediaRecorder.onstop = function() {
+        mediaRecorder.onstop = async function() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             if (blob.size > 0) {
-                recordedBlob = blob; retakeBtn.disabled = false; confirmBtn.disabled = false;
+                if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+                cameraPreview.srcObject = null;
+                if (cameraModal.style.display === 'none') return; // the camera was closed while recording
+                // M5: trim, cut, crop, filters and sound before the video is used. The live camera filter
+                // only changed the preview; it is passed on so it is part of the saved video.
+                cameraStatus.textContent = '✂️ Editing…';
+                recordedBlob = await AWMedia.review(blob, { kind: 'video' });
+                retakeBtn.disabled = false;
+                confirmBtn.disabled = false;
                 cameraStatus.textContent = '✅ Recording complete';
-                cameraStream.getTracks().forEach(track => track.stop()); cameraPreview.srcObject = null;
             }
         };
         mediaRecorder.start();
