@@ -220,7 +220,8 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
 
                     switch ($item['type']) {
                         case 'book':
-                            $link = SITE_URL . '/reader/reader.php?id=' . $item['id'];
+                            // F57: open the book's page (details, price, purchase), not the reader directly.
+                            $link = SITE_URL . '/book.php?id=' . $item['id'];
                             break;
                         case 'poem':
                             $link = SITE_URL . '/poem_view.php?id=' . $item['id'];
