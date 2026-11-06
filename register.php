@@ -221,9 +221,7 @@ $pageTitle = 'Sign Up';
                             <label for="password">Password</label>
                             <div class="password-wrapper">
                                 <input type="password" id="password" name="password" placeholder="Must be at least 8 characters" required>
-                                <span class="password-toggle" id="togglePassword">
-                                    <i class="fas fa-eye"></i>
-                                </span>
+                                <button type="button" class="password-toggle" id="togglePassword" aria-label="Show password" aria-pressed="false"><i class="fas fa-eye" aria-hidden="true"></i><span class="pw-toggle-text">Show</span></button><!-- Q27 -->
                             </div>
                             <div class="password-strength-meter">
                                 <div class="strength-bar" id="strengthBar"></div>
@@ -383,9 +381,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (password.match(/[0-9]/)) strength++;
         if (password.match(/[^a-zA-Z0-9]/)) strength++;
 
-        const levels = ['None', 'Weak', 'Fair', 'Good', 'Strong'];
-        const colors = ['#ddd', '#e74c3c', '#f39c12', '#3498db', '#2ecc71'];
-        const widths = ['0%', '20%', '40%', '60%', '100%'];
+        // Q27: the score runs 0-5 but there were only five labels, so a strong password showed
+        // "Strength: undefined" and no bar. Six levels now.
+        const levels = ['None', 'Very weak', 'Weak', 'Fair', 'Good', 'Strong'];
+        const colors = ['#ddd', '#e74c3c', '#e67e22', '#f39c12', '#3498db', '#2ecc71'];
+        const widths = ['0%', '20%', '40%', '60%', '80%', '100%'];
 
         strengthBar.style.width = widths[strength];
         strengthBar.style.background = colors[strength];
@@ -423,6 +423,10 @@ document.addEventListener('DOMContentLoaded', function() {
         passwordInput.setAttribute('type', type);
         this.querySelector('i').classList.toggle('fa-eye');
         this.querySelector('i').classList.toggle('fa-eye-slash');
+        // Q27: a labelled button with visible text (the icon alone was invisible without the icon font)
+        this.setAttribute('aria-pressed', String(type === 'text'));
+        this.setAttribute('aria-label', type === 'text' ? 'Hide password' : 'Show password');
+        const awT = this.querySelector('.pw-toggle-text'); if (awT) awT.textContent = type === 'text' ? 'Hide' : 'Show';
     });
 
     // ===== COUNTRY CODE DETECTION =====

@@ -199,9 +199,7 @@ $pageTitle = 'Sign In';
                         <label for="password">Password</label>
                         <div class="input-group-wrapper">
                             <input type="password" id="password" name="password" placeholder="Enter your password" required>
-                            <span class="password-toggle" id="togglePassword">
-                                <i class="fas fa-eye"></i>
-                            </span>
+                            <button type="button" class="password-toggle" id="togglePassword" aria-label="Show password" aria-pressed="false"><i class="fas fa-eye" aria-hidden="true"></i><span class="pw-toggle-text">Show</span></button><!-- Q27 -->
                         </div>
                     </div>
 
@@ -250,6 +248,10 @@ document.addEventListener('DOMContentLoaded', function() {
         passwordInput.setAttribute('type', type);
         this.querySelector('i').classList.toggle('fa-eye');
         this.querySelector('i').classList.toggle('fa-eye-slash');
+        // Q27: a labelled button with visible text (the icon alone was invisible without the icon font)
+        this.setAttribute('aria-pressed', String(type === 'text'));
+        this.setAttribute('aria-label', type === 'text' ? 'Hide password' : 'Show password');
+        const awT = this.querySelector('.pw-toggle-text'); if (awT) awT.textContent = type === 'text' ? 'Hide' : 'Show';
     });
 
     // ===== AJAX LOGIN FIELD VALIDATION (EXISTENCE CHECK) =====
