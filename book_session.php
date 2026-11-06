@@ -171,6 +171,9 @@ $pageTitle = 'Book a Session';
                             <span class="session-time"><?php echo date('g:i a', strtotime($s['time'])); ?></span>
                             <span class="session-type"><?php echo htmlspecialchars($session_types[$s['session_type']] ?? 'General'); ?></span>
                             <span class="session-status <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span>
+                            <?php if ($s['status'] === 'confirmed' && !empty($s['meeting_details'])): // Q40 ?>
+                                <p class="session-message"><strong>Where / how:</strong> <?php echo htmlspecialchars($s['meeting_details']); ?></p>
+                            <?php endif; ?>
                             <?php if (!empty($s['message'])): ?>
                                 <p class="session-message"><?php echo htmlspecialchars($s['message']); ?></p>
                             <?php endif; ?>

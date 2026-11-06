@@ -831,7 +831,7 @@ return array (
             message TEXT,
             notes TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, "session_type" TEXT DEFAULT \'spiritual_guidance\', "timezone" TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, "session_type" TEXT DEFAULT \'spiritual_guidance\', "timezone" TEXT, meeting_details TEXT,
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         )',
   83 => 'CREATE TABLE IF NOT EXISTS settings (
