@@ -224,6 +224,8 @@ $pageTitle = htmlspecialchars($book['title']);
                     <div class="price-display">
                         <?php if ($book['is_free']): ?>
                             <span class="free-badge">Free</span>
+                        <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
+                            <span class="regular-price">Not yet on sale</span>
                         <?php elseif ($book['is_sale']): ?>
                             <span class="sale-price">MWK <?php echo number_format($book['price'], 2); ?></span>
                         <?php else: ?>

@@ -119,6 +119,8 @@ $pageTitle = 'Books';
                                 <div class="book-price">
                                     <?php if ($book['is_free']): ?>
                                         <span class="free-text">Free</span>
+                                    <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
+                                        <span>Not yet on sale</span>
                                     <?php elseif ($book['is_sale']): ?>
                                         <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
                                     <?php else: ?>
@@ -129,7 +131,7 @@ $pageTitle = 'Books';
                                     <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
                                         <i class="fas fa-book-open"></i> Read
                                     </a>
-                                    <?php if (isLoggedIn()): ?>
+                                    <?php if (isLoggedIn() && ($book['is_free'] || (float)$book['price'] > 0)): // F80 ?>
                                         <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo $book['is_free'] ? '1' : '0'; ?>" data-price="<?php echo $book['price']; ?>">
                                             <i class="fas fa-download"></i> Download
                                         </button>

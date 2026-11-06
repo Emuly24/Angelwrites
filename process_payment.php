@@ -57,7 +57,8 @@ if (!empty($book['is_free'])) {
 $amount = aw_book_price($book);
 
 if ($amount <= 0) {
-    echo json_encode(['success' => false, 'error' => 'Invalid amount']);
+    // F80: a book that is not free but has no price set cannot be ordered; say so plainly.
+    echo json_encode(['success' => false, 'error' => 'This book is not on sale yet. Please check back soon.']);
     exit;
 }
 
