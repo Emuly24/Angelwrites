@@ -533,15 +533,100 @@ function renderVersionSideBySide($old_html, $new_html, $label_old, $label_new) {
     </div>';
 }
 
+// R6: highlights, bookmarks, reading positions and group notes store a page number. Re-processing
+// (another page length, an edited text) changes the pages, so publishing a new version left them
+// pointing at the wrong text. On publish they are moved to the page of the new version that holds the
+// same text: highlights by their own text, everything else via an old-page -> new-page map built from
+// the opening words of each old page (falling back to the same relative position in the book).
+function aw_pages_text($html) {
+    $out = [];
+    if (preg_match_all('#<div class="page-content" data-page="(\d+)">(.*?)(?=<div class="page-break"|<div class="page-content" data-page=|$)#s', (string)$html, $m)) {
+        foreach ($m[2] as $i => $chunk) {
+            $t = mb_strtolower(html_entity_decode(strip_tags($chunk), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $out[(int)$m[1][$i]] = trim(preg_replace('/\s+/u', ' ', $t));
+        }
+    }
+    return $out;
+}
+
+function aw_remap_positions($book_id, $old_html, $new_html) {
+    global $db;
+    $old = aw_pages_text($old_html);
+    $new = aw_pages_text($new_html);
+    $counts = ['highlights' => 0, 'bookmarks' => 0, 'positions' => 0, 'notes' => 0];
+    if (!$old || !$new) return $counts;
+    $new_count = count($new);
+    $old_count = count($old);
+    // One long string of the new text, remembering where each new page starts.
+    $full = ''; $starts = [];
+    foreach ($new as $pg => $t) { $starts[$pg] = mb_strlen($full); $full .= $t . ' '; }
+    $page_at = function ($pos) use ($starts) {
+        $found = array_key_first($starts);
+        foreach ($starts as $pg => $st) { if ($st <= $pos) $found = $pg; else break; }
+        return $found;
+    };
+    $map = [];
+    foreach ($old as $pg => $t) {
+        $anchor = mb_substr($t, 0, 80);
+        $pos = $anchor !== '' ? mb_strpos($full, $anchor) : false;
+        $map[$pg] = $pos !== false ? $page_at($pos) : max(1, min($new_count, (int)round($pg * $new_count / max(1, $old_count))));
+    }
+    $move = function ($pg) use ($map, $new_count, $old_count) {
+        $pg = (int)$pg;
+        if ($pg <= 0) return $pg;
+        return $map[$pg] ?? max(1, min($new_count, (int)round($pg * $new_count / max(1, $old_count))));
+    };
+    // Highlights: find their own text; otherwise use the page map.
+    $hs = $db->prepare("SELECT id, chapter_index, text FROM highlights WHERE book_id = ?");
+    $hs->execute([$book_id]);
+    $upd = $db->prepare("UPDATE highlights SET chapter_index = ? WHERE id = ?");
+    foreach ($hs->fetchAll(PDO::FETCH_ASSOC) as $h) {
+        $needle = trim(preg_replace('/\s+/u', ' ', mb_strtolower((string)$h['text'])));
+        $pos = $needle !== '' ? mb_strpos($full, $needle) : false;
+        $np = $pos !== false ? $page_at($pos) : $move($h['chapter_index']);
+        if ($np != $h['chapter_index']) { $upd->execute([$np, $h['id']]); $counts['highlights']++; }
+    }
+    foreach ([
+        ['bookmarks', 'SELECT id, chapter_index AS pg FROM bookmarks WHERE book_id = ?', 'UPDATE bookmarks SET chapter_index = ?, section = CAST(? AS TEXT) WHERE id = ?', 'bookmarks', 2],
+        ['reading_progress', 'SELECT id, position_section AS pg FROM reading_progress WHERE book_id = ?', 'UPDATE reading_progress SET position_section = ?, position_offset = 0, progress_percent = ? WHERE id = ?', 'positions', 3],
+        ['group_notes', 'SELECT id, chapter_index AS pg FROM group_notes WHERE book_id = ?', 'UPDATE group_notes SET chapter_index = ?, page_number = ? WHERE id = ?', 'notes', 2],
+    ] as [$table, $sel, $updsql, $key, $nargs]) {
+        try {
+            $st = $db->prepare($sel);
+            $st->execute([$book_id]);
+            $up = $db->prepare($updsql);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $np = $move($r['pg']);
+                if ($np == $r['pg']) continue;
+                if ($key === 'positions') $up->execute([$np, (int)round($np / $new_count * 100), $r['id']]);
+                elseif ($key === 'bookmarks') { try { $up->execute([$np, $np, $r['id']]); } catch (PDOException $e) { $db->prepare("DELETE FROM bookmarks WHERE id = ?")->execute([$r['id']]); } } // two old pages on one new page
+                else $up->execute([$np, $np, $r['id']]);
+                $counts[$key]++;
+            }
+        } catch (PDOException $e) {
+            error_log("aw_remap_positions $table: " . $e->getMessage());
+        }
+    }
+    return $counts;
+}
+
 function publishVersion($book_id, $version) {
     global $db;
     $stmt = $db->prepare("SELECT content_html, toc_json, metadata_json FROM book_content_history WHERE book_id = ? AND version = ?");
     $stmt->execute([$book_id, $version]);
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$data) return false;
+    // R6: move members' highlights, bookmarks, positions and notes to the matching new pages.
+    $cur = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ? AND is_processed = 1");
+    $cur->execute([$book_id]);
+    $old_html = (string)$cur->fetchColumn();
+    $cur->closeCursor();
+    $db->beginTransaction();
+    $GLOBALS['aw_remap_counts'] = $old_html !== '' ? aw_remap_positions($book_id, $old_html, $data['content_html']) : null;
     // R1: publishing is what makes a version readable (also the first time).
     $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, metadata_json = ?, published_version = ?, version = ?, is_processed = 1, processing_status = 'complete', updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
     $stmt->execute([$data['content_html'], $data['toc_json'], $data['metadata_json'], $version, $version, $book_id]);
+    $db->commit();
     return true;
 }
 
@@ -1703,7 +1788,9 @@ if (isset($_POST['action'])) {
     if ($action === 'publish_version') {
         $version = (int)$_POST['version'];
         if (publishVersion($book_id, $version)) {
-            echo json_encode(['success' => true, 'message' => "✅ Version $version published successfully."]);
+            $rc = $GLOBALS['aw_remap_counts'] ?? null; // R6
+            $moved = $rc ? sprintf(' Moved to the matching pages: %d highlights, %d bookmarks, %d reading positions, %d group notes.', $rc['highlights'], $rc['bookmarks'], $rc['positions'], $rc['notes']) : '';
+            echo json_encode(['success' => true, 'message' => "✅ Version $version published successfully." . $moved]);
         } else {
             echo json_encode(['success' => false, 'error' => 'Failed to publish version.']);
         }
