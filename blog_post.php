@@ -189,10 +189,16 @@ $stmt = $db->prepare("
     FROM reflection_comments c
     JOIN users u ON c.user_id = u.id
     WHERE c.reflection_id = ?
-    ORDER BY c.created_at DESC
+    ORDER BY c.created_at DESC, c.id DESC
 ");
 $stmt->execute([$post['id']]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// P13: all comments were shown at once; 10 per page now, newest first.
+require_once __DIR__ . '/includes/pagination.php';
+[$cpage, $cper] = aw_page(10);
+$comments_total = count($comments);
+[$cpage, $coffset] = aw_clamp($comments_total, $cpage, $cper);
+$comments = array_slice($comments, $coffset, $cper);
 
 // ===== FETCH READING PROGRESS FOR THIS POST (user) =====
 // F143: blog posts have no book_id. SQLite silently resolved the subquery's book_id to the
@@ -313,10 +319,10 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
         <?php endif; ?>
 
         <!-- Comments Section -->
-        <section class="reflection-comments">
+        <section class="reflection-comments" id="comments">
             <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Questions</h3>
             
-            <?php if (count($comments) > 0): ?>
+            <?php if ($comments_total > 0): ?>
                 <div class="comments-list">
                     <?php foreach ($comments as $comment): ?>
                         <div class="comment-item <?php echo $comment['is_admin_reply'] ? 'admin-reply' : ''; ?>">
@@ -358,6 +364,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                         </div>
                     <?php endforeach; ?>
                 </div>
+                <?php echo aw_pager($comments_total, $cpage, $cper, 'comments'); // P13 ?>
             <?php else: ?>
                 <p class="no-comments">No comments yet. Share your thoughts or ask a question.</p>
             <?php endif; ?>
