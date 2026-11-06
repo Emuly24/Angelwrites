@@ -162,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     $comment = trim($_POST['comment']);
     $parent_id = isset($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
     $is_private = isset($_POST['is_private']) ? 1 : 0;
-    $target_user_id = $is_private ? 1 : null;
+    $target_user_id = null; // F129: was the hard-coded admin id 1 (the real admin is another id); private = visible to admins
 
     if (!empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, parent_id, is_private, target_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -202,7 +202,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
 // 10. FETCH COMMENTS (threaded)
 // ============================================================
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
-$admin_id = 1;
+// F129: the old clause "OR ? = 1", bound to a hard-coded admin id 1, was meant to be always true;
+// it only stayed closed because SQLite compares the bound string '1' with the integer 1 as
+// unequal (on MySQL, or with a typed binding, every private comment would show to everyone).
+// Visibility is now explicit: admins see all comments, everyone else sees public comments and
+// their own private ones.
+$privacy_sql = isAdmin() ? '' : 'AND (r.is_private IS NULL OR r.is_private = 0 OR r.user_id = ?)';
 
 $stmt = $db->prepare("
     SELECT r.*, u.name AS author_name, u.profile_pic AS author_pic,
@@ -211,14 +216,11 @@ $stmt = $db->prepare("
     FROM reviews r
     JOIN users u ON r.user_id = u.id
     WHERE r.target_type = 'poem' AND r.target_id = ?
-    AND (r.is_private IS NULL OR r.is_private = 0 
-         OR (r.is_private = 1 AND r.target_user_id = ?) 
-         OR r.user_id = ? 
-         OR ? = 1)
+    $privacy_sql
     AND (r.deleted_at IS NULL)
     ORDER BY r.parent_id ASC, r.created_at ASC
 ");
-$stmt->execute([$id, $user_id, $user_id, $admin_id]);
+$stmt->execute(isAdmin() ? [$id] : [$id, $user_id]);
 $comments_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $comments = [];
