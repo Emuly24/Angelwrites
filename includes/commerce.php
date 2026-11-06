@@ -9,7 +9,14 @@ function aw_payment_instructions() {
     return trim((string)aw_setting('payment_instructions', ''));
 }
 
+// F79: a book is on sale when "On sale" is ticked and a sale price below the normal price is set.
+function aw_book_on_sale(array $book) {
+    $sale = (float)($book['sale_price'] ?? 0);
+    return !empty($book['is_sale']) && $sale > 0 && $sale < (float)($book['price'] ?? 0);
+}
+
 // F35: the price a member is charged for a book, from the database (never from the browser).
+// F79: the sale price while the book is on sale.
 function aw_book_price(array $book) {
-    return round((float)($book['price'] ?? 0), 2);
+    return round(aw_book_on_sale($book) ? (float)$book['sale_price'] : (float)($book['price'] ?? 0), 2);
 }

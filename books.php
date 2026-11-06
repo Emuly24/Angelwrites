@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/commerce.php';
 
 // ===== SEARCH & FILTER =====
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -21,7 +22,7 @@ if ($search) {
 if ($filter === 'free') {
     $sql .= " AND is_free = 1";
 } elseif ($filter === 'sale') {
-    $sql .= " AND is_sale = 1";
+    $sql .= " AND is_sale = 1 AND sale_price > 0 AND sale_price < price"; // F79
 }
 
 $sql .= " ORDER BY created_at DESC";
@@ -93,7 +94,7 @@ $pageTitle = 'Books';
                             <div class="book-badges">
                                 <?php if ($book['is_free']): ?>
                                     <span class="badge free">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
+                                <?php elseif (aw_book_on_sale($book)): // F79 ?>
                                     <span class="badge sale">Sale</span>
                                 <?php endif; ?>
                             </div>
@@ -121,8 +122,8 @@ $pageTitle = 'Books';
                                         <span class="free-text">Free</span>
                                     <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
                                         <span>Not yet on sale</span>
-                                    <?php elseif ($book['is_sale']): ?>
-                                        <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                    <?php elseif (aw_book_on_sale($book)): ?>
+                                        <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
                                     <?php else: ?>
                                         <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                     <?php endif; ?>
@@ -132,7 +133,7 @@ $pageTitle = 'Books';
                                         <i class="fas fa-book-open"></i> Read
                                     </a>
                                     <?php if (isLoggedIn() && ($book['is_free'] || (float)$book['price'] > 0)): // F80 ?>
-                                        <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo $book['is_free'] ? '1' : '0'; ?>" data-price="<?php echo $book['price']; ?>">
+                                        <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo $book['is_free'] ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
                                             <i class="fas fa-download"></i> Download
                                         </button>
                                     <?php endif; ?>

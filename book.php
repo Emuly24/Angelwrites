@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/commerce.php';
 require_once 'includes/mail_helper.php';
 
 // ===== ERROR HANDLING =====
@@ -226,8 +227,8 @@ $pageTitle = htmlspecialchars($book['title']);
                             <span class="free-badge">Free</span>
                         <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
                             <span class="regular-price">Not yet on sale</span>
-                        <?php elseif ($book['is_sale']): ?>
-                            <span class="sale-price">MWK <?php echo number_format($book['price'], 2); ?></span>
+                        <?php elseif (aw_book_on_sale($book)): ?>
+                            <span class="sale-price"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
                         <?php else: ?>
                             <span class="regular-price">MWK <?php echo number_format($book['price'], 2); ?></span>
                         <?php endif; ?>

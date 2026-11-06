@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/commerce.php';
 require_once 'includes/mail_helper.php';
 
 // ============================================================
@@ -783,7 +784,7 @@ if ('serviceWorker' in navigator) {
                             <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                         <?php endif; ?>
                         <?php if ($book['is_free']): ?><span class="badge free">Free</span><?php endif; ?>
-                        <?php if ($book['is_sale']): ?><span class="badge sale">Sale</span><?php endif; ?>
+                        <?php if (aw_book_on_sale($book)): // F79 ?><span class="badge sale">Sale</span><?php endif; ?>
                     </div>
                     <div class="book-details">
                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
@@ -800,8 +801,8 @@ if ('serviceWorker' in navigator) {
                             <div class="book-price">
                                 <?php if ($book['is_free']): ?>
                                     <span class="free-text">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
-                                    <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                <?php elseif (aw_book_on_sale($book)): ?>
+                                    <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
                                 <?php else: ?>
                                     <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                 <?php endif; ?>
@@ -836,7 +837,7 @@ if ('serviceWorker' in navigator) {
                             <div class="placeholder-cover"><i class="fas fa-book"></i></div>
                         <?php endif; ?>
                         <?php if ($book['is_free']): ?><span class="badge free">Free</span><?php endif; ?>
-                        <?php if ($book['is_sale']): ?><span class="badge sale">Sale</span><?php endif; ?>
+                        <?php if (aw_book_on_sale($book)): // F79 ?><span class="badge sale">Sale</span><?php endif; ?>
                     </div>
                     <div class="book-details">
                         <h3><?php echo htmlspecialchars($book['title']); ?></h3>
@@ -853,8 +854,8 @@ if ('serviceWorker' in navigator) {
                             <div class="book-price">
                                 <?php if ($book['is_free']): ?>
                                     <span class="free-text">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
-                                    <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                <?php elseif (aw_book_on_sale($book)): ?>
+                                    <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
                                 <?php else: ?>
                                     <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                 <?php endif; ?>

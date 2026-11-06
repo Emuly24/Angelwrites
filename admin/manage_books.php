@@ -59,6 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $price = (float)$_POST['price'];
     $is_free = isset($_POST['is_free']) ? 1 : 0;
     $is_sale = isset($_POST['is_sale']) ? 1 : 0;
+    // F79: optional sale price; used only while "On sale" is ticked and it is below the price.
+    $sale_price = (isset($_POST['sale_price']) && $_POST['sale_price'] !== '') ? max(0, (float)$_POST['sale_price']) : null;
 
     if (empty($title)) {
         $error = 'Book title is required.';
@@ -147,10 +149,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($id > 0) {
                 $stmt = $db->prepare("UPDATE books SET title = ?, author = ?, description = ?, price = ?, is_free = ?, is_sale = ?, cover_path = ?, file_path = ?, file_type = ?, file_size = ?, file_author = ?, release_date = ? WHERE id = ?");
                 $stmt->execute([$title, $author, $description, $price, $is_free, $is_sale, $cover_path, $file_path, $file_type, $file_size, $file_author, $release_date, $id]);
+                $db->prepare("UPDATE books SET sale_price = ? WHERE id = ?")->execute([$sale_price, $id]); // F79
                 $success = 'Book updated successfully.';
             } else {
                 $stmt = $db->prepare("INSERT INTO books (title, author, description, price, is_free, is_sale, cover_path, file_path, file_type, file_size, file_author, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$title, $author, $description, $price, $is_free, $is_sale, $cover_path, $file_path, $file_type, $file_size, $file_author, $release_date]);
+                $db->prepare("UPDATE books SET sale_price = ? WHERE id = ?")->execute([$sale_price, $db->lastInsertId()]); // F79
                 $success = 'Book added successfully.';
 
                 // Admin notification via Zoho SMTP
@@ -281,8 +285,12 @@ $pageTitle = 'Manage Books';
                             <div class="form-group checkbox-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="is_sale" <?php echo ($edit_book['is_sale'] ?? 0) ? 'checked' : ''; ?>>
-                                    <span>For Sale</span>
+                                    <span>On sale (discount)</span>
                                 </label>
+                            </div>
+                            <div class="form-group"><!-- F79 -->
+                                <label for="sale_price">Sale price (MWK)</label>
+                                <input type="number" step="0.01" min="0" id="sale_price" name="sale_price" value="<?php echo htmlspecialchars((string)($edit_book['sale_price'] ?? '')); ?>" placeholder="Used while On sale is ticked">
                             </div>
                         </div>
 
@@ -414,8 +422,8 @@ $pageTitle = 'Manage Books';
                                                 <td data-label="Price">
                                                     <?php if ($book['is_free']): ?>
                                                         <span class="badge free">Free</span>
-                                                    <?php elseif ($book['is_sale']): ?>
-                                                        <span class="badge sale">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                                    <?php elseif (!empty($book['is_sale']) && (float)($book['sale_price'] ?? 0) > 0 && (float)$book['sale_price'] < (float)$book['price']): // F79 ?>
+                                                        <span class="badge sale"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span>
                                                     <?php else: ?>
                                                         <span class="badge">MWK <?php echo number_format($book['price'], 2); ?></span>
                                                     <?php endif; ?>
@@ -520,6 +528,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('price').value = '0';
         document.querySelector('input[name="is_free"]').checked = false;
         document.querySelector('input[name="is_sale"]').checked = false;
+        document.getElementById('sale_price').value = '';
         document.getElementById('cover').value = '';
         document.getElementById('book_file').value = '';
         formTitle.textContent = 'Add New Book';

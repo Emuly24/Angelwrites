@@ -324,6 +324,19 @@ try {
         }
     }
 
+    // F79: books had an "on sale" flag but no sale price, so a sale showed the normal price in a
+    // sale colour. Schema version 5 adds books.sale_price (skipped if already there). It is only
+    // recorded once version 4 has been, so a skipped version 4 still runs later.
+    if ($aw_schema_version < 5 && (int)$db->query('PRAGMA user_version')->fetchColumn() >= 4) {
+        $aw_cols = $db->query("PRAGMA table_info(books)")->fetchAll(PDO::FETCH_COLUMN, 1);
+        if ($aw_cols && !in_array('sale_price', $aw_cols, true)) {
+            $db->exec('ALTER TABLE books ADD COLUMN sale_price REAL');
+        }
+        if ($aw_cols) {
+            $db->exec('PRAGMA user_version = 5');
+        }
+    }
+
 } catch (PDOException $e) {
     // Log error and show user-friendly message
     error_log('Database Error: ' . $e->getMessage());

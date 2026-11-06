@@ -43,7 +43,7 @@ if (!$phone_number || strlen($phone_number) < 10) {
 
 // F35: the amount used to be whatever the browser sent, so a member could "pay" MWK 1 for any
 // book. It is now the book's price from the database; the posted amount is ignored.
-$stmt = $db->prepare("SELECT id, title, price, is_free FROM books WHERE id = ?");
+$stmt = $db->prepare("SELECT id, title, price, is_free, is_sale, sale_price FROM books WHERE id = ?");
 $stmt->execute([$book_id]);
 $book = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$book) {
