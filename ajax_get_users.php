@@ -45,9 +45,19 @@ if (!isLoggedIn()) {
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 
 // Prepare and execute query with safe LIKE pattern
-$stmt = $db->prepare("SELECT id, name FROM users WHERE name != '' AND name LIKE ? ORDER BY name LIMIT 15");
-$stmt->execute([$q . '%']);
-$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// F126: self-registered members have a NULL name, so "name != '' AND name LIKE ?" skipped all of
+// them. Match name, first/last name or username, and return the display name used everywhere
+// else (awDisplayName, F100). The page filters this list as the member types.
+$like = $q . '%';
+$stmt = $db->prepare("SELECT id, name, first_name, last_name, username FROM users
+                      WHERE name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR username LIKE ?
+                      ORDER BY id LIMIT 50");
+$stmt->execute([$like, $like, $like, $like]);
+$users = [];
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $u) {
+    $users[] = ['id' => (int)$u['id'], 'name' => awDisplayName($u)];
+}
+usort($users, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
 // Send JSON response
 header('Content-Type: application/json');
