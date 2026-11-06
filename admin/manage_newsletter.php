@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($total > AW_NL_MAX_FILES_TOTAL) { aw_nl_flash('error', 'Attachments may be 10 MB in total.'); aw_nl_back('send'); }
         }
+        if (!empty($_POST['add_signature'])) $content .= AW_NL_SIG_MARK; // E2
         $qid = aw_nl_queue($db, $subject, $content, $recipients, $send_to, $send_to === 'segment' ? $segment_id : null, $scheduled_at, $files);
         aw_nl_audit($db, $scheduled_at ? 'schedule_newsletter' : 'send_newsletter', "Campaign #$qid \"$subject\" to " . count($recipients) . " ($send_to)");
         unset($_SESSION['aw_nl_draft']);
@@ -87,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif (!aw_nl_rate_ok('test_' . ($_SESSION['user_id'] ?? 0), 10, 600)) $msg = 'Too many test emails; please wait a few minutes.';
         else {
             $sub = aw_nl_subscriber($db, $to) ?: ['email' => $to, 'name' => 'Angella', 'unsubscribe_token' => ''];
-            $m = aw_nl_render($db, '[Test] ' . $subject, $content, $sub, ['preview' => true]);
+            $m = aw_nl_render($db, '[Test] ' . $subject, $content, $sub, ['preview' => true, 'signature' => !empty($_POST['add_signature'])]);
             $ok = aw_nl_mail($to, '[Test] ' . $subject, $m['html'], $m['text']);
             $msg = $ok ? "Test email sent to $to." : "The test email to $to could not be sent. Check the mail settings.";
             aw_nl_audit($db, 'test_send', "To $to: $subject");
