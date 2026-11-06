@@ -592,66 +592,22 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 
 <div class="poem-view-page">
     <div class="container">
-        <div class="poem-nav">
+        <div class="poem-nav aw-hide-focus">
             <a href="<?php echo SITE_URL; ?>/poetry.php" class="back-link">
                 <i class="fas fa-arrow-left"></i> Back to Poetry
             </a>
         </div>
 
-        <header class="poem-header">
-            <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
-            <div class="poem-meta">
-                <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
-                <span class="poem-views"><i class="fas fa-eye"></i> <?php echo number_format($poem['view_count'] ?? 1); ?> views</span>
-                <span class="poem-reading-time"><i class="fas fa-clock"></i> <?php echo $poem['reading_time'] ?? '1 min read'; ?></span>
-            </div>
-        </header>
-
-        <?php if ($poem['image_path']): ?>
-            <div class="poem-image-container">
-                <img src="<?php echo get_image_url($poem['image_path']); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image" loading="lazy">
-            </div>
-        <?php endif; ?>
-
-        <?php if ($poem['audio_path']): ?>
-            <div class="poem-audio-player">
-                <div class="audio-label">
-                    <i class="fas fa-headphones"></i>
-                    <span>Listen to this poem</span>
-                </div>
-                <div id="customAudioPlayer">
-                    <canvas id="waveCanvas"></canvas>
-                    <audio id="audioSource" src="<?php echo $base_url . '/' . ltrim($poem['audio_path'], '/'); ?>" preload="metadata"></audio>
-                    <div class="audio-controls-bar">
-                        <button id="playPauseBtn" class="play-btn" aria-label="Play"><i class="fas fa-play"></i></button>
-                        <div class="progress-container">
-                            <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-                        </div>
-                        <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
-                        <div class="volume-control">
-                            <button id="muteBtn" aria-label="Mute"><i class="fas fa-volume-up"></i></button>
-                            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($poem['intro']): ?>
-            <div class="poem-intro-section">
-                <div class="intro-label">✧ Purpose of this poem</div>
-                <div class="intro-body"><?php echo nl2br(htmlspecialchars($poem['intro'])); ?></div>
-            </div>
-        <?php endif; ?>
-
-        <div class="poem-content-section">
-            <div class="poem-body">
-                <?php echo $poem['content']; ?>
-            </div>
-        </div>
+        <?php
+        // V2: the poem is shown by the shared reader – clean stanzas, reading tools, and a player
+        // only when the recording file exists (includes/poem_reader.php).
+        require_once __DIR__ . '/includes/poem_reader.php';
+        echo aw_poem_assets();
+        echo aw_poem_reader($poem, $db);
+        ?>
 
         <!-- Styled Reaction Section -->
-        <div class="reaction-section">
+        <div class="reaction-section aw-hide-focus">
             <span>React to this poem:</span>
             <div class="reaction-buttons" data-target-type="poem" data-target-id="<?php echo $id; ?>">
                 <button class="reaction-btn" data-reaction="like">👍 <span class="count">0</span></button>
@@ -660,7 +616,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         </div>
 
-        <div class="reviews-section" id="comments">
+        <div class="reviews-section aw-hide-focus" id="comments">
             <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
             <div class="rating-summary">
                 <div class="rating-stars">
@@ -759,7 +715,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         </div>
 
-        <div class="poem-footer-actions">
+        <div class="poem-footer-actions aw-hide-focus">
             <div class="share-section">
                 <span>Share:</span>
                 <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode($share_url); ?>&display=popup" target="_blank" class="share-btn facebook"><i class="fab fa-facebook-f"></i></a>
@@ -986,181 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ===== AUDIO PLAYER =====
-    const audio = document.getElementById('audioSource');
-    if (audio) {
-        const playBtn = document.getElementById('playPauseBtn');
-        const playIcon = playBtn.querySelector('i');
-        const progressFill = document.getElementById('progressFill');
-        const progressBar = document.getElementById('progressBar');
-        const timeDisplay = document.getElementById('timeDisplay');
-        const muteBtn = document.getElementById('muteBtn');
-        const volumeSlider = document.getElementById('volumeSlider');
-        const canvas = document.getElementById('waveCanvas');
-        const ctx = canvas.getContext('2d');
-        let isPlaying = false;
-        let audioContext = null;
-        let analyser = null;
-        let source = null;
-        let animationId = null;
-        let dataArray = null;
-
-        function resizeCanvas() {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = 100;
-        }
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-
-        function initAudioContext() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
-                analyser.smoothingTimeConstant = 0.8;
-                source = audioContext.createMediaElementSource(audio);
-                source.connect(analyser);
-                analyser.connect(audioContext.destination);
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-            }
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-        }
-
-        function drawWave() {
-            if (!analyser) return;
-            animationId = requestAnimationFrame(drawWave);
-            analyser.getByteFrequencyData(dataArray);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const barCount = 64;
-            const barWidth = (canvas.width / barCount) * 0.6;
-            const gap = (canvas.width / barCount) * 0.4;
-            const halfHeight = canvas.height / 2;
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            gradient.addColorStop(0, '#DBA1A2');
-            gradient.addColorStop(0.5, '#e8c0c0');
-            gradient.addColorStop(1, '#DBA1A2');
-            ctx.fillStyle = gradient;
-            for (let i = 0; i < barCount; i++) {
-                const value = dataArray[i] / 255;
-                const barHeight = value * halfHeight * 1.5;
-                const x = i * (barWidth + gap) + gap / 2;
-                const y = halfHeight - barHeight / 2;
-                const radius = 4;
-                ctx.beginPath();
-                ctx.moveTo(x + radius, y);
-                ctx.lineTo(x + barWidth - radius, y);
-                ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
-                ctx.lineTo(x + barWidth, y + barHeight - radius);
-                ctx.quadraticCurveTo(x + barWidth, y + barHeight, x + barWidth - radius, y + barHeight);
-                ctx.lineTo(x + radius, y + barHeight);
-                ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - radius);
-                ctx.lineTo(x, y + radius);
-                ctx.quadraticCurveTo(x, y, x + radius, y);
-                ctx.closePath();
-                ctx.fill();
-            }
-            const overlayGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            overlayGradient.addColorStop(0, 'rgba(219, 161, 162, 0.15)');
-            overlayGradient.addColorStop(0.5, 'rgba(219, 161, 162, 0)');
-            overlayGradient.addColorStop(1, 'rgba(219, 161, 162, 0.15)');
-            ctx.fillStyle = overlayGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        function stopVisualizer() {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-
-        playBtn.addEventListener('click', function() {
-            if (audio.paused) {
-                initAudioContext();
-                audio.play();
-                isPlaying = true;
-                playIcon.className = 'fas fa-pause';
-                if (!animationId) drawWave();
-            } else {
-                audio.pause();
-                isPlaying = false;
-                playIcon.className = 'fas fa-play';
-                stopVisualizer();
-            }
-        });
-
-        audio.addEventListener('ended', function() {
-            isPlaying = false;
-            playIcon.className = 'fas fa-play';
-            stopVisualizer();
-            progressFill.style.width = '0%';
-            updateTimeDisplay();
-        });
-
-        audio.addEventListener('timeupdate', function() {
-            const percent = (audio.currentTime / audio.duration) * 100;
-            progressFill.style.width = percent + '%';
-            updateTimeDisplay();
-        });
-
-        progressBar.addEventListener('click', function(e) {
-            const rect = this.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const percent = x / rect.width;
-            audio.currentTime = percent * audio.duration;
-        });
-
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return mins + ':' + (secs < 10 ? '0' : '') + secs;
-        }
-
-        function updateTimeDisplay() {
-            const current = formatTime(audio.currentTime || 0);
-            const total = formatTime(audio.duration || 0);
-            timeDisplay.textContent = current + ' / ' + total;
-        }
-
-        audio.addEventListener('loadedmetadata', updateTimeDisplay);
-
-        volumeSlider.addEventListener('input', function() {
-            audio.volume = this.value;
-            muteBtn.querySelector('i').className = this.value == 0 ? 'fas fa-volume-mute' : 'fas fa-volume-up';
-        });
-
-        muteBtn.addEventListener('click', function() {
-            if (audio.volume > 0) {
-                audio.volume = 0;
-                volumeSlider.value = 0;
-                muteBtn.querySelector('i').className = 'fas fa-volume-mute';
-            } else {
-                audio.volume = 1;
-                volumeSlider.value = 1;
-                muteBtn.querySelector('i').className = 'fas fa-volume-up';
-            }
-        });
-
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden && isPlaying && !animationId) {
-                drawWave();
-            }
-            if (document.hidden && animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-        });
-
-        window.addEventListener('beforeunload', function() {
-            if (audioContext) {
-                audioContext.close();
-            }
-        });
-    }
+    // V2: the recording player now lives in assets/js/aw-poem.js (shown only when a recording exists).
 });
 </script>
 
