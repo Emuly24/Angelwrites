@@ -161,8 +161,8 @@ $pageTitle = 'Books';
         <span class="modal-close" onclick="closePaymentModal()">&times;</span>
         <div class="modal-header">
             <i class="fas fa-lock modal-lock-icon"></i>
-            <h3>Complete Your Purchase</h3>
-            <p class="modal-sub">You are about to download <strong id="modalBookTitle"></strong>. Choose your payment method below.</p>
+            <h3>Order this book</h3>
+            <p class="modal-sub">Order <strong id="modalBookTitle"></strong>. Choose how you will pay; you will then be shown where to send the money. The book unlocks once we confirm your payment.</p>
         </div>
         
         <div class="payment-options">
@@ -189,10 +189,15 @@ $pageTitle = 'Books';
                 <label for="paymentAmount">Amount (MWK)</label>
                 <input type="text" id="paymentAmount" readonly>
             </div>
+            <div class="form-group">
+                <label for="paymentReference">Transaction ID (optional, if you have already paid)</label>
+                <input type="text" id="paymentReference" maxlength="60" placeholder="From your payment SMS">
+            </div>
             <div id="paymentStatus" class="payment-status"></div>
+            <div id="paymentInstructions" style="display:none;white-space:pre-line;border:1px solid var(--border);border-radius:8px;padding:12px;margin:10px 0;text-align:left;"></div>
             <div class="modal-actions">
                 <button class="btn btn-primary" id="payNowBtn" onclick="processPayment()">
-                    <i class="fas fa-credit-card"></i> Pay Now
+                    <i class="fas fa-paper-plane"></i> Place order
                 </button>
                 <button class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
             </div>
@@ -250,6 +255,8 @@ function openPaymentModal(bookId, title, price) {
     document.getElementById('paymentForm').style.display = 'none';
     document.getElementById('paymentStatus').innerHTML = '';
     document.getElementById('paymentStatus').className = 'payment-status';
+    document.getElementById('paymentInstructions').style.display = 'none';
+    document.getElementById('payNowBtn').style.display = '';
     document.querySelectorAll('.payment-option').forEach(btn => btn.classList.remove('selected'));
     document.getElementById('paymentModal').style.display = 'flex';
 }
@@ -278,13 +285,14 @@ function processPayment() {
     }
 
     const statusDiv = document.getElementById('paymentStatus');
-    statusDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Processing payment...</div>';
+    statusDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Placing your order...</div>';
     statusDiv.className = 'payment-status';
 
     const formData = new FormData();
     formData.append('book_id', currentBookId);
     formData.append('payment_method', selectedMethod);
     formData.append('phone_number', phone);
+    formData.append('payer_reference', document.getElementById('paymentReference').value.trim());
     formData.append('amount', document.getElementById('paymentAmount').value.replace('MWK ', ''));
 
     fetch('<?php echo SITE_URL; ?>/process_payment.php', {
@@ -294,20 +302,25 @@ function processPayment() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            statusDiv.innerHTML = '<span class="success"><i class="fas fa-check-circle"></i> Payment successful! Preparing your download...</span>';
+            // F75: an order is not a payment. Show where to pay and the reference to use; the book
+            // unlocks when the admin confirms the money has arrived.
+            statusDiv.innerHTML = '';
+            const msg = document.createElement('span');
+            msg.className = 'success';
+            msg.textContent = data.message + ' Order reference: ' + data.reference + '.';
+            statusDiv.appendChild(msg);
             statusDiv.className = 'payment-status success';
-
-            setTimeout(() => {
-                window.location.href = '<?php echo SITE_URL; ?>/download.php?book_id=' + currentBookId;
-                closePaymentModal();
-            }, 1000);
+            const box = document.getElementById('paymentInstructions');
+            box.textContent = 'Send MWK ' + Number(data.amount).toFixed(2) + ' and use the reference ' + data.reference + ':\n\n' + data.instructions;
+            box.style.display = 'block';
+            document.getElementById('payNowBtn').style.display = 'none';
         } else {
             statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> ' + data.error + '</span>';
             statusDiv.className = 'payment-status error';
         }
     })
     .catch(error => {
-        statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> Payment failed. Please try again.</span>';
+        statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> The order could not be placed. Please try again.</span>';
         statusDiv.className = 'payment-status error';
     });
 }
