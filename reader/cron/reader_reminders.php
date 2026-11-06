@@ -4,10 +4,12 @@
 //  Sends reminders to users who haven't read in 3+ days.
 // ============================================================
 
-require_once '../includes/config.php';
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
-require_once '../includes/mail_helper.php';
+// F13: '../includes/' resolved against reader/cron/ (or the CLI's working directory), so the
+// script fatalled however it was started. Paths are now relative to this file.
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/mail_helper.php';
 
 // Only run via CLI or with a secret key
 if (php_sapi_name() !== 'cli' && (!isset($_GET['key']) || $_GET['key'] !== 'angelwrites_reader_cron')) {
