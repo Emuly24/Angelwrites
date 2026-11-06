@@ -173,9 +173,8 @@ Also closes the 11 **PLANNED** rows (these aren't OPEN, but the batch owns them)
 `assets/bible/*.db`, `admin/process_book.php`, `blog_post.php`, `community_delete.php`, `community_answer_delete.php`, `admin/comments.php`, `ajax_toggle_reaction.php`, `newsletter.php`, `admin/newsletter_tabs/*.php`, `contact.php`, `admin/manage_messages.php`, `session_cancel.php`, `admin/manage_sessions.php`, `generate_og_image.php`, `reader/cron/reader_reminders.php`.
 
 **Dependencies.**
-- Branches off main.
-- Independent of PRs #1–#3 for correctness, but `admin/process_book.php` and `newsletter.php` are also edited by PR #1, so check rebase conflicts (reported in the PR).
-- Must merge **before EMAIL**, because both edit `newsletter.php` and EMAIL adds a `newsletter_tabs` file that needs the S13 guard.
+- Branches off main. No file overlap with PRs #1–#3; `git merge-tree` is clean against each.
+- Must merge **before EMAIL**. Both touch `newsletter.php` and the newsletter tabs; `git merge-tree` shows no textual conflict, but EMAIL's new tab relies on the S13 guard.
 
 **iPad tests after deploy:**
 
@@ -190,7 +189,7 @@ Also closes the 11 **PLANNED** rows (these aren't OPEN, but the batch owns them)
 | `/contact.php` | Send a valid message | Success; **no copy email** arrives at the typed address | Copy arrives: S11 copy not removed |
 | `/assets/bible/bible_KJV.db` | Open it | 403 | Downloads: S12 deny rule not uploaded |
 | `/bible_reader.php` | Open John 3 | Text loads | Blank: deny rule blocked PHP reads (it shouldn't: PHP reads from disk) |
-| `/admin/newsletter_tabs/compose.php` (logged out) | Open it | Redirect to login | Markup shown |
+| `/admin/newsletter_tabs/send.php` (logged out) | Open it | "Access denied" (403) | Markup shown |
 
 **Effort.** M: 5 commits, about half a day; about 20 minutes of iPad tests.
 
@@ -249,7 +248,7 @@ Closure notes for rows in this batch, and for rows named in the request that sit
 - Branches off main.
 - **Must merge after fix/security-2.** Both edit `newsletter.php` and the newsletter tabs. They are not parallel: rebase EMAIL on main once fix/security-2 merges.
 - **Must merge after PR #1.** Both edit `includes/mail_helper.php` and `register.php`; the overlaps are reported in the PR.
-- **Must merge after PR #2 is applied to the live DB** for F173: segment tables exist in production, but the subscriber export needs `newsletter.source`. The EMAIL code itself uses only columns that exist in production today.
+- **Must merge after PR #2 is applied to the live DB.** Production `email_queue` has no `segment_id` column, and the newsletter queue insert (existing code, kept by EMAIL) writes it. `repair.sql` adds it. The subscriber export also needs `newsletter.source` (repair).
 
 **iPad tests after deploy:**
 
