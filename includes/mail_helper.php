@@ -15,7 +15,15 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         $mail->Password   = getenv('GMAIL_APP_PASSWORD');
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
-        $mail->setFrom($fromEmail, $fromName);
+        // F217: mail goes through Gmail's SMTP, so From must be the Gmail account itself
+        // (SPF/DKIM/DMARC then align with gmail.com). The caller's address (normally the
+        // Zoho mailbox) becomes Reply-To, so replies still arrive there.
+        $smtpUser = getenv('GMAIL_USERNAME');
+        $mail->setFrom($smtpUser ?: $fromEmail, $fromName);
+        $replyTo = (stripos($fromEmail, 'no-reply@') === 0) ? 'angelwrites@zohomail.com' : $fromEmail;
+        if (strcasecmp($replyTo, (string)$smtpUser) !== 0) {
+            $mail->addReplyTo($replyTo, $fromName);
+        }
         $mail->addAddress($to);
         $mail->Subject = $subject;
         $mail->Body    = $message;
