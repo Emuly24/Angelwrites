@@ -337,6 +337,23 @@ $pageTitle = 'Bible Reader';
 <!--  JAVASCRIPT – FULL BIBLE READER ENGINE (ALL FEATURES KEPT)   -->
 <!-- ============================================================ -->
 <script>
+// Q9: feedback used alert()/prompt() (blocking pop-ups) and showed raw server errors. Messages now
+// appear as a short toast at the bottom of the screen; `html` is only used for our own fixed markup.
+function awToast(msg, type, html) {
+    let box = document.getElementById('awToast');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'awToast';
+        box.setAttribute('role', 'status');
+        box.style.cssText = 'position:fixed;left:50%;bottom:calc(20px + var(--cookie-bar-h, 0px));transform:translateX(-50%);z-index:3000;max-width:92vw;padding:12px 18px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.18);font-size:0.95rem;color:#fff;transition:opacity 0.3s;';
+        document.body.appendChild(box);
+    }
+    box.style.background = type === 'error' ? '#b03a3a' : (type === 'info' ? '#6b5a5a' : '#3f7d4f');
+    if (html) box.innerHTML = msg; else box.textContent = msg;
+    box.style.opacity = '1';
+    clearTimeout(box._t);
+    box._t = setTimeout(function () { box.style.opacity = '0'; }, html ? 6000 : 3500);
+}
 (function() {
     'use strict';
 
@@ -527,7 +544,7 @@ $pageTitle = 'Bible Reader';
             })
             .catch(error => {
                 console.error('Fetch error:', error);
-                return `[Error loading chapter]`;
+                return `${book} ${chapter} could not be loaded. Check your connection and try again.`; // Q9: was "[Error loading chapter]"
             });
     }
 
@@ -714,7 +731,7 @@ $pageTitle = 'Bible Reader';
         const selText = getSelectedText();
         const range = getSelectionRange();
         if (!selText || !range) {
-            alert('Please select a verse to highlight.');
+            awToast('Please select a verse to highlight.', 'info');
             return;
         }
         // F27: highlight the verse the selection is in (it used the verse dropdown, so the
@@ -747,7 +764,7 @@ $pageTitle = 'Bible Reader';
         getVerseText(version1, book, chapter, verse).then(text => {
             const content = `${version1} ${book} ${chapter}:${verse}\n${text}`;
             navigator.clipboard.writeText(content).then(() => {
-                alert('Verse copied to clipboard!');
+                awToast('Verse copied.');
             }).catch(() => {
                 prompt('Copy manually:', content);
             });
@@ -815,7 +832,7 @@ $pageTitle = 'Bible Reader';
         const text = noteText.value.trim();
         const isPrivate = notePrivate.checked ? 1 : 0;
         if (!text) {
-            alert('Please enter a note.');
+            awToast('Please write your note first.', 'info');
             return;
         }
         const formData = new FormData();
@@ -835,7 +852,7 @@ $pageTitle = 'Bible Reader';
                 notePrivate.checked = false;
                 document.getElementById('bibleAddNoteForm').style.display = 'none';
             } else {
-                alert('Error: ' + data.error);
+                awToast('Your note could not be saved. Please try again.', 'error'); console.warn(data.error);
             }
         });
     }
@@ -1117,7 +1134,7 @@ $pageTitle = 'Bible Reader';
                 return;
             }
         }
-        alert('Invalid verse format. Use: Book Chapter:Verse (e.g. John 3:16)');
+        awToast('Type a verse like "John 3:16" (book, chapter:verse).', 'info');
     }
 
     // ================================================================
@@ -1394,7 +1411,7 @@ $pageTitle = 'Bible Reader';
         btn.addEventListener('click', function() {
             const url = window.location.origin + '/bible_reader.php?book=' + encodeURIComponent(book) + '&chapter=' + chapter + '&verse=' + verse + '&share=1';
             navigator.clipboard.writeText(url).then(() => {
-                alert('✅ Link copied!');
+                awToast('Link copied.');
                 shareModal.classList.remove('visible');
                 overlay.classList.remove('active');
             }).catch(() => {
@@ -1404,7 +1421,7 @@ $pageTitle = 'Bible Reader';
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
-                alert('✅ Link copied!');
+                awToast('Link copied.');
                 shareModal.classList.remove('visible');
                 overlay.classList.remove('active');
             });
@@ -1464,16 +1481,23 @@ $pageTitle = 'Bible Reader';
                                 <span class="bible-challenge-percent">${percent}%</span>
                             </div>
                             <p class="bible-challenge-stats">${data.progress} / ${data.target} chapters read</p>
-                            <button class="btn btn-sm btn-primary" onclick="updateBibleChallenge()">📈 Update Progress</button>
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;">
+                                <label for="bibleChaptersRead" style="font-size:0.9rem;">Chapters read today</label>
+                                <input type="number" id="bibleChaptersRead" min="1" max="200" inputmode="numeric" style="width:80px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);">
+                                <button class="btn btn-sm btn-primary" onclick="updateBibleChallenge()">📈 Update Progress</button>
+                            </div>
                         </div>
                     `;
                 }
             });
     }
 
+    // Q9: the number of chapters was asked with prompt(); it is now a small field on the card.
     window.updateBibleChallenge = function() {
-        const chapters = prompt('How many chapters did you read today?');
-        if (chapters && parseInt(chapters) > 0) {
+        const input = document.getElementById('bibleChaptersRead');
+        const chapters = input ? input.value : '';
+        if (!(parseInt(chapters) > 0)) { awToast('Enter how many chapters you read (1 or more).', 'info'); if (input) input.focus(); return; }
+        {
             const formData = new FormData();
             formData.append('action', 'update_challenge_progress');
             formData.append('user_id', userId);
@@ -1483,7 +1507,7 @@ $pageTitle = 'Bible Reader';
                 body: formData
             }).then(() => {
                 loadBibleChallenge();
-                alert('✅ Progress updated!');
+                awToast('Progress updated.');
             });
         }
     };
