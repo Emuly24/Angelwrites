@@ -155,7 +155,7 @@ if (isLoggedIn()) {
         
         $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
         $stmt->execute([$user_id]);
-        $reading_streak = $stmt->fetchColumn() ?? 0;
+        $reading_streak = (int)$stmt->fetchColumn(); // F87: fetchColumn() returns false with no row; ?? 0 kept the false (blank)
     } catch (Exception $e) {
         // Tables might not exist – skip
     }
