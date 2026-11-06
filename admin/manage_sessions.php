@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/csrf.php';
 
 redirectIfNotAdmin();
 
@@ -29,7 +30,8 @@ if (isset($_POST['update_status'])) {
 }
 
 // ===== HANDLE DELETE =====
-if (isset($_GET['delete'])) {
+// S9: GET delete requires the CSRF token in the link.
+if (isset($_GET['delete']) && validate_csrf_token($_GET['csrf'] ?? '')) {
     $id = (int)$_GET['delete'];
     $stmt = $db->prepare("DELETE FROM sessions WHERE id = ?");
     $stmt->execute([$id]);
@@ -235,7 +237,7 @@ $pageTitle = 'Manage Sessions';
                                                 </form>
                                             </td>
                                             <td class="actions">
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php?delete=<?php echo $session['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this session?');">
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php?delete=<?php echo $session['id']; ?>&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this session?');">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             </td>

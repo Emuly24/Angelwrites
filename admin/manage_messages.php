@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/csrf.php';
 
 redirectIfNotAdmin();
 
@@ -13,7 +14,9 @@ $limit = 10;
 $offset = ($page - 1) * $limit;
 
 // ===== HANDLE MARK AS READ =====
-if (isset($_GET['mark_read'])) {
+// S9: GET actions require the CSRF token in the link.
+$get_csrf_ok = validate_csrf_token($_GET['csrf'] ?? '');
+if (isset($_GET['mark_read']) && $get_csrf_ok) {
     $id = (int)$_GET['mark_read'];
     $stmt = $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id = ?");
     $stmt->execute([$id]);
@@ -23,7 +26,7 @@ if (isset($_GET['mark_read'])) {
 }
 
 // ===== HANDLE DELETE =====
-if (isset($_GET['delete'])) {
+if (isset($_GET['delete']) && $get_csrf_ok) {
     $id = (int)$_GET['delete'];
     $stmt = $db->prepare("DELETE FROM contact_messages WHERE id = ?");
     $stmt->execute([$id]);
@@ -173,10 +176,10 @@ $pageTitle = 'Manage Messages';
                                                 </span>
                                             </td>
                                             <td class="actions-cell">
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?mark_read=<?php echo $message['id']; ?>" class="btn btn-sm btn-secondary action-btn" title="Mark as read">
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?mark_read=<?php echo $message['id']; ?>&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-secondary action-btn" title="Mark as read">
                                                     <i class="fas fa-check"></i>
                                                 </a>
-                                                <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?delete=<?php echo $message['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this message?');" title="Delete">
+                                                <a href="<?php echo SITE_URL; ?>/admin/manage_messages.php?delete=<?php echo $message['id']; ?>&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this message?');" title="Delete">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             </td>

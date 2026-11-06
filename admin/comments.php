@@ -53,14 +53,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_reply'])) {
 // ============================================================
 // 3. HANDLE GET ACTIONS (Toggle private, delete)
 // ============================================================
-if (isset($_GET['toggle_private']) && is_numeric($_GET['toggle_private'])) {
+// S9: GET actions require the CSRF token in the link.
+$get_csrf_ok = validate_csrf_token($_GET['csrf'] ?? '');
+if (isset($_GET['toggle_private']) && is_numeric($_GET['toggle_private']) && $get_csrf_ok) {
     $id = (int)$_GET['toggle_private'];
     $stmt = $db->prepare("UPDATE reviews SET is_private = NOT is_private WHERE id = ?");
     $stmt->execute([$id]);
     header('Location: ' . SITE_URL . '/admin/comments.php');
     exit;
 }
-if (isset($_GET['delete_comment'])) {
+if (isset($_GET['delete_comment']) && $get_csrf_ok) {
     $id = (int)$_GET['delete_comment'];
     $type = isset($_GET['type']) ? $_GET['type'] : 'poem';
     if ($type === 'poem') {
@@ -348,11 +350,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
                                 <span class="reaction-count">Reactions: <?php echo $comment['total_reactions']; ?></span>
                                 <button class="btn btn-sm btn-outline reply-toggle" data-comment-id="<?php echo $comment['id']; ?>" data-target-type="poem" data-target-id="<?php echo $comment['target_id']; ?>">Reply</button>
                                 <?php if ($comment['is_private']): ?>
-                                    <a href="?toggle_private=<?php echo $comment['id']; ?>" class="btn btn-sm btn-secondary">Make Public</a>
+                                    <a href="?toggle_private=<?php echo $comment['id']; ?>&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-secondary">Make Public</a>
                                 <?php else: ?>
-                                    <a href="?toggle_private=<?php echo $comment['id']; ?>" class="btn btn-sm btn-secondary">Make Private</a>
+                                    <a href="?toggle_private=<?php echo $comment['id']; ?>&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-secondary">Make Private</a>
                                 <?php endif; ?>
-                                <a href="?delete_comment=<?php echo $comment['id']; ?>&type=poem" class="btn btn-sm btn-danger" onclick="return confirm('Delete this comment?');">Delete</a>
+                                <a href="?delete_comment=<?php echo $comment['id']; ?>&type=poem&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this comment?');">Delete</a>
                             </div>
                             <!-- Reply form (hidden) -->
                             <div class="reply-form-container" id="reply-form-<?php echo $comment['id']; ?>">
@@ -462,9 +464,9 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
                             <div class="comment-actions">
                                 <button class="btn btn-sm btn-outline reply-toggle" data-comment-id="<?php echo $comment['id']; ?>" data-target-type="book_comment" data-target-id="<?php echo $comment['book_id']; ?>">Reply</button>
                                 <?php if (!$comment['resolved']): ?>
-                                    <a href="?resolve_comment=<?php echo $comment['id']; ?>&type=book" class="btn btn-sm btn-success" onclick="return confirm('Mark as resolved?');">✓ Resolve</a>
+                                    <a href="?resolve_comment=<?php echo $comment['id']; ?>&type=book&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-success" onclick="return confirm('Mark as resolved?');">✓ Resolve</a>
                                 <?php endif; ?>
-                                <a href="?delete_comment=<?php echo $comment['id']; ?>&type=book" class="btn btn-sm btn-danger" onclick="return confirm('Delete this comment?');">Delete</a>
+                                <a href="?delete_comment=<?php echo $comment['id']; ?>&type=book&csrf=<?php echo urlencode(generate_csrf_token()); ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this comment?');">Delete</a>
                             </div>
                             <!-- Reply form (hidden) -->
                             <div class="reply-form-container" id="reply-form-<?php echo $comment['id']; ?>">
