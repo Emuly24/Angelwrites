@@ -88,7 +88,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $rec_filename = 'rec_' . time() . '.webm';
         if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
-            // Attach audio to post (you might store it in a separate table or as metadata)
+            // CAM2: show the recording in the post (it was saved to disk and never attached)
+            $content .= "\n" . '<figure class="aw-post-media"><audio controls preload="metadata" src="' . SITE_URL . '/assets/uploads/audio/' . $rec_filename . '"></audio></figure>';
         } else {
             $error = 'Failed to upload recorded audio.';
         }
@@ -100,7 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $video_filename = 'vid_' . time() . '.webm';
         if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
-            // Attach video to post
+            // CAM2: show the video in the post (it was saved to disk and never attached)
+            $content .= "\n" . '<figure class="aw-post-media"><video controls preload="metadata" playsinline style="max-width:100%;" src="' . SITE_URL . '/assets/uploads/videos/' . $video_filename . '"></video></figure>';
         } else {
             $error = 'Failed to upload recorded video.';
         }

@@ -86,9 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $rec_filename = 'rec_' . time() . '.webm';
         if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
-            // Store audio path – you may need to add a field to blog_posts or handle separately
-            // For now, we'll just store it in a custom field or session
-            $_SESSION['audio_path'] = 'assets/uploads/audio/' . $rec_filename;
+            // CAM2: show the recording in the post (it was saved to disk and never attached)
+            $content .= "\n" . '<figure class="aw-post-media"><audio controls preload="metadata" src="' . SITE_URL . '/assets/uploads/audio/' . $rec_filename . '"></audio></figure>';
         } else {
             $error = 'Failed to upload recorded audio.';
         }
@@ -100,7 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $video_filename = 'vid_' . time() . '.webm';
         if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
-            $_SESSION['video_path'] = 'assets/uploads/videos/' . $video_filename;
+            // CAM2: show the video in the post (it was saved to disk and never attached)
+            $content .= "\n" . '<figure class="aw-post-media"><video controls preload="metadata" playsinline style="max-width:100%;" src="' . SITE_URL . '/assets/uploads/videos/' . $video_filename . '"></video></figure>';
         } else {
             $error = 'Failed to upload recorded video.';
         }
