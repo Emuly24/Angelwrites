@@ -844,7 +844,7 @@ if (function_exists('renderAchievementToastJS')) {
         if (userId === 0) { alert('Please log in to bookmark.'); return; }
         if (isBookmarked) {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
-            const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); xhr.send(fd);
+            const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); xhr.send(fd); // F235
             isBookmarked = false; bookmarkBtn.querySelector('i').className = 'far fa-bookmark'; bookmarkBtn.style.color = '#555';
         } else {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
