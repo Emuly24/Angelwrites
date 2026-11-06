@@ -311,6 +311,19 @@ try {
         $db->exec('PRAGMA foreign_keys = ON');
     }
 
+    // F76: the phone number a member pays from was only put in the admin email, never stored, so
+    // the admin had nothing to match against a mobile-money statement. Schema version 4 adds
+    // payments.phone_number (skipped if the column is already there, e.g. on a new install).
+    if ($aw_schema_version < 4) {
+        $aw_cols = $db->query("PRAGMA table_info(payments)")->fetchAll(PDO::FETCH_COLUMN, 1);
+        if ($aw_cols && !in_array('phone_number', $aw_cols, true)) {
+            $db->exec('ALTER TABLE payments ADD COLUMN phone_number TEXT');
+        }
+        if ($aw_cols) { // without a payments table yet, check again on the next request
+            $db->exec('PRAGMA user_version = 4');
+        }
+    }
+
 } catch (PDOException $e) {
     // Log error and show user-friendly message
     error_log('Database Error: ' . $e->getMessage());

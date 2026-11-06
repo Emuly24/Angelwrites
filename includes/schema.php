@@ -556,7 +556,7 @@ return array (
     transaction_id TEXT,
     status TEXT DEFAULT \'pending\',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME,
+    completed_at DATETIME, phone_number TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 )',

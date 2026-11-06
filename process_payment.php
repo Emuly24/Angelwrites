@@ -97,10 +97,11 @@ if (!aw_payment_instructions()) {
 // ===== INSERT PAYMENT RECORD =====
 try {
     $stmt = $db->prepare("
-        INSERT INTO payments (user_id, book_id, amount, payment_method, transaction_id, status, created_at)
-        VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+        INSERT INTO payments (user_id, book_id, amount, payment_method, transaction_id, phone_number, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
     ");
-    $stmt->execute([$user_id, $book_id, $amount, $payment_method, $payer_reference !== '' ? $payer_reference : null]);
+    // F76: the payer's phone number is stored with the order (it was only in the admin email).
+    $stmt->execute([$user_id, $book_id, $amount, $payment_method, $payer_reference !== '' ? $payer_reference : null, mb_substr($phone_number, 0, 30)]);
     $payment_id = $db->lastInsertId();
     $reference = 'AW-' . $payment_id;
 
