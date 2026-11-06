@@ -128,7 +128,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $full_message .= "<h2>$title</h2>";
             if (!empty($intro)) $full_message .= "<p><em>$intro</em></p>";
             $full_message .= "<div>" . nl2br($content) . "</div>";
-            $full_message .= "<hr><p>Unsubscribe: " . SITE_URL . "/newsletter.php?unsubscribe=1&token=[TOKEN]</p>";
+            // F141: the real unsubscribe flow is unsubscribe.php?token=<subscriber token>;
+            // newsletter.php has no unsubscribe handler.
+            $full_message .= "<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"" . SITE_URL . "/unsubscribe.php?token=[TOKEN]\">click here</a>.</p>";
             $full_message .= "</body></html>";
 
             $stmt = $db->prepare("SELECT email, unsubscribe_token FROM newsletter WHERE is_active = 1");
