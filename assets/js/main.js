@@ -144,6 +144,10 @@
     });
 
     // ===== LOCAL BIBLE NAVIGATION =====
+    // F199: no page contains the Bible modal's selects, so this block threw on every page
+    // (appendChild on null) and the active-nav code in section 6 never ran. It now runs only
+    // when the modal markup is present. (Block not re-indented, to keep the change small.)
+    if (bibleBookSelect && bibleChapterSelect && bibleVerseSelect && bibleVersionSelect && bibleResult) {
     // List of Bible books
     const books = [
         "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
@@ -241,6 +245,7 @@
             }
         });
     }
+    } // end F199 guard
 
     // ============================================================
     // 6. Navigation Active State (Highlight current page)
@@ -250,7 +255,10 @@
         const currentFile = currentPath.split('/').pop() || 'index.php';
         document.querySelectorAll('.nav-links a').forEach(link => {
             const href = link.getAttribute('href');
-            if (href === currentFile || href === currentPath) {
+            // F199: the header's links are absolute (SITE_URL/page.php); compare file names.
+            let linkFile = '';
+            try { linkFile = new URL(href, window.location.href).pathname.split('/').pop() || 'index.php'; } catch (e) {}
+            if (href === currentFile || href === currentPath || linkFile === currentFile) {
                 link.classList.add('active');
             } else {
                 link.classList.remove('active');
