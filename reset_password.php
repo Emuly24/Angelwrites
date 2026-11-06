@@ -17,7 +17,8 @@ if (isLoggedIn()) {
 $email = isset($_GET['email']) ? trim($_GET['email']) : '';
 $error = '';
 $success = '';
-$step = 1; // 1 = request code, 2 = verify and reset
+// Q25: codes are requested on forgot_password.php only; this page is just "enter the code and a new password".
+$step = 2;
 
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
@@ -40,52 +41,12 @@ if ($attempts >= 5 && (time() - $last_attempt < 900)) {
     $error = 'Too many failed reset attempts. Please wait 15 minutes and try again.';
 }
 
-// ===== STEP 1: REQUEST RESET CODE =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_reset']) && !$error) {
-    $email = trim($_POST['email']);
-
-    if (empty($email)) {
-        $error = 'Please enter your email address.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Please enter a valid email address.';
-    } else {
-        $stmt = $db->prepare("SELECT id, first_name, is_verified FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$user) {
-            $error = 'No account found with that email address.';
-        } elseif ($user['is_verified'] != 1) {
-            $error = 'Please verify your email address before resetting your password. <a href="verify.php?email=' . urlencode($email) . '">Verify now</a>.';
-        } else {
-            // Generate 6-digit reset code
-            $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
-            $stmt = $db->prepare("UPDATE users SET reset_code = ?, reset_code_expiry = ? WHERE id = ?");
-            $stmt->execute([$code, $expiry, $user['id']]);
-
-            // Extract first name for email greeting
-            $rawName = trim($user['first_name'] ?? 'there');
-            $nameParts = preg_split('/[\s_\-]+/', $rawName);
-            $greetingName = ucfirst($nameParts[0] ?? 'there');
-            if (count($nameParts) === 1 && strlen($greetingName) > 12) {
-                $camelParts = preg_split('/(?=[A-Z])/', $greetingName);
-                if (count($camelParts) > 1) {
-                    $greetingName = ucfirst($camelParts[0]);
-                }
-            }
-
-            $subject = "Reset your AngelWrites password";
-            $body = "Hello $greetingName,\n\nYour password reset code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.\n\n— AngelWrites Team";
-
-            if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
-                $step = 2;
-                $success = 'A reset code has been sent to your email address.';
-            } else {
-                $error = 'Failed to send reset code. Please try again later.';
-            }
-        }
-    }
+// Q25: this page had its own "send me a code" step, a second copy of forgot_password.php that also
+// said "No account found with that email address" (the leak F105 closed on forgot_password.php).
+// Any old form that still posts here is sent to the single request page.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_reset'])) {
+    header('Location: ' . SITE_URL . '/forgot_password.php');
+    exit;
 }
 
 // ===== STEP 2: VERIFY CODE AND RESET PASSWORD =====
@@ -156,7 +117,7 @@ $pageTitle = 'Reset Password';
             <div class="auth-card">
                 <div class="auth-header">
                     <h1>Reset Password</h1>
-                    <p><?php echo $step === 1 ? 'Enter your email to receive a reset code.' : 'Enter the 6-digit code and set a new password.'; ?></p>
+                    <p>Enter the 6-digit code from your email and set a new password. No code yet? <a href="<?php echo SITE_URL; ?>/forgot_password.php">Request one</a>.</p>
                 </div>
 
                 <?php if ($error): ?>
@@ -166,22 +127,7 @@ $pageTitle = 'Reset Password';
                     <div class="alert alert-success"><?php echo $success; ?></div>
                 <?php endif; ?>
 
-                <?php if ($step === 1): ?>
-                    <form method="POST" action="" class="auth-form" id="requestForm">
-                        <input type="hidden" name="request_reset" value="1">
-                        <div class="form-group">
-                            <label for="email">Email Address</label>
-                            <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="you@example.com" required autofocus>
-                            <div id="emailStatus" class="field-status"></div>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-block">
-                            <i class="fas fa-paper-plane"></i> Send Reset Code
-                        </button>
-                    </form>
-                    <div class="auth-footer">
-                        <p><a href="<?php echo SITE_URL; ?>/login.php">Back to Login</a></p>
-                    </div>
-                <?php elseif ($step === 2): ?>
+                <?php if ($step === 2): ?>
                     <form method="POST" action="" class="auth-form" id="resetForm">
                         <input type="hidden" name="reset_password" value="1">
                         <div class="form-group">

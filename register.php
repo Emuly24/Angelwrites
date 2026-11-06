@@ -346,7 +346,7 @@ $pageTitle = 'Sign Up';
                             </a>
                             <p class="small-note">
                                 📧 Didn't receive the email? Check your spam folder or 
-                                <a href="<?php echo SITE_URL; ?>/resend_verification.php">Request a new code</a>.
+                                <a href="<?php echo SITE_URL; ?>/verify.php">Request a new code</a>.
                             </p>
                         </div>
                     </div>

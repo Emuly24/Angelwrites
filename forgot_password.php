@@ -73,7 +73,7 @@ $pageTitle = 'Forgot Password';
                 <?php if ($message): ?>
                     <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
                     <div class="success-actions" style="text-align: center; margin-top: 16px;">
-                        <a href="<?php echo SITE_URL; ?>/reset_password.php" class="btn btn-primary">Go to Reset Password</a>
+                        <a href="<?php echo SITE_URL; ?>/reset_password.php<?php echo !empty($email) ? '?email=' . urlencode($email) : ''; ?>" class="btn btn-primary">Enter the code</a><!-- Q25 -->
                     </div>
                 <?php endif; ?>
 
