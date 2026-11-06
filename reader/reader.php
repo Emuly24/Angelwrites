@@ -738,7 +738,22 @@ if (function_exists('renderAchievementToastJS')) {
         loadNotes();
     }
 
+    // Q5: every page turn (and every scroll update) sent its own save_position request. The save now
+    // waits until the reader has stayed on a page for 3 s; a pending save is sent when the page is
+    // hidden or closed, so the position is never lost.
+    let savePositionTimer = null;
     function savePosition() {
+        if (userId === 0 || currentPage === 0) return;
+        clearTimeout(savePositionTimer);
+        savePositionTimer = setTimeout(sendPosition, 3000);
+    }
+    function flushPosition() {
+        if (savePositionTimer) { clearTimeout(savePositionTimer); sendPosition(); }
+    }
+    document.addEventListener('visibilitychange', function () { if (document.hidden) flushPosition(); });
+    window.addEventListener('pagehide', flushPosition);
+    function sendPosition() {
+        savePositionTimer = null;
         if (userId === 0 || currentPage === 0) return;
         const data = new FormData();
         data.append('action','save_position');
@@ -926,13 +941,16 @@ if (function_exists('renderAchievementToastJS')) {
     document.getElementById('readingSpeedSlider').addEventListener('input',function() {
         const val = parseInt(this.value);
         document.getElementById('readingSpeedLabel').textContent = val + ' wpm';
+        updateUI(currentPage);
+    });
+    // Q5: saved once when the slider is released ('change'), not on every step of the drag ('input').
+    document.getElementById('readingSpeedSlider').addEventListener('change',function() {
         if (userId > 0) {
             const data = new FormData();
             data.append('action','update_reading_speed');
-            data.append('speed',val);
+            data.append('speed',parseInt(this.value));
             navigator.sendBeacon('/reader/reader_ajax.php',data);
         }
-        updateUI(currentPage);
     });
 
     // ----- Reading status auto-update -----
