@@ -66,9 +66,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_status'])) {
 $sql = "
     SELECT 
         b.id, b.title, b.author, b.cover_path, b.file_path, b.file_type, b.is_free, b.price, b.is_sale,
-        rs.status, rs.progress, rs.last_read_page
+        rs.status,
+        -- R8: progress comes from where the reader saves it (reading_status.progress was never written)
+        COALESCE(rp.progress_percent, rs.progress, 0) AS progress,
+        COALESCE(CAST(rp.position_section AS INTEGER), rs.last_read_page) AS last_read_page,
+        rp.last_accessed_at
     FROM books b
     LEFT JOIN reading_status rs ON b.id = rs.book_id AND rs.user_id = ?
+    LEFT JOIN reading_progress rp ON b.id = rp.book_id AND rp.user_id = rs.user_id
     WHERE 1=1
 ";
 $params = [$user_id];
@@ -244,7 +249,7 @@ $pageTitle = 'My Library';
                                     <div class="progress-bar">
                                         <div class="progress-fill" style="width: <?php echo min($book['progress'] ?? 0, 100); ?>%;"></div>
                                     </div>
-                                    <span class="progress-text"><?php echo min($book['progress'] ?? 0, 100); ?>% complete</span>
+                                    <span class="progress-text"><?php echo min($book['progress'] ?? 0, 100); ?>% complete<?php if (!empty($book['last_read_page'])): ?> · page <?php echo (int)$book['last_read_page']; ?><?php endif; ?><?php if (!empty($book['last_accessed_at'])): ?> · <?php echo date('M j', strtotime($book['last_accessed_at'])); ?><?php endif; ?></span>
                                 </div>
                                 <div class="book-actions">
                                     <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">

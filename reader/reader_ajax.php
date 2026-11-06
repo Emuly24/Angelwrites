@@ -60,6 +60,16 @@ if ($action === 'save_position') {
         $stmt->execute([$user_id, $book_id, $offset, $chapter, $percent]);
     }
 
+    // R8: reading a book puts it on the member's "Currently reading" shelf (library and dashboard)
+    // unless they have already shelved it themselves.
+    try {
+        $db->prepare("INSERT INTO reading_status (user_id, book_id, status) SELECT ?, ?, 'currently reading' WHERE NOT EXISTS (SELECT 1 FROM reading_status WHERE user_id = ? AND book_id = ?)")
+           ->execute([$user_id, $book_id, $user_id, $book_id]);
+        $db->prepare("UPDATE reading_status SET updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND book_id = ? AND status = 'currently reading'")->execute([$user_id, $book_id]);
+    } catch (PDOException $e) {
+        error_log('R8 reading_status: ' . $e->getMessage());
+    }
+
     // Update streak and gamification
     updateReadingStreak($user_id);
     updateReadingSessionDuration($user_id, $book_id);
