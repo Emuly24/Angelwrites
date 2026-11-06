@@ -6,12 +6,20 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
     http_response_code(403);
     exit('Access denied.');
 }
+// F173: segment membership per subscriber, for the Segments column.
+$segment_names_by_subscriber = [];
+foreach ($db->query("SELECT a.subscriber_id, s.name FROM subscriber_segment_assignments a JOIN subscriber_segments s ON s.id = a.segment_id ORDER BY s.name") as $row) {
+    $segment_names_by_subscriber[$row['subscriber_id']][] = $row['name'];
+}
 ?>
 <div class="card">
     <div class="card-header">
         <h2>👥 Subscribers (<?php echo count($subscribers); ?>, <?php echo (int)$active_count; ?> active)</h2>
     </div>
     <div class="card-body">
+        <?php if (count($segments) === 0): ?>
+            <p class="field-hint">To group subscribers, first create a segment on the Segments tab, then select subscribers here and choose “Add to segment”.</p>
+        <?php endif; ?>
         <?php if (count($subscribers) > 0): ?>
             <form method="POST" id="bulkSubscribersForm" onsubmit="return collectSelectedSubscribers();">
                 <input type="hidden" name="action" value="bulk_subscribers">
@@ -21,6 +29,14 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
                         <option value="">Bulk action…</option>
                         <option value="unsubscribe">Unsubscribe</option>
                         <option value="delete">Delete</option>
+                        <option value="add_segment">Add to segment</option>
+                        <option value="remove_segment">Remove from segment</option>
+                    </select>
+                    <select name="segment_id" id="bulkSegmentId" aria-label="Segment">
+                        <option value="">Segment…</option>
+                        <?php foreach ($segments as $seg): ?>
+                            <option value="<?php echo (int)$seg['id']; ?>"><?php echo htmlspecialchars($seg['name']); ?></option>
+                        <?php endforeach; ?>
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary">Apply to selected</button>
                 </div>
@@ -32,6 +48,7 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
                                 <th>Email</th>
                                 <th>Name</th>
                                 <th>Status</th>
+                                <th>Segments</th>
                                 <th>Subscribed</th>
                             </tr>
                         </thead>
@@ -46,6 +63,7 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
                                             <?php echo $sub['is_active'] ? 'Active' : 'Inactive'; ?>
                                         </span>
                                     </td>
+                                    <td><?php echo htmlspecialchars(implode(', ', $segment_names_by_subscriber[$sub['id']] ?? [])) ?: '—'; ?></td>
                                     <td><?php echo $sub['subscribed_at'] ? date('M j, Y', strtotime($sub['subscribed_at'])) : '—'; ?></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -61,6 +79,7 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
                 const ids = Array.from(document.querySelectorAll('.bulk-subscriber:checked')).map(cb => cb.value);
                 if (ids.length === 0) { alert('Select at least one subscriber.'); return false; }
                 const action = document.getElementById('bulkSubscriberAction').value;
+                if ((action === 'add_segment' || action === 'remove_segment') && !document.getElementById('bulkSegmentId').value) { alert('Choose a segment.'); return false; }
                 if (action === 'delete' && !confirm('Delete ' + ids.length + ' subscriber(s)? This cannot be undone.')) return false;
                 document.getElementById('selectedSubscriberIds').value = ids.join(',');
                 return true;
