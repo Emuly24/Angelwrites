@@ -8,3 +8,5 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
 RewriteEngine On
 # Allow the bot to fetch the clean /img/ URL, which routes internally to serve_og.php
 RewriteRule ^img/([0-9]+)/?$ serve_og.php?id=$1 [L,QSA]
+# F225: unknown URLs get the site's own 404 page (404.php sends the 404 status itself)
+ErrorDocument 404 /404.php

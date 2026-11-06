@@ -1,4 +1,7 @@
 <?php
+// F225: this page used to answer with HTTP 200, so missing pages looked like real ones to browsers
+// and search engines. It now sends 404 (it is also the ErrorDocument in .htaccess).
+http_response_code(404);
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
