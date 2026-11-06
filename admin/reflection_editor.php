@@ -279,9 +279,9 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                         <div class="recorder-controls">
                             <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
                             <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="videoRecordingForm" style="display:none;">
+                            <div id="videoRecordingForm" style="display:none;"><!-- M4: was a nested <form>, which ended the page form early -->
                                 <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
-                            </form>
+                            </div>
                             <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
                                 <video controls width="100%"><source src="" type="video/webm"></video>
                             </div>
@@ -553,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                videoRecorder.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                videoRecorder.stream = await AWMedia.getStream({ video: true, audio: true }); // M4: noise reduction while recording
                 videoRecorder.mediaRecorder = new MediaRecorder(videoRecorder.stream);
                 videoRecorder.chunks = [];
 
@@ -569,59 +569,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     videoRecorder.chunks.push(event.data);
                 };
 
-                videoRecorder.mediaRecorder.onstop = () => {
-                    videoRecorder.blob = new Blob(videoRecorder.chunks, { type: 'video/webm' });
-                    const url = URL.createObjectURL(videoRecorder.blob);
+                videoRecorder.mediaRecorder.onstop = async () => {
+                    videoRecorder.stream.getTracks().forEach(t => t.stop()); // M4: release camera and microphone
+                    if (videoPreview) videoPreview.srcObject = null;
+                    // M4: edit the video (trim, cut, crop, filters, sound), then put it straight into the form.
+                    // "Use This" used to reload the page, which threw the recording away.
+                    videoRecorder.blob = await AWMedia.review(new Blob(videoRecorder.chunks, { type: 'video/webm' }), { kind: 'video' });
+                    const dt = new DataTransfer();
+                    dt.items.add(new File([videoRecorder.blob], 'video_recording.webm', { type: 'video/webm' }));
+                    videoRecordingInput.files = dt.files;
                     if (videoPreview) {
-                        videoPreview.srcObject = null;
-                        videoPreview.src = url;
+                        videoPreview.src = URL.createObjectURL(videoRecorder.blob);
                         videoPreview.muted = false;
                         videoPreview.load();
                         videoPreview.style.display = 'block';
+                        AWMedia.attachEditButton(videoRecordingInput, videoPreview, 'video', 'video_recording.webm');
                     }
                     videoPreviewContainer.style.display = 'block';
-
-                    document.querySelector('.recorder-controls').innerHTML = `
-                        <video controls src="${url}" width="100%"></video>
-                        <div style="display:flex; gap:12px; margin-top:10px;">
-                            <button type="button" id="confirmVideoBtn" class="btn btn-success btn-sm">✅ Use This</button>
-                            <button type="button" id="retakeVideoBtn" class="btn btn-warning btn-sm">🔄 Retake</button>
-                        </div>
-                    `;
-
-                    document.getElementById('confirmVideoBtn').addEventListener('click', function() {
-                        const dt = new DataTransfer();
-                        dt.items.add(new File([videoRecorder.blob], 'video_recording.webm', { type: 'video/webm' }));
-                        videoRecordingInput.files = dt.files;
-                        document.getElementById('videoRecordingForm').style.display = 'block';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
-                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="videoRecordingForm" style="display:none;">
-                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
-                            </form>
-                            <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
-                                <video controls width="100%"><source src="" type="video/webm"></video>
-                            </div>
-                        `;
-                        location.reload();
-                    });
-
-                    document.getElementById('retakeVideoBtn').addEventListener('click', function() {
-                        videoRecorder.blob = null;
-                        videoPreviewContainer.style.display = 'none';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
-                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="videoRecordingForm" style="display:none;">
-                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
-                            </form>
-                            <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
-                                <video controls width="100%"><source src="" type="video/webm"></video>
-                            </div>
-                        `;
-                        location.reload();
-                    });
+                    videoRecordBtn.textContent = '🎥 Record Again';
                 };
 
                 videoRecorder.mediaRecorder.start();
