@@ -33,12 +33,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// P7: was capped at 300 with no way to see older testimonials; 20 per page now.
+require_once __DIR__ . '/../includes/pagination.php';
+[$page, $per_page] = aw_page(20);
+$items_total = (int)$db->query("SELECT COUNT(*) FROM testimonials")->fetchColumn();
+[$page, $offset] = aw_clamp($items_total, $page, $per_page);
 $items = $db->query("
     SELECT t.id, t.testimony, t.is_public, t.approved, t.created_at,
            u.name, u.first_name, u.last_name, u.username, u.email
     FROM testimonials t LEFT JOIN users u ON u.id = t.user_id
-    ORDER BY t.approved ASC, t.created_at DESC
-    LIMIT 300
+    ORDER BY t.approved ASC, t.created_at DESC, t.id DESC
+    LIMIT $per_page OFFSET $offset
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Testimonials';
@@ -74,6 +79,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </form>
             </div>
         <?php endforeach; ?>
+        <?php echo aw_pager($items_total, $page, $per_page); // P7 ?>
     </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
