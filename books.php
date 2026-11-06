@@ -30,6 +30,16 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// F34: books this member has bought download directly instead of opening the order form.
+$owned = [];
+if (isLoggedIn()) {
+    foreach ($books as $b) {
+        if (empty($b['is_free']) && aw_has_purchased($db, $_SESSION['user_id'], $b['id'])) {
+            $owned[(int)$b['id']] = true;
+        }
+    }
+}
+
 $pageTitle = 'Books';
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -132,8 +142,8 @@ $pageTitle = 'Books';
                                     <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
                                         <i class="fas fa-book-open"></i> Read
                                     </a>
-                                    <?php if (isLoggedIn() && ($book['is_free'] || (float)$book['price'] > 0)): // F80 ?>
-                                        <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo $book['is_free'] ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
+                                    <?php if (isLoggedIn() && ($book['is_free'] || isset($owned[(int)$book['id']]) || (float)$book['price'] > 0)): // F80, F34 ?>
+                                        <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo ($book['is_free'] || isset($owned[(int)$book['id']])) ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
                                             <i class="fas fa-download"></i> Download
                                         </button>
                                     <?php endif; ?>

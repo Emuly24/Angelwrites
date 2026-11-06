@@ -33,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pid = (int)($_POST['payment_id'] ?? 0);
         if (isset($_POST['confirm'])) {
             $msg = aw_confirm_payment($db, $pid) ? 'Order AW-' . $pid . ' confirmed.' : 'That order is not pending.';
+        } elseif (isset($_POST['unlock_legacy'])) {
+            $msg = aw_unlock_legacy_payment($db, $pid) ? 'Order AW-' . $pid . ' unlocked.' : 'Nothing to unlock for that order.';
         } elseif (isset($_POST['reject'])) {
             $msg = aw_reject_payment($db, $pid) ? 'Order AW-' . $pid . ' rejected.' : 'That order is not pending.';
         }
@@ -49,7 +51,7 @@ $where = $filter === 'all' ? '' : 'WHERE p.status = ' . $db->quote($filter);
 $orders = $db->query("
     SELECT p.id, p.amount, p.payment_method, p.transaction_id, p.phone_number, p.status, p.created_at, p.completed_at,
            b.title AS book_title, p.book_id,
-           u.name, u.first_name, u.last_name, u.username, u.email
+           u.name, u.first_name, u.last_name, u.username, u.email, p.user_id
     FROM payments p
     LEFT JOIN books b ON b.id = p.book_id
     LEFT JOIN users u ON u.id = p.user_id
@@ -103,6 +105,14 @@ require_once __DIR__ . '/../includes/header.php';
                     Member's transaction ID: <?php echo htmlspecialchars((string)($o['transaction_id'] ?? '') ?: 'not given'); ?><br>
                     Status: <?php echo $o['status'] === 'completed' ? '✅ Confirmed' . ($o['completed_at'] ? ' ' . date('M j, Y', strtotime($o['completed_at'])) : '') : ($o['status'] === 'rejected' ? '✖ Rejected' : '⏳ Waiting for payment'); ?>
                 </div>
+                <?php if ($o['status'] === 'completed' && !aw_has_purchased($db, $o['user_id'], $o['book_id'])): ?>
+                    <p style="font-size:0.9rem;margin:6px 0;">⚠ Recorded as paid by the old checkout, which took no money and checked nothing. The member cannot open the book. Check your statement before unlocking it.</p>
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
+                        <input type="hidden" name="payment_id" value="<?php echo (int)$o['id']; ?>">
+                        <button type="submit" name="unlock_legacy" value="1" class="btn btn-sm btn-outline" onclick="return confirm('Have you checked that this payment really arrived?');">Money verified: unlock</button>
+                    </form>
+                <?php endif; ?>
                 <?php if ($o['status'] === 'pending'): ?>
                     <form method="POST" style="display:flex;gap:8px;flex-wrap:wrap;">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">

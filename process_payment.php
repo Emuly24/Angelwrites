@@ -63,9 +63,8 @@ if ($amount <= 0) {
 }
 
 // ===== CHECK IF USER ALREADY PURCHASED THIS BOOK =====
-$stmt = $db->prepare("SELECT id FROM payments WHERE user_id = ? AND book_id = ? AND status = 'completed'");
-$stmt->execute([$user_id, $book_id]);
-if ($stmt->fetch()) {
+// F34: ownership is read from `purchases`, the table the reader and download gates use.
+if (aw_has_purchased($db, $user_id, $book_id)) {
     echo json_encode(['success' => false, 'error' => 'You have already purchased this book']);
     exit;
 }
