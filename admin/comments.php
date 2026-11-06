@@ -75,7 +75,7 @@ if (isset($_GET['delete_comment'])) {
     $id = (int)$_GET['delete_comment'];
     $type = isset($_GET['type']) ? $_GET['type'] : 'poem';
     if ($type === 'poem') {
-        $stmt = $db->prepare("UPDATE reviews SET deleted_at = NOW() WHERE id = ?");
+        $stmt = $db->prepare("UPDATE reviews SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?"); // F155: NOW() is MySQL-only (fatal on SQLite)
     } else {
         // For book comments, we just delete permanently (or soft delete if you have a deleted_at column)
         // We'll just delete permanently for simplicity.
