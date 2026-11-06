@@ -17,7 +17,9 @@ if (!isLoggedIn()) {
         exit;
     }
     ob_start();
-    $doCache = true;
+    // F210: cache/ does not exist on the host, so writing the cache warned on every guest
+    // visit. Only cache when the folder exists (create it only after #7's F174 token fix).
+    $doCache = is_dir(dirname($cacheFile));
 } else {
     $doCache = false;
 }
