@@ -1,86 +1,73 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/db.php';
+// N6: unsubscribing is a two-step action. Opening the link only shows a "Yes, unsubscribe me"
+// button, because mail scanners open links on their own and used to unsubscribe people. Mail
+// apps' own "Unsubscribe" button (RFC 8058 one-click, a POST of List-Unsubscribe=One-Click) works
+// directly. Asking for a link by email gives the same answer whether or not the address is on the
+// list (it used to say so), and is rate-limited. "Resubscribe" now works (it linked to a missing page).
+require_once 'includes/newsletter.php';
+require_once 'includes/mail_helper.php';
 
 $error = '';
 $success = '';
-$email = isset($_GET['email']) ? trim($_GET['email']) : '';
+$state = 'form';           // form | confirm | done | resubscribed | already
+$token = trim((string)($_POST['token'] ?? $_GET['token'] ?? ''));
+$subscriber = null;
+if ($token !== '') {
+    $st = $db->prepare("SELECT id, email, name, is_active FROM newsletter WHERE unsubscribe_token = ?");
+    $st->execute([$token]);
+    $subscriber = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+$mask = function ($email) {
+    [$u, $d] = array_pad(explode('@', (string)$email, 2), 2, '');
+    return mb_substr($u, 0, 2) . str_repeat('•', max(1, mb_strlen($u) - 2)) . '@' . $d;
+};
+$reasons = ['too_many' => 'Too many emails', 'not_relevant' => 'Not what I expected', 'never_signed_up' => 'I never signed up', 'other' => 'Another reason'];
 
-// ===== HANDLE UNSUBSCRIBE (via token) =====
-if (isset($_GET['token'])) {
-    $token = trim($_GET['token']);
-
-    $stmt = $db->prepare("SELECT id, email, is_active FROM newsletter WHERE unsubscribe_token = ?");
-    $stmt->execute([$token]);
-    $subscriber = $stmt->fetch(PDO::FETCH_ASSOC);
-
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $token !== '') {
+    $one_click = ($_POST['List-Unsubscribe'] ?? '') === 'One-Click';
+    $action = $one_click ? 'unsubscribe' : ($_POST['action'] ?? 'unsubscribe');
     if (!$subscriber) {
-        $error = 'Invalid or expired unsubscribe link.';
-    } elseif ($subscriber['is_active'] == 0) {
-        $success = 'This email is already unsubscribed.';
+        if ($one_click) { http_response_code(404); exit; }
+        $error = 'This link is not valid any more. Enter your email below and we will send you a new one.';
+    } elseif ($action === 'resubscribe') {
+        $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$subscriber['id']]);
+        aw_nl_audit($db, 'resubscribe', $subscriber['email'] . ' via link');
+        $state = 'resubscribed';
     } else {
-        $stmt = $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP WHERE id = ?");
-        if ($stmt->execute([$subscriber['id']])) {
-            $success = 'You have been successfully unsubscribed from the newsletter. We\'re sorry to see you go, but we respect your decision.';
-            $email = $subscriber['email'];
-
-            // ===== SEND ADMIN NOTIFICATION =====
-            $admin_email = aw_admin_email();
-            $admin_subject = 'User Unsubscribed from Newsletter';
-            $admin_body = "A user has unsubscribed from the newsletter.\n\nEmail: $email";
-            
-            if (function_exists('sendEmail')) {
-                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
-            } else {
-                require_once 'includes/mail_helper.php';
-                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
-            }
-
-            // ===== LOG TO AUDIT =====
-            $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
-            $stmt->execute([null, 'unsubscribe', "Email: $email via token"]);
-        } else {
-            $error = 'Something went wrong. Please try again.';
+        if ((int)$subscriber['is_active'] === 1) {
+            $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$subscriber['id']]);
+            $reason = $reasons[$_POST['reason'] ?? ''] ?? '';
+            aw_nl_audit($db, 'unsubscribe', $subscriber['email'] . ($one_click ? ' (one-click from the mail app)' : ' via link') . ($reason ? " – $reason" : ''));
+            sendEmail(aw_admin_email(), 'A reader unsubscribed from the newsletter',
+                "{$subscriber['email']} unsubscribed" . ($reason ? " ($reason)" : '') . '.', 'angelwrites@zohomail.com', 'AngelWrites', false);
         }
+        if ($one_click) { header('Content-Type: text/plain; charset=utf-8'); exit('Unsubscribed.'); }
+        $state = 'done';
     }
+} elseif ($token !== '') {
+    if (!$subscriber) $error = 'This link is not valid any more. Enter your email below and we will send you a new one.';
+    else $state = (int)$subscriber['is_active'] === 1 ? 'confirm' : 'already';
 } elseif (isset($_GET['email'])) {
-    // ===== SEND UNSUBSCRIBE LINK VIA EMAIL =====
-    $email = trim($_GET['email']);
+    $email = trim((string)$_GET['email']);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
+    } elseif (!aw_nl_rate_ok('unsub_ip_' . ($_SERVER['REMOTE_ADDR'] ?? ''), 5, 3600) || !aw_nl_rate_ok('unsub_mail_' . md5(strtolower($email)), 1, 600)) {
+        $error = 'Please wait a few minutes before asking again.';
     } else {
-        $stmt = $db->prepare("SELECT id, is_active, unsubscribe_token FROM newsletter WHERE email = ?");
-        $stmt->execute([$email]);
-        $subscriber = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$subscriber) {
-            $error = 'This email is not subscribed to our newsletter.';
-        } elseif ($subscriber['is_active'] == 0) {
-            $success = 'This email is already unsubscribed.';
-        } else {
-            $token = $subscriber['unsubscribe_token'];
-            $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $token;
-            
-            $subject = 'Unsubscribe from AngelWrites Newsletter';
-            $body = "<p>You requested to unsubscribe from the AngelWrites newsletter.</p>";
-            $body .= "<p>To confirm your unsubscription, please click the link below:</p>";
-            $body .= "<p><a href=\"$unsubscribe_link\">$unsubscribe_link</a></p>";
-            $body .= "<p>If you did not request this, you can safely ignore this email.</p>";
-            $body .= "<p>— AngelWrites Team</p>";
-
-            if (function_exists('sendEmail')) {
-                $result = sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
-            } else {
-                require_once 'includes/mail_helper.php';
-                $result = sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+        $sub = aw_nl_subscriber($db, $email);
+        if ($sub && (int)$sub['is_active'] === 1) {
+            if (empty($sub['unsubscribe_token'])) {
+                $sub['unsubscribe_token'] = bin2hex(random_bytes(32));
+                $db->prepare("UPDATE newsletter SET unsubscribe_token = ? WHERE id = ?")->execute([$sub['unsubscribe_token'], $sub['id']]);
             }
-
-            if ($result) {
-                $success = 'An unsubscribe link has been sent to your email address. Please check your inbox.';
-            } else {
-                $error = 'Failed to send unsubscribe link. Please try again later.';
-            }
+            $link = aw_nl_unsubscribe_url($sub['unsubscribe_token']);
+            $m = aw_nl_render($db, 'Unsubscribe from the AngelWrites newsletter', '<p>Hello {{first_name}},</p><p>Someone (hopefully you) asked to stop receiving the AngelWrites newsletter at this address.</p><p><a href="' . htmlspecialchars($link) . '" style="display:inline-block;background:#DBA1A2;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;">Unsubscribe</a></p><p>If you did not ask for this, simply ignore this email and nothing will change.</p>', $sub, ['preview' => true]);
+            aw_nl_mail($sub['email'], 'Unsubscribe from the AngelWrites newsletter', $m['html'], $m['text']);
         }
+        $success = 'If this address receives our newsletter, we have emailed it a link to unsubscribe. Please check your inbox.';
+        $state = 'sent';
     }
 }
 
@@ -91,64 +78,65 @@ $pageTitle = 'Unsubscribe';
 <div class="unsubscribe-page">
     <div class="container">
         <div class="unsubscribe-wrapper">
-            <!-- Page Header -->
             <div class="unsubscribe-header">
-                <h1>Unsubscribe</h1>
-                <p>We're sorry to see you go, but we respect your decision.</p>
+                <h1><?php echo $state === 'resubscribed' ? 'Welcome back' : 'Newsletter preferences'; ?></h1>
+                <p><?php echo $state === 'resubscribed' ? 'We are glad you are staying with us.' : 'You are always free to leave, and welcome to come back.'; ?></p>
             </div>
 
-            <!-- Alert Messages -->
             <?php if ($error): ?>
-                <div class="alert alert-error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <?php echo htmlspecialchars($error); ?>
-                </div>
-            <?php endif; ?>
-            <?php if ($success): ?>
-                <div class="alert alert-success">
-                    <i class="fas fa-check-circle"></i>
-                    <?php echo htmlspecialchars($success); ?>
-                    <div class="success-actions">
-                        <a href="<?php echo SITE_URL; ?>/index.php" class="btn btn-primary">
-                            <i class="fas fa-home"></i> Return Home
-                        </a>
-                        <a href="<?php echo SITE_URL; ?>/subscribe.php" class="btn btn-outline">
-                            <i class="fas fa-undo"></i> Resubscribe
-                        </a>
-                    </div>
-                </div>
+                <div class="alert alert-error" role="alert"><i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
 
-            <!-- Only show form if no token was provided and no success/error -->
-            <?php if (!$success && !$error): ?>
+            <?php if ($state === 'confirm'): ?>
                 <div class="unsubscribe-form-container">
-                    <div class="info-box">
-                        <p>
-                            <i class="fas fa-info-circle" style="color: var(--rose);"></i>
-                            Please enter your email address below and we will send you an unsubscribe link.
-                        </p>
+                    <div class="info-box"><p>Unsubscribe <strong><?php echo htmlspecialchars($mask($subscriber['email'])); ?></strong> from the AngelWrites newsletter?</p></div>
+                    <form method="POST" class="unsubscribe-form">
+                        <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
+                        <input type="hidden" name="action" value="unsubscribe">
+                        <div class="form-group">
+                            <label for="reason">Would you tell us why? (optional)</label>
+                            <select id="reason" name="reason">
+                                <option value="">Prefer not to say</option>
+                                <?php foreach ($reasons as $k => $l): ?><option value="<?php echo $k; ?>"><?php echo $l; ?></option><?php endforeach; ?>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-times-circle"></i> Yes, unsubscribe me</button>
+                    </form>
+                    <div class="unsubscribe-footer"><p><a href="<?php echo SITE_URL; ?>/index.php"><i class="fas fa-arrow-left"></i> No, keep me subscribed</a></p></div>
+                </div>
+            <?php elseif (in_array($state, ['done', 'already'], true)): ?>
+                <div class="alert alert-success" role="status">
+                    <i class="fas fa-check-circle"></i>
+                    <?php echo $state === 'done' ? 'You have been unsubscribed. You will not receive any more newsletters. Thank you for reading with us.' : 'This address is already unsubscribed.'; ?>
+                    <div class="success-actions">
+                        <a href="<?php echo SITE_URL; ?>/index.php" class="btn btn-primary"><i class="fas fa-home"></i> Return home</a>
+                        <form method="POST" style="display:inline;">
+                            <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
+                            <input type="hidden" name="action" value="resubscribe">
+                            <button type="submit" class="btn btn-outline"><i class="fas fa-undo"></i> Resubscribe</button>
+                        </form>
                     </div>
-                    
+                </div>
+            <?php elseif ($state === 'resubscribed'): ?>
+                <div class="alert alert-success" role="status">
+                    <i class="fas fa-heart"></i> You are subscribed again and will receive the next newsletter.
+                    <div class="success-actions"><a href="<?php echo SITE_URL; ?>/reflections.php" class="btn btn-primary">Read the latest reflections</a></div>
+                </div>
+            <?php elseif ($state === 'sent'): ?>
+                <div class="alert alert-success" role="status"><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($success); ?>
+                    <div class="success-actions"><a href="<?php echo SITE_URL; ?>/index.php" class="btn btn-primary"><i class="fas fa-home"></i> Return home</a></div>
+                </div>
+            <?php else: ?>
+                <div class="unsubscribe-form-container">
+                    <div class="info-box"><p><i class="fas fa-info-circle" style="color: var(--rose);"></i> Every newsletter has an unsubscribe link at the bottom. Lost it? Enter your email and we will send you one.</p></div>
                     <form method="GET" class="unsubscribe-form">
                         <div class="form-group">
-                            <label for="email">Email Address</label>
-                            <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" placeholder="you@example.com" required>
+                            <label for="email">Email address</label>
+                            <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
                         </div>
-                        
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary btn-block">
-                                <i class="fas fa-times-circle"></i> Send Unsubscribe Link
-                            </button>
-                        </div>
+                        <div class="form-actions"><button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Send me an unsubscribe link</button></div>
                     </form>
-                    
-                    <div class="unsubscribe-footer">
-                        <p>
-                            <a href="<?php echo SITE_URL; ?>/index.php">
-                                <i class="fas fa-arrow-left"></i> Return to Home
-                            </a>
-                        </p>
-                    </div>
+                    <div class="unsubscribe-footer"><p><a href="<?php echo SITE_URL; ?>/index.php"><i class="fas fa-arrow-left"></i> Return home</a></p></div>
                 </div>
             <?php endif; ?>
         </div>
@@ -166,6 +154,7 @@ $pageTitle = 'Unsubscribe';
 .info-box i { margin-right: 6px; }
 .unsubscribe-form .form-group { margin-bottom: 20px; }
 .unsubscribe-form label { display: block; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+.unsubscribe-form select { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--input-bg); color: var(--text); }
 .unsubscribe-form input { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--input-bg); color: var(--text); }
 .unsubscribe-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
 .unsubscribe-form .btn-block { width: 100%; padding: 14px; font-size: 1.05rem; justify-content: center; }
@@ -178,4 +167,4 @@ $pageTitle = 'Unsubscribe';
 @media (max-width: 480px) { .unsubscribe-form-container { padding: 20px; } .unsubscribe-header h1 { font-size: 1.8rem; } .success-actions { flex-direction: column; align-items: center; } .success-actions .btn { width: 100%; } }
 </style>
 
-<?php require_once 'includes/footer.php'; ?>
+<?php require_once 'includes/footer.php'; ?><?php require_once 'includes/footer.php'; ?>
