@@ -26,6 +26,20 @@ require_once __DIR__ . '/reader_functions.php';
 // --- User progress (already extracted, but we need some variables for the UI) ---
 $last_offset = $user_progress['position_offset'] ?? 0;
 $last_chapter = $user_progress['position_section'] ?? 0;
+
+// Q6: a book whose file has not been processed for the reader opened an empty reader showing "1 / 0"
+// with no explanation. Show a normal site page that says so and leads to the book page instead.
+if (empty($pages)) {
+    $pageTitle = $book['title'];
+    require_once __DIR__ . '/../includes/header.php';
+    echo '<div class="container" style="max-width:640px;margin:40px auto;padding:0 16px;text-align:center;">'
+       . '<h1 style="font-size:1.6rem;">' . htmlspecialchars($book['title']) . '</h1>'
+       . '<p>This book is not ready to read online yet. Please check back soon.</p>'
+       . '<p><a class="btn btn-primary" href="' . SITE_URL . '/book.php?id=' . (int)$book_id . '">Go to the book page</a></p>'
+       . '</div>';
+    require_once __DIR__ . '/../includes/footer.php';
+    exit;
+}
 $progress_percent = $user_progress['progress_percent'] ?? 0;
 
 // --- Get additional user data ---
