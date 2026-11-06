@@ -46,6 +46,22 @@ try {
     // They now run once per database file; PRAGMA user_version records that they have run.
     // (The block is deliberately not re-indented, to keep this change small.)
     $aw_schema_version = (int)$db->query('PRAGMA user_version')->fetchColumn();
+
+    // F207: a brand-new database gets the complete schema (97 tables, generated from the repaired
+    // production database by tools/generate_schema.php). The 23 definitions below could not run
+    // the site on their own and conflicted with what the code inserts. Existing databases (they
+    // have a users table) are never touched by this step.
+    $aw_has_users = (bool)$db->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'")->fetchColumn();
+    if (!$aw_has_users) {
+        $db->beginTransaction();
+        foreach (require __DIR__ . '/schema.php' as $sql) {
+            $db->exec($sql);
+        }
+        $db->exec('PRAGMA user_version = 1');
+        $db->commit();
+        $aw_schema_version = 1;
+    }
+
     if ($aw_schema_version < 1) {
     
     // Create tables if they don't exist
