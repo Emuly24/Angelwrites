@@ -251,6 +251,7 @@ $pageTitle = htmlspecialchars($book['title']);
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
+                    <p style="text-align:center;margin-top:8px;"><a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>">👥 Reading groups for this book</a></p><!-- F51 -->
                     <?php if (isLoggedIn()):
                         // F111: add this book to the member's library from its own page (the catalogue
                         // and book page had no way to do so). Posts to library.php's existing handler.

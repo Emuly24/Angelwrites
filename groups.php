@@ -32,8 +32,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['join_group'])) {
     }
 }
 
+// ===== F51: JOIN A PUBLIC GROUP FROM THE DIRECTORY (no invite code needed) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['join_public'])) {
+    $pg = $db->prepare("SELECT invite_code FROM reading_groups WHERE id = ? AND is_private = 0");
+    $pg->execute([(int)$_POST['group_id']]);
+    $pcode = $pg->fetchColumn();
+    $pg->closeCursor();
+    $result = $pcode ? joinGroupByCode($pcode, $user_id) : false;
+    if ($result === false) {
+        $join_error = 'That group is not open to join.';
+    } elseif ($result === 'already_member') {
+        $join_error = 'You are already a member of this group.';
+    } else {
+        $join_success = 'You have joined the group! <a href="group.php?id=' . (int)$result . '">Go to group</a>';
+    }
+}
+
 // ===== FETCH USER GROUPS =====
 $groups = getUserGroups($user_id);
+
+// ===== F51: GROUP DIRECTORY =====
+// There was no way to find a group: joining needed a code from the creator. Public groups the
+// member is not in are listed (optionally only those reading one book: groups.php?book=<id>,
+// linked from book.php). Decision D-G1.
+$book_filter = isset($_GET['book']) ? (int)$_GET['book'] : 0;
+$dsql = "SELECT g.id, g.name, g.description, g.content_type, g.content_id,
+                (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) AS member_count,
+                b.title AS book_title, p.title AS poem_title, n.subject AS newsletter_title
+         FROM reading_groups g
+         LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
+         LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
+         LEFT JOIN newsletter_archive n ON g.content_type = 'newsletter' AND g.content_id = n.id
+         WHERE g.is_private = 0 AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)";
+$dparams = [$user_id];
+if ($book_filter) {
+    $dsql .= " AND g.content_type = 'book' AND g.content_id = ?";
+    $dparams[] = $book_filter;
+}
+$dstmt = $db->prepare($dsql . " ORDER BY member_count DESC, g.created_at DESC LIMIT 30");
+$dstmt->execute($dparams);
+$public_groups = $dstmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'My Reading Groups';
 ?>
@@ -147,6 +185,31 @@ $pageTitle = 'My Reading Groups';
                         </a>
                     </div>
                 </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- ===== F51: DISCOVER GROUPS ===== -->
+<div class="groups-dashboard groups-directory">
+    <div class="container">
+        <h2>🔎 Discover groups<?php echo $book_filter ? ' reading this book' : ''; ?></h2>
+        <?php if (empty($public_groups)): ?>
+            <p class="empty-message">No open groups to join<?php echo $book_filter ? ' for this book yet' : ' right now'; ?>. You can create one.</p>
+        <?php else: ?>
+            <div class="groups-grid">
+                <?php foreach ($public_groups as $pg): ?>
+                    <div class="group-card">
+                        <h3><?php echo htmlspecialchars($pg['name']); ?></h3>
+                        <p class="group-content"><?php echo htmlspecialchars(ucfirst($pg['content_type']) . ': ' . ($pg['book_title'] ?? $pg['poem_title'] ?? $pg['newsletter_title'] ?? '')); ?></p>
+                        <?php if (!empty($pg['description'])): ?><p><?php echo htmlspecialchars(mb_substr($pg['description'], 0, 140)); ?></p><?php endif; ?>
+                        <p><small><?php echo (int)$pg['member_count']; ?> members</small></p>
+                        <form method="POST">
+                            <input type="hidden" name="group_id" value="<?php echo (int)$pg['id']; ?>">
+                            <button type="submit" name="join_public" value="1" class="btn btn-sm btn-primary">Join</button>
+                        </form>
+                    </div>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
