@@ -300,9 +300,13 @@ if ($action === 'get_monthly_challenge' && $user_id > 0) {
         ];
     }
     
-    // Count unique chapters read this month
+    // Count unique chapters read this month.
+    // F236: chapters the member reports by hand are stored as 'Daily Reading' chapter 0 (one row per
+    // chapter), so counting DISTINCT book-chapter counted all of them as one. Those rows are now added
+    // one by one; chapters actually opened in the reader are still counted once each.
     $stmt = $db->prepare("
-        SELECT COUNT(DISTINCT book || '-' || chapter) as count 
+        SELECT COUNT(DISTINCT CASE WHEN book = 'Daily Reading' THEN NULL ELSE book || '-' || chapter END)
+             + COALESCE(SUM(CASE WHEN book = 'Daily Reading' THEN 1 ELSE 0 END), 0) as count
         FROM bible_reading_history 
         WHERE user_id = ? AND strftime('%Y', read_at) = ? AND strftime('%m', read_at) = ?
     ");
