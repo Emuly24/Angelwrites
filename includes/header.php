@@ -55,6 +55,7 @@ if ($isLoggedIn) {
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
     <meta name="theme-color" content="#DBA1A2">
     <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
+    <link rel="apple-touch-icon" href="<?php echo SITE_URL; ?>/assets/images/apple-touch-icon.png"><!-- Q44 -->
 
    <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
 <?php
