@@ -22,7 +22,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // auth.php without db.php (logout.php) skip this.
 if (!isset($_SESSION['user_id']) && !empty($_COOKIE['remember_token']) && isset($GLOBALS['db']) && $GLOBALS['db'] instanceof PDO) {
     try {
-        $aw_rm = $GLOBALS['db']->prepare("SELECT u.id, u.username, u.name, u.role, u.is_verified
+        $aw_rm = $GLOBALS['db']->prepare("SELECT u.id, u.username, u.name, u.first_name, u.last_name, u.role, u.is_verified
                                           FROM remember_tokens t JOIN users u ON u.id = t.user_id
                                           WHERE t.token = ? AND t.expires_at > ?");
         $aw_rm->execute([(string)$_COOKIE['remember_token'], date('Y-m-d H:i:s')]);
@@ -32,7 +32,7 @@ if (!isset($_SESSION['user_id']) && !empty($_COOKIE['remember_token']) && isset(
             session_regenerate_id(true);
             $_SESSION['user_id'] = $aw_ru['id'];
             $_SESSION['username'] = $aw_ru['username'];
-            $_SESSION['name'] = $aw_ru['name'];
+            $_SESSION['name'] = awDisplayName($aw_ru); // F100
             $_SESSION['role'] = $aw_ru['role'];
         }
     } catch (Throwable $e) {
@@ -88,6 +88,19 @@ function getUserId() {
 /**
  * Get the current user's name (returns 'Guest' if not logged in)
  */
+/**
+ * F100: a member's display name. Self-registered members have first/last name and username but
+ * a NULL name column (the greeting printed "Deprecated: htmlspecialchars()…" instead of a name).
+ * Decision D-M1: work it out when shown; no data change.
+ */
+function awDisplayName($u) {
+    $u = (array)$u;
+    $name = trim((string)($u['name'] ?? ''));
+    if ($name === '') $name = trim(trim((string)($u['first_name'] ?? '')) . ' ' . trim((string)($u['last_name'] ?? '')));
+    if ($name === '') $name = trim((string)($u['username'] ?? ''));
+    return $name !== '' ? $name : 'Friend';
+}
+
 function getUserName() {
     return $_SESSION['name'] ?? 'Guest';
 }

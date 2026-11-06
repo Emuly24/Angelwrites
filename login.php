@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
     if (empty($login) || empty($password)) {
         $error = 'Please fill in all fields.';
     } else {
-        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name FROM users WHERE username = ? OR email = ?");
+        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name, first_name, last_name FROM users WHERE username = ? OR email = ?");
         $stmt->execute([$login, $login]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
                 // Set session
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
-                $_SESSION['name'] = $user['name'];
+                $_SESSION['name'] = awDisplayName($user); // F100: NULL name for self-registered members
                 $_SESSION['role'] = $user['role'];
 
                 // ===== REMEMBER ME LOGIC =====

@@ -198,7 +198,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <!-- User Hero -->
     <div class="user-hero">
         <div>
-            <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars($user['name']); ?></span></h1>
+            <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars(awDisplayName($user)); /* F100 */ ?></span></h1>
             <div class="sub">Your personal dashboard – track your reading journey.</div>
             <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <span style="background: #f1c40f; color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo $stats['current_streak']; ?> Day Streak</span>
