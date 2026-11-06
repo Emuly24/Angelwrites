@@ -456,6 +456,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <?php if (count($tocEntries) > 0): ?>
             <p class="toc-summary" id="tocSummary"></p>
             <div class="toc-group" id="tocGroup" hidden></div>
+            <p><button type="button" class="btn btn-sm btn-outline" id="tocPrint">🖨 Print or save this chapter</button></p><!-- R14 -->
             <ul class="toc-list">
                 <?php foreach ($tocEntries as $entry): ?>
                 <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><span class="toc-mark" aria-hidden="true"></span><span class="toc-title"><?php echo htmlspecialchars($entry['title']); ?></span><span class="toc-page">p. <?php echo (int)($entry['page'] ?? 1); ?></span></a></li>
@@ -897,6 +898,31 @@ if (function_exists('renderAchievementToastJS')) {
         });
     }
     document.addEventListener('DOMContentLoaded', renderGroupPlan);
+
+    // R14: print (or "Save as PDF") the chapter being read, as clean pages without the reader controls.
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('tocPrint');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const ch = getChapterForPage(currentPage || 1);
+            const nums = (chapterMap[ch] && chapterMap[ch].length) ? chapterMap[ch] : [currentPage || 1];
+            const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const body = nums.map(n => { const el = document.querySelector('.page-content-inner[data-page="' + n + '"]'); return el ? '<section>' + el.innerHTML + '</section>' : ''; }).join('');
+            const w = window.open('', '_blank');
+            if (!w) { alert('Please allow pop-ups for this site to print the chapter.'); return; }
+            const bookTitle = <?php echo json_encode((string)$book['title'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            w.document.write('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(bookTitle + ' – ' + getChapterTitle(ch)) + '</title>'
+                + '<style>body{font-family:Georgia,"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#000;max-width:42em;margin:2em auto;padding:0 1em}'
+                + 'header{border-bottom:1px solid #999;margin-bottom:1.5em;font-size:10pt;color:#444}section{margin-bottom:1em}'
+                + 'img{max-width:100%}[class^="highlight-"],mark{background:none!important;text-decoration:underline}'
+                + '@media print{body{margin:0}a{color:#000;text-decoration:none}}</style></head><body>'
+                + '<header>' + esc(bookTitle) + ' · ' + esc(getChapterTitle(ch)) + ' · pages ' + nums[0] + '–' + nums[nums.length - 1] + '</header>'
+                + body + '</body></html>');
+            w.document.close();
+            w.focus();
+            setTimeout(() => w.print(), 300);
+        });
+    });
 
     // R7: mark the current chapter and the chapters already read in the contents.
     var furthestPage = 0; // var: markToc can run before this line during start-up
