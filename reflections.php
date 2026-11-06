@@ -1,14 +1,15 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/db.php';
+require_once 'includes/auth.php';
 
-// ===== PAGINATION =====
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 9;
-$offset = ($page - 1) * $limit;
-
-// ===== SEARCH =====
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+// RF1: tag filter (?tag=), sort that works, plain-text excerpts, the shared pager and reactions that
+// reach a real endpoint (reflections_reactions.php).
+require_once __DIR__ . '/includes/pagination.php';
+require_once __DIR__ . '/includes/newsletter.php'; // CSRF token for the reaction buttons
+$search = isset($_GET['search']) ? mb_substr(trim((string)$_GET['search']), 0, 100) : '';
+$tag = isset($_GET['tag']) ? mb_substr(trim((string)$_GET['tag']), 0, 50) : '';
+$sort = in_array($_GET['sort'] ?? '', ['newest', 'oldest', 'most_viewed', 'most_commented', 'most_loved'], true) ? $_GET['sort'] : 'newest';
 
 // F71: admin/reflection_editor.php saves reflections as blog_posts (category 'Christian
 // Reflections'); this page read the separate reflections table, which nothing writes, so
@@ -16,86 +17,71 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 // alias keeps the column names the rest of the page uses (image_path = featured_image).
 $refl_src = "(SELECT id, title, content, excerpt, featured_image AS image_path, created_at, updated_at, views, tags, slug, featured, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published' AND category = 'Christian Reflections') reflections";
 
-// ===== SORT =====
-$sort = isset($_GET['sort']) ? $_GET['sort'] : 'newest';
-
-// ===== FETCH TAGS =====
-$stmt = $db->query("SELECT DISTINCT tags FROM $refl_src WHERE tags != ''");
-$tags = [];
-while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-    $tag_list = explode(',', $row['tags']);
-    foreach ($tag_list as $tag) {
-        $tag = trim($tag);
-        if ($tag) $tags[] = $tag;
+// ===== TAGS (with how many reflections use each) =====
+$tag_counts = [];
+foreach ($db->query("SELECT tags FROM $refl_src WHERE tags != ''")->fetchAll(PDO::FETCH_COLUMN) as $list) {
+    foreach (array_unique(array_filter(array_map('trim', explode(',', $list)))) as $t) {
+        $k = mb_strtolower($t);
+        if (!isset($tag_counts[$k])) $tag_counts[$k] = ['label' => $t, 'n' => 0];
+        $tag_counts[$k]['n']++;
     }
 }
-$tags = array_unique($tags);
-sort($tags);
+uasort($tag_counts, function ($a, $b) { return $b['n'] <=> $a['n'] ?: strcasecmp($a['label'], $b['label']); });
+$tags = array_column(array_slice($tag_counts, 0, 30), 'label');
 
-// ===== FETCH TOTAL REFLECTIONS =====
-$count_sql = "SELECT COUNT(*) FROM $refl_src";
-$count_params = [];
-if ($search) {
-    $count_sql .= " WHERE (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)";
-    $count_params[] = "%$search%";
-    $count_params[] = "%$search%";
-    $count_params[] = "%$search%";
+// ===== FILTERS =====
+$where = []; $params = [];
+if ($search !== '') {
+    $where[] = "(title LIKE ? OR content LIKE ? OR excerpt LIKE ? OR tags LIKE ?)";
+    array_push($params, "%$search%", "%$search%", "%$search%", "%$search%");
 }
-$stmt = $db->prepare($count_sql);
-$stmt->execute($count_params);
-$total_reflections = $stmt->fetchColumn();
-$total_pages = ceil($total_reflections / $limit);
-
-// ===== FETCH REFLECTIONS =====
-$sql = "SELECT * FROM $refl_src";
-$params = [];
-if ($search) {
-    $sql .= " WHERE (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
+if ($tag !== '') {
+    // exact tag in the comma-separated list (spaces after commas ignored)
+    $where[] = "(',' || lower(replace(replace(tags, ', ', ','), ' ,', ',')) || ',') LIKE ?";
+    $params[] = '%,' . mb_strtolower($tag) . ',%';
 }
-
-switch ($sort) {
-    case 'oldest':
-        $sql .= " ORDER BY created_at ASC";
-        break;
-    case 'most_viewed':
-        $sql .= " ORDER BY views DESC";
-        break;
-    case 'most_commented':
-        $sql .= " ORDER BY comment_count DESC";
-        break;
-    default:
-        $sql .= " ORDER BY created_at DESC";
-        break;
-}
-
-$sql .= " LIMIT ? OFFSET ?";
-$params[] = $limit;
-$params[] = $offset;
-
-$stmt = $db->prepare($sql);
+$where_sql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+$stmt = $db->prepare("SELECT COUNT(*) FROM $refl_src$where_sql");
 $stmt->execute($params);
+$total_reflections = (int)$stmt->fetchColumn();
+[$page, $limit] = aw_page(9);
+[$page, $offset] = aw_clamp($total_reflections, $page, $limit);
+$order = ['oldest' => 'created_at ASC', 'most_viewed' => 'views DESC, created_at DESC', 'most_commented' => 'comment_count DESC, created_at DESC', 'most_loved' => '(COALESCE(likes,0) + COALESCE(loves,0) + COALESCE(prays,0)) DESC, created_at DESC'][$sort] ?? 'created_at DESC, id DESC';
+$stmt = $db->prepare("SELECT * FROM $refl_src$where_sql ORDER BY $order LIMIT ? OFFSET ?");
+$stmt->execute(array_merge($params, [$limit, $offset]));
 $reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== FETCH RECENT REFLECTIONS (for sidebar) =====
-$stmt = $db->query("SELECT id, title, slug, created_at, comment_count FROM $refl_src ORDER BY created_at DESC LIMIT 5");
-$recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// ===== SIDEBAR + FEATURED =====
+$recent_reflections = $db->query("SELECT id, title, slug, created_at, comment_count FROM $refl_src ORDER BY created_at DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
+$featured_reflections = $db->query("SELECT * FROM $refl_src WHERE featured = 1 ORDER BY created_at DESC LIMIT 3")->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== FETCH FEATURED REFLECTIONS =====
-$stmt = $db->prepare("SELECT * FROM $refl_src WHERE featured = 1 ORDER BY created_at DESC LIMIT 3");
-$stmt->execute();
-$featured_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Which reactions the member already gave on this page's cards.
+$my_reactions = [];
+if (isLoggedIn() && $reflections) {
+    $ids = array_column($reflections, 'id');
+    $st = $db->prepare("SELECT target_id, reaction_type FROM reactions WHERE target_type = 'reflection' AND user_id = ? AND target_id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")");
+    $st->execute(array_merge([$_SESSION['user_id']], $ids));
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $my_reactions[$r['target_id']][$r['reaction_type']] = true;
+}
 
-// ===== READING TIME CALCULATION =====
 function readingTime($content) {
-    $word_count = str_word_count(strip_tags($content));
+    $word_count = str_word_count(strip_tags((string)$content));
     $minutes = ceil($word_count / 200);
     return $minutes < 1 ? '1 min read' : $minutes . ' min read';
 }
+// Plain text, cut on a word, never in the middle of a character (substr() split é, ’ …).
+function aw_refl_excerpt($row, $len = 150) {
+    $src = trim((string)($row['excerpt'] ?? '')) !== '' ? $row['excerpt'] : $row['content'];
+    $t = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags((string)$src), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+    if (mb_strlen($t) <= $len) return $t;
+    $cut = mb_substr($t, 0, $len);
+    $sp = mb_strrpos($cut, ' ');
+    return rtrim($sp > $len * 0.6 ? mb_substr($cut, 0, $sp) : $cut, ' ,.;:') . '…';
+}
+function aw_refl_url($row) { return SITE_URL . '/blog_post.php?slug=' . urlencode((string)$row['slug']); }
 
-$pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christian Reflections';
+// The header prints $pageTitle into <title> as it is, so the search and tag are escaped here.
+$pageTitle = htmlspecialchars($search !== '' ? 'Search: ' . $search : ($tag !== '' ? '#' . $tag . ' – Christian Reflections' : 'Christian Reflections'));
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -124,14 +110,20 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
         <div class="reflections-controls">
             <div class="reflections-controls-left">
                 <!-- Sort Dropdown -->
-                <div class="sort-dropdown">
-                    <select id="sortSelect" onchange="this.form.submit()">
+                <form method="GET" class="sort-dropdown" id="sortForm">
+                    <?php if ($search !== ''): ?><input type="hidden" name="search" value="<?php echo htmlspecialchars($search); ?>"><?php endif; ?>
+                    <?php if ($tag !== ''): ?><input type="hidden" name="tag" value="<?php echo htmlspecialchars($tag); ?>"><?php endif; ?>
+                    <label for="sortSelect" style="position:absolute;left:-9999px;">Sort reflections</label>
+                    <select id="sortSelect" name="sort" onchange="this.form.submit()">
                         <option value="newest" <?php echo $sort === 'newest' ? 'selected' : ''; ?>>Newest first</option>
                         <option value="oldest" <?php echo $sort === 'oldest' ? 'selected' : ''; ?>>Oldest first</option>
                         <option value="most_viewed" <?php echo $sort === 'most_viewed' ? 'selected' : ''; ?>>Most viewed</option>
                         <option value="most_commented" <?php echo $sort === 'most_commented' ? 'selected' : ''; ?>>Most commented</option>
+                        <option value="most_loved" <?php echo $sort === 'most_loved' ? 'selected' : ''; ?>>Most loved</option>
                     </select>
-                </div>
+                    <noscript><button type="submit" class="btn btn-sm btn-outline">Sort</button></noscript>
+                </form>
+                <?php if ($tag !== ''): ?><a class="active-tag" href="<?php echo SITE_URL; ?>/reflections.php<?php echo $search !== '' ? '?search=' . urlencode($search) : ''; ?>" aria-label="Remove the tag filter">#<?php echo htmlspecialchars($tag); ?> ✕</a><?php endif; ?>
             </div>
 
             <div class="reflections-controls-right">
@@ -146,7 +138,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                 </button>
 
                 <!-- Post Count -->
-                <span class="post-count"><?php echo $total_reflections; ?> reflection<?php echo $total_reflections != 1 ? 's' : ''; ?></span>
+                <span class="post-count"><?php echo $total_reflections; ?> reflection<?php echo $total_reflections != 1 ? 's' : ''; ?><?php echo $search !== '' ? ' matching “' . htmlspecialchars($search) . '”' : ''; ?></span>
             </div>
         </div>
 
@@ -155,17 +147,17 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
             <!-- Main Content -->
             <div class="reflections-main">
                 <!-- Featured Reflections -->
-                <?php if (count($featured_reflections) > 0 && $page === 1 && !$search): ?>
+                <?php if (count($featured_reflections) > 0 && $page === 1 && $search === '' && $tag === ''): ?>
                     <div class="featured-section">
                         <h3><i class="fas fa-star" style="color: var(--rose);"></i> Featured Reflections</h3>
                         <div class="featured-grid">
                             <?php foreach ($featured_reflections as $fr): ?>
                                 <div class="featured-card">
-                                    <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($fr['slug']); /* F72 */ ?>">
+                                    <a href="<?php echo htmlspecialchars(aw_refl_url($fr)); /* F72 */ ?>">
                                         <div class="featured-card-content">
                                             <span class="featured-badge"><i class="fas fa-star"></i> Featured</span>
                                             <h4><?php echo htmlspecialchars($fr['title']); ?></h4>
-                                            <p><?php echo htmlspecialchars(substr($fr['excerpt'] ?? $fr['content'], 0, 120)); ?>...</p>
+                                            <p><?php echo htmlspecialchars(aw_refl_excerpt($fr, 120)); ?></p>
                                             <span class="featured-read-more">Read <i class="fas fa-arrow-right"></i></span>
                                         </div>
                                     </a>
@@ -182,7 +174,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                             <article class="reflection-card">
                                 <?php if ($reflection['image_path']): ?>
                                     <div class="reflection-image">
-                                        <img src="<?php echo SITE_URL . '/' . $reflection['image_path']; ?>" alt="<?php echo htmlspecialchars($reflection['title']); ?>" loading="lazy">
+                                        <a href="<?php echo htmlspecialchars(aw_refl_url($reflection)); ?>" tabindex="-1" aria-hidden="true"><img src="<?php echo htmlspecialchars(SITE_URL . '/' . ltrim($reflection['image_path'], '/')); ?>" alt="" loading="lazy"></a>
                                     </div>
                                 <?php endif; ?>
                                 <div class="reflection-card-content">
@@ -196,29 +188,29 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                                         </span>
                                     </div>
                                     <h3>
-                                        <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($reflection['slug']); /* F72 */ ?>">
+                                        <a href="<?php echo htmlspecialchars(aw_refl_url($reflection)); /* F72 */ ?>">
                                             <?php echo htmlspecialchars($reflection['title']); ?>
                                         </a>
                                     </h3>
-                                    <p class="reflection-excerpt">
-                                        <?php echo htmlspecialchars(substr($reflection['excerpt'] ?? $reflection['content'], 0, 150)); ?>
-                                        <?php if (strlen($reflection['excerpt'] ?? $reflection['content']) > 150) echo '...'; ?>
-                                    </p>
+                                    <p class="reflection-excerpt"><?php echo htmlspecialchars(aw_refl_excerpt($reflection, 150)); ?></p>
+                                    <?php $rtags = array_slice(array_filter(array_map('trim', explode(',', (string)$reflection['tags']))), 0, 3); if ($rtags): ?>
+                                        <div class="reflection-tags"><?php foreach ($rtags as $t): ?><a href="<?php echo SITE_URL; ?>/reflections.php?tag=<?php echo urlencode($t); ?>">#<?php echo htmlspecialchars($t); ?></a><?php endforeach; ?></div>
+                                    <?php endif; ?>
                                     <div class="reflection-footer">
                                         <div class="reflection-reactions">
-                                            <button class="reaction-btn" onclick="reactReflection(<?php echo $reflection['id']; ?>, 'like')">
-                                                <i class="fas fa-thumbs-up"></i> <span id="likes-<?php echo $reflection['id']; ?>"><?php echo $reflection['likes'] ?? 0; ?></span>
+                                            <button type="button" class="reaction-btn<?php echo !empty($my_reactions[$reflection['id']]['like']) ? ' active' : ''; ?>" aria-pressed="<?php echo !empty($my_reactions[$reflection['id']]['like']) ? 'true' : 'false'; ?>" aria-label="Like" onclick="reactReflection(<?php echo (int)$reflection['id']; ?>, 'like', this)">
+                                                <i class="fas fa-thumbs-up"></i> <span id="likes-<?php echo (int)$reflection['id']; ?>"><?php echo (int)($reflection['likes'] ?? 0); ?></span>
                                             </button>
-                                            <button class="reaction-btn" onclick="reactReflection(<?php echo $reflection['id']; ?>, 'love')">
-                                                ❤️ <span id="loves-<?php echo $reflection['id']; ?>"><?php echo $reflection['loves'] ?? 0; ?></span>
+                                            <button type="button" class="reaction-btn<?php echo !empty($my_reactions[$reflection['id']]['love']) ? ' active' : ''; ?>" aria-pressed="<?php echo !empty($my_reactions[$reflection['id']]['love']) ? 'true' : 'false'; ?>" aria-label="Love" onclick="reactReflection(<?php echo (int)$reflection['id']; ?>, 'love', this)">
+                                                ❤️ <span id="loves-<?php echo (int)$reflection['id']; ?>"><?php echo (int)($reflection['loves'] ?? 0); ?></span>
                                             </button>
-                                            <button class="reaction-btn" onclick="reactReflection(<?php echo $reflection['id']; ?>, 'pray')">
-                                                🙏 <span id="prays-<?php echo $reflection['id']; ?>"><?php echo $reflection['prays'] ?? 0; ?></span>
+                                            <button type="button" class="reaction-btn<?php echo !empty($my_reactions[$reflection['id']]['pray']) ? ' active' : ''; ?>" aria-pressed="<?php echo !empty($my_reactions[$reflection['id']]['pray']) ? 'true' : 'false'; ?>" aria-label="Praying" onclick="reactReflection(<?php echo (int)$reflection['id']; ?>, 'pray', this)">
+                                                🙏 <span id="prays-<?php echo (int)$reflection['id']; ?>"><?php echo (int)($reflection['prays'] ?? 0); ?></span>
                                             </button>
                                         </div>
                                         <div class="reflection-actions">
                                             <span class="comment-count"><i class="fas fa-comment"></i> <?php echo number_format($reflection['comment_count'] ?? 0); ?></span>
-                                            <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($reflection['slug']); /* F72 */ ?>" class="read-more">
+                                            <a href="<?php echo htmlspecialchars(aw_refl_url($reflection)); /* F72 */ ?>" class="read-more">
                                                 Read <i class="fas fa-arrow-right"></i>
                                             </a>
                                         </div>
@@ -228,31 +220,13 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                         <?php endforeach; ?>
                     </div>
 
-                    <!-- Pagination -->
-                    <?php if ($total_pages > 1): ?>
-                        <div class="pagination">
-                            <?php if ($page > 1): ?>
-                                <a href="?page=<?php echo $page - 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $sort ? '&sort=' . urlencode($sort) : ''; ?>" class="page-link">
-                                    <i class="fas fa-chevron-left"></i>
-                                </a>
-                            <?php endif; ?>
-                            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                                <a href="?page=<?php echo $i; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $sort ? '&sort=' . urlencode($sort) : ''; ?>" class="page-link <?php echo $i === $page ? 'active' : ''; ?>">
-                                    <?php echo $i; ?>
-                                </a>
-                            <?php endfor; ?>
-                            <?php if ($page < $total_pages): ?>
-                                <a href="?page=<?php echo $page + 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $sort ? '&sort=' . urlencode($sort) : ''; ?>" class="page-link">
-                                    <i class="fas fa-chevron-right"></i>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
+                    <?php echo aw_pager($total_reflections, $page, $limit); // RF1: shared pager (keeps search, tag and sort) ?>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-church" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
                         <h3>No reflections found</h3>
-                        <p><?php echo $search ? 'Try adjusting your search.' : 'Check back soon for new reflections from Angella.'; ?></p>
+                        <p><?php echo ($search !== '' || $tag !== '') ? 'Try another word or tag.' : 'Check back soon for new reflections from Angella.'; ?></p>
+                        <?php if ($search !== '' || $tag !== ''): ?><a class="btn btn-outline btn-sm" href="<?php echo SITE_URL; ?>/reflections.php">Show all reflections</a><?php endif; ?>
                     </div>
                 <?php endif; ?>
             </div>
@@ -266,7 +240,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                         <ul class="recent-posts-list">
                             <?php foreach ($recent_reflections as $rr): ?>
                                 <li>
-                                    <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($rr['slug']); /* F72 */ ?>">
+                                    <a href="<?php echo htmlspecialchars(aw_refl_url($rr)); /* F72 */ ?>">
                                         <?php echo htmlspecialchars($rr['title']); ?>
                                     </a>
                                     <small><?php echo date('M j, Y', strtotime($rr['created_at'])); ?> • <?php echo $rr['comment_count'] ?? 0; ?> comments</small>
@@ -283,9 +257,9 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                     <div class="sidebar-card">
                         <h4><i class="fas fa-cloud" style="color: var(--rose);"></i> Tags</h4>
                         <div class="tag-cloud">
-                            <?php foreach ($tags as $tag): ?>
-                                <a href="<?php echo SITE_URL; ?>/reflections.php?search=<?php echo urlencode($tag); ?>" class="tag-cloud-link">
-                                    #<?php echo htmlspecialchars($tag); ?>
+                            <?php foreach ($tags as $t): ?>
+                                <a href="<?php echo SITE_URL; ?>/reflections.php?tag=<?php echo urlencode($t); ?>" class="tag-cloud-link<?php echo mb_strtolower($t) === mb_strtolower($tag) ? ' active' : ''; ?>">
+                                    #<?php echo htmlspecialchars($t); ?> <small><?php echo (int)$tag_counts[mb_strtolower($t)]['n']; ?></small>
                                 </a>
                             <?php endforeach; ?>
                         </div>
@@ -297,7 +271,12 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                     <h4><i class="fas fa-envelope" style="color: var(--rose);"></i> Stay Updated</h4>
                     <p>Get new reflections delivered to your inbox.</p>
                     <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="sidebar-newsletter">
-                        <input type="email" name="email" placeholder="Your email address" required>
+                        <input type="hidden" name="redirect" value="/reflections.php">
+                        <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;">
+                        <label for="sidebarName" style="position:absolute;left:-9999px;">Your first name</label>
+                        <input type="text" id="sidebarName" name="name" placeholder="Your first name (optional)" maxlength="100">
+                        <label for="sidebarEmail" style="position:absolute;left:-9999px;">Your email address</label>
+                        <input type="email" id="sidebarEmail" name="email" placeholder="Your email address" required>
                         <button type="submit" class="btn btn-primary btn-block">
                             <i class="fas fa-paper-plane"></i> Subscribe
                         </button>
@@ -352,7 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== VIEW TOGGLE =====
     const viewToggle = document.getElementById('viewToggle');
-    const reflectionsGrid = document.getElementById('reflectionsGrid');
+    const reflectionsGrid = document.getElementById('reflectionsGrid') || document.createElement('div'); // RF1: no grid when nothing matches
     const currentView = localStorage.getItem('reflectionsView') || 'grid';
     if (currentView === 'list') {
         reflectionsGrid.classList.add('list-view');
@@ -401,21 +380,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ===== REACTIONS =====
-    window.reactReflection = function(reflectionId, reaction) {
-        fetch('<?php echo SITE_URL; ?>/reflections_reactions.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'reflection_id=' + reflectionId + '&reaction=' + reaction
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('likes-' + reflectionId).textContent = data.likes;
-                document.getElementById('loves-' + reflectionId).textContent = data.loves;
-                document.getElementById('prays-' + reflectionId).textContent = data.prays;
-            }
-        });
+    // ===== REACTIONS (RF1: reflections_reactions.php did not exist, so these never worked) =====
+    window.reactReflection = function(reflectionId, reaction, btn) {
+        const fd = new FormData();
+        fd.append('reflection_id', reflectionId); fd.append('reaction', reaction);
+        fd.append('csrf_token', <?php echo json_encode(generate_csrf_token()); ?>);
+        fetch('<?php echo SITE_URL; ?>/reflections_reactions.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.login) { if (confirm('Please log in to react. Go to the login page now?')) location.href = '<?php echo SITE_URL; ?>/login.php?redirect=' + encodeURIComponent('/reflections.php'); return; }
+                if (!data.success) { alert(data.error || 'Please try again.'); return; }
+                ['likes', 'loves', 'prays'].forEach(k => { const el = document.getElementById(k + '-' + reflectionId); if (el) el.textContent = data[k]; });
+                if (btn) { btn.classList.toggle('active', data.active); btn.setAttribute('aria-pressed', data.active ? 'true' : 'false'); }
+            })
+            .catch(() => alert('Please try again.'));
     };
 
     // ===== SORT DROPDOWN =====
@@ -430,17 +408,13 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== BASE & DARK MODE ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
-    --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    /* RF4: the brand palette (assets/css/style.css); these pages used their own red and vanilla */
+    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6; --fantasy: #F7F3ED; --white: #ffffff;
+    --dark: #2c1e1e; --text: #3d2e2e; --text-light: #6b5a5a;
+    --input-bg: #ffffff; --card-bg: #ffffff; --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08); --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --bg: #F7F3ED;
 }
 body.dark-mode {
     --bg: #1a1a1a;
@@ -536,7 +510,14 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 
 .tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag-cloud-link { background: var(--vanilla); padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; color: var(--text); text-decoration: none; transition: background 0.2s, color 0.2s; }
-.tag-cloud-link:hover { background: var(--rose); color: white; }
+.tag-cloud-link:hover, .tag-cloud-link.active { background: var(--rose); color: white; }
+/* RF1 */
+.tag-cloud-link small { opacity: .7; margin-left: 2px; }
+.reaction-btn.active { color: var(--rose-dark, #c08a8b); font-weight: 700; }
+.reflection-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px; }
+.reflection-tags a { font-size: .75rem; color: var(--rose-dark, #c08a8b); text-decoration: none; background: var(--fantasy); padding: 2px 8px; border-radius: 999px; }
+.active-tag { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 999px; background: var(--rose); color: #fff; text-decoration: none; font-size: .85rem; }
+.sidebar-newsletter input[type="text"] { margin-bottom: 8px; }
 
 .sidebar-newsletter input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: var(--input-bg); color: var(--text); }
 .sidebar-newsletter input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
