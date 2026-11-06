@@ -63,6 +63,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_video'])) {
         }
 
         // ===== STANDARD THUMBNAIL UPLOAD =====
+        // S8 (F68): public folder, so only real images (≤ 5 MB).
+        if (empty($error) && !empty($_FILES['thumbnail']['name'])) {
+            $thumb_ext = strtolower(pathinfo($_FILES['thumbnail']['name'], PATHINFO_EXTENSION));
+            if (!in_array($thumb_ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
+                || $_FILES['thumbnail']['size'] > 5 * 1024 * 1024
+                || @getimagesize($_FILES['thumbnail']['tmp_name']) === false) {
+                $error = 'Thumbnail must be a JPG, PNG, GIF or WebP image of at most 5 MB.';
+            }
+        }
         if (empty($error) && !empty($_FILES['thumbnail']['name'])) {
             $upload_dir = '../assets/uploads/videos/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -75,10 +84,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_video'])) {
         }
 
         // ===== VIDEO FILE UPLOAD (Live Recording) =====
-        if (!empty($_FILES['video_file']['name'])) {
+        // S8 (F68): only video formats (≤ 100 MB); the extension was copied from the upload,
+        // so a .php file would have landed in this public folder.
+        if (empty($error) && !empty($_FILES['video_file']['name'])) {
+            $file_extension = strtolower(pathinfo($_FILES['video_file']['name'], PATHINFO_EXTENSION));
+            if (!in_array($file_extension, ['mp4', 'webm', 'mov', 'm4v', 'ogv'], true)) {
+                $error = 'Video must be MP4, WebM, MOV, M4V or OGV.';
+            } elseif ($_FILES['video_file']['size'] > 100 * 1024 * 1024) {
+                $error = 'Video is larger than 100 MB.';
+            }
+        }
+        if (empty($error) && !empty($_FILES['video_file']['name'])) {
             $upload_dir = '../assets/uploads/videos/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $file_extension = pathinfo($_FILES['video_file']['name'], PATHINFO_EXTENSION);
             $new_filename = 'video_' . time() . '.' . $file_extension;
             if (move_uploaded_file($_FILES['video_file']['tmp_name'], $upload_dir . $new_filename)) {
                 $video_file = 'assets/uploads/videos/' . $new_filename;
