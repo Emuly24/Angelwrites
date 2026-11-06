@@ -228,9 +228,9 @@ $pageTitle = htmlspecialchars($book['title']);
                         <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
                             <span class="regular-price">Not yet on sale</span>
                         <?php elseif (aw_book_on_sale($book)): ?>
-                            <span class="sale-price"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
+                            <span class="sale-price"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
                         <?php else: ?>
-                            <span class="regular-price">MWK <?php echo number_format($book['price'], 2); ?></span>
+                            <span class="regular-price"><?php echo aw_mwk($book['price']); ?></span>
                         <?php endif; ?>
                     </div>
 
@@ -264,7 +264,7 @@ $pageTitle = htmlspecialchars($book['title']);
                             </a>
                         <?php else: ?>
                             <a href="<?php echo SITE_URL; ?>/books.php?buy=<?php echo (int)$book_id; ?>#book-<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
-                                <i class="fas fa-shopping-cart"></i> Buy this book (MWK <?php echo number_format(aw_book_price($book), 2); ?>)
+                                <i class="fas fa-shopping-cart"></i> Buy this book (<?php echo aw_mwk(aw_book_price($book)); ?>)
                             </a>
                         <?php endif; ?>
                         <?php if ($owns_book && !$is_free_book && !isAdmin()): ?>

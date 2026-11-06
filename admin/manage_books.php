@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
@@ -458,9 +459,9 @@ $pageTitle = 'Manage Books';
                                                     <?php if ($book['is_free']): ?>
                                                         <span class="badge free">Free</span>
                                                     <?php elseif (!empty($book['is_sale']) && (float)($book['sale_price'] ?? 0) > 0 && (float)$book['sale_price'] < (float)$book['price']): // F79 ?>
-                                                        <span class="badge sale"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span>
+                                                        <span class="badge sale"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span>
                                                     <?php else: ?>
-                                                        <span class="badge">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                                        <span class="badge"><?php echo aw_mwk($book['price']); ?></span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td data-label="File">

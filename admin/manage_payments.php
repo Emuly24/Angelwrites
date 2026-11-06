@@ -114,7 +114,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div style="font-size:0.95rem;margin:6px 0;line-height:1.6;">
                     Member: <?php echo htmlspecialchars($o['username'] !== null ? awDisplayName($o) : 'Deleted member'); ?>
                     <?php if (!empty($o['email'])): ?>(<a href="mailto:<?php echo htmlspecialchars($o['email']); ?>"><?php echo htmlspecialchars($o['email']); ?></a>)<?php endif; ?><br>
-                    Amount: <strong>MWK <?php echo number_format((float)$o['amount'], 2); ?></strong>
+                    Amount: <strong><?php echo aw_mwk((float)$o['amount']); ?></strong>
                     · Method: <?php echo htmlspecialchars($methods[$o['payment_method']] ?? (string)$o['payment_method']); ?>
                     · Phone: <?php echo htmlspecialchars((string)($o['phone_number'] ?? '') ?: 'not recorded'); ?><br>
                     Member's transaction ID: <?php echo htmlspecialchars((string)($o['transaction_id'] ?? '') ?: 'not given'); ?><br>
@@ -132,7 +132,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <form method="POST" style="display:flex;gap:8px;flex-wrap:wrap;">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
                         <input type="hidden" name="payment_id" value="<?php echo (int)$o['id']; ?>">
-                        <button type="submit" name="confirm" value="1" class="btn btn-sm btn-primary" onclick="return confirm('Confirm that MWK <?php echo number_format((float)$o['amount'], 2); ?> for AW-<?php echo (int)$o['id']; ?> has arrived? The member can then read and download the book.');">Payment received: confirm</button>
+                        <button type="submit" name="confirm" value="1" class="btn btn-sm btn-primary" onclick="return confirm('Confirm that <?php echo aw_mwk((float)$o['amount']); ?> for AW-<?php echo (int)$o['id']; ?> has arrived? The member can then read and download the book.');">Payment received: confirm</button>
                         <button type="submit" name="reject" value="1" class="btn btn-sm btn-danger" onclick="return confirm('Reject order AW-<?php echo (int)$o['id']; ?>?');">Reject</button>
                     </form>
                 <?php endif; ?>

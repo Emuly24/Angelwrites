@@ -151,9 +151,9 @@ $pageTitle = 'Books';
                                     <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
                                         <span>Not yet on sale</span>
                                     <?php elseif (aw_book_on_sale($book)): ?>
-                                        <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
+                                        <span class="sale-text"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
                                     <?php else: ?>
-                                        <span>MWK <?php echo number_format($book['price'], 2); ?></span>
+                                        <span><?php echo aw_mwk($book['price']); ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <div class="book-actions">
@@ -210,14 +210,17 @@ $pageTitle = 'Books';
             <button class="payment-option" data-method="airtel" onclick="selectPayment('airtel')">
                 <i class="fas fa-mobile-alt"></i>
                 <span>Airtel Money</span>
+                <small class="payment-hint">From an Airtel line</small><!-- Q21 -->
             </button>
             <button class="payment-option" data-method="mpamba" onclick="selectPayment('mpamba')">
                 <i class="fas fa-mobile-alt"></i>
-                <span>Mpamba</span>
+                <span>TNM Mpamba</span>
+                <small class="payment-hint">From a TNM line</small>
             </button>
             <button class="payment-option" data-method="nbm" onclick="selectPayment('nbm')">
                 <i class="fas fa-university"></i>
                 <span>NBM Mo626</span>
+                <small class="payment-hint">National Bank mobile banking</small>
             </button>
         </div>
 
@@ -293,6 +296,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btn) btn.click();
 });
 
+// Q21: same format as aw_mwk(): no tambala unless there are any.
+function awMwk(n) { n = Math.round(Number(n) * 100) / 100; return 'MWK ' + n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }); }
+
 // ===== PAYMENT MODAL FUNCTIONS =====
 let currentBookId = null;
 let selectedMethod = null;
@@ -300,7 +306,7 @@ let selectedMethod = null;
 function openPaymentModal(bookId, title, price) {
     currentBookId = bookId;
     document.getElementById('modalBookTitle').textContent = title;
-    document.getElementById('paymentAmount').value = 'MWK ' + price.toFixed(2);
+    document.getElementById('paymentAmount').value = awMwk(price); // Q21
     document.getElementById('paymentForm').style.display = 'none';
     document.getElementById('paymentStatus').innerHTML = '';
     document.getElementById('paymentStatus').className = 'payment-status';
@@ -360,7 +366,7 @@ function processPayment() {
             statusDiv.appendChild(msg);
             statusDiv.className = 'payment-status success';
             const box = document.getElementById('paymentInstructions');
-            box.textContent = 'Send MWK ' + Number(data.amount).toFixed(2) + ' and use the reference ' + data.reference + ':\n\n' + data.instructions;
+            box.textContent = 'Send ' + awMwk(data.amount) + ' and use the reference ' + data.reference + ':\n\n' + data.instructions;
             box.textContent += '\n\nYour orders and receipts are in My purchases (' + <?php echo json_encode(SITE_URL . '/my_purchases.php'); ?> + ').';
             box.style.display = 'block';
             document.getElementById('payNowBtn').style.display = 'none';
@@ -609,6 +615,9 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     .book-details h3 { font-size: 1rem; }
     .book-actions .btn { padding: 4px 12px; font-size: 0.7rem; }
 }
+
+/* Q21 */
+.payment-option .payment-hint { display:block; font-size:0.75rem; color:var(--text-light); font-weight:400; }
 </style>
 
 <?php require_once 'includes/footer.php'; ?>
