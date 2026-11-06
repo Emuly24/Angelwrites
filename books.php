@@ -30,6 +30,17 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// F86: only books with processed reader content can be read online; the others showed a Read
+// button that opened an empty reader ("1 / 0").
+$readable = [];
+try {
+    foreach ($db->query("SELECT book_id FROM book_content WHERE is_processed = 1")->fetchAll(PDO::FETCH_COLUMN) as $rid) {
+        $readable[(int)$rid] = true;
+    }
+} catch (PDOException $e) {
+    $readable = [];
+}
+
 // F34: books this member has bought download directly instead of opening the order form.
 $owned = [];
 if (isLoggedIn()) {
@@ -144,9 +155,15 @@ $pageTitle = 'Books';
                                     <?php endif; ?>
                                 </div>
                                 <div class="book-actions">
+                                    <?php if (isset($readable[(int)$book['id']])): // F86 ?>
                                     <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
                                         <i class="fas fa-book-open"></i> Read
                                     </a>
+                                    <?php else: ?>
+                                    <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book['id']; ?>" class="btn btn-outline">
+                                        <i class="fas fa-info-circle"></i> Details
+                                    </a>
+                                    <?php endif; ?>
                                     <?php if (isLoggedIn() && ($book['is_free'] || isset($owned[(int)$book['id']]) || (float)$book['price'] > 0)): // F80, F34 ?>
                                         <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo ($book['is_free'] || isset($owned[(int)$book['id']])) ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
                                             <i class="fas fa-download"></i> Download
