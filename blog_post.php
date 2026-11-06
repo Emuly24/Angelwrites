@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
         unset($_FILES['live_comment_photo']);
     }
     if (!empty($_FILES['live_comment_photo']['name'])) {
-        $upload_dir = '../assets/uploads/comments/';
+        $upload_dir = __DIR__ . '/assets/uploads/comments/'; // F135: was '../assets/…' (outside the web root) while 'assets/uploads/comments/…' was stored
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $photo_filename = 'comment_' . time() . '.jpg';
         if (move_uploaded_file($_FILES['live_comment_photo']['tmp_name'], $upload_dir . $photo_filename)) {
@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment'
         $voice_ok = strncmp($head, "\x1A\x45\xDF\xA3", 4) === 0 || substr($head, 4, 4) === 'ftyp' || strncmp($head, 'OggS', 4) === 0;
     }
     if ($voice_ok) {
-        $upload_dir = '../assets/uploads/voice_comments/';
+        $upload_dir = __DIR__ . '/assets/uploads/voice_comments/'; // F135: was '../assets/…' (outside the web root) while 'assets/uploads/voice_comments/…' was stored
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $filename = 'voice_' . time() . '.webm';
         $target = $upload_dir . $filename;
