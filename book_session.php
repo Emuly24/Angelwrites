@@ -62,6 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $message = trim($_POST['message']);
     $duration = (int)($_POST['duration'] ?? 60);
     $timezone = $_POST['timezone'] ?? 'UTC';
+    // F186: the timezone was collected but never stored; keep only real timezone names
+    if (!in_array($timezone, timezone_identifiers_list(), true)) {
+        $timezone = 'UTC';
+    }
 
     // Check if session type is valid
     if (!array_key_exists($session_type, $session_types)) {
@@ -83,10 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Insert the booking
             $stmt = $db->prepare("
-                INSERT INTO sessions (user_id, date, time, duration, message, status, session_type)
-                VALUES (?, ?, ?, ?, ?, 'pending', ?)
+                INSERT INTO sessions (user_id, date, time, duration, message, status, session_type, timezone)
+                VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
             ");
-            if ($stmt->execute([$user_id, $date, $time, $duration, $message, $session_type])) {
+            if ($stmt->execute([$user_id, $date, $time, $duration, $message, $session_type, $timezone])) { // F186
                 $session_id = $db->lastInsertId();
                 $success = 'Your session has been booked successfully! Angella will confirm it soon.';
                 

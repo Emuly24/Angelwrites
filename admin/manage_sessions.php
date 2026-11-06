@@ -220,7 +220,7 @@ $pageTitle = 'Manage Sessions';
                                                 <br><small><?php echo htmlspecialchars($session['user_email']); ?></small>
                                             </td>
                                             <td><?php echo htmlspecialchars($session['date']); ?></td>
-                                            <td><?php echo htmlspecialchars($session['time']); ?></td>
+                                            <td><?php echo htmlspecialchars($session['time']); ?><?php if (!empty($session['timezone'])): ?> <small>(<?php echo htmlspecialchars($session['timezone']); ?>)</small><?php endif; /* F186 */ ?></td>
                                             <td><?php echo $session['duration'] ?? 60; ?> min</td>
                                             <td>
                                                 <form method="POST" class="status-form">
