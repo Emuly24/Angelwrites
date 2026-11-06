@@ -46,24 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
     }
 }
 
-// ===== USER REPUTATION & ACHIEVEMENTS =====
-$user_rep = null;
-$achievements = [];
-$reading_streak = 0;
-if (isLoggedIn()) {
-    $user_id = $_SESSION['user_id'];
-    $stmt = $db->prepare("SELECT points, level, badges FROM user_reputations WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $user_rep = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    $stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC LIMIT 5");
-    $stmt->execute([$user_id]);
-    $achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $reading_streak = $stmt->fetchColumn() ?? 0;
-}
+// F221: the About page used to load the visitor's reputation, achievements and reading streak
+// (unrelated to the page; a fatal for members on databases without those tables). Removed.
 
 $pageTitle = 'About Angella Bottoman';
 ?>
@@ -120,26 +104,6 @@ $pageTitle = 'About Angella Bottoman';
                         </blockquote>
                     </div>
 
-                    <!-- ===== USER REPUTATION DISPLAY ===== -->
-                    <?php if ($user_rep): ?>
-                        <div class="user-reputation-box">
-                            <h4>🏆 Your Reputation</h4>
-                            <div class="rep-stats">
-                                <span class="rep-points"><?php echo $user_rep['points']; ?> pts</span>
-                                <span class="rep-level">Level <?php echo $user_rep['level']; ?></span>
-                                <span class="rep-streak">🔥 <?php echo $reading_streak; ?> day streak</span>
-                            </div>
-                            <?php if ($achievements): ?>
-                                <div class="achievement-badges">
-                                    <?php foreach ($achievements as $a): ?>
-                                        <span class="achievement-badge" title="<?php echo ucfirst(str_replace('_', ' ', $a['achievement_type'])); ?>">
-                                            🏆 <?php echo date('M j, Y', strtotime($a['unlocked_at'])); ?>
-                                        </span>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
