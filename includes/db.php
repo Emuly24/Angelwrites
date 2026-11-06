@@ -18,7 +18,9 @@ if (!defined('SITE_NAME') && !defined('SITE_URL')) {
 }
 
 // Database file path
-$dbPath = __DIR__ . '/../data/site.db';
+// F219: one source for the path. config.php defines DB_PATH (it was unused); this file
+// keeps its old value only as a fallback when config.php has not been loaded.
+$dbPath = defined('DB_PATH') ? DB_PATH : __DIR__ . '/../data/site.db';
 $dbDir = dirname($dbPath);
 
 // Create data directory if it doesn't exist
