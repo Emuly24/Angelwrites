@@ -102,7 +102,7 @@ $og_description = "Poems by Angella Bottoman – words of faith, healing and hop
             $fs = aw_poem_stats($featured); $fimg = aw_cat_img($featured); ?>
             <a class="aw-featured" href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$featured['id']; ?>">
                 <div class="aw-featured-img"<?php if ($fimg): ?> style="background-image:url('<?php echo htmlspecialchars($fimg, ENT_QUOTES); ?>')"<?php endif; ?>>
-                    <?php if (!$fimg): ?><span class="aw-ph" style="position:absolute;inset:0;display:grid;place-items:center;font-size:4rem;color:rgba(255,255,255,.85);">❦</span><?php endif; ?>
+                    <?php if (!$fimg): ?><span class="aw-ph" style="position:absolute;inset:0;display:grid;place-items:center;font-size:3.6rem;color:var(--rose);"><i class="fas fa-heart"></i></span><?php endif; ?>
                     <?php if (aw_poem_audio_url($featured) !== ''): ?><span class="aw-badge">🎧 Listen</span><?php endif; ?>
                 </div>
                 <div class="aw-featured-body">
@@ -128,7 +128,7 @@ $og_description = "Poems by Angella Bottoman – words of faith, healing and hop
                             <?php if ($img): ?>
                                 <img src="<?php echo htmlspecialchars($img); ?>" alt="" loading="lazy" onerror="this.remove()">
                             <?php endif; ?>
-                            <span class="aw-ph" aria-hidden="true">❦</span>
+                            <span class="aw-ph" aria-hidden="true"><i class="fas fa-heart"></i></span>
                             <?php if (aw_poem_audio_url($poem) !== ''): ?><span class="aw-badge">🎧 Listen</span><?php endif; ?>
                         </div>
                         <div class="aw-card-body">
@@ -149,7 +149,7 @@ $og_description = "Poems by Angella Bottoman – words of faith, healing and hop
 
         <?php if (!$poems && !$featured): ?>
             <div class="aw-empty">
-                <div class="aw-ph">❦</div>
+                <div class="aw-ph"><i class="fas fa-heart" aria-hidden="true"></i></div>
                 <h3>No poems found</h3>
                 <p><?php echo ($search !== '' || $only_audio) ? 'Try another word, or show all poems.' : 'Check back soon for new poetry from Angella.'; ?></p>
                 <?php if ($search !== '' || $only_audio): ?><a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm">Show all poems</a><?php endif; ?>
