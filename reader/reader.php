@@ -101,6 +101,7 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title><?php echo htmlspecialchars($book['title']); ?></title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" /><!-- R13: easy-to-read font -->
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
@@ -113,6 +114,10 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 .theme-paper { --bg: #EFD8D6; --card-bg: #fffdf9; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
 .theme-light { --bg: #F7F3ED; --card-bg: #ffffff; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
 .theme-dark { --bg: #1a1212; --card-bg: #2c1e1e; --text: #e8dddd; --border: #4a3a3a; --input-bg: #2c1e1e; }
+/* R13: high contrast – black on white, strong borders and darker accents (WCAG AAA text contrast) */
+.theme-contrast { --bg: #ffffff; --card-bg: #ffffff; --text: #000000; --text-light: #1a1a1a; --dark: #000000; --border: #000000; --input-bg: #ffffff; --rose: #7a1f22; --rose-dark: #5c1215; --vanilla: #f2f2f2; }
+.theme-contrast .page-content-inner, .theme-contrast .flip-page-custom { color:#000!important; background:#fff!important; }
+.theme-contrast a { text-decoration:underline; }
 .theme-sepia { --bg: #fbf3e9; --card-bg: #fdf5ec; --text: #4a3d36; --border: #d9c9b8; --input-bg: #fdf5ec; }
 /* R12: announcements for screen readers only; a clear focus ring for keyboard users */
 .aw-sr-only { position:absolute!important; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
@@ -435,7 +440,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll">Scroll</button><button data-mode="flip" class="active">Page Flip</button></div></div>
             <div class="settings-group"><label>Theme</label><div class="btn-group" id="themeGroup"><button data-theme="paper">Paper</button><button data-theme="light" class="active">Light</button><button data-theme="dark">Dark</button><button data-theme="sepia">Sepia</button></div></div>
             <div class="settings-group"><label>Font Size</label><div class="slider-group"><button onclick="adjustFontSize(-5)">A-</button><input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5"><button onclick="adjustFontSize(5)">A+</button><span id="fontSizeLabel">100%</span></div></div>
-            <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option></select></div></div>
+            <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option><option value="'Atkinson Hyperlegible', Verdana, sans-serif">Atkinson Hyperlegible (easy to read)</option></select></div></div>
             <div class="settings-group"><label>Line Height</label><div class="slider-group"><button onclick="adjustLineHeight(-10)">-</button><input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10"><button onclick="adjustLineHeight(10)">+</button><span id="lineHeightLabel">1.8</span></div></div>
             <div class="settings-group"><label>Reading Speed</label><div class="slider-group"><input type="range" id="readingSpeedSlider" min="100" max="500" value="<?php echo $reading_speed_wpm; ?>" step="10"><span id="readingSpeedLabel"><?php echo $reading_speed_wpm; ?> wpm</span></div></div>
         </div>
@@ -746,7 +751,7 @@ if (function_exists('renderAchievementToastJS')) {
     // ----- Theme -----
     function applyTheme(theme) {
         const app = document.getElementById('reader-app');
-        app.classList.remove('theme-paper','theme-light','theme-dark','theme-sepia');
+        app.classList.remove('theme-paper','theme-light','theme-dark','theme-sepia','theme-contrast');
         app.classList.add('theme-'+theme);
         localStorage.setItem('reader_theme',theme); awPrefsChanged();
     }
@@ -1069,6 +1074,8 @@ if (function_exists('renderAchievementToastJS')) {
         });
     });
 
+    // R13: high-contrast theme (added here so the theme buttons line stays as it is)
+    document.getElementById('themeGroup').insertAdjacentHTML('beforeend', '<button data-theme="contrast" title="High contrast: black on white">Contrast</button>');
     document.querySelectorAll('#themeGroup button').forEach(btn => {
         btn.addEventListener('click',function() {
             const theme = this.dataset.theme;
