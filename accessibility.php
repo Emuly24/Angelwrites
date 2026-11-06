@@ -115,7 +115,7 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
             <section class="a11y-section">
                 <h2>Compliance & Standards</h2>
                 <p>AngelWrites is committed to meeting the <a href="https://www.w3.org/TR/WCAG21/" target="_blank">WCAG 2.1 Level AA</a> standards. We conduct regular audits and user testing to ensure ongoing compliance.</p>
-                <p>This accessibility statement was last updated on <strong><?php echo date('F j, Y'); ?></strong>.</p>
+                <p>This accessibility statement was last updated on <strong>6 November 2026</strong><!-- F222: a fixed date (it used to print today's date on every visit) -->.</p>
             </section>
         </div>
     </div>

@@ -56,7 +56,7 @@ $pageTitle = htmlspecialchars($privacy_content['title'] ?? 'Privacy Policy');
             <div class="header-decoration">
                 <span class="decoration-line"></span>
             </div>
-            <p class="last-updated">Last updated: <?php echo date('F j, Y'); ?></p>
+            <p class="last-updated">Last updated: 6 November 2026</p><!-- F222: a fixed date (it used to print today's date on every visit) -->
         </div>
 
         <!-- Main Content -->
