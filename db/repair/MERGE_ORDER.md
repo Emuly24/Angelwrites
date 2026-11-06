@@ -30,8 +30,8 @@ Follow these steps in order. Don't start a step until the previous one is verifi
 **Roll back:** revert the PR on GitHub. Deleted one-off scripts would come back in the repo, but `deploy/exclude-sensitive` keeps them from being uploaded.
 **Is the `site.db` backup enough?** Not needed: no database change.
 
-## 3. Apply the database repair to the live site (Option B)
-Follow `db/repair/README.md` exactly, on a **freshly downloaded** `site.db` + `-wal` + `-shm`. Needs a computer with DB Browser for SQLite, not an iPad.
+## 3. Apply the database repair to the live site (Option C, in the browser)
+Upload `db/repair/web/aw_repair.php` to `htdocs/`, log in as the admin, open `/aw_repair.php`, type **REPAIR**. It backs up, repairs, checks every row count and the integrity check before saving, and offers Restore. Delete the file afterwards. (Option B, DB Browser on a fresh download, still works; see `db/repair/README.md`.)
 Then verify: the homepage loads, a poem loads, a reader can change a book's status in My Library, and a poem comment saves.
 
 **Risk: this is the risky step.** It's the only step that rewrites live data, and it involves a manual download, edit and upload with WAL side files.
@@ -39,8 +39,8 @@ Then verify: the homepage loads, a poem loads, a reader can change a book's stat
 - DB Browser shows *any* error while running the script (the live schema has drifted, so regenerate the script)
 - the final `foreign_key_check` is not empty or `integrity_check` is not `ok`
 - after upload, the site shows *database disk image is malformed*, *no such table*, or nobody can log in
-**Roll back:** delete the live `site.db` (and any new `-wal`/`-shm`), then upload the backup files you downloaded in README step 1.
-**Is the `site.db` backup enough?** **Only the fresh one from README step 1, taken minutes before the repair, with its `-wal`/`-shm`.** An older backup (e.g. the copy downloaded weeks ago) is *not* a safe rollback: restoring it would erase every signup, subscriber, password change and saved item since it was taken.
+**Roll back:** with Option C, open `/aw_repair.php` again and press **Restore** with the `before-repair` backup. With Option B, delete the live `site.db` (and any new `-wal`/`-shm`), then upload the backup files you downloaded in README step 1.
+**Is the `site.db` backup enough?** With Option C the script's own `before-repair` backup is taken seconds before the repair, so it is. With Option B: **only the fresh one from README step 1, taken minutes before the repair, with its `-wal`/`-shm`.** An older backup (e.g. the copy downloaded weeks ago) is *not* a safe rollback: restoring it would erase every signup, subscriber, password change and saved item since it was taken.
 
 ## 4. Core fixes (PR #1)
 1. Rebase `fix/core-fatals` on the new `main`. Re-run `php -l` on the changed files and the local 207-page sweep against a repaired database. It must still show zero fatals.

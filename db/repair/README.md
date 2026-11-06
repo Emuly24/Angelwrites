@@ -10,7 +10,31 @@
 
 **Nothing is deleted:** every existing row in every table is kept and checked byte for byte. Only `users_old` is removed, and it is empty.
 
-## Use Option B: run the script on a fresh download
+## Easiest: Option C, run it in the browser (`web/aw_repair.php`)
+No download, no DB Browser, works from a phone or iPad. It repairs the **live** database where it is, after taking its own backup, and reads the database as it is today, so it still works if the database has changed since the snapshot.
+
+1. In the InfinityFree file manager (or FTP), upload `db/repair/web/aw_repair.php` to `htdocs/`, next to `index.php`.
+2. Log in to the site as the admin, then open `https://angelwrites.gt.tc/aw_repair.php`.
+3. Read the **check** (read-only): the integrity check should say **ok**, and it lists what will be done (19 tables relinked, 2 NOT NULL traps, 30 columns, 4 tables, the empty `users_old`).
+4. Type **REPAIR** and press **Back up and repair now**. It:
+   - makes a full backup first (SQLite online backup, which includes changes still in `site.db-wal`) in `data/backups/` and checks it;
+   - then runs the repair in one transaction with foreign keys off;
+   - checks that **every table has exactly the same number of rows** and that the integrity check is **ok** before saving. If anything differs, nothing is saved.
+5. Check the site (homepage, a poem, change a book's status in My Library, a poem comment).
+6. On the page, **Download the backup** to keep a copy, then **delete `aw_repair.php`** from the server.
+
+**If anything looks wrong:** open `aw_repair.php` again and use **Restore** with the backup. A restore backs up the current state first, so it can be undone too.
+
+**Tested:**
+- On a copy of the production database the result is identical to `repair.sql`: tables, every row, columns, foreign keys, indexes, autoincrement counters, `integrity_check` ok and `foreign_key_check` empty.
+- A row still in `site.db-wal` is included in both the backup and the repair.
+- A column and row added after the snapshot are kept.
+- A second run finds nothing to do.
+- Restore brings back the exact original.
+- Only a logged-in admin (checked against `users`) can use it; every action needs a token and a typed confirmation.
+- Backups get a random name and a deny-all `.htaccess`.
+
+## Option B: run the script on a fresh download
 
 An earlier draft offered an "Option A", uploading a pre-repaired copy of the database. **Don't use it.** That copy is a snapshot of the day you downloaded the database. Uploading it would erase every signup, subscriber, password change and saved item since then. It isn't in this repository, deliberately. Always run `repair.sql` on a database you've **just** downloaded.
 
@@ -18,6 +42,7 @@ An earlier draft offered an "Option A", uploading a pre-repaired copy of the dat
 
 | File | What it is |
 |---|---|
+| `web/aw_repair.php` | **Option C:** the same repair, run in the browser on the live database, with its own backup, checks and restore. |
 | `repair.sql` | The repair. Plain SQL, about 450 lines (mostly table definitions). It has no `BEGIN`/`COMMIT` of its own: DB Browser supplies the transaction, so nothing is saved until you press *Write Changes*, and *close without saving* undoes everything. |
 | `generate.py` | Regenerates `repair.sql` from a database file. Use it if the script stops with an error because the live database has changed shape since the snapshot. |
 | `verify.py` | The test harness used to prove the repair on copies of the database. |
