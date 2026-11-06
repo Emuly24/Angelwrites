@@ -157,8 +157,19 @@ function fixEncoding($text) {
     return trim($fixed);
 }
 
+// F218: extraction runs inside the admin's request, and parsing a large PDF/EPUB/DOCX there
+// exceeds the host's time and memory limits (the request dies with no message). Files above
+// this size are refused with an explanation instead (decision D-I3: cap + message).
+define('AW_MAX_EXTRACT_BYTES', 15 * 1024 * 1024);
+
 function extractRawText($file_path) {
     if (!file_exists($file_path)) return false;
+    $size = filesize($file_path);
+    if ($size > AW_MAX_EXTRACT_BYTES) {
+        return '⚠️ This file is ' . round($size / 1048576, 1) . ' MB. The host cannot extract text from files over '
+             . (AW_MAX_EXTRACT_BYTES / 1048576) . ' MB in one request. Upload a smaller PDF/EPUB/DOCX (for example, '
+             . 'without embedded images, or split into parts); the original file can still be offered for download.';
+    }
     $type = detectFileType($file_path);
     if ($type === 'pdf') return extractPDF($file_path);
     if ($type === 'epub') return extractEPUB($file_path);
@@ -926,8 +937,8 @@ function compareWithOriginal($book_id) {
         return ['error' => 'Original file not found.'];
     }
     $original_text = extractRawText('../' . $file_path);
-    if (!$original_text) {
-        return ['error' => 'Failed to extract original text.'];
+    if (!$original_text || strpos($original_text, '⚠️') === 0) { // F218: size-limit message
+        return ['error' => $original_text ?: 'Failed to extract original text.'];
     }
     $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
     $stmt->execute([$book_id]);
@@ -1141,8 +1152,8 @@ if (isset($_POST['reset_page_breaks'])) {
     $stmt->execute([$book_id]);
     $old_content = $stmt->fetchColumn();
     $raw_text = extractRawText($file_path);
-    if (!$raw_text) {
-        echo json_encode(['success' => false, 'error' => 'Failed to extract content from the original file.']);
+    if (!$raw_text || strpos($raw_text, '⚠️') === 0) { // F218: size-limit message
+        echo json_encode(['success' => false, 'error' => $raw_text ?: 'Failed to extract content from the original file.']);
         exit;
     }
     $parsed = parseBook($raw_text);
