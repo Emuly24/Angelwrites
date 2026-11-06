@@ -21,149 +21,142 @@ if (!function_exists('get_image_url')) {
     }
 }
 
-// ===== PAGINATION =====
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 9;
-$offset = ($page - 1) * $limit;
+// V5: the catalogue – search, "with a recording" filter, sort, a featured newest poem and cards that
+// show each poem's opening lines. Built on includes/poem_reader.php; paged with the shared pager.
+require_once __DIR__ . '/includes/poem_reader.php';
+require_once __DIR__ . '/includes/pagination.php';
+$search = isset($_GET['search']) ? trim((string)$_GET['search']) : '';
+$sort = in_array($_GET['sort'] ?? '', ['newest', 'popular', 'az'], true) ? $_GET['sort'] : 'newest';
+$only_audio = !empty($_GET['audio']);
+$order = ['newest' => 'created_at DESC, id DESC', 'popular' => 'view_count DESC, created_at DESC', 'az' => 'title COLLATE NOCASE ASC'][$sort];
 
-// ===== SEARCH =====
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-
-// ===== FETCH TOTAL POEMS =====
-// F122: drafts are not public (poems marked draft in admin were listed here).
-$count_sql = "SELECT COUNT(*) FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')";
-$count_params = [];
-if ($search) {
-    $count_sql .= " AND (title LIKE ? OR intro LIKE ? OR content LIKE ?)";
-    $count_params[] = "%$search%";
-    $count_params[] = "%$search%";
-    $count_params[] = "%$search%";
-}
-$stmt = $db->prepare($count_sql);
-$stmt->execute($count_params);
-$total_poems = $stmt->fetchColumn();
-$total_pages = ceil($total_poems / $limit);
-
-// ===== FETCH POEMS =====
-$sql = "SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')"; // F122
+$where = "id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')"; // F122: drafts are not public
 $params = [];
-if ($search) {
-    $sql .= " AND (title LIKE ? OR intro LIKE ? OR content LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
+if ($search !== '') {
+    $where .= " AND (title LIKE ? OR intro LIKE ? OR content LIKE ?)";
+    array_push($params, "%$search%", "%$search%", "%$search%");
 }
-$sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-$params[] = $limit;
-$params[] = $offset;
-
-$stmt = $db->prepare($sql);
+if ($only_audio) {
+    // Only poems whose recording file exists (the same rule that shows the player).
+    $ids = [0];
+    foreach ($db->query("SELECT id, audio_path FROM poems WHERE audio_path IS NOT NULL AND audio_path <> ''")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if (aw_poem_audio_url($r) !== '') $ids[] = (int)$r['id'];
+    }
+    $where .= ' AND id IN (' . implode(',', $ids) . ')';
+}
+$stmt = $db->prepare("SELECT COUNT(*) FROM poems WHERE $where");
 $stmt->execute($params);
+$total_poems = (int)$stmt->fetchColumn();
+[$page, $per_page] = aw_page(12);
+[$page, $offset] = aw_clamp($total_poems, $page, $per_page);
+$stmt = $db->prepare("SELECT * FROM poems WHERE $where ORDER BY $order LIMIT ? OFFSET ?");
+$stmt->execute(array_merge($params, [$per_page, $offset]));
 $poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$featured = ($page === 1 && $search === '' && !$only_audio && $sort === 'newest' && count($poems) > 2) ? array_shift($poems) : null;
+
+function aw_cat_link(array $change) {
+    $q = array_merge($_GET, $change);
+    unset($q['page']);
+    $q = array_filter($q, function ($v) { return $v !== '' && $v !== null && $v !== 0 && $v !== '0'; });
+    return SITE_URL . '/poetry.php' . ($q ? '?' . htmlspecialchars(http_build_query($q)) : '');
+}
+function aw_cat_img(array $poem) {
+    $img = trim((string)($poem['image_path'] ?? ''));
+    return $img === '' ? '' : get_image_url($img);
+}
 
 $pageTitle = 'Poetry';
+$og_description = "Poems by Angella Bottoman – words of faith, healing and hope.";
 ?>
 <?php require_once 'includes/header.php'; ?>
-
-<!-- ===== READING PROGRESS BAR ===== -->
-<div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:3px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
+<?php echo aw_poem_assets(); ?>
 
 <div class="poetry-page">
     <div class="container">
-        <!-- ===== PAGE HERO (Unified design with Admin Dashboard) ===== -->
-        <div class="poetry-hero">
-            <div class="poetry-hero-content">
-                <h1>Poetry</h1>
-                <p>Words that speak to the soul — discover Angella's poetic collection.</p>
-            </div>
-            <div class="poetry-hero-decoration">
-                <span class="decoration-line"></span>
-            </div>
-        </div>
+        <header class="aw-cat-hero">
+            <div class="aw-hero-kicker">The poetry of Angella Bottoman</div>
+            <h1>Poetry</h1>
+            <p>Words that speak to the soul — of faith, healing and the beauty of being known by God.</p>
+        </header>
 
-        <!-- ===== SEARCH & COUNT ===== -->
-        <div class="poetry-tools">
-            <form method="GET" class="search-form">
-                <input type="text" name="search" placeholder="Search poems by title or theme..." value="<?php echo htmlspecialchars($search); ?>">
-                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
-                <?php if (!empty($search)): ?>
-                    <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
-                <?php endif; ?>
+        <div class="aw-cat-tools">
+            <form method="GET" class="aw-cat-search" role="search">
+                <label for="poemSearch" class="sr-only" style="position:absolute;left:-9999px;">Search poems</label>
+                <input type="search" id="poemSearch" name="search" placeholder="Search by title, line or theme…" value="<?php echo htmlspecialchars($search); ?>">
+                <?php if ($sort !== 'newest'): ?><input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort); ?>"><?php endif; ?>
+                <?php if ($only_audio): ?><input type="hidden" name="audio" value="1"><?php endif; ?>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search" aria-hidden="true"></i> Search</button>
             </form>
-            <div class="poem-count"><?php echo $total_poems; ?> poem<?php echo $total_poems != 1 ? 's' : ''; ?></div>
+            <nav class="aw-cat-filters" aria-label="Filter and sort">
+                <a href="<?php echo aw_cat_link(['audio' => '']); ?>" class="<?php echo !$only_audio ? 'on' : ''; ?>">All poems</a>
+                <a href="<?php echo aw_cat_link(['audio' => 1]); ?>" class="<?php echo $only_audio ? 'on' : ''; ?>">🎧 With recording</a>
+                <span aria-hidden="true" style="width:1px;height:24px;background:var(--border);margin:0 4px;"></span>
+                <a href="<?php echo aw_cat_link(['sort' => '']); ?>" class="<?php echo $sort === 'newest' ? 'on' : ''; ?>">Newest</a>
+                <a href="<?php echo aw_cat_link(['sort' => 'popular']); ?>" class="<?php echo $sort === 'popular' ? 'on' : ''; ?>">Most read</a>
+                <a href="<?php echo aw_cat_link(['sort' => 'az']); ?>" class="<?php echo $sort === 'az' ? 'on' : ''; ?>">A–Z</a>
+            </nav>
+            <div class="aw-cat-count"><?php echo number_format($total_poems); ?> poem<?php echo $total_poems === 1 ? '' : 's'; ?><?php if ($search !== ''): ?> matching “<?php echo htmlspecialchars($search); ?>” · <a href="<?php echo aw_cat_link(['search' => '']); ?>">clear search</a><?php endif; ?></div>
         </div>
 
-        <!-- ===== POEM GRID ===== -->
-        <?php if (count($poems) > 0): ?>
-            <div class="poems-grid">
-                <?php foreach ($poems as $poem): ?>
-                    <div class="poem-card">
-                        <?php if ($poem['image_path']): ?>
-                            <div class="poem-thumbnail">
-                                <img src="<?php echo get_image_url($poem['image_path']); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" loading="lazy">
-                            </div>
-                        <?php else: ?>
-                            <div class="poem-thumbnail placeholder">
-                                <i class="fas fa-feather-alt"></i>
-                            </div>
-                        <?php endif; ?>
-                        <div class="poem-card-content">
-                            <h3><a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>"><?php echo htmlspecialchars($poem['title']); ?></a></h3>
-                            <?php if ($poem['intro']): ?>
-                                <div class="poem-intro-preview">
-                                    <span class="intro-label">✧ Purpose</span>
-                                    <p><?php echo htmlspecialchars(substr($poem['intro'], 0, 120)); ?><?php if (strlen($poem['intro']) > 120) echo '...'; ?></p>
-                                </div>
+        <?php if ($featured):
+            $fs = aw_poem_stats($featured); $fimg = aw_cat_img($featured); ?>
+            <a class="aw-featured" href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$featured['id']; ?>">
+                <div class="aw-featured-img"<?php if ($fimg): ?> style="background-image:url('<?php echo htmlspecialchars($fimg, ENT_QUOTES); ?>')"<?php endif; ?>>
+                    <?php if (!$fimg): ?><span class="aw-ph" style="position:absolute;inset:0;display:grid;place-items:center;font-size:4rem;color:rgba(255,255,255,.85);">❦</span><?php endif; ?>
+                    <?php if (aw_poem_audio_url($featured) !== ''): ?><span class="aw-badge">🎧 Listen</span><?php endif; ?>
+                </div>
+                <div class="aw-featured-body">
+                    <div class="aw-hero-kicker" style="color:var(--rose-dark);">Newest poem</div>
+                    <h2><?php echo htmlspecialchars($featured['title']); ?></h2>
+                    <p class="aw-opening"><?php foreach (aw_poem_opening($featured, 4) as $l): ?><span><?php echo htmlspecialchars($l); ?></span><?php endforeach; ?></p>
+                    <div class="aw-card-foot" style="border:0;padding:0;">
+                        <span><i class="far fa-calendar" aria-hidden="true"></i><?php echo date('M j, Y', strtotime($featured['created_at'])); ?></span>
+                        <span><i class="far fa-clock" aria-hidden="true"></i><?php echo $fs['minutes']; ?> min read</span>
+                        <span><i class="fas fa-align-center" aria-hidden="true"></i><?php echo $fs['stanzas']; ?> stanzas</span>
+                    </div>
+                    <span class="btn btn-primary btn-sm" style="margin-top:18px;align-self:flex-start;"><i class="fas fa-book-open" aria-hidden="true"></i> Read the poem</span>
+                </div>
+            </a>
+        <?php endif; ?>
+
+        <?php if ($poems): ?>
+            <div class="aw-cat-grid">
+                <?php foreach ($poems as $poem):
+                    $st = aw_poem_stats($poem); $img = aw_cat_img($poem); ?>
+                    <a class="aw-card" href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$poem['id']; ?>">
+                        <div class="aw-card-img">
+                            <?php if ($img): ?>
+                                <img src="<?php echo htmlspecialchars($img); ?>" alt="" loading="lazy" onerror="this.remove()">
                             <?php endif; ?>
-                            <div class="poem-footer">
-                                <div class="poem-meta">
-                                    <span class="poem-date"><i class="far fa-calendar-alt"></i> <?php echo date('M j, Y', strtotime($poem['created_at'])); ?></span>
-                                    <span class="poem-views"><i class="fas fa-eye"></i> <?php echo number_format($poem['view_count'] ?? 0); ?></span>
-                                </div>
-                                <div class="poem-actions">
-                                    <?php if ($poem['audio_path']): ?>
-                                        <span class="audio-indicator"><i class="fas fa-headphones"></i> Audio</span>
-                                    <?php endif; ?>
-                                    <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-book-open"></i> Read
-                                    </a>
-                                </div>
+                            <span class="aw-ph" aria-hidden="true">❦</span>
+                            <?php if (aw_poem_audio_url($poem) !== ''): ?><span class="aw-badge">🎧 Listen</span><?php endif; ?>
+                        </div>
+                        <div class="aw-card-body">
+                            <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
+                            <?php $open = aw_poem_opening($poem, 3); if ($open): ?>
+                                <p class="aw-opening"><?php foreach ($open as $l): ?><span><?php echo htmlspecialchars($l); ?></span><?php endforeach; ?></p>
+                            <?php endif; ?>
+                            <div class="aw-card-foot">
+                                <span><i class="far fa-calendar" aria-hidden="true"></i><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></span>
+                                <span><i class="far fa-clock" aria-hidden="true"></i><?php echo $st['minutes']; ?> min</span>
+                                <span><i class="far fa-eye" aria-hidden="true"></i><?php echo number_format((int)($poem['view_count'] ?? 0)); ?></span>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 <?php endforeach; ?>
             </div>
+        <?php endif; ?>
 
-            <!-- ===== PAGINATION ===== -->
-            <?php if ($total_pages > 1): ?>
-                <div class="pagination">
-                    <?php if ($page > 1): ?>
-                        <a href="?page=<?php echo $page - 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?>" class="page-link">
-                            <i class="fas fa-chevron-left"></i>
-                        </a>
-                    <?php endif; ?>
-                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                        <a href="?page=<?php echo $i; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?>" class="page-link <?php echo $i === $page ? 'active' : ''; ?>">
-                            <?php echo $i; ?>
-                        </a>
-                    <?php endfor; ?>
-                    <?php if ($page < $total_pages): ?>
-                        <a href="?page=<?php echo $page + 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?>" class="page-link">
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
-        <?php else: ?>
-            <div class="empty-state">
-                <i class="fas fa-pen-fancy empty-icon"></i>
+        <?php if (!$poems && !$featured): ?>
+            <div class="aw-empty">
+                <div class="aw-ph">❦</div>
                 <h3>No poems found</h3>
-                <p><?php echo $search ? 'Try adjusting your search.' : 'Check back soon for new poetry from Angella.'; ?></p>
-                <?php if ($search): ?>
-                    <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm">Clear Search</a>
-                <?php endif; ?>
+                <p><?php echo ($search !== '' || $only_audio) ? 'Try another word, or show all poems.' : 'Check back soon for new poetry from Angella.'; ?></p>
+                <?php if ($search !== '' || $only_audio): ?><a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm">Show all poems</a><?php endif; ?>
             </div>
         <?php endif; ?>
+
+        <?php echo aw_pager($total_poems, $page, $per_page); ?>
     </div>
 </div>
 
@@ -174,13 +167,6 @@ $pageTitle = 'Poetry';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== READING PROGRESS BAR =====
-    window.addEventListener('scroll', function() {
-        const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercent = (scrollTop / docHeight) * 100;
-        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
-    });
 
     // ===== BACK TO TOP BUTTON =====
     const backToTopBtn = document.getElementById('backToTop');
@@ -239,90 +225,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
 
-/* ===== UNIFIED HERO (Matching Admin Dashboard Gradient) ===== */
-.poetry-hero {
-    background: linear-gradient(135deg, #fff, var(--rose-light));
-    border-radius: 20px;
-    padding: 28px 32px;
-    margin-bottom: 28px;
-    border: 1px solid var(--rose-light);
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-}
-.poetry-hero h1 { font-size:2.8rem; margin:0 0 4px 0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
-.poetry-hero p { color:var(--text-light); font-size:1.15rem; max-width:600px; margin:0 auto; }
-.poetry-hero-decoration { display:flex; justify-content:center; margin-top:12px; }
-.decoration-line { width:60px; height:3px; background:var(--rose); border-radius:4px; }
-
-/* ===== TOOLS ===== */
-.poetry-tools { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:16px; margin-bottom:32px; }
-.search-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; flex:1; min-width:200px; }
-.search-form input { flex:1; min-width:180px; padding:12px 16px; border:1px solid var(--border); border-radius:50px; font-size:0.95rem; background:var(--card-bg); color:var(--text); transition:border-color 0.2s; }
-.search-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.search-form .btn { padding:8px 20px; font-size:0.85rem; border-radius:50px; }
-.poem-count { font-size:0.9rem; color:var(--text-light); font-weight:500; }
-
-/* ===== POEM GRID ===== */
-.poems-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:24px; }
-.poem-card {
-    background:var(--card-bg); border-radius:20px; overflow:hidden;
-    border:1px solid var(--border); box-shadow:var(--shadow);
-    transition:all var(--transition); display:flex; flex-direction:column;
-}
-.poem-card:hover { transform:translateY(-6px); box-shadow:var(--shadow-hover); border-color:var(--rose-light); }
-.poem-thumbnail {
-    width:100%; height:200px; overflow:hidden; background:var(--vanilla);
-    display:flex; align-items:center; justify-content:center;
-}
-.poem-thumbnail img { width:100%; height:100%; object-fit:cover; transition:transform 0.6s; }
-.poem-card:hover .poem-thumbnail img { transform:scale(1.08); }
-.poem-thumbnail.placeholder { background:var(--vanilla); }
-.poem-thumbnail.placeholder i { font-size:3.5rem; color:var(--rose-light); opacity:0.6; }
-
-.poem-card-content { padding:24px; display:flex; flex-direction:column; flex:1; }
-.poem-card-content h3 { font-size:1.3rem; margin-bottom:8px; line-height:1.3; }
-.poem-card-content h3 a { color:var(--text); text-decoration:none; transition:color 0.2s; }
-.poem-card-content h3 a:hover { color:var(--rose); }
-
-.poem-intro-preview {
-    background:var(--vanilla); padding:12px 16px; border-radius:12px;
-    margin:4px 0 12px; border-left:4px solid var(--rose);
-}
-.poem-intro-preview .intro-label { display:block; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--rose); margin-bottom:4px; }
-.poem-intro-preview p { font-style:italic; color:var(--text); font-size:0.95rem; line-height:1.5; margin:0; }
-
-.poem-footer {
-    margin-top:auto; padding-top:12px; border-top:1px solid var(--border);
-    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;
-}
-.poem-meta { display:flex; gap:12px; font-size:0.8rem; color:var(--text-light); }
-.poem-meta i { margin-right:2px; }
-.poem-actions { display:flex; gap:8px; align-items:center; }
-.audio-indicator { font-size:0.8rem; color:var(--rose); display:flex; align-items:center; gap:4px; background:rgba(219,161,162,0.1); padding:2px 10px; border-radius:20px; font-weight:500; }
-.poem-footer .btn { padding:4px 14px; font-size:0.75rem; border-radius:50px; }
-
-/* ===== PAGINATION ===== */
-.pagination { display:flex; justify-content:center; gap:6px; margin-top:32px; flex-wrap:wrap; }
-.page-link {
-    display:inline-flex; align-items:center; justify-content:center;
-    padding:8px 16px; border-radius:12px; background:var(--card-bg);
-    border:1px solid var(--border); color:var(--text); font-size:0.9rem;
-    transition:all 0.2s; min-width:40px; text-decoration:none;
-}
-.page-link:hover { border-color:var(--rose); transform:translateY(-2px); }
-.page-link.active { background:var(--rose); color:white; border-color:var(--rose); }
-
-/* ===== EMPTY STATE ===== */
-.empty-state { text-align:center; padding:60px 20px; color:var(--text-light); }
-.empty-state h3 { font-size:1.4rem; margin-bottom:6px; color:var(--dark); }
-.empty-state p { font-size:0.95rem; }
-.empty-state .empty-icon { font-size:3rem; color:var(--rose); margin-bottom:16px; opacity:0.6; }
+/* V5: hero, tools, cards and pager are styled in assets/css/aw-poem.css and style.css. */
+.poetry-page .aw-pager { margin-top: 36px; }
 
 /* ===== BACK TO TOP ===== */
 .back-to-top {
@@ -333,22 +237,6 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 }
 .back-to-top:hover { transform:scale(1.05); }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width:768px) {
-    .poetry-hero h1 { font-size:2.2rem; }
-    .poetry-tools { flex-direction:column; align-items:stretch; }
-    .search-form { flex-direction:column; }
-    .search-form input { width:100%; }
-    .poem-count { text-align:center; margin-top:4px; }
-}
-@media (max-width:480px) {
-    .poetry-hero { padding:20px; }
-    .poetry-hero h1 { font-size:1.8rem; }
-    .poems-grid { grid-template-columns:1fr; }
-    .poem-thumbnail { height:160px; }
-    .poem-footer { flex-direction:column; align-items:flex-start; }
-    .poem-actions { width:100%; justify-content:space-between; }
-}
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

@@ -181,10 +181,10 @@ body.aw-focus .aw-exit-focus { display: inline-flex; background: var(--card-bg, 
 .aw-card { display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: var(--card-bg, #fff); border: 1px solid var(--border, #e5d5d5); box-shadow: var(--shadow, 0 4px 16px rgba(44,30,30,.08)); text-decoration: none; color: inherit; transition: transform .25s, box-shadow .25s, border-color .25s; }
 .aw-card:hover, .aw-card:focus-visible { transform: translateY(-6px); box-shadow: var(--shadow-hover, 0 8px 30px rgba(44,30,30,.15)); border-color: var(--rose-light, #e8c0c0); outline: none; }
 .aw-card-img { position: relative; aspect-ratio: 16 / 10; background: linear-gradient(135deg, var(--vanilla, #EFD8D6), var(--rose-light, #e8c0c0)); overflow: hidden; }
-.aw-card-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s; display: block; }
+.aw-card-img img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; transition: transform .6s; display: block; }
 .aw-card:hover .aw-card-img img { transform: scale(1.06); }
 .aw-card-img .aw-ph { position: absolute; inset: 0; display: grid; place-items: center; font-size: 3rem; color: rgba(255,255,255,.85); }
-.aw-badge { position: absolute; top: 12px; left: 12px; font: 600 .72rem/1 'Inter', sans-serif; padding: 7px 11px; border-radius: 999px; background: rgba(20,12,14,.62); color: #fff; backdrop-filter: blur(6px); }
+.aw-badge { position: absolute; z-index: 2; top: 12px; left: 12px; font: 600 .72rem/1 'Inter', sans-serif; padding: 7px 11px; border-radius: 999px; background: rgba(20,12,14,.62); color: #fff; backdrop-filter: blur(6px); }
 .aw-card-body { padding: 20px 22px 18px; display: flex; flex-direction: column; flex: 1; }
 .aw-card-body h3 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.22rem; line-height: 1.3; margin: 0 0 10px; color: var(--dark, #2c1e1e); }
 .aw-opening { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 1.08rem; line-height: 1.55; color: var(--text-light, #6b5a5a); margin: 0 0 14px; border-left: 2px solid var(--rose-light, #e8c0c0); padding-left: 12px; }
