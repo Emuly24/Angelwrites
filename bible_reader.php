@@ -644,7 +644,10 @@ $pageTitle = 'Bible Reader';
         }
 
         chapterDisplay.textContent = `${b} ${c}`;
-        document.getElementById('notesVerseRef').textContent = `${b} ${c}`;
+        // F23: #notesVerseRef is not in the markup; the null access threw on every chapter load
+        // and the "Go to" box below was never updated.
+        const notesVerseRef = document.getElementById('notesVerseRef');
+        if (notesVerseRef) notesVerseRef.textContent = `${b} ${c}`;
         goToInput.value = `${b} ${c}:${v}`;
     }
 
