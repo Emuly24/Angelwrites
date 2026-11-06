@@ -57,7 +57,8 @@ switch ($sort) {
         $sql .= " ORDER BY created_at ASC";
         break;
     case 'most_viewed':
-        $sql .= " ORDER BY views DESC";
+        // F64: production's column is view_count (views exists only after the DB repair)
+        $sql .= " ORDER BY view_count DESC";
         break;
     case 'most_commented':
         // F63: videos has no comment_count column (fatal). Count video_comments instead; before
@@ -191,7 +192,7 @@ $pageTitle = 'Videos';
                             <div class="video-footer">
                                 <div class="video-meta">
                                     <span class="video-date"><i class="far fa-calendar-alt"></i> <?php echo date('M j, Y', strtotime($video['created_at'])); ?></span>
-                                    <span class="video-views"><i class="fas fa-eye"></i> <?php echo number_format($video['views'] ?? 0); ?></span>
+                                    <span class="video-views"><i class="fas fa-eye"></i> <?php echo number_format($video['view_count'] ?? 0); ?></span>
                                 </div>
                                 
                                 <!-- 🚀 ENHANCED: Reactions & Share -->

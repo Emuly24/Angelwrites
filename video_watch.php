@@ -7,10 +7,14 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $stmt = $db->prepare("SELECT * FROM videos WHERE id = ?");
 $stmt->execute([$id]);
 $video = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->closeCursor(); // release the read snapshot before the write below (see F205)
 if (!$video) {
     header('Location: ' . SITE_URL . '/videos.php');
     exit;
 }
+// F64: nothing ever counted views, so "Most viewed" and the view counts were meaningless.
+$db->prepare("UPDATE videos SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")->execute([$id]);
+$video['view_count'] = (int)($video['view_count'] ?? 0) + 1;
 
 /* 
  * ===== FOR FULL INTERACTION SUPPORT, RUN THESE SQL QUERIES IN YOUR DATABASE =====
@@ -81,7 +85,7 @@ $stmt->execute([$id]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH RELATED VIDEOS =====
-$stmt = $db->prepare("SELECT id, title, thumbnail, views FROM videos WHERE id != ? ORDER BY created_at DESC LIMIT 4");
+$stmt = $db->prepare("SELECT id, title, thumbnail, view_count FROM videos WHERE id != ? ORDER BY created_at DESC LIMIT 4"); // F64: views column is missing in production
 $stmt->execute([$id]);
 $relatedVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -125,7 +129,7 @@ $pageTitle = htmlspecialchars($video['title']);
                     
                     <div class="video-meta">
                         <div class="meta-left">
-                            <span class="views"><i class="fas fa-eye"></i> <?php echo number_format($video['views'] ?? 0); ?> views</span>
+                            <span class="views"><i class="fas fa-eye"></i> <?php echo number_format($video['view_count'] ?? 0); ?> views</span>
                             <span class="date"><i class="fas fa-calendar-alt"></i> <?php echo time_ago($video['created_at']); ?></span>
                         </div>
                         <div class="meta-right">
@@ -230,7 +234,7 @@ $pageTitle = htmlspecialchars($video['title']);
                                 </div>
                                 <div class="rel-info">
                                     <h4><?php echo htmlspecialchars($rel['title']); ?></h4>
-                                    <span><?php echo number_format($rel['views'] ?? 0); ?> views</span>
+                                    <span><?php echo number_format($rel['view_count'] ?? 0); ?> views</span>
                                 </div>
                             </a>
                         <?php endforeach; ?>
