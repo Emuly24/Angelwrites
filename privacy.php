@@ -14,14 +14,41 @@ if (!$privacy_content) {
     $privacy_content = [
         'title' => 'Privacy Policy',
         'sections' => [
-            ['heading' => '1. Information We Collect', 'content' => 'We collect personal information you provide to us, such as name, email address, phone number, and payment information when you register, book a session, or subscribe to our newsletter.'],
-            ['heading' => '2. How We Use Your Information', 'content' => 'We use your information to provide and improve our services, process transactions, send notifications, and communicate with you about updates.'],
-            ['heading' => '3. Data Security', 'content' => 'We implement reasonable security measures to protect your personal information from unauthorized access, alteration, or disclosure.'],
-            ['heading' => '4. Third-Party Services', 'content' => 'We may use third-party services (e.g., Zoho SMTP for email, InfinityFree for hosting) that have their own privacy policies. We do not share your data unnecessarily.'],
-            ['heading' => '5. Your Rights', 'content' => 'You have the right to access, correct, or delete your personal data. You may also unsubscribe from our newsletter at any time.'],
-            ['heading' => '6. Cookies', 'content' => 'We use cookies to improve your browsing experience. You can manage cookie preferences in your browser settings.'],
-            ['heading' => '7. Changes to This Policy', 'content' => 'We may update this privacy policy from time to time. Changes will be posted on this page.'],
-            ['heading' => '8. Contact Us', 'content' => 'If you have any questions about this privacy policy, please contact us at angelwrites@zohomail.com.']
+            // F223: the old text named Zoho as the email processor (mail is sent through Gmail) and left out
+            // most of what is collected: IP logging, date of birth, gender, phone, camera and voice uploads,
+            // reading activity, orders, Google sign-in and the CDNs every page loads.
+            ['heading' => '1. Who we are', 'content' => 'AngelWrites (angelwrites.gt.tc) is run from Malawi and is responsible for the personal information described here. Contact: angelwrites@zohomail.com.'],
+            ['heading' => '2. Information we collect', 'content' => 'When you register: first and last name, username, email address, password (stored only as a secure hash), gender, country, phone number, date of birth and how you heard about us.
+
+If you add them: a profile photo (uploaded or taken with your camera), a short bio and contact details on your profile.
+
+What you send us: comments, voice comments (recorded with your microphone only when you choose to record one), reviews, community questions and answers, reading-group posts, prayer requests, testimonials, contact-form messages and session bookings (date, time and time zone).
+
+Your reading activity: books, poems and posts you open, reading progress and time, bookmarks, highlights and notes.
+
+Book orders: the book, amount, the payment method you choose, the phone number you pay from and any transaction ID you give us. We never receive card or mobile-money PINs; you pay through your own mobile-money or bank service and we check the payment by hand.
+
+Technical information: your IP address is recorded with login, registration and contact-form attempts (to stop abuse) and with some page views and reactions. See also Cookies below.'],
+            ['heading' => '3. How we use your information', 'content' => 'To run your account and the features you use; to deliver books you have bought; to confirm orders and send receipts; to answer messages, prayer requests and session bookings; to send the newsletter if you subscribe (each email has an unsubscribe link); to keep the site secure and prevent abuse; and to understand which writing is read so we can improve the site. We do not sell your information or use it for advertising.'],
+            ['heading' => '4. Services that process your information', 'content' => 'Hosting: InfinityFree hosts the website and its database.
+
+Email: our emails (verification codes, password resets, receipts, notifications, newsletters) are sent through Google\'s Gmail service, which therefore handles your email address and the message. Replies go to our Zoho Mail mailbox.
+
+Web fonts and code libraries: pages load fonts and scripts from Google Fonts, cdnjs (Cloudflare), jsDelivr and unpkg. Your browser contacts these services directly, so they receive your IP address and browser details.
+
+Payments: the mobile-money or bank service you choose to pay with (for example Airtel Money, TNM Mpamba or National Bank of Malawi) processes your payment under its own terms.
+
+Sign in with Google or Facebook: only if this option is available and you choose it; that provider then shares your name and email address with us.
+
+Share buttons: Facebook, X (Twitter) and WhatsApp are contacted only when you press a share button.
+
+Each of these services has its own privacy policy.'],
+            ['heading' => '5. Cookies and browser storage', 'content' => 'We use a session cookie to keep you logged in, and, if you tick "Remember me", cookies that keep you logged in on that device. The site remembers your cookie choice and display preferences (such as dark mode and text size) in your browser. We do not use advertising or tracking cookies. You can clear cookies in your browser settings at any time; you will then need to log in again.'],
+            ['heading' => '6. How long we keep it', 'content' => 'We keep your account information while your account exists. Order records are kept so that your purchases stay available to you and for our accounts. Records of login and contact-form attempts are used to prevent abuse. If you ask us to delete your account, we delete or anonymise your personal information unless we must keep part of it (for example a record of a payment).'],
+            ['heading' => '7. Security', 'content' => 'Passwords are stored as secure hashes, and access to member and admin areas requires logging in. No website is completely secure, so please use a password you do not use elsewhere.'],
+            ['heading' => '8. Your rights', 'content' => 'You can see and correct most of your details on your profile page, and unsubscribe from the newsletter at any time. You may ask us for a copy of the personal information we hold about you, or ask us to correct or delete it, by writing to angelwrites@zohomail.com. These rights are provided under the laws of Malawi.'],
+            ['heading' => '9. Changes to this policy', 'content' => 'If we change this policy we will update this page and its "Last updated" date.'],
+            ['heading' => '10. Contact us', 'content' => 'Questions about this policy or your information: angelwrites@zohomail.com, or use the contact page.']
         ]
     ];
 } else {
