@@ -143,6 +143,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
+    // F44: group creator/admin actions. group.php sends these here, but they were only handled
+    // in admin/manage_groups_ajax.php, so this endpoint answered "Invalid action".
+    if (in_array($action, ['update_group', 'change_member_role', 'remove_member'], true)) {
+        $group_id = (int)($_POST['group_id'] ?? 0);
+        $stmt = $db->prepare("SELECT g.creator_id, m.role FROM reading_groups g
+                              LEFT JOIN group_members m ON m.group_id = g.id AND m.user_id = ? WHERE g.id = ?");
+        $stmt->execute([$user_id, $group_id]);
+        $gr = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        if (!$gr || !in_array($gr['role'], ['creator', 'admin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Only the group creator or a group admin can do that.']);
+            exit;
+        }
+        if ($action === 'update_group') {
+            $name = trim($_POST['name'] ?? '');
+            if ($name === '') {
+                echo json_encode(['success' => false, 'error' => 'Group name is required.']);
+                exit;
+            }
+            $db->prepare("UPDATE reading_groups SET name = ?, description = ? WHERE id = ?")
+               ->execute([$name, trim($_POST['description'] ?? ''), $group_id]);
+            echo json_encode(['success' => true]);
+            exit;
+        }
+        $target = (int)($_POST['user_id'] ?? 0);
+        if (!$target || $target === (int)$gr['creator_id']) {
+            echo json_encode(['success' => false, 'error' => 'The group creator cannot be changed or removed.']);
+            exit;
+        }
+        if ($action === 'change_member_role') {
+            $role = trim($_POST['role'] ?? '');
+            if ($role === 'reader') {
+                $role = 'member'; // the page's "Make Reader" button; members join as 'member'
+            }
+            if (!in_array($role, ['admin', 'member'], true)) {
+                echo json_encode(['success' => false, 'error' => 'Invalid role.']);
+                exit;
+            }
+            $db->prepare("UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?")->execute([$role, $group_id, $target]);
+        } else {
+            $db->prepare("DELETE FROM group_members WHERE group_id = ? AND user_id = ?")->execute([$group_id, $target]);
+        }
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     if ($action === 'add_reaction') {
         $target_type = $_POST['target_type'];
         $target_id = (int)$_POST['target_id'];
