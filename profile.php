@@ -15,6 +15,56 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+// ===== S5 (F115): CONFIRM OR CANCEL A PENDING EMAIL CHANGE =====
+// A new email address is only saved after the code sent to that address is entered here.
+// The pending change lives in the session (no schema change) and expires after 1 hour.
+$pending_email = $_SESSION['pending_email_change'] ?? null;
+if ($pending_email && ($pending_email['user_id'] != $user_id || $pending_email['expires'] < time())) {
+    unset($_SESSION['pending_email_change']);
+    $pending_email = null;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_email_change'])) {
+    unset($_SESSION['pending_email_change']);
+    $pending_email = null;
+    $success = 'Email change cancelled. Your email address is unchanged.';
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_email_change'])) {
+    $entered = trim($_POST['email_code'] ?? '');
+    if (!$pending_email) {
+        $error = 'There is no pending email change (it may have expired). Please save the new email again.';
+    } elseif (($pending_email['attempts'] ?? 0) >= 5) {
+        unset($_SESSION['pending_email_change']);
+        $pending_email = null;
+        $error = 'Too many wrong codes. Please save the new email again to get a new code.';
+    } elseif (!hash_equals($pending_email['code'], hash('sha256', $entered))) {
+        $_SESSION['pending_email_change']['attempts'] = ($pending_email['attempts'] ?? 0) + 1;
+        $pending_email = $_SESSION['pending_email_change'];
+        $error = 'That code is not correct.';
+    } else {
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $stmt->execute([$pending_email['email'], $user_id]);
+        if ($stmt->fetch()) {
+            $error = 'This email is already in use by another account.';
+        } else {
+            $old_email = $user['email'];
+            $stmt = $db->prepare("UPDATE users SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$pending_email['email'], $user_id]);
+            sendEmail($old_email, 'Your AngelWrites email address was changed',
+                "Hello,\n\nThe email address on your AngelWrites account was changed from $old_email to {$pending_email['email']}.\n\nIf you did not do this, reply to this email straight away.\n\n— AngelWrites",
+                'angelwrites@zohomail.com', 'AngelWrites', false);
+            sendEmail('angelwrites@zohomail.com', 'User Email Changed',
+                "User ID $user_id confirmed an email change from $old_email to {$pending_email['email']}.",
+                'angelwrites@zohomail.com', 'AngelWrites', false);
+            unset($_SESSION['pending_email_change']);
+            $pending_email = null;
+            $success = 'Your email address has been changed.';
+            $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
+            $stmt->execute([$user_id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+    }
+}
+
 // ===== FETCH USER STATS =====
 $stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'finished'");
 $stmt->execute([$user_id]);
@@ -105,16 +155,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                         name = ?, email = ?, username = ?, gender = ?, country = ?, contact_number = ?, bio = ?, profile_pic = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ");
-                $stmt->execute([$name, $email, $username, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
+                // S5 (F115): the email column keeps the current address; a new address only
+                // takes effect after the code sent to it is confirmed (handler above).
+                $stmt->execute([$name, $user['email'], $username, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
                 $_SESSION['name'] = $name;
                 $success = 'Profile updated successfully!';
 
-                // ===== NOTIFY ADMIN ON EMAIL CHANGE =====
-                if ($email !== $user['email']) {
-                    $admin_email = 'angelwrites@zohomail.com';
-                    $subject = 'User Email Changed';
-                    $body = "User {$name} (ID: {$user_id}) changed their email from {$user['email']} to {$email}.";
-                    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+                if (strcasecmp($email, $user['email']) !== 0) {
+                    $code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                    $_SESSION['pending_email_change'] = [
+                        'user_id' => $user_id, 'email' => $email,
+                        'code' => hash('sha256', $code), 'expires' => time() + 3600, 'attempts' => 0,
+                    ];
+                    $pending_email = $_SESSION['pending_email_change'];
+                    sendEmail($email, 'Confirm your new AngelWrites email address',
+                        "Hello,\n\nYour code to confirm this email address for your AngelWrites account is: $code\n\nIt expires in 1 hour. If you did not ask for this, ignore this email; nothing will change.\n\n— AngelWrites",
+                        'angelwrites@zohomail.com', 'AngelWrites', false);
+                    $success = 'Profile updated. To change your email, enter the 6-digit code we sent to ' . $email . ' below. Until then your email stays ' . $user['email'] . '.';
                 }
             }
         }
@@ -169,6 +226,17 @@ $pageTitle = 'My Profile';
         <?php endif; ?>
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
+        <?php if (!empty($pending_email)): ?>
+            <!-- S5 (F115): pending email change -->
+            <div class="alert alert-info" id="pendingEmailChange">
+                <form method="POST" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                    <label for="email_code">Code sent to <strong><?php echo htmlspecialchars($pending_email['email']); ?></strong>:</label>
+                    <input type="text" id="email_code" name="email_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required style="width:8em;">
+                    <button type="submit" name="confirm_email_change" value="1" class="btn btn-primary btn-sm">Confirm new email</button>
+                    <button type="submit" name="cancel_email_change" value="1" class="btn btn-outline btn-sm" formnovalidate>Cancel</button>
+                </form>
+            </div>
         <?php endif; ?>
 
         <!-- Profile Grid -->

@@ -1,0 +1,11 @@
+# S2 (F33): book files are served only through download.php (login + purchase check),
+# which reads them from disk. Direct URLs are refused. Cover images in this folder stay public.
+<FilesMatch "\.(?i:pdf|epub|mobi|azw3|docx?|txt|rtf|odt|zip)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

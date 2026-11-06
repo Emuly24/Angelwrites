@@ -1,7 +1,10 @@
 <?php
-require_once 'includes/config.php';
-require_once 'includes/db.php';
-require_once 'includes/auth.php';
+// Item 7 (F127): bare relative includes resolved against admin/ and fatalled on every request.
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+// Now that the page runs, keep it admin-only like the rest of admin/ (it previews drafts).
+redirectIfNotAdmin();
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
@@ -95,7 +98,7 @@ $total_reviews = $rating_data['total'] ?? 0;
 
 $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 ?>
-<?php require_once 'includes/header.php'; ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
 
 <!-- ===== READING PROGRESS BAR ===== -->
 <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
@@ -526,4 +529,4 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
-<?php require_once 'includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>

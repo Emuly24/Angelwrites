@@ -23,9 +23,11 @@ if ($action === 'get_notes' && $user_id > 0) {
         FROM bible_notes n
         LEFT JOIN users u ON n.user_id = u.id
         WHERE n.book = ? AND n.chapter = ?
+          AND (COALESCE(n.is_private, 0) = 0 OR n.user_id = ?)
         ORDER BY n.created_at DESC
     ");
-    $stmt->execute([$book, $chapter]);
+    // Item 4 (F22): private notes are returned only to their author.
+    $stmt->execute([$book, $chapter, $user_id]);
     $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Fetch reactions for each note

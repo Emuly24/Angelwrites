@@ -7,6 +7,17 @@ require_once 'includes/reading_groups.php';
 redirectIfNotLoggedIn();
 $user_id = $_SESSION['user_id'];
 
+// S4 (F45): writes into a group are for its members only (private groups included).
+function s4_require_member($db, $group_id, $user_id) {
+    $stmt = $db->prepare("SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?");
+    $stmt->execute([$group_id, $user_id]);
+    if (!$stmt->fetchColumn()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Only members of this group can do that.']);
+        exit;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
 
@@ -25,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($action === 'create_discussion') {
         $group_id = (int)$_POST['group_id'];
+        s4_require_member($db, $group_id, $user_id);
         $title = trim($_POST['title']);
         $content = trim($_POST['content']);
         $chapter_index = isset($_POST['chapter_index']) && $_POST['chapter_index'] !== '' ? (int)$_POST['chapter_index'] : null;
@@ -39,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($action === 'add_note') {
         $group_id = (int)$_POST['group_id'];
+        s4_require_member($db, $group_id, $user_id);
         $book_id = (int)$_POST['book_id'];
         $text = trim($_POST['text']);
         $chapter_index = isset($_POST['chapter_index']) && $_POST['chapter_index'] !== '' ? (int)$_POST['chapter_index'] : null;
@@ -62,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($action === 'update_progress') {
         $group_id = (int)$_POST['group_id'];
+        s4_require_member($db, $group_id, $user_id);
         $chapter_index = (int)$_POST['chapter_index'];
         // Toggle: unread -> reading -> finished -> unread
         $stmt = $db->prepare("SELECT status FROM group_reading_progress WHERE group_id = ? AND user_id = ? AND chapter_index = ?");

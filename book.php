@@ -6,8 +6,11 @@ require_once 'includes/mail_helper.php';
 require_once 'includes/reputation.php';
 
 // ===== ERROR HANDLING =====
+// S7 (F88, F211): errors are logged, never printed to visitors (they leaked server paths
+// and corrupted this page's JSON responses).
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
 // ===== GET BOOK ID =====
 $book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -223,10 +226,30 @@ $pageTitle = htmlspecialchars($book['title']);
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
-                        <?php else: ?>
-                            <a href="<?php echo SITE_URL . '/' . $book['file_path']; ?>" download class="btn btn-primary btn-lg">
-                                <i class="fas fa-download"></i> Download (<?php echo strtoupper($book['file_type']); ?>)
-                            </a>
+                        <?php else:
+                            // Item 3 (F32): never link the raw file. Free books (and paid books the member
+                            // has bought) go through download.php, which checks login and purchase.
+                            // A missing purchases table (before the DB repair) counts as "not purchased".
+                            $can_download = !empty($book['is_free']);
+                            if (!$can_download && isLoggedIn()) {
+                                try {
+                                    $pstmt = $db->prepare("SELECT 1 FROM purchases WHERE user_id = ? AND book_id = ? AND payment_status = 'completed' LIMIT 1");
+                                    $pstmt->execute([$_SESSION['user_id'], $book_id]);
+                                    $can_download = (bool)$pstmt->fetchColumn();
+                                } catch (PDOException $e) {
+                                    $can_download = false;
+                                }
+                            }
+                        ?>
+                            <?php if ($can_download): ?>
+                                <a href="<?php echo SITE_URL; ?>/download.php?book_id=<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-download"></i> Download (<?php echo strtoupper(htmlspecialchars($book['file_type'])); ?>)
+                                </a>
+                            <?php else: ?>
+                                <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-lock"></i> Purchase required to download
+                                </a>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>

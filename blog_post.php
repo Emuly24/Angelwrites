@@ -48,6 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
     $photo_path = null;
     
     // ===== LIVE PHOTO CAPTURE =====
+    // S8 (F137): only a real image of at most 5 MB is stored; anything else is dropped.
+    if (!empty($_FILES['live_comment_photo']['name'])
+        && ($_FILES['live_comment_photo']['size'] > 5 * 1024 * 1024
+            || @getimagesize($_FILES['live_comment_photo']['tmp_name']) === false)) {
+        unset($_FILES['live_comment_photo']);
+    }
     if (!empty($_FILES['live_comment_photo']['name'])) {
         $upload_dir = '../assets/uploads/comments/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -90,7 +96,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
 // ===== HANDLE VOICE COMMENT SUBMISSION =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment']) && isLoggedIn()) {
     $reflection_id = (int)$_POST['reflection_id'];
-    if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK) {
+    // S8 (F137): at most 10 MB, and the file must start like an audio recording
+    // (WebM/Matroska, MP4/M4A as recorded by Safari, or Ogg).
+    $voice_ok = false;
+    if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK && $_FILES['voice_file']['size'] <= 10 * 1024 * 1024) {
+        $head = (string)@file_get_contents($_FILES['voice_file']['tmp_name'], false, null, 0, 12);
+        $voice_ok = strncmp($head, "\x1A\x45\xDF\xA3", 4) === 0 || substr($head, 4, 4) === 'ftyp' || strncmp($head, 'OggS', 4) === 0;
+    }
+    if ($voice_ok) {
         $upload_dir = '../assets/uploads/voice_comments/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $filename = 'voice_' . time() . '.webm';

@@ -33,6 +33,25 @@ if (!$book) {
     exit;
 }
 
+// --- S1 (F18): paid books are readable only by the admin or a member with a completed purchase.
+// Before the DB repair the purchases table may not exist; that counts as "not purchased".
+if (empty($book['is_free'])) {
+    $reader_allowed = isAdmin();
+    if (!$reader_allowed && isLoggedIn()) {
+        try {
+            $pstmt = $db->prepare("SELECT 1 FROM purchases WHERE user_id = ? AND book_id = ? AND payment_status = 'completed' LIMIT 1");
+            $pstmt->execute([$_SESSION['user_id'], $book_id]);
+            $reader_allowed = (bool)$pstmt->fetchColumn();
+        } catch (PDOException $e) {
+            $reader_allowed = false;
+        }
+    }
+    if (!$reader_allowed) {
+        header('Location: ' . SITE_URL . '/book.php?id=' . $book_id);
+        exit;
+    }
+}
+
 // --- Increment view count ---
 $stmt = $db->prepare("UPDATE books SET view_count = view_count + 1 WHERE id = ?");
 $stmt->execute([$book_id]);
