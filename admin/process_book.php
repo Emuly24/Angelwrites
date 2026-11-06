@@ -556,6 +556,67 @@ function deleteVersion($book_id, $version) {
     return true;
 }
 
+// R3: pages used to exist only where the text had printed page numbers (lines holding just a
+// number, as in PDFs). DOCX and EPUB books have none, so they became one huge page. Page length is now
+// a per-book choice: 'auto' keeps printed page numbers when they give real pages and otherwise cuts
+// about 350 words per page; '250' / '350' / '500' always cut by words. Pages end at paragraph
+// boundaries and every chapter (or Preface, Introduction...) starts on a new page.
+function aw_is_section_start($line) {
+    $t = trim($line);
+    if (preg_match('/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)\b/i', $t)) return true;
+    foreach (['ACKNOWLEDGEMENT', "AUTHOR'S NOTE", 'ABOUT THE AUTHOR', 'Preface', 'Foreword', 'Introduction', 'DEDICATION', 'Prologue', 'Epilogue'] as $k) {
+        if (stripos($t, $k) === 0 && mb_strlen($t) < 80) return true;
+    }
+    return false;
+}
+
+function aw_split_pages_by_words($text, $words_per_page) {
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $paras = preg_split('/\n\s*\n/', $text);
+    if (count($paras) < 3) $paras = preg_split('/\n/', $text); // text without blank lines
+    $pages = [];
+    $cur = [];
+    $count = 0;
+    foreach ($paras as $para) {
+        $para = trim($para);
+        if ($para === '' || preg_match('/^\d+$/', $para)) continue; // drop stray printed page numbers
+        $w = str_word_count($para);
+        if ($cur && (aw_is_section_start($para) || $count + $w > $words_per_page * 1.15)) {
+            $pages[] = implode("\n\n", $cur);
+            $cur = [];
+            $count = 0;
+        }
+        $cur[] = $para;
+        $count += $w;
+    }
+    if ($cur) $pages[] = implode("\n\n", $cur);
+    return $pages;
+}
+
+function aw_split_pages($text, $mode = 'auto') {
+    if ($mode === 'auto') {
+        $pages = array_values(splitPagesByNumbers($text));
+        $biggest = 0;
+        foreach ($pages as $pg) $biggest = max($biggest, str_word_count($pg));
+        if (count($pages) >= 3 && $biggest <= 1200) return $pages;
+        $mode = '350';
+    }
+    return aw_split_pages_by_words($text, max(150, (int)$mode));
+}
+
+function aw_page_length_setting($book_id, $new = null) {
+    global $db;
+    $key = 'book_page_length_' . (int)$book_id;
+    if ($new !== null && in_array($new, ['auto', '250', '350', '500'], true)) {
+        $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")->execute([$key, $new]);
+        return $new;
+    }
+    $st = $db->prepare("SELECT value FROM settings WHERE key = ?");
+    $st->execute([$key]);
+    $v = (string)$st->fetchColumn();
+    return in_array($v, ['auto', '250', '350', '500'], true) ? $v : 'auto';
+}
+
 function parseBook($raw_text) {
     $pages = splitPagesByNumbers($raw_text);
     $toc = generateTOC($pages);
@@ -1043,7 +1104,8 @@ if (isset($_POST['extract'])) {
     $raw_text = extractRawText($file_path);
     if ($raw_text && strpos($raw_text, '⚠️') !== 0) {
         $raw_text = fixEncoding($raw_text);
-        $pages = splitPagesByNumbers($raw_text);
+        $page_mode = aw_page_length_setting($book_id, isset($_POST['page_length']) ? (string)$_POST['page_length'] : null); // R3
+        $pages = aw_split_pages($raw_text, $page_mode);
         $toc = generateTOC($pages);
         $toc_json = json_encode($toc);
         
@@ -1960,6 +2022,15 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
         <div class="card">
             <div class="card-header"><h2>📥 Stage 1: Extract & Parse</h2></div>
             <div class="card-body">
+                <?php $aw_mode = aw_page_length_setting($book_id); /* R3 */ ?>
+                <label for="pageLength" style="display:block;margin-bottom:8px;">Page length
+                    <select id="pageLength" style="margin-left:8px;">
+                        <option value="auto" <?php echo $aw_mode === 'auto' ? 'selected' : ''; ?>>Automatic (printed page numbers if the file has them, otherwise ~350 words)</option>
+                        <option value="250" <?php echo $aw_mode === '250' ? 'selected' : ''; ?>>Short pages (~250 words, best on phones)</option>
+                        <option value="350" <?php echo $aw_mode === '350' ? 'selected' : ''; ?>>Medium pages (~350 words)</option>
+                        <option value="500" <?php echo $aw_mode === '500' ? 'selected' : ''; ?>>Long pages (~500 words)</option>
+                    </select>
+                </label>
                 <button onclick="extractAndParse()" class="btn btn-primary btn-large">
                     <i class="fas fa-magic"></i> Extract & Parse Content
                 </button>
@@ -2224,6 +2295,7 @@ function extractAndParse() {
     statusDiv.style.color = '#333';
     const formData = new FormData();
     formData.append('extract', '1');
+    const pl = document.getElementById('pageLength'); if (pl) formData.append('page_length', pl.value); // R3
     fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
         method: 'POST',
         body: formData
