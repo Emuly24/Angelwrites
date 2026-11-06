@@ -162,7 +162,7 @@ $pageTitle = 'My Reading Groups';
         </div>
         <div class="modal-body">
             <p>Enter the invite code provided by the group creator.</p>
-            <form method="POST" onsubmit="closeJoinModalAfterSubmit()">
+            <form method="POST" onsubmit="closeJoinModal()"><!-- F49: called an undefined closeJoinModalAfterSubmit() -->
                 <div class="form-group">
                     <label for="invite_code">Invite Code</label>
                     <input type="text" id="invite_code" name="invite_code" placeholder="e.g., ABC123XYZ" required>
