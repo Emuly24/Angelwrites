@@ -10,10 +10,8 @@ $limit = 12;
 $offset = ($page - 1) * $limit;
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'relevance';
 
-if (empty($q)) {
-    header('Location: ' . SITE_URL . '/index.php');
-    exit;
-}
+// F56: the header's search icon opens this page without a query; it used to bounce to the
+// homepage, so search was unreachable. An empty query now shows the page with a search box.
 
 $results = [];
 $total_results = 0;
@@ -85,6 +83,11 @@ if ($type === 'all' || $type === 'videos') {
     ];
 }
 
+// F56: nothing to search for yet (an empty term would match everything with LIKE '%%').
+if ($q === '') {
+    $search_configs = [];
+}
+
 // Execute each search
 foreach ($search_configs as $config) {
     $where_data = buildSearchWhere($config['columns'], $like_terms);
@@ -144,17 +147,25 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
     <div class="container">
         <!-- Page Header -->
         <div class="search-header">
+            <?php if ($q === ''): ?>
+                <h1>Search</h1>
+                <p>Search books, poems, blog posts, reflections and videos.</p>
+            <?php else: ?>
             <h1>Search Results</h1>
             <p>Showing results for "<strong><?php echo htmlspecialchars($q); ?></strong>"</p>
             <div class="search-meta">
                 <span><?php echo number_format($total_results); ?> result<?php echo $total_results != 1 ? 's' : ''; ?> found</span>
             </div>
+            <?php endif; ?>
         </div>
 
         <!-- Search Filters -->
         <div class="search-filters">
             <form method="GET" action="<?php echo SITE_URL; ?>/search_results.php" class="filter-form" id="searchForm">
-                <input type="hidden" name="q" value="<?php echo htmlspecialchars($q); ?>">
+                <div class="filter-group">
+                    <label for="q">Search for</label>
+                    <input type="search" id="q" name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="e.g. grace" required>
+                </div>
                 <div class="filter-group">
                     <label for="type">Content Type</label>
                     <select id="type" name="type">
@@ -290,7 +301,7 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
-        <?php else: ?>
+        <?php elseif ($q !== ''): ?>
             <div class="no-results">
                 <div class="no-results-icon">
                     <i class="fas fa-search" style="font-size: 4rem; color: var(--rose);"></i>
