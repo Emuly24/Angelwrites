@@ -117,7 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
                     $stmt->execute([$user['id'], $token, $expiry_date]);
 
                     // Set secure HTTP-only cookie
-                    setcookie('remember_token', $token, $expires, '/', '', false, true);
+                    // F101: secure flag (the site is HTTPS-only), HttpOnly as before
+                    setcookie('remember_token', $token, ['expires' => $expires, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
                 }
 
                 // Update last login timestamp
