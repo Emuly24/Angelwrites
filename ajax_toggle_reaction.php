@@ -51,8 +51,9 @@ if (!$target_type || !$target_id || !$reaction) {
 
 // S13 (F161): only the target types and reactions the site's buttons actually send
 // (poem_view.php: poem and comment containers; like/love/laugh/wow/sad/angry).
+// 'pray' is also accepted: the QUALITY batch (Q33) moves poems to the site-wide like/love/pray set.
 $allowed_target_types = ['poem', 'comment'];
-$allowed_reactions = ['like', 'love', 'laugh', 'wow', 'sad', 'angry'];
+$allowed_reactions = ['like', 'love', 'pray', 'laugh', 'wow', 'sad', 'angry'];
 if (!in_array($target_type, $allowed_target_types, true) || !in_array($reaction, $allowed_reactions, true)) {
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Invalid request parameters.']);
