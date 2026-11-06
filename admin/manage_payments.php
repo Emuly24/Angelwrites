@@ -32,11 +32,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $pid = (int)($_POST['payment_id'] ?? 0);
         if (isset($_POST['confirm'])) {
-            $msg = aw_confirm_payment($db, $pid) ? 'Order AW-' . $pid . ' confirmed.' : 'That order is not pending.';
+            if (aw_confirm_payment($db, $pid)) {
+                aw_notify_payment_member($db, $pid, 'completed'); // F77
+                $msg = 'Order AW-' . $pid . ' confirmed; the member has been told.';
+            } else {
+                $msg = 'That order is not pending.';
+            }
         } elseif (isset($_POST['unlock_legacy'])) {
-            $msg = aw_unlock_legacy_payment($db, $pid) ? 'Order AW-' . $pid . ' unlocked.' : 'Nothing to unlock for that order.';
+            if (aw_unlock_legacy_payment($db, $pid)) {
+                aw_notify_payment_member($db, $pid, 'completed'); // F77
+                $msg = 'Order AW-' . $pid . ' unlocked; the member has been told.';
+            } else {
+                $msg = 'Nothing to unlock for that order.';
+            }
         } elseif (isset($_POST['reject'])) {
-            $msg = aw_reject_payment($db, $pid) ? 'Order AW-' . $pid . ' rejected.' : 'That order is not pending.';
+            if (aw_reject_payment($db, $pid)) {
+                aw_notify_payment_member($db, $pid, 'rejected'); // F77
+                $msg = 'Order AW-' . $pid . ' rejected; the member has been told.';
+            } else {
+                $msg = 'That order is not pending.';
+            }
         }
     }
     header('Location: ' . SITE_URL . '/admin/manage_payments.php?msg=' . urlencode($msg));

@@ -89,3 +89,33 @@ function aw_unlock_legacy_payment(PDO $db, $payment_id) {
        ->execute([$pay['user_id'], $pay['book_id']]);
     return true;
 }
+
+// F77: tell the member (email receipt + bell notification) when their order is confirmed or rejected.
+function aw_notify_payment_member(PDO $db, $payment_id, $status) {
+    require_once __DIR__ . '/mail_helper.php';
+    require_once __DIR__ . '/notifications.php';
+    $st = $db->prepare("SELECT p.id, p.amount, p.completed_at, b.title, u.id AS uid, u.email
+                        FROM payments p JOIN users u ON u.id = p.user_id LEFT JOIN books b ON b.id = p.book_id WHERE p.id = ?");
+    $st->execute([(int)$payment_id]);
+    $o = $st->fetch(PDO::FETCH_ASSOC);
+    $st->closeCursor();
+    if (!$o) return;
+    $ref = 'AW-' . (int)$o['id'];
+    $book = (string)($o['title'] ?? 'your book');
+    $link = SITE_URL . '/my_purchases.php';
+    if ($status === 'completed') {
+        $title = 'Payment confirmed: ' . $book;
+        $text = "Thank you! We have received your payment of MWK " . number_format((float)$o['amount'], 2) . " for \"$book\" (order $ref). You can now read and download it.";
+        $body = "Receipt\n\nOrder: $ref\nBook: $book\nAmount paid: MWK " . number_format((float)$o['amount'], 2)
+              . "\nConfirmed: " . date('j M Y', strtotime((string)($o['completed_at'] ?: 'now')))
+              . "\n\nRead or download it from My purchases: $link\n\nBlessings,\nAngelWrites";
+    } else {
+        $title = 'Order not confirmed: ' . $book;
+        $text = "We could not match a payment to order $ref for \"$book\". If you did pay, please reply with your transaction ID.";
+        $body = "$text\n\nYour orders: $link\n\nAngelWrites";
+    }
+    awNotify($db, $o['uid'], 'payment_' . $status, $title, $text, $link);
+    if (!empty($o['email'])) {
+        sendEmail($o['email'], $title, $body, 'angelwrites@zohomail.com', 'AngelWrites', false);
+    }
+}

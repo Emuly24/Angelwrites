@@ -48,7 +48,7 @@ $pageTitle = 'Books';
     <div class="container">
         <?php if (($_GET['error'] ?? '') === 'not_purchased'): // F37 ?>
             <div class="books-notice" role="alert" style="border:1px solid var(--rose, #DBA1A2);border-radius:10px;padding:12px 16px;margin:16px 0;">
-                🔒 That book has to be bought before it can be downloaded. Press <strong>Download</strong> on it below to order it; it unlocks once your payment is confirmed. Already paid? It unlocks as soon as we confirm the payment.
+                🔒 That book has to be bought before it can be downloaded. Press <strong>Download</strong> on it below to order it; it unlocks once your payment is confirmed. Already ordered? See <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a>.
             </div>
         <?php endif; ?>
         <!-- ===== PAGE HEADER ===== -->
@@ -330,6 +330,7 @@ function processPayment() {
             statusDiv.className = 'payment-status success';
             const box = document.getElementById('paymentInstructions');
             box.textContent = 'Send MWK ' + Number(data.amount).toFixed(2) + ' and use the reference ' + data.reference + ':\n\n' + data.instructions;
+            box.textContent += '\n\nYour orders and receipts are in My purchases (' + <?php echo json_encode(SITE_URL . '/my_purchases.php'); ?> + ').';
             box.style.display = 'block';
             document.getElementById('payNowBtn').style.display = 'none';
         } else {

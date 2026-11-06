@@ -316,6 +316,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
         <div class="user-module"><h3>⚙️ My Account</h3><div class="user-module-grid">
             <a href="profile.php" class="user-module-btn"><i class="fas fa-user"></i><span>My Profile</span></a>
+            <a href="my_purchases.php" class="user-module-btn"><i class="fas fa-receipt"></i><span>My Purchases</span></a><!-- F77 -->
         </div></div>
     </div>
 
