@@ -104,10 +104,12 @@ $pageTitle = 'My Reading Groups';
             <div class="empty-state">
                 <div class="empty-icon">📖</div>
                 <h2>No groups yet</h2>
-                <p>Start a reading group with friends or join an existing one using an invite code.</p>
+                <p>A reading group lets you read a book, poem or reflection together: share notes, discuss chapters and keep a reading schedule.</p>
+                <p>Start one with friends, join one with an invite code<?php if (!empty($public_groups)): ?>, or join an open group below<?php endif; ?>.</p><!-- Q16 -->
                 <div class="empty-actions">
                     <a href="create_group.php" class="btn btn-primary">Create Your First Group</a>
-                    <button onclick="showJoinModal()" class="btn btn-secondary">Join a Group</button>
+                    <button onclick="showJoinModal()" class="btn btn-secondary">Join with a code</button>
+                    <?php if (!empty($public_groups)): ?><a href="#discover" class="btn btn-outline">See open groups</a><?php endif; ?>
                 </div>
             </div>
         <?php else: ?>
@@ -192,7 +194,7 @@ $pageTitle = 'My Reading Groups';
 </div>
 
 <!-- ===== F51: DISCOVER GROUPS ===== -->
-<div class="groups-dashboard groups-directory">
+<div class="groups-dashboard groups-directory" id="discover">
     <div class="container">
         <h2>🔎 Discover groups<?php echo $book_filter ? ' reading this book' : ''; ?></h2>
         <?php if (empty($public_groups)): ?>
