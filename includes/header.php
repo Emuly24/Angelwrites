@@ -37,7 +37,7 @@ if ($isLoggedIn) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' : ''; ?><?php echo SITE_NAME; ?></title>
+    <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' : ''; ?><?php echo htmlspecialchars(aw_site_name()); /* F191 */ ?></title>
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -46,7 +46,7 @@ if ($isLoggedIn) {
     <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : 'AngelWrites — Christian writing and community platform by Angella Bottoman.'; ?>">
     <meta name="keywords" content="AngelWrites, Christian writing, faith, poetry, books, reflections, Angella Bottoman">
     <meta name="robots" content="index, follow">
-    <meta property="og:title" content="<?php echo isset($pageTitle) ? $pageTitle . ' - ' . SITE_NAME : SITE_NAME; ?>">
+    <meta property="og:title" content="<?php echo htmlspecialchars(isset($pageTitle) ? $pageTitle . ' - ' . aw_site_name() : aw_site_name()); /* F191 */ ?>">
     <meta property="og:description" content="AngelWrites — Christian writing and community platform by Angella Bottoman.">
     <meta property="og:url" content="<?php echo SITE_URL . $_SERVER['REQUEST_URI']; ?>">
     <meta name="twitter:card" content="summary_large_image">
@@ -59,7 +59,7 @@ if ($isLoggedIn) {
    <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
 <?php
     // 1. Strictly ENSURE these variables are defined, even if they are empty.
-    $og_title       = isset($og_title)       ? htmlspecialchars($og_title)       : (isset($pageTitle) ? htmlspecialchars($pageTitle) : SITE_NAME);
+    $og_title       = isset($og_title)       ? htmlspecialchars($og_title)       : (isset($pageTitle) ? htmlspecialchars($pageTitle) : htmlspecialchars(aw_site_name())); // F191
     $og_description = isset($og_description) ? htmlspecialchars($og_description) : 'AngelWrites — Christian writing and community platform.';
     $og_url         = isset($og_url)         ? htmlspecialchars($og_url)         : SITE_URL . $_SERVER['REQUEST_URI'];
     $og_image       = isset($og_image)       ? htmlspecialchars($og_image)       : SITE_URL . '/assets/images/angelwrites-logo.png';
@@ -263,7 +263,7 @@ if ($isLoggedIn) {
         <nav class="navbar" role="navigation" aria-label="Main navigation">
             <div class="container nav-container">
                 <a href="<?php echo SITE_URL; ?>/index.php" class="logo" aria-label="AngelWrites – Home">
-                    <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites – Christian writing and community" class="logo-img">
+                    <img src="<?php echo SITE_URL . '/' . htmlspecialchars(aw_logo_path()); /* F191 */ ?>" alt="AngelWrites – Christian writing and community" class="logo-img">
                 </a>
 
                 <!-- ===== NAVIGATION LINKS ===== -->
