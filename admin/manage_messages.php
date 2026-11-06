@@ -53,6 +53,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
     exit;
 }
 
+// ===== E3: REPLY FROM THE SITE =====
+// Replies used to open the admin's own mail program (mailto:), so they did not carry the AngelWrites
+// logo or signature. They are now sent from here, in the AngelWrites layout; the signature and quoting
+// the original message are optional.
+require_once __DIR__ . '/../includes/newsletter.php'; // CSRF helpers (same session key as csrf.php)
+require_once __DIR__ . '/../includes/mail_helper.php';
+if (isset($_SESSION['aw_msg_flash'])) { [$t, $m] = $_SESSION['aw_msg_flash']; unset($_SESSION['aw_msg_flash']); if ($t === 'error') $error = $m; else $success = $m; }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reply') {
+    aw_csrf_require();
+    $mid = (int)($_POST['message_id'] ?? 0);
+    $st = $db->prepare("SELECT * FROM contact_messages WHERE id = ?");
+    $st->execute([$mid]);
+    $orig = $st->fetch(PDO::FETCH_ASSOC);
+    $reply_subject = mb_substr(trim((string)($_POST['reply_subject'] ?? '')), 0, 150);
+    $reply_body = trim((string)($_POST['reply_body'] ?? ''));
+    if (!$orig || $reply_body === '' || $reply_subject === '') {
+        $_SESSION['aw_msg_flash'] = ['error', 'Please write a subject and a reply.'];
+    } else {
+        $text = $reply_body;
+        if (!empty($_POST['quote'])) {
+            $text .= "\n\n— On " . date('F j, Y', strtotime($orig['created_at'])) . ', ' . $orig['name'] . " wrote:\n" . preg_replace('/^/m', '> ', trim($orig['message']));
+        }
+        $ok = sendEmail($orig['email'], $reply_subject, $text, 'angelwrites@zohomail.com', 'Angella Bottoman', false, null, null, ['signature' => !empty($_POST['signature'])]);
+        if ($ok) $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id = ?")->execute([$mid]);
+        $_SESSION['aw_msg_flash'] = $ok ? ['success', 'Your reply was sent to ' . $orig['email'] . '.'] : ['error', 'The reply could not be sent. Please check the mail settings and try again.'];
+    }
+    header('Location: ' . SITE_URL . '/admin/manage_messages.php');
+    exit;
+}
+
 // ===== FETCH TOTAL MESSAGES =====
 $count_sql = "SELECT COUNT(*) FROM contact_messages";
 $count_params = [];
@@ -163,8 +193,9 @@ $pageTitle = 'Manage Messages';
                                             <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $message['id']; ?>"></td>
                                             <td><span class="user-id"><?php echo $message['id']; ?></span></td>
                                             <td><strong><?php echo htmlspecialchars($message['name']); ?></strong></td>
-                                            <td><?php // F181: reply by email (there was no reply action) ?>
-                                                <a href="mailto:<?php echo htmlspecialchars($message['email']); ?>?subject=<?php echo rawurlencode('Re: ' . ($message['subject'] ?: 'Your message to AngelWrites')); ?>" title="Reply by email"><i class="fas fa-reply"></i> <?php echo htmlspecialchars($message['email']); ?></a>
+                                            <td><?php // F181 / E3: reply from the site, in the AngelWrites layout ?>
+                                                <?php echo htmlspecialchars($message['email']); ?><br>
+                                                <button type="button" class="btn btn-sm btn-primary reply-btn" data-id="<?php echo (int)$message['id']; ?>" data-name="<?php echo htmlspecialchars($message['name']); ?>" data-email="<?php echo htmlspecialchars($message['email']); ?>" data-subject="<?php echo htmlspecialchars('Re: ' . ($message['subject'] ?: 'Your message to AngelWrites')); ?>" data-message="<?php echo htmlspecialchars($message['message']); ?>"><i class="fas fa-reply"></i> Reply</button>
                                             </td>
                                             <td><?php echo htmlspecialchars($message['subject'] ?: 'No Subject'); ?></td>
                                             <td><div class="msg-preview"><?php echo htmlspecialchars(substr($message['message'], 0, 60)); ?>...</div></td>
@@ -222,7 +253,41 @@ $pageTitle = 'Manage Messages';
 </div>
 
 <!-- ===== JAVASCRIPT ===== -->
+<dialog id="replyDialog" aria-labelledby="replyTitle" style="max-width:640px;width:calc(100% - 32px);border:1px solid var(--border);border-radius:16px;padding:0;">
+    <form method="POST" style="padding:20px;">
+        <?php echo aw_csrf_field(); ?>
+        <input type="hidden" name="action" value="reply">
+        <input type="hidden" name="message_id" id="replyId">
+        <h2 id="replyTitle" style="margin:0 0 4px;font-size:1.3rem;">Reply to <span id="replyName"></span></h2>
+        <p class="field-hint" id="replyEmail" style="margin:0 0 12px;"></p>
+        <blockquote id="replyOriginal" style="margin:0 0 12px;padding:10px 12px;background:var(--fantasy);border-left:3px solid var(--rose);border-radius:8px;max-height:140px;overflow:auto;white-space:pre-wrap;font-size:.9rem;"></blockquote>
+        <label for="replySubject" style="font-weight:600;">Subject</label>
+        <input type="text" id="replySubject" name="reply_subject" maxlength="150" required style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin:4px 0 10px;">
+        <label for="replyBody" style="font-weight:600;">Your reply</label>
+        <textarea id="replyBody" name="reply_body" rows="8" required style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin:4px 0 10px;"></textarea>
+        <label style="display:block;"><input type="checkbox" name="signature" value="1" checked> Add my signature (“With love and blessings, Angella Bottoman”)</label>
+        <label style="display:block;"><input type="checkbox" name="quote" value="1" checked> Include their original message below my reply</label>
+        <p class="field-hint">The email is sent in the AngelWrites design, with the logo. Replies come back to angelwrites@zohomail.com.</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('replyDialog').close()">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send reply</button>
+        </div>
+    </form>
+</dialog>
 <script>
+document.querySelectorAll('.reply-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+        var d = document.getElementById('replyDialog');
+        document.getElementById('replyId').value = b.dataset.id;
+        document.getElementById('replyName').textContent = b.dataset.name;
+        document.getElementById('replyEmail').textContent = b.dataset.email;
+        document.getElementById('replyOriginal').textContent = b.dataset.message;
+        document.getElementById('replySubject').value = b.dataset.subject;
+        document.getElementById('replyBody').value = 'Dear ' + b.dataset.name.split(' ')[0] + ',\n\n';
+        d.showModal();
+        var t = document.getElementById('replyBody'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);
+    });
+});
 document.addEventListener('DOMContentLoaded', function() {
     // ===== BULK ACTIONS =====
     const selectAllRows = document.getElementById('selectAllRows');
