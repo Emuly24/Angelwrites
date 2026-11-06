@@ -62,7 +62,7 @@ if ($isLoggedIn) {
     $og_title       = isset($og_title)       ? htmlspecialchars($og_title)       : (isset($pageTitle) ? htmlspecialchars($pageTitle) : htmlspecialchars(aw_site_name())); // F191
     $og_description = isset($og_description) ? htmlspecialchars($og_description) : 'AngelWrites — Christian writing and community platform.';
     $og_url         = isset($og_url)         ? htmlspecialchars($og_url)         : SITE_URL . $_SERVER['REQUEST_URI'];
-    $og_image       = isset($og_image)       ? htmlspecialchars($og_image)       : SITE_URL . '/assets/images/angelwrites-logo.png';
+    $og_image       = isset($og_image)       ? htmlspecialchars($og_image)       : SITE_URL . '/assets/images/og-logo.jpg'; // Q43: angelwrites-logo.png never existed
 ?>
 <meta property="og:type" content="article" />
 <meta property="og:title" content="<?php echo $og_title; ?>" />
