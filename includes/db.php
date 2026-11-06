@@ -35,6 +35,16 @@ try {
     
     // Enable foreign keys
     $db->exec('PRAGMA foreign_keys = ON');
+
+    // F205: wait up to 5 s for a concurrent writer instead of failing at once with
+    // "database is locked" (page views write view/read logs on almost every request).
+    $db->exec('PRAGMA busy_timeout = 5000');
+
+    // F205: the CREATE TABLE / CREATE INDEX statements below used to run on every request.
+    // They now run once per database file; PRAGMA user_version records that they have run.
+    // (The block is deliberately not re-indented, to keep this change small.)
+    $aw_schema_version = (int)$db->query('PRAGMA user_version')->fetchColumn();
+    if ($aw_schema_version < 1) {
     
     // Create tables if they don't exist
     $tables = [
@@ -227,7 +237,10 @@ try {
     foreach ($indexes as $sql) {
         $db->exec($sql);
     }
-    
+
+    $db->exec('PRAGMA user_version = 1');
+    } // end F205 run-once block
+
 } catch (PDOException $e) {
     // Log error and show user-friendly message
     error_log('Database Error: ' . $e->getMessage());
