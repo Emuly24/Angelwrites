@@ -349,6 +349,19 @@ try {
         }
     }
 
+    // R9: reader text settings (theme, size, spacing, font, mode) lived only in one browser's
+    // localStorage. Schema version 7 adds reader_preferences, one JSON row per member, so they follow
+    // the member to every device. Recorded once version 6 has been.
+    if ($aw_schema_version < 7 && (int)$db->query('PRAGMA user_version')->fetchColumn() >= 6) {
+        $db->exec("CREATE TABLE IF NOT EXISTS reader_preferences (
+            user_id INTEGER PRIMARY KEY,
+            prefs TEXT NOT NULL DEFAULT '{}',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )");
+        $db->exec('PRAGMA user_version = 7');
+    }
+
     // Q50: daily clean-up of tables that only grow (see includes/housekeeping.php).
     if (mt_rand(1, 100) === 1) {
         require_once __DIR__ . '/housekeeping.php';

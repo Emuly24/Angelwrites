@@ -35,6 +35,22 @@ if (empty($action)) {
 // ================================================================
 // 1. SAVE READING POSITION
 // ================================================================
+// R9: the member's reader settings, kept with their account.
+if ($action === 'save_prefs') {
+    $in = json_decode((string)($_POST['prefs'] ?? ''), true);
+    $allowed = ['reader_theme' => 30, 'reader_mode' => 10, 'reader_font_size' => 5, 'reader_line_height' => 5, 'reader_font_family' => 80, 'reader_font_readable' => 5];
+    $prefs = [];
+    foreach ($allowed as $k => $max) {
+        if (is_array($in) && isset($in[$k]) && is_scalar($in[$k]) && preg_match('/^[\w ,.\'"#-]*$/u', (string)$in[$k])) {
+            $prefs[$k] = mb_substr((string)$in[$k], 0, $max);
+        }
+    }
+    $db->prepare("INSERT INTO reader_preferences (user_id, prefs, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET prefs = excluded.prefs, updated_at = CURRENT_TIMESTAMP")
+       ->execute([$user_id, json_encode($prefs)]);
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 if ($action === 'save_position') {
     $book_id = (int)$_POST['book_id'];
     $offset = (int)$_POST['offset'];

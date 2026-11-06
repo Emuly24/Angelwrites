@@ -591,6 +591,34 @@ if (function_exists('renderAchievementToastJS')) {
     const groupId = <?php echo $group_id ? (int)$group_id : 0; ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
+    // R9: settings saved with the account are applied before the reader reads its settings, so they
+    // follow the member to every device; later changes are saved back (only when they differ).
+    const awServerPrefs = <?php
+        $aw_prefs = null;
+        if (isLoggedIn() && empty($preview_version)) {
+            try {
+                $ps = $db->prepare("SELECT prefs FROM reader_preferences WHERE user_id = ?");
+                $ps->execute([$_SESSION['user_id']]);
+                $aw_prefs = json_decode((string)$ps->fetchColumn(), true);
+            } catch (PDOException $e) { $aw_prefs = null; }
+        }
+        echo json_encode(is_array($aw_prefs) ? $aw_prefs : null, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    ?>;
+    const awPrefKeys = ['reader_theme', 'reader_mode', 'reader_font_size', 'reader_line_height', 'reader_font_family', 'reader_font_readable'];
+    function awPrefsSnapshot() { const o = {}; awPrefKeys.forEach(k => { try { const v = localStorage.getItem(k); if (v !== null) o[k] = v; } catch (e) {} }); return o; }
+    if (awServerPrefs) { try { Object.keys(awServerPrefs).forEach(k => { if (awPrefKeys.includes(k)) localStorage.setItem(k, awServerPrefs[k]); }); } catch (e) {} }
+    let awPrefsSent = JSON.stringify(awServerPrefs ? awPrefsSnapshot() : null);
+    let awPrefsTimer = null;
+    function awPrefsChanged() {
+        if (!userId) return;
+        clearTimeout(awPrefsTimer);
+        awPrefsTimer = setTimeout(() => {
+            const now = JSON.stringify(awPrefsSnapshot());
+            if (now === awPrefsSent) return;
+            const fd = new FormData(); fd.append('action', 'save_prefs'); fd.append('prefs', now);
+            fetch('reader_ajax.php', { method: 'POST', body: fd }).then(r => r.json()).then(d => { if (d && d.success) awPrefsSent = now; }).catch(() => {});
+        }, 800);
+    }
     const cover_path = <?php echo json_encode($cover_path); ?>;
     const chapterMap = <?php echo json_encode($chapterMap); ?>;
     const pageToChapter = <?php echo json_encode($pageToChapter); ?>;
@@ -683,7 +711,7 @@ if (function_exists('renderAchievementToastJS')) {
         const app = document.getElementById('reader-app');
         app.classList.remove('theme-paper','theme-light','theme-dark','theme-sepia');
         app.classList.add('theme-'+theme);
-        localStorage.setItem('reader_theme',theme);
+        localStorage.setItem('reader_theme',theme); awPrefsChanged();
     }
 
     // ----- Highlight application -----
@@ -856,7 +884,7 @@ if (function_exists('renderAchievementToastJS')) {
 
     function switchMode(mode) {
         readingMode = mode;
-        localStorage.setItem('reader_mode',mode);
+        localStorage.setItem('reader_mode',mode); awPrefsChanged();
         if (mode === 'flip') {
             scrollContainer.style.display = 'none';
             flipContainer.style.display = 'flex';
@@ -990,7 +1018,7 @@ if (function_exists('renderAchievementToastJS')) {
         const val = parseInt(this.value);
         document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontSize = val+'%');
         document.getElementById('fontSizeLabel').textContent = val+'%';
-        localStorage.setItem('reader_font_size',val);
+        localStorage.setItem('reader_font_size',val); awPrefsChanged();
     });
     window.adjustFontSize = function(amount) {
         const slider = document.getElementById('fontSizeSlider');
@@ -1009,7 +1037,7 @@ if (function_exists('renderAchievementToastJS')) {
         const val = parseInt(this.value);
         document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.lineHeight = (val/100).toFixed(1));
         document.getElementById('lineHeightLabel').textContent = (val/100).toFixed(1);
-        localStorage.setItem('reader_line_height',val);
+        localStorage.setItem('reader_line_height',val); awPrefsChanged();
     });
     window.adjustLineHeight = function(amount) {
         const slider = document.getElementById('lineHeightSlider');
@@ -1027,7 +1055,7 @@ if (function_exists('renderAchievementToastJS')) {
     const fontTypeSelect = document.getElementById('fontTypeSelect');
     const savedFont = localStorage.getItem('reader_font_family') || 'Inter,sans-serif';
     if (savedFont) { fontTypeSelect.value = savedFont; applyFontType(savedFont); }
-    fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); });
+    fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); awPrefsChanged(); });
     function applyFontType(font) { document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontFamily = font); }
 
     // ----- Reading speed -----
