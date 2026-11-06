@@ -198,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
             }
         }
 
-        header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
+        header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id . '#comments'); // P12
         exit;
     }
 }
@@ -240,6 +240,15 @@ foreach ($comments_raw as $c) {
         $comments[$c['parent_id']]['children'][$c['id']] = $c;
     }
 }
+
+// P12: every comment thread was shown on one page. Top-level comments are paged, 10 at a time,
+// each with all its replies.
+require_once __DIR__ . '/includes/pagination.php';
+[$cpage, $cper] = aw_page(10);
+$comments = array_reverse($comments, true); // newest threads first (replies stay in order), as on blogs and reviews
+$comments_total = count($comments);
+[$cpage, $coffset] = aw_clamp($comments_total, $cpage, $cper);
+$comments = array_slice($comments, $coffset, $cper, true);
 
 function render_comment($comment, $level = 0) {
     $id = $GLOBALS['id'];
@@ -651,7 +660,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             </div>
         </div>
 
-        <div class="reviews-section">
+        <div class="reviews-section" id="comments">
             <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
             <div class="rating-summary">
                 <div class="rating-stars">
@@ -739,10 +748,11 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             <?php endif; ?>
 
             <div class="reviews-list">
-                <?php if (count($comments) > 0): ?>
+                <?php if ($comments_total > 0): ?>
                     <?php foreach ($comments as $comment): ?>
                         <?php render_comment($comment); ?>
                     <?php endforeach; ?>
+                    <?php echo aw_pager($comments_total, $cpage, $cper, 'comments'); // P12 ?>
                 <?php else: ?>
                     <p style="text-align:center; color:var(--text-light);">No comments yet. Be the first to share your thoughts!</p>
                 <?php endif; ?>
