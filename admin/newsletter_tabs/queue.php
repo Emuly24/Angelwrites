@@ -1,8 +1,13 @@
 <div class="card">
     <div class="card-header">
         <h2>⏳ Email Queue (<?php echo count($queue); ?>)</h2>
+        <form method="POST" style="display:inline;">
+            <input type="hidden" name="action" value="send_due">
+            <button type="submit" class="btn btn-sm btn-primary">📤 Send queued now</button>
+        </form>
     </div>
     <div class="card-body">
+        <p class="field-hint" style="margin-top:0;">Scheduled newsletters are not sent automatically (this host has no timer). Press <strong>Send queued now</strong> on or after their date; it sends the oldest one that is due.</p>
         <?php if (count($queue) > 0): ?>
             <div class="table-responsive">
                 <table class="admin-table">
