@@ -354,6 +354,12 @@ function awToast(msg, type, html) {
     clearTimeout(box._t);
     box._t = setTimeout(function () { box.style.opacity = '0'; }, html ? 6000 : 3500);
 }
+// Q12: guests trying a member-only action got a technical alert (or a silent failure) and no way
+// to sign in. They now get a toast with Log in / Create account links that return to this page.
+function awGuestOnly(what) {
+    const back = encodeURIComponent(location.pathname + location.search);
+    awToast('Please log in to ' + what + '. <a href="<?php echo SITE_URL; ?>/login.php?redirect=' + back + '" style="color:#fff;text-decoration:underline;">Log in</a> or <a href="<?php echo SITE_URL; ?>/register.php" style="color:#fff;text-decoration:underline;">create an account</a>.', 'info', true);
+}
 (function() {
     'use strict';
 
@@ -829,6 +835,7 @@ function awToast(msg, type, html) {
 
     function submitBibleNote(e) {
         e.preventDefault();
+        if (userId === 0) { awGuestOnly('post notes'); return; }
         const text = noteText.value.trim();
         const isPrivate = notePrivate.checked ? 1 : 0;
         if (!text) {
@@ -871,6 +878,7 @@ function awToast(msg, type, html) {
     }
 
     function reactBibleNote(noteId, reactionType) {
+        if (userId === 0) { awGuestOnly('react to notes'); return; }
         const formData = new FormData();
         formData.append('action', 'toggle_reaction');
         formData.append('note_id', noteId);
@@ -908,10 +916,7 @@ function awToast(msg, type, html) {
     }
 
     function toggleBookmark() {
-        if (userId === 0) {
-            alert('Please log in to bookmark verses.');
-            return;
-        }
+        if (userId === 0) { awGuestOnly('bookmark verses'); return; }
         const formData = new FormData();
         formData.append('action', isBookmarked ? 'remove_bookmark' : 'add_bookmark');
         formData.append('book', book);
@@ -1249,6 +1254,7 @@ function awToast(msg, type, html) {
     document.querySelectorAll('.bible-highlight-color').forEach(btn => {
         btn.addEventListener('click', function() {
             const color = this.dataset.color;
+            if (userId === 0) { awGuestOnly('save highlights'); return; }
             if (selectedText && selectedRange) {
                 const formData = new FormData();
                 formData.append('action', 'add_highlight');
@@ -1284,6 +1290,7 @@ function awToast(msg, type, html) {
 
     annotationSave.addEventListener('click', function() {
         const note = annotationText.value.trim();
+        if (userId === 0) { awGuestOnly('save notes on verses'); return; }
         if (note && selectedText && selectedRange) {
             const formData = new FormData();
             formData.append('action', 'add_highlight');
@@ -1434,6 +1441,7 @@ function awToast(msg, type, html) {
     document.querySelectorAll('.reaction-option').forEach(btn => {
         btn.addEventListener('click', function() {
             if (!currentNoteId) return;
+            if (userId === 0) { awGuestOnly('react to notes'); return; }
             const reaction = this.dataset.reaction;
             const formData = new FormData();
             formData.append('action', 'add_reaction');
