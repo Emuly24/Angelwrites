@@ -521,6 +521,16 @@ html,body { height:100%; width:100%; overflow:hidden; }
 
     <!-- Overlay -->
     <div id="overlay"></div>
+    <?php if (!isLoggedIn()): $aw_back = urlencode('/reader/reader.php?id=' . (int)$book_id); ?>
+    <!-- Q7: guests could read but were never told that their place, highlights and notes are not saved -->
+    <div id="guestNotice" role="note" style="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:35;max-width:94vw;width:520px;background:var(--card-bg);border:1px solid var(--rose-light);border-radius:12px;box-shadow:var(--shadow-hover);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;color:var(--text);">
+        <span style="flex:1 1 220px;">You're reading as a guest: your place, highlights and notes won't be saved.</span>
+        <a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo $aw_back; ?>" class="note-submit" style="text-decoration:none;min-height:40px;display:inline-flex;align-items:center;">Log in</a>
+        <a href="<?php echo SITE_URL; ?>/register.php" style="color:var(--rose-dark);min-height:40px;display:inline-flex;align-items:center;">Create account</a>
+        <button type="button" aria-label="Dismiss" onclick="this.parentNode.remove();try{sessionStorage.setItem('awGuestNotice','1')}catch(e){}" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-light);min-width:40px;min-height:40px;">&times;</button>
+    </div>
+    <script>try { if (sessionStorage.getItem('awGuestNotice')) document.getElementById('guestNotice').remove(); } catch (e) {}</script>
+    <?php endif; ?>
 </div>
 
 <!-- ====== Include all enhanced modules ====== -->
@@ -543,6 +553,12 @@ if (function_exists('renderAchievementToastJS')) {
     const totalPages = pages.length;
     const bookId = <?php echo $book_id; ?>;
     const userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
+    // Q7: guest-only actions showed a bare alert; offer to log in and come back to this book.
+    function awNeedLogin(what) {
+        if (confirm('Please log in to ' + what.replace(/\.$/, '') + '.\n\nGo to the login page now? You will come back to this book.')) {
+            window.location.href = '<?php echo SITE_URL; ?>/login.php?redirect=' + encodeURIComponent('/reader/reader.php?id=<?php echo (int)$book_id; ?>');
+        }
+    }
     const groupId = <?php echo $group_id ? (int)$group_id : 0; ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
@@ -855,7 +871,7 @@ if (function_exists('renderAchievementToastJS')) {
 
     // ----- Bookmarks -----
     bookmarkBtn.addEventListener('click',function() {
-        if (userId === 0) { alert('Please log in to bookmark.'); return; }
+        if (userId === 0) { awNeedLogin('bookmark.'); return; }
         if (isBookmarked) {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
             const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); xhr.send(fd); // F235
@@ -1017,9 +1033,9 @@ if (function_exists('renderAchievementToastJS')) {
         }
         openModal('share-modal');
     });
-    commentsBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to view comments.'); return; } loadComments(); openModal('commentsModal'); });
-    errorReportBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to report errors.'); return; } errorPageInput.value = currentPage; errorPageNumSpan.textContent = '(current: ' + currentPage + ')'; openModal('errorModal'); });
-    prayerBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to submit prayer requests.'); return; } prayerText.value = ''; openModal('prayerModal'); });
+    commentsBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('view comments.'); return; } loadComments(); openModal('commentsModal'); });
+    errorReportBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('report errors.'); return; } errorPageInput.value = currentPage; errorPageNumSpan.textContent = '(current: ' + currentPage + ')'; openModal('errorModal'); });
+    prayerBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('submit prayer requests.'); return; } prayerText.value = ''; openModal('prayerModal'); });
     challengeBtn.addEventListener('click', loadChallenge);
 
     // ----- Analytics / notes / TTS buttons (redirect) -----
@@ -1046,7 +1062,7 @@ if (function_exists('renderAchievementToastJS')) {
 
     // ----- Reset progress -----
     resetProgressBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to reset progress.'); return; }
+        if (userId === 0) { awNeedLogin('reset progress.'); return; }
         if (confirm('Are you sure you want to reset your reading progress for this book? This cannot be undone.')) {
             const data = new FormData(); data.append('action', 'reset_progress'); data.append('book_id', bookId);
             const xhr = new XMLHttpRequest(); xhr.open('POST', '/reader/reader_ajax.php', true);
@@ -1485,7 +1501,7 @@ if (function_exists('renderAchievementToastJS')) {
 
     // ----- Export highlights -----
     exportHighlightsBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to export your highlights.'); return; }
+        if (userId === 0) { awNeedLogin('export your highlights.'); return; }
         const xhr = new XMLHttpRequest();
         xhr.open('GET','/reader/reader_ajax.php?action=get_highlights&book_id=' + bookId, true);
         xhr.onload = function() {
