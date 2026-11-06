@@ -43,8 +43,13 @@ if (isLoggedIn()) {
 
 $currentUserLiked = false;
 $currentUserDisliked = false;
-$likeCount = $video['likes'] ?? rand(100, 500); // Fallback if column missing
-$dislikeCount = $video['dislikes'] ?? rand(10, 50); // Fallback if column missing
+// F62: the counts fell back to rand(100, 500) / rand(10, 50), i.e. made-up numbers shown as real.
+// Count the stored reactions instead (the table cannot hold 'dislike', so that count is 0).
+$rc = $db->prepare("SELECT COUNT(CASE WHEN reaction_type = 'like' THEN 1 END) FROM video_reactions WHERE video_id = ?");
+$rc->execute([$id]);
+$likeCount = (int)$rc->fetchColumn();
+$rc->closeCursor();
+$dislikeCount = 0;
 
 if (isLoggedIn()) {
     $stmt = $db->prepare("SELECT reaction_type FROM video_reactions WHERE video_id = ? AND user_id = ?");
