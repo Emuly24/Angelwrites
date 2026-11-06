@@ -30,6 +30,25 @@ $stats['total_views'] = ($stats['poem_views'] ?? 0) + ($stats['book_views'] ?? 0
 try { $stmt = $db->prepare("SELECT s.*, u.name AS user_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date ASC LIMIT 5"); $stmt->execute(); $recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5"); $stmt->execute(); $recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
 
+// Q42: the real to-do items were buried among totals and zero-filled charts. Count what is waiting
+// for the admin; each query is optional (a table may not exist before the DB repair).
+$aw_attention = [];
+foreach ([
+    ['Orders to confirm', "SELECT COUNT(*) FROM payments WHERE status = 'pending'", 'manage_payments.php', 'fa-money-bill-wave'],
+    ['Session requests', "SELECT COUNT(*) FROM sessions WHERE status = 'pending'", 'manage_sessions.php?status=pending', 'fa-calendar-check'],
+    ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'manage_messages.php', 'fa-envelope'],
+    ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'fa-hands-praying'],
+    ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'fa-quote-left'],
+    ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'manage_community.php', 'fa-flag'],
+] as [$aw_label, $aw_sql, $aw_link, $aw_icon]) {
+    try {
+        $aw_n = (int)$db->query($aw_sql)->fetchColumn();
+        if ($aw_n > 0) $aw_attention[] = [$aw_label, $aw_n, $aw_link, $aw_icon];
+    } catch (Throwable $e) {
+        // table not there yet
+    }
+}
+
 $pageTitle = 'Admin Dashboard';
 ?>
 <?php require_once '../includes/header.php'; ?>
@@ -119,6 +138,20 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <!-- Theme toggle removed from here as header has it -->
             <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Quick Add</button>
         </div>
+    </div>
+
+    <!-- Q42: needs attention -->
+    <div class="admin-module" style="margin-bottom:16px;">
+        <h3>🔔 Needs your attention</h3>
+        <?php if (!$aw_attention): ?>
+            <p style="margin:0;">Nothing is waiting for you. ✅</p>
+        <?php else: ?>
+            <div class="admin-module-grid">
+                <?php foreach ($aw_attention as [$aw_label, $aw_n, $aw_link, $aw_icon]): ?>
+                    <a href="<?php echo $aw_link; ?>" class="admin-module-btn"><i class="fas <?php echo $aw_icon; ?>"></i><span><strong><?php echo $aw_n; ?></strong> <?php echo htmlspecialchars($aw_label); ?></span></a>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Core Stats -->
