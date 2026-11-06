@@ -20,3 +20,18 @@ function aw_book_on_sale(array $book) {
 function aw_book_price(array $book) {
     return round(aw_book_on_sale($book) ? (float)$book['sale_price'] : (float)($book['price'] ?? 0), 2);
 }
+
+// F78: the admin confirms that the money for a pending order has arrived. Returns false if the
+// order is not pending (already handled, or unknown).
+function aw_confirm_payment(PDO $db, $payment_id) {
+    $stmt = $db->prepare("UPDATE payments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'");
+    $stmt->execute([(int)$payment_id]);
+    return $stmt->rowCount() === 1;
+}
+
+// F78: the admin rejects a pending order (no payment arrived).
+function aw_reject_payment(PDO $db, $payment_id) {
+    $stmt = $db->prepare("UPDATE payments SET status = 'rejected' WHERE id = ? AND status = 'pending'");
+    $stmt->execute([(int)$payment_id]);
+    return $stmt->rowCount() === 1;
+}
