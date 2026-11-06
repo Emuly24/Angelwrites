@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $success = 'Your question has been updated!';
             
             // ===== SEND ADMIN NOTIFICATION =====
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = '📝 Question Edited';
             $body_msg = "A question has been edited by the user.\n\n";
             $body_msg .= "Question ID: $question_id\n";

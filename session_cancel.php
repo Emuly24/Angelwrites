@@ -36,7 +36,7 @@ if ($confirmed === 1) {
         $success = 'Session cancelled successfully.';
         
         // ===== SEND ADMIN NOTIFICATION =====
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '❌ Session Cancelled';
         $body = "<h2>Session Cancelled</h2>";
         $body .= "<p><strong>Session ID:</strong> $session_id</p>";

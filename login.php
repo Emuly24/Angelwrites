@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
 
             // ===== SEND ADMIN NOTIFICATION FOR SUSPICIOUS ACTIVITY =====
             if ($attempts >= 3) {
-                $admin_email = 'angelwrites@zohomail.com';
+                $admin_email = aw_admin_email();
                 $admin_subject = '⚠️ Multiple Failed Login Attempts';
                 $admin_body = "There have been $attempts failed login attempts for IP: $ip\n\nLogin attempted: $login\n\nTime: " . date('Y-m-d H:i:s');
                 sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites Admin');

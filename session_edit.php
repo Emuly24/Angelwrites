@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                 $success = 'Session updated successfully!';
                 
                 // ===== SEND ADMIN NOTIFICATION =====
-                $admin_email = 'angelwrites@zohomail.com';
+                $admin_email = aw_admin_email();
                 $subject = '📅 Session Updated';
                 $body = "<h2>Session Updated</h2>";
                 $body .= "<p><strong>Session ID:</strong> $session_id</p>";

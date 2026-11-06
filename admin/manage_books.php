@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = 'Book added successfully.';
 
                 // Admin notification via Zoho SMTP
-                $admin_email = 'angelwrites@zohomail.com';
+                $admin_email = aw_admin_email();
                 $subject = '📚 New Book Added: ' . $title;
                 $body = "<h2>New Book Added to AngelWrites</h2>";
                 $body .= "<p><strong>Title:</strong> " . $title . "</p>";

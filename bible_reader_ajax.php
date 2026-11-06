@@ -69,7 +69,7 @@ if ($action === 'add_note' && $user_id > 0) {
     
     // ===== NOTIFY ADMIN (if not private) =====
     if (!$is_private) {
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '📝 New Bible Note';
         $body = "<h2>New Bible Note</h2>";
         $body .= "<p><strong>User:</strong> " . $_SESSION['name'] . " (ID: $user_id)</p>";

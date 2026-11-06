@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reset_password']) && 
             }
             
             // ===== SEND ADMIN NOTIFICATION =====
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = '🔐 Password Reset Completed';
             $body = "<h2>Password Reset Completed</h2>";
             $body .= "<p><strong>Email:</strong> $email</p>";

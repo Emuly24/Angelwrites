@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
         $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
         $user_name = $user['name'] ?? 'A user';
         
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '💬 New Comment on: ' . $post['title'];
         $body = "<h2>New Comment Posted</h2>";
         $body .= "<p><strong>Post:</strong> " . $post['title'] . "</p>";
@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment'
             $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
             $user_name = $user['name'] ?? 'A user';
             
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = '🎙️ New Voice Comment on: ' . $post['title'];
             $body = "<h2>New Voice Comment Posted</h2>";
             $body .= "<p><strong>Post:</strong> " . $post['title'] . "</p>";
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_prayer']) && 
     $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
     $user_name = $user['name'] ?? 'A user';
     
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '🙏 New Prayer Request on: ' . $post['title'];
     $body = "<h2>New Prayer Request Submitted</h2>";
     $body .= "<p><strong>Post:</strong> " . $post['title'] . "</p>";

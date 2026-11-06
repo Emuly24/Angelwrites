@@ -27,7 +27,7 @@ if (isset($_GET['delete'])) {
         $stmt->execute([$id]);
         $success = 'User deleted successfully.';
         
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '👤 User Deleted: ' . $user['name'];
         $body = "<h2>User Account Deleted</h2>";
         $body .= "<p><strong>Name:</strong> " . $user['name'] . "</p>";
@@ -57,7 +57,7 @@ if (isset($_POST['change_role'])) {
         $stmt->execute([$new_role, $user_id]);
         $success = 'User role updated successfully.';
         
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '🔄 Role Changed: ' . $user['name'];
         $body = "<h2>User Role Updated</h2>";
         $body .= "<p><strong>Name:</strong> " . $user['name'] . "</p>";

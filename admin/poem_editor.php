@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = 'Poem created successfully!';
 
             // ===== ADMIN NOTIFICATION =====
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = 'New Poem Added: ' . $title;
             $body = "A new poem has been added.\n\nTitle: $title\nIntro: $intro\n\nView poem: " . SITE_URL . "/poem_view.php?id=$id";
             sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');

@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = 'Your session has been booked successfully! Angella will confirm it soon.';
                 
                 // ===== SEND ADMIN NOTIFICATION =====
-                $admin_email = 'angelwrites@zohomail.com';
+                $admin_email = aw_admin_email();
                 $subject = '📅 New Session Booking';
                 $body = "<h2>New Session Booking</h2>";
                 $body .= "<p><strong>Client:</strong> {$user_name}</p>";

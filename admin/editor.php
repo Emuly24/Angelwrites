@@ -121,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = 'Blog post created successfully!';
 
             // Admin notification via Zoho SMTP
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = 'New Blog Post: ' . $title;
             $body = "A new blog post has been added.\n\nTitle: $title\nCategory: $category\n\nView post: " . SITE_URL . "/blog.php?slug=" . $slug;
             sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');

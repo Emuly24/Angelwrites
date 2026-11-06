@@ -64,7 +64,7 @@ try {
     $payment_id = $db->lastInsertId();
 
     // ===== LOG PAYMENT FOR ADMIN =====
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '💳 New Payment Received';
     $body = "<h2>New Payment Completed</h2>";
     $body .= "<p><strong>Payment ID:</strong> $payment_id</p>";

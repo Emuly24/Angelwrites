@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_email_change'
             sendEmail($old_email, 'Your AngelWrites email address was changed',
                 "Hello,\n\nThe email address on your AngelWrites account was changed from $old_email to {$pending_email['email']}.\n\nIf you did not do this, reply to this email straight away.\n\n— AngelWrites",
                 'angelwrites@zohomail.com', 'AngelWrites', false);
-            sendEmail('angelwrites@zohomail.com', 'User Email Changed',
+            sendEmail(aw_admin_email(), 'User Email Changed',
                 "User ID $user_id confirmed an email change from $old_email to {$pending_email['email']}.",
                 'angelwrites@zohomail.com', 'AngelWrites', false);
             unset($_SESSION['pending_email_change']);

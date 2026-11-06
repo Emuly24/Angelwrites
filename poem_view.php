@@ -188,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
         require_once __DIR__ . '/includes/mail_helper.php';
         $from_name = awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']);
         $what = $is_private ? 'Private message' : ($parent_id ? 'Reply' : 'Comment');
-        sendEmail('angelwrites@zohomail.com', "$what on \"{$poem['title']}\" from $from_name",
+        sendEmail(aw_admin_email(), "$what on \"{$poem['title']}\" from $from_name",
             "$what from $from_name on the poem \"{$poem['title']}\":\n\n$comment\n\nView: " . SITE_URL . '/poem_view.php?id=' . $target_id,
             'angelwrites@zohomail.com', 'AngelWrites', false);
         foreach ($db->query("SELECT id FROM users WHERE role = 'admin'")->fetchAll(PDO::FETCH_COLUMN) as $admin_uid) {

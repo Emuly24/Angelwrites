@@ -264,7 +264,7 @@ if ($action === 'ask_question') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '❓ Reader Question: ' . $book['title'];
     $body = "<h2>New Reader Question</h2>";
     $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";
@@ -292,7 +292,7 @@ if ($action === 'report_typo') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '📝 Typo Report: ' . $book['title'];
     $body = "<h2>Typo Report</h2>";
     $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
@@ -705,7 +705,7 @@ if ($action === 'submit_prayer_request') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '🙏 Prayer Request from ' . $user['email'];
     $body = "<h2>New Prayer Request</h2>";
     $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";
@@ -738,7 +738,7 @@ if ($action === 'submit_error_report') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '⚠️ Book Error Report: ' . $book['title'];
     $body = "<h2>New Error Report</h2>";
     $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
@@ -865,7 +865,7 @@ function checkMilestone($user_id, $book_id, $percent) {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '📖 Reader Milestone: ' . $percent . '% – ' . $book['title'];
     $body = "<h2>Reader Milestone Reached</h2>";
     $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";

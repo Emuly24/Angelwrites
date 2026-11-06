@@ -25,7 +25,7 @@ if (isset($_GET['token'])) {
             $email = $subscriber['email'];
 
             // ===== SEND ADMIN NOTIFICATION =====
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $admin_subject = 'User Unsubscribed from Newsletter';
             $admin_body = "A user has unsubscribed from the newsletter.\n\nEmail: $email";
             
