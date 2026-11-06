@@ -604,6 +604,17 @@ if (function_exists('renderAchievementToastJS')) {
         }
         echo json_encode(is_array($aw_prefs) ? $aw_prefs : null, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     ?>;
+    // R10: keep this book readable offline (see /sw.js) and say when the reader is offline.
+    if ('serviceWorker' in navigator && userId) { navigator.serviceWorker.register('/sw.js').catch(() => {}); }
+    function awOfflineNotice() {
+        let n = document.getElementById('awOffline');
+        if (!navigator.onLine) {
+            if (!n) { n = document.createElement('div'); n.id = 'awOffline'; n.setAttribute('role', 'status'); n.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:100002;background:#333;color:#fff;padding:6px 14px;border-radius:16px;font-size:0.85rem;'; document.body.appendChild(n); }
+            n.textContent = 'You are offline. Reading the saved copy; your place will be saved when you reconnect.';
+        } else if (n) { n.remove(); savePosition && savePosition(); }
+    }
+    window.addEventListener('online', awOfflineNotice); window.addEventListener('offline', awOfflineNotice);
+    document.addEventListener('DOMContentLoaded', awOfflineNotice);
     const awPrefKeys = ['reader_theme', 'reader_mode', 'reader_font_size', 'reader_line_height', 'reader_font_family', 'reader_font_readable'];
     function awPrefsSnapshot() { const o = {}; awPrefKeys.forEach(k => { try { const v = localStorage.getItem(k); if (v !== null) o[k] = v; } catch (e) {} }); return o; }
     if (awServerPrefs) { try { Object.keys(awServerPrefs).forEach(k => { if (awPrefKeys.includes(k)) localStorage.setItem(k, awServerPrefs[k]); }); } catch (e) {} }
