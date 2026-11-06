@@ -525,7 +525,8 @@ function publishVersion($book_id, $version) {
     $stmt->execute([$book_id, $version]);
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$data) return false;
-    $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, metadata_json = ?, published_version = ?, version = ?, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
+    // R1: publishing is what makes a version readable (also the first time).
+    $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, metadata_json = ?, published_version = ?, version = ?, is_processed = 1, processing_status = 'complete', updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
     $stmt->execute([$data['content_html'], $data['toc_json'], $data['metadata_json'], $version, $version, $book_id]);
     return true;
 }
@@ -1052,9 +1053,9 @@ if (isset($_POST['extract'])) {
         $metadata = ['keywords' => extractKeywords($raw_text)];
         $metadata_json = json_encode($metadata);
         
-        $stmt = $db->prepare("SELECT published_version FROM book_content WHERE book_id = ?");
+        $stmt = $db->prepare("SELECT published_version FROM book_content WHERE book_id = ? AND is_processed = 1");
         $stmt->execute([$book_id]);
-        $published_version = $stmt->fetchColumn() ?? 1;
+        $published_version = $stmt->fetchColumn() ?: null; // R1: null = nothing published yet
         
         $stmt = $db->prepare("SELECT MAX(version) FROM book_content_history WHERE book_id = ?");
         $stmt->execute([$book_id]);
@@ -1063,19 +1064,22 @@ if (isset($_POST['extract'])) {
         $stmt = $db->prepare("INSERT INTO book_content_history (book_id, content_html, toc_json, metadata_json, version, note) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$book_id, $html_content, $toc_json, $metadata_json, $next_version, 'Extracted version ' . $next_version]);
         
+        // R1: extracting used to overwrite the live text members read (for a book already processed),
+        // although the message said the published version was unchanged, so a bad extraction went
+        // straight to readers. Extraction now only creates a draft version; members see it only after
+        // "Publish". A book processed for the first time gets a book_content row that stays
+        // unpublished (is_processed = 0, so the reader says "not ready yet") until then.
         $stmt = $db->prepare("SELECT COUNT(*) FROM book_content WHERE book_id = ?");
         $stmt->execute([$book_id]);
         if ($stmt->fetchColumn() == 0) {
-            $stmt = $db->prepare("INSERT INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status, published_version) VALUES (?, ?, ?, ?, ?, 1, 'complete', ?)");
-            $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json, $next_version]);
-        } else {
-            $stmt = $db->prepare("UPDATE book_content SET content_html = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
-            $stmt->execute([$html_content, $book_id]);
+            $stmt = $db->prepare("INSERT INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status, published_version) VALUES (?, ?, '', '[]', ?, 0, 'draft', NULL)");
+            $stmt->execute([$book_id, $book['title'], $metadata_json]);
+            $published_version = null;
         }
         
         // F89: a processed book leaves the queue
         $db->prepare("UPDATE book_processing_queue SET status = 'complete', progress = 100, updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]);
-        echo json_encode(['success' => true, 'message' => "✅ Extracted version $next_version created. Published version remains v$published_version."]);
+        echo json_encode(['success' => true, 'version' => $next_version, 'message' => "✅ Draft version $next_version created. " . ($published_version ? "Members still read v$published_version until you publish." : 'Nothing is shown to members until you publish.')]);
     } else {
         $db->prepare("UPDATE book_processing_queue SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]); // F89
         $error_msg = $raw_text ?: 'Failed to extract content from the file.';
