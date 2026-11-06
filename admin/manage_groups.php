@@ -68,7 +68,7 @@ try {
         SELECT g.*,
                b.title as book_title, b.author as book_author,
                p.title as poem_title, p.author as poem_author,
-               n.title as newsletter_title, n.author as newsletter_author,
+               n.subject as newsletter_title, NULL as newsletter_author,
                (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
                (SELECT COUNT(*) FROM group_notes WHERE group_id = g.id) as note_count,
                (SELECT COUNT(*) FROM group_discussions WHERE group_id = g.id) as discussion_count,
@@ -76,7 +76,7 @@ try {
         FROM reading_groups g
         LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
         LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
-        LEFT JOIN newsletters n ON g.content_type = 'newsletter' AND g.content_id = n.id
+        LEFT JOIN newsletter_archive n ON g.content_type = 'newsletter' AND g.content_id = n.id -- F48: sent newsletters live here; 'newsletters' is an empty, unused table
         LEFT JOIN users u ON g.creator_id = u.id
         ORDER BY g.created_at DESC
     ");
