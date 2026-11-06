@@ -16,7 +16,7 @@ if (isset($_GET['confirm'])) {
     } else {
         if ($sub['is_active'] != 1) {
             $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL WHERE id = ?")->execute([$sub['id']]);
-            sendEmail('angelwrites@zohomail.com', 'New Newsletter Subscriber (confirmed)',
+            sendEmail(aw_admin_email(), 'New Newsletter Subscriber (confirmed)',
                 "A subscriber confirmed their newsletter subscription.\n\nEmail: {$sub['email']}\nName: " . ($sub['name'] ?: 'Not provided'),
                 'angelwrites@zohomail.com', 'AngelWrites', false);
         }
