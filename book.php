@@ -326,7 +326,7 @@ $pageTitle = htmlspecialchars($book['title']);
                                 <?php endfor; ?>
                             </div>
                             <span class="rating-value"><?php echo number_format($avg_rating, 1); ?></span>
-                            <span class="rating-count">(<?php echo $total_reviews; ?> reviews)</span>
+                            <span class="rating-count">(<?php echo (int)$total_reviews; ?> review<?php echo (int)$total_reviews === 1 ? '' : 's'; ?>)</span><!-- Q22 -->
                         </div>
                     </div>
 
@@ -652,6 +652,10 @@ p { line-height:1.6; }
     .reviews-header { flex-direction:column; align-items:flex-start; gap:8px; }
     .book-cover-section { position:relative; top:0; }
     .book-cover-card { padding:12px; }
+    /* Q22: a full-width cover filled the first phone screen and pushed the price and Read/Download
+       button below the fold; it is now capped so they are visible without scrolling. */
+    .cover-image { width:auto; max-width:100%; max-height:42vh; object-fit:contain; }
+    .placeholder-cover { height:160px; }
 }
 @media (max-width:480px) {
     .book-title { font-size:1.6rem; }
