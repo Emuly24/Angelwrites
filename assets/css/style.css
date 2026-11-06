@@ -37,7 +37,10 @@
 }
 
 /* ===== DARK THEME ===== */
-[data-theme="dark"] {
+/* Q46: 38 pages redefine :root with light colours in their own <style>, which came after this rule with
+   the same specificity and so switched dark mode off on those pages. html[data-theme="dark"] is more
+   specific than :root, so the site's dark colours now win everywhere dark mode is on. */
+html[data-theme="dark"], [data-theme="dark"] {
     --rose: #dba1a2;
     --rose-dark: #c08a8b;
     --rose-light: #e8c0c0;
