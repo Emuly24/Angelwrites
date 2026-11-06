@@ -33,6 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// P6: was capped at 300 with no way to see older requests; 20 per page now.
+require_once __DIR__ . '/../includes/pagination.php';
+[$page, $per_page] = aw_page(20);
+$requests_total = (int)$db->query("SELECT COUNT(*) FROM prayer_requests")->fetchColumn();
+[$page, $offset] = aw_clamp($requests_total, $page, $per_page);
 $requests = $db->query("
     SELECT pr.id, pr.status, pr.created_at,
            COALESCE(NULLIF(pr.message, ''), pr.request_text) AS text,
@@ -42,8 +47,8 @@ $requests = $db->query("
     LEFT JOIN users u ON u.id = pr.user_id
     LEFT JOIN blog_posts bp ON bp.id = pr.reflection_id
     LEFT JOIN books b ON b.id = pr.book_id
-    ORDER BY (pr.status = 'prayed'), pr.created_at DESC
-    LIMIT 300
+    ORDER BY (pr.status = 'prayed'), pr.created_at DESC, pr.id DESC
+    LIMIT $per_page OFFSET $offset
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Prayer Requests';
@@ -84,6 +89,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </form>
             </div>
         <?php endforeach; ?>
+        <?php echo aw_pager($requests_total, $page, $per_page); // P6 ?>
     </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
