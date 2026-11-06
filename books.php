@@ -118,7 +118,9 @@ $pageTitle = 'Books';
                             
                             <!-- Badges -->
                             <div class="book-badges">
-                                <?php if ($book['is_free']): ?>
+                                <?php if (isset($owned[(int)$book['id']])): // Q14 ?>
+                                    <span class="badge free">Owned</span>
+                                <?php elseif ($book['is_free']): ?>
                                     <span class="badge free">Free</span>
                                 <?php elseif (aw_book_on_sale($book)): // F79 ?>
                                     <span class="badge sale">Sale</span>
@@ -168,6 +170,10 @@ $pageTitle = 'Books';
                                         <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo ($book['is_free'] || isset($owned[(int)$book['id']])) ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
                                             <i class="fas fa-download"></i> Download
                                         </button>
+                                    <?php elseif (!isLoggedIn() && ($book['is_free'] || (float)$book['price'] > 0)): // Q14: guests were not told ?>
+                                        <a class="btn btn-secondary" href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode('/books.php#book-' . (int)$book['id']); ?>">
+                                            <i class="fas fa-sign-in-alt"></i> Log in to <?php echo $book['is_free'] ? 'download' : 'buy'; ?>
+                                        </a>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -277,6 +283,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+});
+
+// Q14: book.php's "Buy this book" links here with ?buy=<id>; open that book's order form.
+document.addEventListener('DOMContentLoaded', function () {
+    const m = location.search.match(/[?&]buy=(\d+)/);
+    if (!m) return;
+    const btn = document.querySelector('.download-btn[data-id="' + m[1] + '"]');
+    if (btn) btn.click();
 });
 
 // ===== PAYMENT MODAL FUNCTIONS =====

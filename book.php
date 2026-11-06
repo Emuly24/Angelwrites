@@ -235,34 +235,40 @@ $pageTitle = htmlspecialchars($book['title']);
                     </div>
 
                     <div class="action-buttons">
-                        <?php if ($has_processed): ?>
+                        <?php
+                        // Q14: one rule for what this visitor can do. Item 3 (F32) still applies: the raw file
+                        // is never linked, downloads go through download.php. A paid book with reader content
+                        // used to show "Read Book" to non-buyers (the reader then sent them back here), and
+                        // there was no way to buy from this page or any hint for guests.
+                        $is_free_book = !empty($book['is_free']);
+                        $owns_book = $is_free_book || isAdmin() || (isLoggedIn() && aw_has_purchased($db, $_SESSION['user_id'], $book_id));
+                        $back_here = urlencode('/book.php?id=' . (int)$book_id);
+                        ?>
+                        <?php if ($owns_book && $has_processed): ?>
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
-                        <?php else:
-                            // Item 3 (F32): never link the raw file. Free books (and paid books the member
-                            // has bought) go through download.php, which checks login and purchase.
-                            // A missing purchases table (before the DB repair) counts as "not purchased".
-                            $can_download = !empty($book['is_free']);
-                            if (!$can_download && isLoggedIn()) {
-                                try {
-                                    $pstmt = $db->prepare("SELECT 1 FROM purchases WHERE user_id = ? AND book_id = ? AND payment_status = 'completed' LIMIT 1");
-                                    $pstmt->execute([$_SESSION['user_id'], $book_id]);
-                                    $can_download = (bool)$pstmt->fetchColumn();
-                                } catch (PDOException $e) {
-                                    $can_download = false;
-                                }
-                            }
-                        ?>
-                            <?php if ($can_download): ?>
-                                <a href="<?php echo SITE_URL; ?>/download.php?book_id=<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
-                                    <i class="fas fa-download"></i> Download (<?php echo strtoupper(htmlspecialchars($book['file_type'])); ?>)
-                                </a>
-                            <?php else: ?>
-                                <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-primary btn-lg">
-                                    <i class="fas fa-lock"></i> Purchase required to download
-                                </a>
-                            <?php endif; ?>
+                        <?php elseif ($owns_book && isLoggedIn()): ?>
+                            <a href="<?php echo SITE_URL; ?>/download.php?book_id=<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
+                                <i class="fas fa-download"></i> Download (<?php echo strtoupper(htmlspecialchars((string)$book['file_type'])); ?>)
+                            </a>
+                        <?php elseif ($owns_book): ?>
+                            <a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo $back_here; ?>" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt"></i> Log in to download (free)
+                            </a>
+                        <?php elseif ((float)$book['price'] <= 0): ?>
+                            <span class="btn btn-outline btn-lg" aria-disabled="true">Not yet on sale</span>
+                        <?php elseif (!isLoggedIn()): ?>
+                            <a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo $back_here; ?>" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt"></i> Log in to buy this book
+                            </a>
+                        <?php else: ?>
+                            <a href="<?php echo SITE_URL; ?>/books.php?buy=<?php echo (int)$book_id; ?>#book-<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
+                                <i class="fas fa-shopping-cart"></i> Buy this book (MWK <?php echo number_format(aw_book_price($book), 2); ?>)
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($owns_book && !$is_free_book && !isAdmin()): ?>
+                            <p style="margin-top:8px;">✅ You own this book. <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a></p>
                         <?php endif; ?>
                     </div>
                     <p style="text-align:center;margin-top:8px;"><a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>">👥 Reading groups for this book</a></p><!-- F51 -->
