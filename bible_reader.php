@@ -212,7 +212,6 @@ $pageTitle = 'Bible Reader';
                         <option value="AMP">Amplified Bible (AMP)</option>
                         <option value="ASV">American Standard Version (ASV)</option>
                         <option value="WEB">World English Bible (WEB)</option>
-                        <option value="YLT">Young's Literal Translation (YLT)</option>
                     </select>
                 </div>
 
@@ -234,7 +233,6 @@ $pageTitle = 'Bible Reader';
                         <option value="AMP">Amplified Bible (AMP)</option>
                         <option value="ASV">American Standard Version (ASV)</option>
                         <option value="WEB">World English Bible (WEB)</option>
-                        <option value="YLT">Young's Literal Translation (YLT)</option>
                     </select>
                 </div>
 
@@ -353,8 +351,8 @@ $pageTitle = 'Bible Reader';
         'NKJV': 'bible_NKJV.db',
         'AMP': 'bible_AMP.db',
         'ASV': 'bible_ASV.db',
-        'WEB': 'bible_WEB.db',
-        'YLT': 'bible_YLT.db'
+        'WEB': 'bible_WEB.db'
+        // F24: YLT removed (decision D-I1): there is no bible_YLT.db, and the lookup served KJV under the YLT label.
     };
 
     const BOOKS = [

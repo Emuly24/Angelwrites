@@ -11,7 +11,12 @@ function getBibleText($book, $chapter, $verse_start = 1, $verse_end = 0, $versio
         'WEB'  => 'bible_WEB.db',
     ];
     
-    $db_file = $version_map[$version] ?? 'bible_KJV.db';
+    // F24: an unknown version (e.g. YLT, which has no database) used to fall back silently to
+    // KJV while the page still said YLT. It is now reported instead.
+    if (!isset($version_map[$version])) {
+        return ["error" => "The $version translation is not available."];
+    }
+    $db_file = $version_map[$version];
     $bible_db = __DIR__ . '/../assets/bible/' . $db_file;
     
     if (!file_exists($bible_db)) {
