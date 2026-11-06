@@ -108,8 +108,10 @@ foreach ($search_configs as $config) {
         if ($config['type'] === 'blog') {
             $fetch_sql = str_replace("WHERE status = 'published'", "", $config['select']) . " WHERE status = 'published' AND " . $where_data['where'];
         }
-        $fetch_sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-        $fetch_params = array_merge($where_data['params'], [$limit, $offset]);
+        // F58: no per-type LIMIT/OFFSET (that showed up to 12 of each type per page, up to 60);
+        // the merged list is paged once, below.
+        $fetch_sql .= " ORDER BY created_at DESC";
+        $fetch_params = $where_data['params'];
         $stmt = $db->prepare($fetch_sql);
         $stmt->execute($fetch_params);
         $results = array_merge($results, $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -125,6 +127,9 @@ if ($sort === 'newest') {
     usort($results, function($a, $b) { return ($b['comment_count'] ?? 0) - ($a['comment_count'] ?? 0); });
 }
 
+// F58: page the merged, sorted list: 12 results per page in total.
+$total_results = count($results);
+$results = array_slice($results, $offset, $limit);
 $total_pages = ceil($total_results / $limit);
 $current_page = $page;
 $query_params = http_build_query(['q' => $q, 'type' => $type, 'sort' => $sort]);
