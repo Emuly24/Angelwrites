@@ -22,7 +22,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($queue as $q): ?>
+                        <?php foreach ($aw_nl['queue']['rows'] as $q): // P18 ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($q['subject']); ?></td>
                                 <td><?php echo count(explode(',', $q['recipient_emails'])); ?> recipients</td>
@@ -61,6 +61,7 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                <?php echo aw_pager($aw_nl['queue']['total'], $aw_nl['queue']['page'], $aw_nl['queue']['per'], '', $aw_nl['queue']['param']); // P18 ?>
             </div>
         <?php else: ?>
             <p class="no-items">No emails in the queue.</p>
