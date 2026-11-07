@@ -314,7 +314,7 @@ class ProgressTracker {
         $stmt->execute([$this->book_id]);
         $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '📖 Reader Milestone: ' . $percent . '% – ' . $book['title'];
         $body = "<h2>Reader Milestone Reached</h2>";
         $body .= "<p><strong>User:</strong> " . ($user['email'] ?? 'Unknown') . "</p>";

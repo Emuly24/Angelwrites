@@ -264,7 +264,7 @@ if ($action === 'ask_question') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '❓ Reader Question: ' . $book['title'];
     $body = "<h2>New Reader Question</h2>";
     $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";
@@ -292,7 +292,7 @@ if ($action === 'report_typo') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '📝 Typo Report: ' . $book['title'];
     $body = "<h2>Typo Report</h2>";
     $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
@@ -694,8 +694,9 @@ if ($action === 'submit_prayer_request') {
         exit;
     }
 
-    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, book_id, request_text) VALUES (?, ?, ?)");
-    $stmt->execute([$user_id, $book_id, $text]);
+    // F233: request_type and message are required by the table and read by the admin screen.
+    $stmt = $db->prepare("INSERT INTO prayer_requests (user_id, book_id, request_type, message, request_text) VALUES (?, ?, 'prayer', ?, ?)");
+    $stmt->execute([$user_id, $book_id, $text, $text]);
 
     $stmt = $db->prepare("SELECT email FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
@@ -705,7 +706,7 @@ if ($action === 'submit_prayer_request') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '🙏 Prayer Request from ' . $user['email'];
     $body = "<h2>New Prayer Request</h2>";
     $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";
@@ -738,7 +739,7 @@ if ($action === 'submit_error_report') {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '⚠️ Book Error Report: ' . $book['title'];
     $body = "<h2>New Error Report</h2>";
     $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";
@@ -865,7 +866,7 @@ function checkMilestone($user_id, $book_id, $percent) {
     $stmt->execute([$book_id]);
     $book = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $admin_email = 'angelwrites@zohomail.com';
+    $admin_email = aw_admin_email();
     $subject = '📖 Reader Milestone: ' . $percent . '% – ' . $book['title'];
     $body = "<h2>Reader Milestone Reached</h2>";
     $body .= "<p><strong>User:</strong> " . $user['email'] . "</p>";

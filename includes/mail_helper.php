@@ -28,6 +28,13 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         $mail->Subject = $subject;
         $mail->Body    = $message;
         $mail->isHTML($isHTML);
+        // F91: optional attachment as 7th/8th argument (path, file name). admin/process_book.php
+        // passed one, but the arguments were ignored, so the file was silently dropped. (Read with
+        // func_get_args() so the signature line stays unchanged.)
+        $aw_extra = func_get_args();
+        if (!empty($aw_extra[6]) && is_file($aw_extra[6])) {
+            $mail->addAttachment($aw_extra[6], !empty($aw_extra[7]) ? $aw_extra[7] : basename($aw_extra[6]));
+        }
         $mail->send();
         return true;
     } catch (\Throwable $e) {

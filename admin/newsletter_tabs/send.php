@@ -131,13 +131,13 @@ document.getElementById('testSendBtn')?.addEventListener('click', function() {
     formData.append('subject', subject);
     formData.append('content', content);
     formData.append('send_to', 'single');
-    formData.append('single_email', 'angelwrites@zohomail.com');
+    formData.append('single_email', <?php echo json_encode(function_exists('aw_admin_email') ? aw_admin_email() : 'angelwrites@zohomail.com'); ?>);
     formData.append('schedule_type', 'now');
     fetch('manage_newsletter.php', {
         method: 'POST',
         body: formData
     }).then(() => {
-        alert('Test email sent to angelwrites@zohomail.com.');
+        alert('Test email sent to ' + <?php echo json_encode(function_exists('aw_admin_email') ? aw_admin_email() : 'angelwrites@zohomail.com'); ?> + '.');
     }).catch(() => {
         alert('Failed to send test email.');
     });

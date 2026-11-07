@@ -33,6 +33,18 @@ function aw_set_poem_status($db, array $ids, $status) {
     }
 }
 
+// F130: deleting a poem left its reactions (on the poem and on its comments), poem_reads and
+// view_logs rows behind. Remove them before the comments, status and poem rows.
+function aw_delete_poem_children($db, array $ids) {
+    $ids = array_values(array_map('intval', $ids));
+    if (!$ids) return;
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $db->prepare("DELETE FROM reactions WHERE target_type = 'comment' AND target_id IN (SELECT id FROM reviews WHERE target_type = 'poem' AND target_id IN ($ph))")->execute($ids);
+    $db->prepare("DELETE FROM reactions WHERE target_type = 'poem' AND target_id IN ($ph)")->execute($ids);
+    $db->prepare("DELETE FROM poem_reads WHERE poem_id IN ($ph)")->execute($ids);
+    $db->prepare("DELETE FROM view_logs WHERE target_type = 'poem' AND target_id IN ($ph)")->execute($ids);
+}
+
 // ===== HANDLE PUBLISH / UNPUBLISH =====
 if (isset($_GET['publish']) && is_numeric($_GET['publish'])) {
     $id = (int)$_GET['publish'];
@@ -61,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
         if ($action === 'delete') {
             $db->beginTransaction();
             try {
+                aw_delete_poem_children($db, $ids); // F130
                 $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id IN ($placeholders)");
                 $stmt->execute($ids);
                 $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id IN ($placeholders)");
@@ -102,6 +115,7 @@ if (isset($_GET['delete'])) {
             if (!empty($poem['image_path']) && file_exists($doc_root . '/' . $poem['image_path'])) @unlink($doc_root . '/' . $poem['image_path']);
             if (!empty($poem['audio_path']) && file_exists($doc_root . '/' . $poem['audio_path'])) @unlink($doc_root . '/' . $poem['audio_path']);
             
+            aw_delete_poem_children($db, [$id]); // F130
             $stmt = $db->prepare("DELETE FROM poem_status WHERE poem_id = ?"); $stmt->execute([$id]);
             $stmt = $db->prepare("DELETE FROM reviews WHERE target_type = 'poem' AND target_id = ?"); $stmt->execute([$id]);
             $stmt = $db->prepare("DELETE FROM poems WHERE id = ?"); $stmt->execute([$id]);

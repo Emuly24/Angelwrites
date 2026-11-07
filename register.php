@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                     if ($mail_sent) {
                         
                         // ===== SEND ADMIN NOTIFICATION =====
-                        $admin_email = 'angelwrites@zohomail.com';
+                        $admin_email = aw_admin_email();
                         $admin_subject = '📝 New User Registration';
                         $admin_body = "A new user has registered on AngelWrites.\n\n";
                         $admin_body .= "Name: $first_name $last_name\n";

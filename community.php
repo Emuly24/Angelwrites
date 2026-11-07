@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_question'])) {
                 }
                 
                 // Admin notification
-                $admin_email = 'angelwrites@zohomail.com';
+                $admin_email = aw_admin_email();
                 $subject = 'New Community Question: ' . $title;
                 $body_msg = "A new question has been posted.\n\nTitle: $title\nBody: $body\n\nView question: " . SITE_URL . "/community.php?id=" . $question_id;
                 sendEmail($admin_email, $subject, $body_msg, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                 }
                 
                 // Admin notification
-                $admin_email = 'angelwrites@zohomail.com';
+                $admin_email = aw_admin_email();
                 $subject = 'New Answer to Question #' . $question_id;
                 $stmt = $db->prepare("SELECT title, user_id FROM questions WHERE id = ?");
                 $stmt->execute([$question_id]);

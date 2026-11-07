@@ -14,6 +14,30 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 10;
 $offset = ($page - 1) * $limit;
 
+// F188: confirming or cancelling a booking did not tell the member. Email them and add a bell
+// notification (F114) when a session becomes confirmed or cancelled.
+function aw_notify_session_member($db, $session_id, $status) {
+    if (!in_array($status, ['confirmed', 'cancelled'], true)) return;
+    require_once __DIR__ . '/../includes/mail_helper.php';
+    require_once __DIR__ . '/../includes/notifications.php';
+    $st = $db->prepare("SELECT s.date, s.time, s.timezone, u.id AS uid, u.email, u.name, u.first_name, u.last_name, u.username
+                        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?");
+    $st->execute([(int)$session_id]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    $st->closeCursor();
+    if (!$row) return;
+    $when = $row['date'] . ' at ' . $row['time'] . (!empty($row['timezone']) ? ' (' . $row['timezone'] . ')' : '');
+    $title = $status === 'confirmed' ? 'Your session is confirmed' : 'Your session was cancelled';
+    $text = $status === 'confirmed'
+        ? "Angella has confirmed your session on $when."
+        : "Your session on $when has been cancelled. You are welcome to book another time.";
+    awNotify($db, $row['uid'], 'session_' . $status, $title, $text, SITE_URL . '/book_session.php');
+    if (!empty($row['email'])) {
+        sendEmail($row['email'], $title, 'Hello ' . awDisplayName($row) . ",\n\n$text\n\nYour sessions: " . SITE_URL . "/book_session.php\n\n— AngelWrites",
+            'angelwrites@zohomail.com', 'AngelWrites', false);
+    }
+}
+
 // ===== HANDLE STATUS UPDATE =====
 if (isset($_POST['update_status'])) {
     $session_id = (int)$_POST['session_id'];
@@ -23,6 +47,7 @@ if (isset($_POST['update_status'])) {
     if (in_array($status, $valid_statuses)) {
         $stmt = $db->prepare("UPDATE sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         $stmt->execute([$status, $session_id]);
+        aw_notify_session_member($db, $session_id, $status); // F188
         $success = 'Session status updated successfully.';
     } else {
         $error = 'Invalid status.';
@@ -54,11 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $db->prepare("UPDATE sessions SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
         $stmt->execute($ids);
+        foreach ($ids as $sid) { aw_notify_session_member($db, $sid, 'confirmed'); } // F188
         $success = count($ids) . ' sessions confirmed.';
     } elseif (!empty($ids) && $action === 'cancel') {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $db->prepare("UPDATE sessions SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
         $stmt->execute($ids);
+        foreach ($ids as $sid) { aw_notify_session_member($db, $sid, 'cancelled'); } // F188
         $success = count($ids) . ' sessions cancelled.';
     }
     header('Location: ' . SITE_URL . '/admin/manage_sessions.php');
@@ -222,7 +249,7 @@ $pageTitle = 'Manage Sessions';
                                                 <br><small><?php echo htmlspecialchars($session['user_email']); ?></small>
                                             </td>
                                             <td><?php echo htmlspecialchars($session['date']); ?></td>
-                                            <td><?php echo htmlspecialchars($session['time']); ?></td>
+                                            <td><?php echo htmlspecialchars($session['time']); ?><?php if (!empty($session['timezone'])): ?> <small>(<?php echo htmlspecialchars($session['timezone']); ?>)</small><?php endif; /* F186 */ ?></td>
                                             <td><?php echo $session['duration'] ?? 60; ?> min</td>
                                             <td>
                                                 <form method="POST" class="status-form">

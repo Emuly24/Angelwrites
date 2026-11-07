@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
         $stmt = $db->prepare("INSERT INTO contact_messages (name, email, message) VALUES (?, ?, ?)");
         $stmt->execute([$name, $email, $message]);
         
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '📩 New Contact Message from ' . $name;
         $body = "<h2>New Contact Message</h2>";
         $body .= "<p><strong>Name:</strong> $name</p>";

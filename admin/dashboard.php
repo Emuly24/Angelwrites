@@ -201,6 +201,8 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
                 <a href="manage_blog.php" class="admin-module-btn"><i class="fas fa-blog"></i><span>Manage Blog</span></a>
                 <a href="editor.php" class="admin-module-btn"><i class="fas fa-pen-fancy"></i><span>Blog Editor</span></a>
                 <a href="manage_reflections.php" class="admin-module-btn"><i class="fas fa-pray"></i><span>Reflections</span></a>
+                <a href="manage_prayer_requests.php" class="admin-module-btn"><i class="fas fa-hands-praying"></i><span>Prayer Requests</span></a><!-- F138 -->
+                <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a><!-- F202 -->
             </div>
         </div>
 

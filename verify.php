@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             }
             
             // ===== SEND ADMIN NOTIFICATION =====
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = '✅ User Verified';
             $body = "<h2>User Verified</h2>";
             $body .= "<p><strong>Email:</strong> $email</p>";

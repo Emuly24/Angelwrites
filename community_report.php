@@ -48,7 +48,7 @@ $stmt = $db->prepare("INSERT INTO reports (reporter_user_id, target_type, target
 $stmt->execute([$user_id, $target_type, $target_id, $reason, $details]);
 
 // Notify admin via email
-$admin_email = 'angelwrites@zohomail.com';
+$admin_email = aw_admin_email();
 $subject = '🚩 New Report: ' . ucfirst($target_type) . ' #' . $target_id;
 $body = "<h2>New Report Submitted</h2>";
 $body .= "<p><strong>Reporter:</strong> User #$user_id</p>";

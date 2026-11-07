@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
                 
                 // ===== SEND ADMIN NOTIFICATION =====
-                $admin_email = 'angelwrites@zohomail.com';
+                $admin_email = aw_admin_email();
                 $admin_subject = '🔑 Password Reset Requested';
                 $admin_body = "A user requested a password reset code.\n\nEmail: $email\nName: " . $user['first_name'];
                 sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');

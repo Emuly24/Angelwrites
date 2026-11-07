@@ -40,7 +40,7 @@ if ($confirmed === 1) {
     $stmt = $db->prepare("DELETE FROM questions WHERE id = ?");
     if ($stmt->execute([$question_id])) {
         // ===== SEND ADMIN NOTIFICATION =====
-        $admin_email = 'angelwrites@zohomail.com';
+        $admin_email = aw_admin_email();
         $subject = '🗑️ Question Deleted';
         $body = "A question has been deleted by the user.\n\n";
         $body .= "Question ID: $question_id\n";

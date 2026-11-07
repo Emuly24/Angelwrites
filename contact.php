@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         $stmt = $db->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
         if ($stmt->execute([$name, $email, $subject, $message])) {
             // ===== ADMIN NOTIFICATION =====
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $admin_subject = '📩 New Contact Message: ' . ($subject ?: 'No Subject');
             $admin_body = "You have received a new message.\n\n";
             $admin_body .= "Name: $name\n";

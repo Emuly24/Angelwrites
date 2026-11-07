@@ -183,7 +183,7 @@ if ($isLoggedIn && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit
             $stmt->execute([$userId, $testimony, $is_public]);
             $testimonial_success = 'Thank you for sharing! Your story will be reviewed and featured soon.';
             
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = 'New Testimonial Submission';
             $body = "A new testimonial has been submitted.\n\nUser: " . $_SESSION['name'] . "\nPublic: " . ($is_public ? 'Yes' : 'No') . "\n\n$testimony";
             sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');

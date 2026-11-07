@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
             }
             
             // Admin notification
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = '📖 New Book Review: ' . $book['title'];
             $body = "<h2>New Book Review</h2>";
             $body .= "<p><strong>Book:</strong> " . $book['title'] . "</p>";

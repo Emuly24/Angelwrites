@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = 'Reflection created successfully!';
 
             // Admin notification via Zoho SMTP
-            $admin_email = 'angelwrites@zohomail.com';
+            $admin_email = aw_admin_email();
             $subject = 'New Christian Reflection: ' . $title;
             $body = "A new reflection has been added.\n\nTitle: $title\nCategory: $category\n\nView reflection: " . SITE_URL . "/blog_post.php?slug=" . $slug;
             sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
