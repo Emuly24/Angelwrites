@@ -450,25 +450,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== BASE & DARK MODE ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }

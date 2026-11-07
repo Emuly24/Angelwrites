@@ -316,8 +316,8 @@ document.addEventListener('DOMContentLoaded', function() {
     flex-wrap: wrap;
 }
 .notifications-actions .btn-sm { padding: 6px 16px; border-radius: 30px; }
-.btn-danger { background: #e74c3c; color: white; transition: background 0.3s; }
-.btn-danger:hover { background: #c0392b; }
+.btn-danger { background: #b4505a; color: white; transition: background 0.3s; }
+.btn-danger:hover { background: #94404a; }
 
 .notifications-list { display: flex; flex-direction: column; gap: 12px; }
 .notification-item {

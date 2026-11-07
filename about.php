@@ -307,8 +307,8 @@ p { line-height:1.7; }
 
 /* ===== ALERTS ===== */
 .alert { padding:12px 16px; border-radius:12px; margin-bottom:16px; font-weight:500; }
-.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
+.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width:992px) {

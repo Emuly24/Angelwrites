@@ -173,9 +173,9 @@ $pageTitle = 'Manage Community';
 
 <style>
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.pending { background: #f1c40f; color: #fff; }
-.status-badge.dismissed { background: #95a5a6; color: #fff; }
-.status-badge.action_taken { background: #2ecc71; color: #fff; }
+.status-badge.pending { background: #c9965a; color: #fff; }
+.status-badge.dismissed { background: #a08a8a; color: #fff; }
+.status-badge.action_taken { background: #4f8a63; color: #fff; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

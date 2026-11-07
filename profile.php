@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', function() {
             startCameraBtn.disabled = true;
             capturePhotoBtn.disabled = false;
             cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#27ae60';
+            cameraStatus.style.color = '#4f8a63';
         } catch (error) {
             alert('Camera access denied: ' + error.message);
         }
@@ -722,7 +722,7 @@ document.addEventListener('DOMContentLoaded', function() {
             retakePhotoBtn.disabled = false;
             confirmPhotoBtn.disabled = false;
             cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#3498db';
+            cameraStatus.style.color = '#8a6f86';
             cameraStream.getTracks().forEach(track => track.stop());
             cameraPreview.srcObject = null;
             cameraPreview.style.display = 'none';
@@ -763,7 +763,7 @@ document.addEventListener('DOMContentLoaded', function() {
         retakePhotoBtn.disabled = true;
         capturePhotoBtn.disabled = true;
         cameraStatus.textContent = 'Photo sent to crop';
-        cameraStatus.style.color = '#2ecc71';
+        cameraStatus.style.color = '#4f8a63';
     }
 
     startCameraBtn.addEventListener('click', startCamera);
@@ -791,7 +791,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Q27: the score runs 0-5 but there were only five labels, so a strong password showed
         // "Strength: undefined" and no bar. Six levels now.
         const levels = ['None', 'Very weak', 'Weak', 'Fair', 'Good', 'Strong'];
-        const colors = ['#ddd', '#e74c3c', '#e67e22', '#f39c12', '#3498db', '#2ecc71'];
+        const colors = ['#e5d5d5', '#b4505a', '#a8783f', '#c9965a', '#8a6f86', '#4f8a63'];
         const widths = ['0%', '20%', '40%', '60%', '80%', '100%'];
 
         strengthBar.style.width = widths[strength];
@@ -944,12 +944,12 @@ body.dark-mode {
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-block { width:100%; justify-content:center; }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
-.btn-success:hover { background:#218838; border-color:#218838; }
-.btn-warning { background:#f39c12; color:white; border:2px solid #f39c12; }
-.btn-warning:hover { background:#e67e22; border-color:#e67e22; }
-.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
-.btn-danger:hover { background:#c82333; border-color:#c82333; }
+.btn-success { background:#4f8a63; color:white; border:2px solid #4f8a63; }
+.btn-success:hover { background:#3e6f4f; border-color:#3e6f4f; }
+.btn-warning { background:#c9965a; color:white; border:2px solid #c9965a; }
+.btn-warning:hover { background:#a8783f; border-color:#a8783f; }
+.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
+.btn-danger:hover { background:#94404a; border-color:#94404a; }
 
 /* ===== PROFILE PAGE ===== */
 .profile-page { padding:40px 0 80px; }
@@ -959,8 +959,8 @@ body.dark-mode {
 
 /* ===== ALERTS ===== */
 .alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
-.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
+.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
 
 /* ===== PROFILE GRID ===== */
 .profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:32px; max-width:1100px; margin:0 auto; }
@@ -1055,9 +1055,9 @@ body.dark-mode {
 }
 .form-group textarea { resize:vertical; min-height:80px; font-family:'Inter',sans-serif; }
 .field-status { font-size:0.8rem; margin-top:4px; }
-.field-status.success { color:#27ae60; }
-.field-status.error { color:#e74c3c; }
-.field-status.info { color:#3498db; }
+.field-status.success { color:#4f8a63; }
+.field-status.error { color:#b4505a; }
+.field-status.info { color:#8a6f86; }
 
 /* ===== PASSWORD ===== */
 .password-wrapper { position:relative; }
@@ -1065,7 +1065,7 @@ body.dark-mode {
 .password-toggle { position:absolute; right:14px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--text-light); transition:color 0.2s; }
 .password-toggle:hover { color:var(--text); }
 .password-strength-meter { display:flex; align-items:center; gap:10px; margin-top:6px; }
-.strength-bar { height:4px; width:0%; background:#ddd; border-radius:4px; transition:width 0.3s; }
+.strength-bar { height:4px; width:0%; background:#e5d5d5; border-radius:4px; transition:width 0.3s; }
 #strengthText { font-size:0.8rem; color:var(--text-light); }
 
 /* ===== RESPONSIVE ===== */

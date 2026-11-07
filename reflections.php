@@ -417,12 +417,12 @@ document.addEventListener('DOMContentLoaded', function() {
     --bg: #F7F3ED;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }

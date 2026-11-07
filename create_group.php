@@ -167,7 +167,7 @@ $pageTitle = 'Create a Reading Group';
     outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15);
 }
 .create-group-form textarea { resize: vertical; min-height: 80px; }
-.required { color: #dc2626; }
+.required { color: #b4505a; }
 .field-hint { display: block; margin-top: 6px; font-size: 0.85rem; color: var(--text-light); }
 
 .checkbox-label {

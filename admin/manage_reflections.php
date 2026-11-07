@@ -263,13 +263,13 @@ document.addEventListener('DOMContentLoaded', function() {
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.draft { background: #f1c40f; color: #fff; }
-.status-badge.published { background: #27ae60; color: #fff; }
-.status-badge.archived { background: #e74c3c; color: #fff; }
+.status-badge.draft { background: #c9965a; color: #fff; }
+.status-badge.published { background: #4f8a63; color: #fff; }
+.status-badge.archived { background: #b4505a; color: #fff; }
 .status-tabs { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; }
 .status-tabs a { padding:6px 14px; border-radius:999px; border:1px solid var(--border); text-decoration:none; color:var(--text); font-size:.85rem; }
 .status-tabs a.on { background:var(--rose); border-color:var(--rose); color:#fff; }
-.btn-success { background:#27ae60; color:#fff; }
+.btn-success { background:#4f8a63; color:#fff; }
 
 .actions { display: flex; gap: 6px; }
 .btn-sm { padding: 4px 10px; font-size: 0.8rem; }

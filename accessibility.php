@@ -240,14 +240,14 @@ p { line-height:1.6; }
 
 /* ===== HIGH CONTRAST MODE ===== */
 .high-contrast {
-    --rose: #c0392b;
-    --rose-dark: #922b21;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #f5f0e8;
     --fantasy: #faf3ef;
     --card-bg: #ffffff;
-    --border: #222222;
+    --border: #2c1e1e;
     --text: #000000;
-    --text-light: #333333;
+    --text-light: #3d2e2e;
     --dark: #000000;
     --bg: #fcfcfc;
     --input-bg: #ffffff;

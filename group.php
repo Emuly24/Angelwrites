@@ -784,9 +784,9 @@ document.querySelectorAll('.modal').forEach(modal => {
     font-size: 0.75rem;
     font-weight: 600;
 }
-.badge-book { background: #e3f2fd; color: #0d47a1; }
-.badge-poem { background: #f3e5f5; color: #4a148c; }
-.badge-newsletter { background: #e8f5e9; color: #1b5e20; }
+.badge-book { background: #efe6ee; color: #6f5770; }
+.badge-poem { background: #efe6ee; color: #4e3a4c; }
+.badge-newsletter { background: #e3efe6; color: #2d5039; }
 
 .group-description { color: var(--text-light); margin: 0 0 12px; font-size: 1rem; }
 
@@ -856,7 +856,7 @@ document.querySelectorAll('.modal').forEach(modal => {
 }
 .note-author { font-weight: 600; color: var(--dark); }
 .badge-private {
-    background: #6c757d; color: white; padding: 0 10px;
+    background: #7a6868; color: white; padding: 0 10px;
     border-radius: 4px; font-size: 0.7rem; font-weight: 600;
 }
 .note-text { margin: 8px 0; font-size: 0.95rem; line-height: 1.6; }

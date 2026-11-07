@@ -357,8 +357,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
-.btn-danger:hover { background:#c82333; border-color:#c82333; }
+.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
+.btn-danger:hover { background:#94404a; border-color:#94404a; }
 
 /* ===== PAGE ===== */
 .admin-page { padding:32px 0 60px; }
@@ -376,8 +376,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 
 /* ===== ALERTS ===== */
 .alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
-.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
+.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
 
 /* ===== SEARCH BAR ===== */
 .search-bar { margin-bottom:24px; }
@@ -416,8 +416,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .role-badge.reader { background:var(--vanilla); color:var(--text); }
 .role-select { padding:6px 10px; border-radius:8px; border:1px solid var(--border); font-size:0.85rem; cursor:pointer; background:var(--input-bg); color:var(--text); transition:border-color 0.2s; }
 .role-select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.role-select.reader { border-left:4px solid #3498db; }
-.role-select.admin { border-left:4px solid #e74c3c; }
+.role-select.reader { border-left:4px solid #8a6f86; }
+.role-select.admin { border-left:4px solid #b4505a; }
 
 /* ===== BULK ===== */
 .bulk-select { padding:6px 12px; border-radius:8px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); font-size:0.85rem; }

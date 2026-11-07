@@ -492,9 +492,9 @@ body.dark-mode {
 .video-actions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 .action-btn { background:transparent; border:none; cursor:pointer; color:var(--text-light); font-size:0.8rem; transition:all 0.2s; display:flex; align-items:center; gap:3px; padding:4px 8px; border-radius:30px; }
 .action-btn:hover { background:var(--vanilla); color:var(--rose); transform:scale(1.05); }
-.action-btn.like-btn:hover { color:#3b82f6; }
-.action-btn.love-btn:hover { color:#ef4444; }
-.action-btn.pray-btn:hover { color:#8b5cf6; }
+.action-btn.like-btn:hover { color:#8a6f86; }
+.action-btn.love-btn:hover { color:#b4505a; }
+.action-btn.pray-btn:hover { color:#8a6f86; }
 .action-btn.share-btn { padding:4px 6px; font-size:0.9rem; }
 .action-btn.share-btn:hover { color:var(--rose); }
 

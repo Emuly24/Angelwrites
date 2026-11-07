@@ -355,25 +355,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -393,19 +393,19 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .form-group input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 
 .field-status { font-size: 0.8rem; margin-top: 4px; }
-.field-status.success { color: #27ae60; }
-.field-status.error { color: #e74c3c; }
+.field-status.success { color: #4f8a63; }
+.field-status.error { color: #b4505a; }
 
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
 
 .auth-footer { text-align: center; margin-top: 20px; font-size: 0.95rem; }
 
 .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
-.alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+.alert-error { background: #f6e1e3; color: #94404a; border: 1px solid #f87171; }
 .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
 
 .success-popup { text-align: center; padding: 30px 20px; animation: fadeInUp 0.6s ease-out; }
-.success-icon { font-size: 4rem; color: #28a745; margin-bottom: 15px; animation: popIn 0.5s ease-out; }
+.success-icon { font-size: 4rem; color: #4f8a63; margin-bottom: 15px; animation: popIn 0.5s ease-out; }
 .success-popup h2 { margin-bottom: 10px; color: var(--text); }
 .success-popup .success-message { font-size: 1.1rem; color: var(--text-light); margin-bottom: 25px; line-height: 1.6; }
 .success-actions .btn-block { padding: 14px; font-size: 1.05rem; }

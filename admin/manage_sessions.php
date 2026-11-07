@@ -184,19 +184,19 @@ $pageTitle = 'Manage Sessions';
         <!-- Status Summary Cards -->
         <div class="status-summary">
             <div class="summary-card">
-                <div class="summary-count" style="color: #f1c40f;"><?php echo $status_counts['pending']; ?></div>
+                <div class="summary-count" style="color: #c9965a;"><?php echo $status_counts['pending']; ?></div>
                 <div class="summary-label">Pending</div>
             </div>
             <div class="summary-card">
-                <div class="summary-count" style="color: #2ecc71;"><?php echo $status_counts['confirmed']; ?></div>
+                <div class="summary-count" style="color: #4f8a63;"><?php echo $status_counts['confirmed']; ?></div>
                 <div class="summary-label">Confirmed</div>
             </div>
             <div class="summary-card">
-                <div class="summary-count" style="color: #3498db;"><?php echo $status_counts['completed']; ?></div>
+                <div class="summary-count" style="color: #8a6f86;"><?php echo $status_counts['completed']; ?></div>
                 <div class="summary-label">Completed</div>
             </div>
             <div class="summary-card">
-                <div class="summary-count" style="color: #e74c3c;"><?php echo $status_counts['cancelled']; ?></div>
+                <div class="summary-count" style="color: #b4505a;"><?php echo $status_counts['cancelled']; ?></div>
                 <div class="summary-label">Cancelled</div>
             </div>
         </div>
@@ -366,25 +366,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -414,10 +414,10 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 
 .status-select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; cursor: pointer; background: var(--input-bg); color: var(--text); transition: border-color 0.2s; }
 .status-select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.status-select.pending { border-left: 4px solid #f1c40f; }
-.status-select.confirmed { border-left: 4px solid #2ecc71; }
-.status-select.completed { border-left: 4px solid #3498db; }
-.status-select.cancelled { border-left: 4px solid #e74c3c; }
+.status-select.pending { border-left: 4px solid #c9965a; }
+.status-select.confirmed { border-left: 4px solid #4f8a63; }
+.status-select.completed { border-left: 4px solid #8a6f86; }
+.status-select.cancelled { border-left: 4px solid #b4505a; }
 
 .actions { display: flex; gap: 4px; }
 .btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 20px; }

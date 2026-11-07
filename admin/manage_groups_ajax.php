@@ -65,7 +65,7 @@ if ($action === 'get_activity_feed') {
     header('Content-Type: text/html; charset=utf-8');
     $acts = getAllGroupActivity(50);
     if (!$acts) {
-        echo '<p style="text-align:center;color:#999;">No group activity yet.</p>';
+        echo '<p style="text-align:center;color:#a08a8a;">No group activity yet.</p>';
         exit;
     }
     echo '<ul class="activity-feed">';

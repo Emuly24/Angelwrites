@@ -552,7 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {
             startCameraBtn.disabled = true;
             capturePhotoBtn.disabled = false;
             cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#27ae60';
+            cameraStatus.style.color = '#4f8a63';
         } catch (error) {
             alert('Camera access denied: ' + error.message);
         }
@@ -574,7 +574,7 @@ document.addEventListener('DOMContentLoaded', function() {
             retakePhotoBtn.disabled = false;
             confirmPhotoBtn.disabled = false;
             cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#3498db';
+            cameraStatus.style.color = '#8a6f86';
             cameraStream.getTracks().forEach(track => track.stop());
             cameraPreview.srcObject = null;
             cameraPreview.style.display = 'none';
@@ -604,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmPhotoBtn.disabled = true;
         retakePhotoBtn.disabled = true;
         cameraStatus.textContent = '✅ Photo confirmed!';
-        cameraStatus.style.color = '#2ecc71';
+        cameraStatus.style.color = '#4f8a63';
     }
 
     startCameraBtn.addEventListener('click', startCamera);
@@ -694,12 +694,12 @@ document.addEventListener('DOMContentLoaded', function() {
     --bg: #F7F3ED;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -780,7 +780,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 
 .voice-comment-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .voice-comment-section .btn { margin-right: 8px; }
-#recordingStatus { font-weight: 600; color: #e74c3c; }
+#recordingStatus { font-weight: 600; color: #b4505a; }
 
 .admin-reply-container { background: var(--vanilla); border-radius: 12px; padding: 20px; border-left: 5px solid var(--rose); margin-top: 16px; }
 .admin-reply-container h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--dark); }

@@ -220,7 +220,7 @@ function toggleTheme() {
     box-shadow: 0 0 0 3px rgba(219,161,162,0.15);
 }
 .session-form textarea { resize: vertical; min-height: 100px; }
-.required { color: #e74c3c; }
+.required { color: #b4505a; }
 .session-form .btn-block { width: 100%; padding: 14px; font-size: 1.05rem; justify-content: center; }
 
 @media (max-width: 480px) {

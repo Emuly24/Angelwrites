@@ -587,8 +587,8 @@ p { line-height:1.6; }
 /* ===== ACTIONS ===== */
 .book-action-row { display:flex; flex-direction:column; gap:12px; }
 .price-display { display:flex; justify-content:center; }
-.free-badge { background:#27ae60; color:white; padding:4px 16px; border-radius:20px; font-weight:700; font-size:1rem; }
-.sale-price { color:#e74c3c; font-weight:700; font-size:1.1rem; }
+.free-badge { background:#4f8a63; color:white; padding:4px 16px; border-radius:20px; font-weight:700; font-size:1rem; }
+.sale-price { color:#b4505a; font-weight:700; font-size:1.1rem; }
 .regular-price { font-weight:700; font-size:1.1rem; color:var(--text); }
 .action-buttons { display:flex; justify-content:center; }
 .book-meta { text-align:center; color:var(--text-light); font-size:0.9rem; }
@@ -607,8 +607,8 @@ p { line-height:1.6; }
 .reviews-header h3 { font-size:1.4rem; margin:0; }
 .rating-summary { display:flex; align-items:center; gap:8px; }
 .rating-summary .stars { display:flex; gap:2px; }
-.rating-summary .stars .filled { color:#f1c40f; }
-.rating-summary .stars .empty { color:#ddd; }
+.rating-summary .stars .filled { color:#c9965a; }
+.rating-summary .stars .empty { color:#e5d5d5; }
 .rating-value { font-weight:700; font-size:1.1rem; }
 .rating-count { color:var(--text-light); font-size:0.9rem; }
 
@@ -617,9 +617,9 @@ p { line-height:1.6; }
 .review-form .star-rating { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
 .review-form .stars { display:flex; flex-direction:row-reverse; gap:2px; }
 .review-form .stars input { display:none; }
-.review-form .stars label { font-size:1.4rem; color:#ddd; cursor:pointer; transition:color 0.2s; }
-.review-form .stars label:hover, .review-form .stars label:hover ~ label { color:#f1c40f; }
-.review-form .stars input:checked ~ label { color:#f1c40f; }
+.review-form .stars label { font-size:1.4rem; color:#e5d5d5; cursor:pointer; transition:color 0.2s; }
+.review-form .stars label:hover, .review-form .stars label:hover ~ label { color:#c9965a; }
+.review-form .stars input:checked ~ label { color:#c9965a; }
 .review-form .form-group textarea { width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; resize:vertical; min-height:80px; background:var(--input-bg); color:var(--text); }
 .review-form .form-group textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
 .review-form .btn-block { width:100%; justify-content:center; margin-top:8px; }
@@ -637,8 +637,8 @@ p { line-height:1.6; }
 .author-name { font-weight:600; }
 .review-date { font-size:0.8rem; color:var(--text-light); }
 .review-rating { margin-bottom:6px; }
-.review-rating .filled { color:#f1c40f; }
-.review-rating .empty { color:#ddd; }
+.review-rating .filled { color:#c9965a; }
+.review-rating .empty { color:#e5d5d5; }
 .rating-label { font-size:0.8rem; color:var(--text-light); margin-left:4px; }
 .review-comment { line-height:1.6; color:var(--text); }
 .review-footer { margin-top:10px; border-top:1px solid var(--border); padding-top:8px; }

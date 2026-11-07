@@ -366,7 +366,7 @@ if ($isLoggedIn) {
                                 <a href="<?php echo SITE_URL; ?>/library.php">My Library</a>
                                 <a href="<?php echo SITE_URL; ?>/profile.php">Profile</a>
                                 <hr>
-                                <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #e74c3c;">Logout</a>
+                                <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #b4505a;">Logout</a>
                             </div>
                         </div>
                     <?php else: ?>

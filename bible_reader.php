@@ -1749,10 +1749,10 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .btn-white { background:var(--white); color:var(--dark); border:2px solid var(--white); }
 .btn-white:hover { background:var(--vanilla); border-color:var(--vanilla); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-danger { background:#e74c3c; color:white; border:2px solid #e74c3c; }
-.btn-danger:hover { background:#c0392b; border-color:#c0392b; }
-.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
-.btn-success:hover { background:#218838; border-color:#218838; }
+.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
+.btn-danger:hover { background:#94404a; border-color:#94404a; }
+.btn-success { background:#4f8a63; color:white; border:2px solid #4f8a63; }
+.btn-success:hover { background:#3e6f4f; border-color:#3e6f4f; }
 
 /* ===== DARK MODE SUPPORT ===== */
 body.dark-mode {
@@ -1824,7 +1824,7 @@ body.dark-mode {
 .bible-notes-title .badge { background:var(--rose); color:white; padding:0 8px; border-radius:12px; font-size:0.75rem; }
 .bible-notes-body { flex:1; overflow-y:auto; padding:12px 16px; }
 .note-card { border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px; }
-.note-card.private { border-left:4px solid #6c757d; }
+.note-card.private { border-left:4px solid #7a6868; }
 .note-author { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .note-avatar { width:32px; height:32px; border-radius:50%; object-fit:cover; }
 .note-avatar-placeholder { width:32px; height:32px; border-radius:50%; background:var(--rose); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem; }
@@ -1835,7 +1835,7 @@ body.dark-mode {
 .note-reactions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 .reaction { background:var(--vanilla); padding:0 8px; border-radius:12px; font-size:0.8rem; cursor:pointer; transition:all 0.2s; }
 .reaction:hover { background:rgba(219,161,162,0.2); }
-.badge-private { background:#6c757d; color:white; padding:0 6px; border-radius:4px; font-size:0.7rem; }
+.badge-private { background:#7a6868; color:white; padding:0 6px; border-radius:4px; font-size:0.7rem; }
 .empty-notes { color:var(--text-light); text-align:center; padding:24px 12px; }
 #bibleAddNoteForm { padding:12px 16px; border-top:1px solid var(--border); }
 #bibleAddNoteForm textarea { width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; resize:vertical; background:var(--input-bg); color:var(--text); }
@@ -1938,8 +1938,8 @@ body.dark-mode {
 
 /* ===== THEME VARIANTS ===== */
 .bible-reader-container[data-theme="paper"] { --bg: #f5f0e1; --card-bg: #faf6ed; --text: #3d2b1f; --text-light: #6b4f3a; --border: #d4c5a9; --vanilla: #faf6ed; --input-bg: #f5f0e1; }
-.bible-reader-container[data-theme="light"] { --bg: #fdfdfd; --card-bg: #ffffff; --text: #1a1a1a; --text-light: #666; --border: #e0e0e0; --vanilla: #fdf5e6; --input-bg: #f9f9f9; }
-.bible-reader-container[data-theme="dark"] { --bg: #1a1a1a; --card-bg: #2a2a2a; --text: #e0e0e0; --text-light: #aaa; --border: #444; --vanilla: #2a2a2a; --input-bg: #333; }
+.bible-reader-container[data-theme="light"] { --bg: #fdf9f8; --card-bg: #ffffff; --text: #1a1212; --text-light: #6b5a5a; --border: #ece0de; --vanilla: #fdf5e6; --input-bg: #fdf9f8; }
+.bible-reader-container[data-theme="dark"] { --bg: #1a1212; --card-bg: #2c1e1e; --text: #ece0de; --text-light: #b8a8a8; --border: #4a3a3a; --vanilla: #2c1e1e; --input-bg: #3d2e2e; }
 .bible-reader-container[data-theme="sepia"] { --bg: #f4e8d1; --card-bg: #fdf5e6; --text: #4a3728; --text-light: #7a5a3a; --border: #d4c5a9; --vanilla: #fdf5e6; --input-bg: #f4e8d1; }
 
 /* ===== FONT VARIANTS ===== */

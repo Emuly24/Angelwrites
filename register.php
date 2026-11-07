@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Q27: the score runs 0-5 but there were only five labels, so a strong password showed
         // "Strength: undefined" and no bar. Six levels now.
         const levels = ['None', 'Very weak', 'Weak', 'Fair', 'Good', 'Strong'];
-        const colors = ['#ddd', '#e74c3c', '#e67e22', '#f39c12', '#3498db', '#2ecc71'];
+        const colors = ['#e5d5d5', '#b4505a', '#a8783f', '#c9965a', '#8a6f86', '#4f8a63'];
         const widths = ['0%', '20%', '40%', '60%', '80%', '100%'];
 
         strengthBar.style.width = widths[strength];
@@ -548,17 +548,17 @@ document.addEventListener('DOMContentLoaded', function() {
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 
 .field-status { font-size: 0.8rem; margin-top: 4px; }
-.field-status.success { color: #27ae60; }
-.field-status.error { color: #e74c3c; }
-.field-status.info { color: #3498db; }
+.field-status.success { color: #4f8a63; }
+.field-status.error { color: #b4505a; }
+.field-status.info { color: #8a6f86; }
 
 .password-wrapper { position: relative; }
 .password-wrapper input { padding-right: 40px; }
-.password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; }
-.password-toggle:hover { color: #333; }
+.password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6b5a5a; }
+.password-toggle:hover { color: #3d2e2e; }
 
 .password-strength-meter { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.strength-bar { height: 4px; width: 0%; background: #ddd; border-radius: 2px; transition: width 0.3s; }
+.strength-bar { height: 4px; width: 0%; background: #e5d5d5; border-radius: 2px; transition: width 0.3s; }
 #strengthText { font-size: 0.8rem; color: var(--text-light); }
 
 #generatePassword { margin-top: 4px; padding: 4px 12px; font-size: 0.8rem; }
@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .social-login-section { text-align: center; margin: 20px 0; }
 
 .success-popup { text-align: center; padding: 30px 20px; animation: fadeInUp 0.6s ease-out; }
-.success-icon { font-size: 4rem; color: #28a745; margin-bottom: 15px; animation: popIn 0.5s ease-out; }
+.success-icon { font-size: 4rem; color: #4f8a63; margin-bottom: 15px; animation: popIn 0.5s ease-out; }
 .success-popup h2 { margin-bottom: 10px; color: var(--text); }
 .success-popup .success-message { font-size: 1.1rem; color: var(--text-light); margin-bottom: 25px; line-height: 1.6; }
 .success-popup .small-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; }

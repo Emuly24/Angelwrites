@@ -392,25 +392,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -434,12 +434,12 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
 
 .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-.badge-answered { background: #2ecc71; color: white; }
-.badge-unanswered { background: #e67e22; color: white; }
+.badge-answered { background: #4f8a63; color: white; }
+.badge-unanswered { background: #a8783f; color: white; }
 
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.answered { background: #2ecc71; color: white; }
-.status-badge.unanswered { background: #e74c3c; color: white; }
+.status-badge.answered { background: #4f8a63; color: white; }
+.status-badge.unanswered { background: #b4505a; color: white; }
 
 .actions { display: flex; gap: 4px; }
 .btn-sm { padding: 4px 10px; font-size: 0.8rem; border-radius: 20px; }

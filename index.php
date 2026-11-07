@@ -498,8 +498,8 @@ if ('serviceWorker' in navigator) {
     .book-cover-wrapper:hover img { transform:scale(1.05); }
     .placeholder-cover { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--vanilla); font-size:3rem; color:var(--text-light); }
     .badge { position:absolute; top:8px; right:8px; padding:4px 12px; border-radius:20px; font-size:0.7rem; font-weight:700; text-transform:uppercase; color:white; }
-    .badge.free { background:#28a745; }
-    .badge.sale { background:#dc3545; }
+    .badge.free { background:#4f8a63; }
+    .badge.sale { background:#b4505a; }
     .book-details { padding:16px; display:flex; flex-direction:column; flex:1; justify-content:space-between; }
     .book-details h3 { font-size:1.05rem; margin:0 0 4px; line-height:1.3; }
     .book-author { font-size:0.85rem; color:var(--text-light); }
@@ -509,8 +509,8 @@ if ('serviceWorker' in navigator) {
     .toggle-desc-btn:hover { text-decoration:underline; }
     .book-bottom { display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
     .book-price { font-size:0.9rem; font-weight:600; color:var(--text); }
-    .free-text { color:#28a745; }
-    .sale-text { color:#dc3545; text-decoration:line-through; }
+    .free-text { color:#4f8a63; }
+    .sale-text { color:#b4505a; text-decoration:line-through; }
 
     /* ===== POEMS ===== */
     .poem-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:24px; }

@@ -323,9 +323,9 @@ document.getElementById('joinModal').addEventListener('click', function(e) {
     display: inline-block; padding: 2px 12px; border-radius: 20px;
     font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;
 }
-.badge-book { background: #e3f2fd; color: #0d47a1; }
-.badge-poem { background: #f3e5f5; color: #4a148c; }
-.badge-newsletter { background: #e8f5e9; color: #1b5e20; }
+.badge-book { background: #efe6ee; color: #6f5770; }
+.badge-poem { background: #efe6ee; color: #4e3a4c; }
+.badge-newsletter { background: #e3efe6; color: #2d5039; }
 .badge-other { background: #f1f3f5; color: #495057; }
 
 .content-info strong { color: var(--dark); }
