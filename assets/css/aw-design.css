@@ -691,3 +691,42 @@ html.aw-ui .site-footer .logo-img { filter: drop-shadow(0 6px 18px rgba(219, 161
 html.aw-ui #tocFloatingBtn { background: var(--aw-grad); box-shadow: 0 10px 24px -8px rgba(168, 103, 106, 0.7); }
 html.aw-ui #tocFloatingBtn.visible:hover { transform: translateY(-3px) scale(1.06); }
 html.aw-ui #tocPanel { border-color: var(--aw-hairline); box-shadow: var(--aw-sh-3); border-radius: 18px; }
+
+/* ===== D8: page-to-page fades, messages, and reduced motion ===== */
+@view-transition { navigation: auto; }
+html.aw-ui .site-header { view-transition-name: aw-header; }
+::view-transition-old(root) { animation: awVtOut 0.22s ease both; }
+::view-transition-new(root) { animation: awVtIn 0.38s var(--aw-ease) both; }
+@keyframes awVtOut { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes awVtIn { from { opacity: 0; transform: translateY(10px); } }
+
+/* site messages slide in */
+html.aw-ui .global-notification {
+    background: var(--aw-grad);
+    box-shadow: 0 8px 24px -12px rgba(168, 103, 106, 0.6);
+    animation: awDrop 0.6s var(--aw-ease) both;
+}
+@keyframes awDrop { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
+html.aw-ui #awToast {
+    border-radius: 14px !important;
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.35) !important;
+    font-weight: 500;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+/* Visitors who ask their device for less motion get a still site:
+   no drifting, floating, shimmering, tilting or page fades. */
+@media (prefers-reduced-motion: reduce) {
+    @view-transition { navigation: none; }
+    html.aw-ui *, html.aw-ui *::before, html.aw-ui *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.001ms !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important;
+    }
+    html.aw-ui .btn::after, html.aw-ui .aw-spot::after { display: none; }
+    html.aw-ui .aw-progress { display: none; }
+}
