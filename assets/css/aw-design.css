@@ -832,3 +832,50 @@ html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflect
     .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
     .notifications-header, .community-header, .session-header, .library-header, .page-header,
     .admin-header, .admin-hero, .user-hero, .group-header) :is(.hero-divider, .header-decoration, .header-divider, .title-divider) { display: none; }
+
+/* ===== C4: admin tables — one style of action button ===== */
+html.aw-ui .admin-table td:last-child { white-space: nowrap; }
+html.aw-ui .admin-table .aw-iconbtn {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    padding: 0;
+    margin: 2px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--aw-ink);
+    background: var(--card-bg);
+    border: 1px solid rgba(168, 103, 106, 0.28);
+    box-shadow: 0 1px 2px rgba(58, 38, 41, 0.06);
+    text-decoration: none;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: transform 0.3s var(--aw-spring), background-color 0.25s ease, color 0.2s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+html.aw-ui .admin-table .aw-iconbtn::after { display: none; }
+html.aw-ui .admin-table .aw-iconbtn:hover {
+    color: #fff;
+    background: var(--aw-rose-deep);
+    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(168, 103, 106, 0.7);
+    text-decoration: none;
+}
+html.aw-ui .admin-table .aw-iconbtn.aw-danger { color: #b4505a; border-color: rgba(180, 80, 90, 0.35); }
+html.aw-ui .admin-table .aw-iconbtn.aw-danger:hover { color: #fff; background: #b4505a; box-shadow: 0 8px 18px -8px rgba(180, 80, 90, 0.7); }
+html.aw-ui .admin-table .aw-iconbtn.aw-good { color: #3e6f4f; border-color: rgba(79, 138, 99, 0.35); }
+html.aw-ui .admin-table .aw-iconbtn.aw-good:hover { color: #fff; background: #4f8a63; }
+html[data-theme="dark"].aw-ui .admin-table .aw-iconbtn { color: var(--text); border-color: rgba(219, 161, 162, 0.28); }
+html.aw-ui .admin-table td:last-child form { display: inline; margin: 0; }
+/* table heads and rows read as one family */
+html.aw-ui .admin-table thead th {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+html.aw-ui .admin-table tbody td { vertical-align: middle; }
+html.aw-ui .admin-table td:last-child > div:not(.dropdown) { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 2px; width: auto; }

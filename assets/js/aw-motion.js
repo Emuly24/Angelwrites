@@ -300,6 +300,48 @@
         if (btn) mo.observe(btn, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     });
 
+    /* ===== C4: admin table actions =====
+       Icon-only buttons in the last column of admin tables get one shared look, and a spoken
+       name when they had none (screen readers announced them as just "button" or "link"). */
+    var ICON_NAMES = [
+        [/fa-(trash|trash-alt|trash-can)\b/, 'Delete', 'aw-danger'],
+        [/fa-(edit|pen|pen-to-square|pencil|pencil-alt)\b/, 'Edit', ''],
+        [/fa-eye-slash\b/, 'Hide', ''],
+        [/fa-eye\b/, 'View', ''],
+        [/fa-(check|check-circle|circle-check)\b/, 'Approve', 'aw-good'],
+        [/fa-(times|xmark|ban)\b/, 'Cancel', 'aw-danger'],
+        [/fa-(envelope|reply)\b/, 'Email', ''],
+        [/fa-(paper-plane)\b/, 'Send', ''],
+        [/fa-(link|external-link|external-link-alt|up-right-from-square)\b/, 'Open link', ''],
+        [/fa-(star)\b/, 'Feature', ''],
+        [/fa-(download|file-download)\b/, 'Download', ''],
+        [/fa-(copy|clone)\b/, 'Copy', ''],
+        [/fa-(undo|rotate-left|redo|rotate-right)\b/, 'Restore', '']
+    ];
+    function tableActions(scope) {
+        (scope || document).querySelectorAll('.admin-table td:last-child').forEach(function (td) {
+            td.querySelectorAll('a, button').forEach(function (b) {
+                if (b.classList.contains('aw-iconbtn') || b.textContent.trim() !== '') return;
+                var icon = b.querySelector('i');
+                if (!icon) return;
+                b.classList.add('aw-iconbtn');
+                var cls = icon.className + ' ' + b.className;
+                for (var k = 0; k < ICON_NAMES.length; k++) {
+                    if (ICON_NAMES[k][0].test(cls)) {
+                        if (ICON_NAMES[k][2]) b.classList.add(ICON_NAMES[k][2]);
+                        if (!b.getAttribute('aria-label') && !b.getAttribute('title')) b.setAttribute('aria-label', ICON_NAMES[k][1]);
+                        if (!b.getAttribute('title')) b.setAttribute('title', b.getAttribute('aria-label') || ICON_NAMES[k][1]);
+                        break;
+                    }
+                }
+                if (/btn-danger|delete/i.test(b.className)) b.classList.add('aw-danger');
+            });
+        });
+    }
+    ready(function () { tableActions(); });
+    var enhance1 = AW.enhance;
+    AW.enhance = function (scope) { enhance1(scope); tableActions(scope); };
+
     AW.ready = ready;
     AW.finePointer = finePointer;
 })();
