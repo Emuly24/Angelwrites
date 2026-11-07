@@ -6,6 +6,11 @@ require_once 'includes/mail_helper.php';
 
 // ===== REDIRECT IF ALREADY VERIFIED OR LOGGED IN =====
 if (isLoggedIn()) {
+    // AV1: admins have nothing to verify; send them to their dashboard
+    if (isAdmin()) {
+        header('Location: ' . SITE_URL . '/admin/dashboard.php');
+        exit;
+    }
     $stmt = $db->prepare("SELECT is_verified FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     if ($stmt->fetchColumn() == 1) {
