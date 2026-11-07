@@ -41,7 +41,12 @@ require_once __DIR__ . '/includes/header.php';
         <p><a href="<?php echo SITE_URL; ?>/dashboard.php">← Dashboard</a> · <a href="<?php echo SITE_URL; ?>/books.php">Browse books</a></p>
     </div>
     <?php if (!$orders): ?>
-        <p>You have not ordered any books yet.</p>
+        <div class="empty-state"><!-- C5 -->
+            <div class="empty-state-icon"><i class="fas fa-receipt" aria-hidden="true"></i></div>
+            <h3>No purchases yet</h3>
+            <p>Books you order will appear here, with their payment status.</p>
+            <a class="btn btn-primary" href="<?php echo SITE_URL; ?>/books.php"><i class="fas fa-book-open"></i> Browse books</a>
+        </div>
     <?php endif; ?>
     <?php foreach ($orders as $o):
         $owned = $o['status'] === 'completed' && aw_has_purchased($db, $_SESSION['user_id'], $o['book_id']);

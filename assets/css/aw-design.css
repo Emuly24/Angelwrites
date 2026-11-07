@@ -879,3 +879,82 @@ html.aw-ui .admin-table thead th {
 }
 html.aw-ui .admin-table tbody td { vertical-align: middle; }
 html.aw-ui .admin-table td:last-child > div:not(.dropdown) { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 2px; width: auto; }
+
+/* ===== C5: messages and "nothing here yet" panels look the same everywhere ===== */
+html.aw-ui .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 18px;
+    margin: 0 0 18px;
+    border: 1px solid transparent;
+    border-left-width: 4px;
+    border-radius: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    box-shadow: 0 6px 18px -12px rgba(58, 38, 41, 0.35);
+    animation: awRise 0.5s var(--aw-ease) both;
+}
+html.aw-ui .alert::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    flex-shrink: 0;
+    line-height: 1.5;
+}
+html.aw-ui .alert:has(> i:first-child)::before { content: none; }
+html.aw-ui .alert-success { background: #e3efe6; color: #2d5039; border-color: #c5dccb; border-left-color: #4f8a63; }
+html.aw-ui .alert-success::before { content: "\f058"; color: #4f8a63; }
+html.aw-ui :is(.alert-error, .alert-danger) { background: #f6e1e3; color: #6e2a31; border-color: #ecc5c9; border-left-color: #b4505a; }
+html.aw-ui :is(.alert-error, .alert-danger)::before { content: "\f06a"; color: #b4505a; }
+html.aw-ui .alert-info { background: #efe6ee; color: #4e3a4c; border-color: #dccfdb; border-left-color: #8a6f86; }
+html.aw-ui .alert-info::before { content: "\f05a"; color: #8a6f86; }
+html.aw-ui .alert-warning { background: #f7ecdc; color: #6f4e22; border-color: #ead6b8; border-left-color: #c9965a; }
+html.aw-ui .alert-warning::before { content: "\f071"; color: #c9965a; }
+html[data-theme="dark"].aw-ui .alert-success { background: rgba(79, 138, 99, 0.16); color: #cfe6d6; border-color: rgba(79, 138, 99, 0.35); }
+html[data-theme="dark"].aw-ui :is(.alert-error, .alert-danger) { background: rgba(180, 80, 90, 0.16); color: #f3d0d4; border-color: rgba(180, 80, 90, 0.4); }
+html[data-theme="dark"].aw-ui .alert-info { background: rgba(138, 111, 134, 0.18); color: #e6d9e4; border-color: rgba(138, 111, 134, 0.4); }
+html[data-theme="dark"].aw-ui .alert-warning { background: rgba(201, 150, 90, 0.16); color: #f0dcc0; border-color: rgba(201, 150, 90, 0.4); }
+
+html.aw-ui .empty-state {
+    text-align: center;
+    padding: clamp(32px, 6vw, 56px) 20px;
+    border: 1.5px dashed rgba(168, 103, 106, 0.32);
+    border-radius: var(--aw-r-lg);
+    background:
+        radial-gradient(50% 80% at 50% 0%, rgba(219, 161, 162, 0.14), transparent 70%),
+        color-mix(in srgb, var(--card-bg) 85%, transparent);
+    color: var(--text-light);
+}
+html.aw-ui :is(.empty-state-icon, .empty-icon) {
+    width: 76px;
+    height: 76px;
+    margin: 0 auto 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 1.9rem;
+    color: #fff;
+    background: var(--aw-grad);
+    box-shadow: 0 14px 30px -12px rgba(168, 103, 106, 0.65);
+    animation: awFloat 6s ease-in-out infinite;
+}
+html.aw-ui .empty-state-icon i { color: #fff; }
+html.aw-ui .empty-state h3 { color: var(--dark); font-size: 1.3rem; margin: 0 0 6px; }
+html.aw-ui .empty-state p { max-width: 460px; margin: 0 auto 18px; }
+html.aw-ui :is(.no-items, .empty-message, .no-results, .no-comments, .no-reviews, .no-content, .empty-notes) {
+    text-align: center;
+    padding: 28px 20px;
+    border: 1.5px dashed rgba(168, 103, 106, 0.3);
+    border-radius: var(--aw-r);
+    color: var(--text-light);
+    background: color-mix(in srgb, var(--card-bg) 80%, transparent);
+}
+html.aw-ui :is(.no-items, .empty-message, .no-comments, .no-reviews, .empty-notes)::before {
+    content: "\f004";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.4rem;
+    color: var(--rose);
+}

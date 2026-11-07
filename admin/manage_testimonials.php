@@ -58,7 +58,11 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <?php if (!$items): ?>
-            <p>No testimonials yet.</p>
+            <div class="empty-state"><!-- C5 -->
+            <div class="empty-state-icon"><i class="fas fa-comment-dots" aria-hidden="true"></i></div>
+            <h3>No testimonials yet</h3>
+            <p>Testimonies shared by members will wait here for your review.</p>
+        </div>
         <?php endif; ?>
         <?php foreach ($items as $t): ?>
             <div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">

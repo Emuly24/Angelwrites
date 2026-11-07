@@ -63,7 +63,11 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <?php if (!$requests): ?>
-            <p>No prayer requests yet.</p>
+            <div class="empty-state"><!-- C5 -->
+            <div class="empty-state-icon"><i class="fas fa-hands-praying" aria-hidden="true"></i></div>
+            <h3>No prayer requests yet</h3>
+            <p>When members ask for prayer, their requests will appear here.</p>
+        </div>
         <?php endif; ?>
         <?php foreach ($requests as $r): ?>
             <div class="comment-item" style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;<?php echo $r['status'] === 'prayed' ? 'opacity:0.65;' : ''; ?>">

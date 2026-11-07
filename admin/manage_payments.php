@@ -112,7 +112,11 @@ require_once __DIR__ . '/../includes/header.php';
         </p>
 
         <?php if (!$orders): ?>
-            <p>No orders here.</p>
+            <div class="empty-state"><!-- C5 -->
+            <div class="empty-state-icon"><i class="fas fa-receipt" aria-hidden="true"></i></div>
+            <h3>No orders here</h3>
+            <p>Orders in this list will appear here.</p>
+        </div>
         <?php endif; ?>
         <?php foreach ($orders as $o): ?>
             <div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
