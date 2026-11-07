@@ -33,10 +33,18 @@ if ($isLoggedIn) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="aw-ui" data-aw-page="<?php echo htmlspecialchars(basename($_SERVER['PHP_SELF'] ?? '', '.php')); ?>"><!-- D1 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+    // D8: apply the saved theme before the page paints, so dark mode no longer flashes light first.
+    (function () { try {
+        var t = localStorage.getItem('angelwrites_theme');
+        var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    } catch (e) {} })();
+    </script>
     <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' : ''; ?><?php echo htmlspecialchars(aw_site_name()); /* F191 */ ?></title>
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -254,6 +262,9 @@ if ($isLoggedIn) {
             .user-wrapper span { display: none; } /* hide username on tiny screens to prevent overflow */
         }
     </style>
+    <!-- D1: site-wide design layer, after the header styles so it applies on every page -->
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=1">
+    <script src="<?php echo SITE_URL; ?>/assets/js/aw-motion.js?v=1" defer></script><!-- D2 -->
 </head>
 <body>
     <a href="#mainContent" class="skip-link">Skip to main content</a>

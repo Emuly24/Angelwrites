@@ -1,0 +1,732 @@
+/* ============================================================
+   AngelWrites design layer (D1–D8)
+   Loaded after every page's own styles through includes/header.php.
+   Rules are scoped to html.aw-ui so they win over the per-page <style>
+   blocks without !important, and the brand colours (rose, vanilla,
+   fantasy) stay exactly as defined in style.css.
+   ============================================================ */
+
+/* ===== D1: tokens ===== */
+:root {
+    --aw-ink: #3a2629;
+    --aw-rose-deep: #a8676a;
+    --aw-rose-ink: #9a5a5e;
+    --aw-gold: #d6a85c;
+    --aw-grad: linear-gradient(135deg, #a8676a 0%, #c27f82 45%, #b8706f 100%);
+    --aw-grad-soft: linear-gradient(135deg, #DBA1A2 0%, #EFD8D6 55%, #F7F3ED 100%);
+    --aw-grad-text: linear-gradient(100deg, #a8676a 0%, #d48f92 35%, #c9965a 55%, #d48f92 75%, #a8676a 100%);
+    --aw-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --aw-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --aw-r-sm: 10px;
+    --aw-r: 18px;
+    --aw-r-lg: 26px;
+    --aw-sh-1: 0 1px 2px rgba(58, 38, 41, 0.06), 0 4px 14px rgba(58, 38, 41, 0.06);
+    --aw-sh-2: 0 2px 6px rgba(58, 38, 41, 0.06), 0 14px 34px -8px rgba(168, 103, 106, 0.28);
+    --aw-sh-3: 0 4px 10px rgba(58, 38, 41, 0.08), 0 26px 60px -14px rgba(168, 103, 106, 0.38);
+    --aw-ring: 0 0 0 4px rgba(219, 161, 162, 0.32);
+    --aw-glass: rgba(247, 243, 237, 0.72);
+    --aw-hairline: rgba(168, 103, 106, 0.16);
+}
+html[data-theme="dark"] {
+    --aw-ink: #f0e8e8;
+    --aw-sh-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.3);
+    --aw-sh-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 14px 34px -8px rgba(0, 0, 0, 0.6);
+    --aw-sh-3: 0 4px 10px rgba(0, 0, 0, 0.4), 0 26px 60px -14px rgba(219, 161, 162, 0.22);
+    --aw-glass: rgba(26, 18, 18, 0.72);
+    --aw-hairline: rgba(219, 161, 162, 0.14);
+    --aw-grad-soft: linear-gradient(135deg, #3d2a2b 0%, #2c1e1e 55%, #1a1212 100%);
+}
+
+/* ===== D1: base polish ===== */
+html.aw-ui body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+html.aw-ui :is(h1, h2, h3) { letter-spacing: -0.012em; }
+html.aw-ui ::selection { background: rgba(219, 161, 162, 0.45); color: var(--aw-ink); }
+
+html.aw-ui { scrollbar-color: var(--rose) transparent; scrollbar-width: thin; }
+html.aw-ui ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.aw-ui ::-webkit-scrollbar-track { background: transparent; }
+html.aw-ui ::-webkit-scrollbar-thumb {
+    background: linear-gradient(var(--rose), var(--rose-dark));
+    border-radius: 10px; border: 2px solid var(--bg);
+}
+
+/* keyboard focus: one clear, on-brand ring everywhere */
+html.aw-ui :is(a, button, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--aw-rose-deep);
+    outline-offset: 3px;
+    border-radius: 8px;
+}
+
+/* form fields: soft hover, glowing focus */
+html.aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"],
+    input[type="date"], input[type="datetime-local"], input[type="time"], select, textarea) {
+    transition: border-color 0.2s ease, box-shadow 0.25s var(--aw-ease), background-color 0.2s ease;
+}
+html.aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"],
+    input[type="date"], input[type="datetime-local"], input[type="time"], select, textarea):hover:not(:focus):not(:disabled) {
+    border-color: var(--rose);
+}
+html.aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"],
+    input[type="date"], input[type="datetime-local"], input[type="time"], select, textarea):focus {
+    outline: none;
+    border-color: var(--aw-rose-deep);
+    box-shadow: var(--aw-ring);
+}
+html.aw-ui :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) {
+    accent-color: var(--aw-rose-deep);
+}
+
+/* ===== D2: buttons ===== */
+html.aw-ui .btn {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.01em;
+    transition: transform 0.35s var(--aw-spring), box-shadow 0.35s var(--aw-ease),
+                background-position 0.6s var(--aw-ease), background-color 0.25s ease,
+                color 0.25s ease, border-color 0.25s ease;
+}
+/* light sweep across the button on hover */
+html.aw-ui .btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.42) 50%, transparent 70%);
+    transform: translateX(-130%);
+    transition: transform 0.85s var(--aw-ease);
+    pointer-events: none;
+}
+html.aw-ui .btn:hover::after { transform: translateX(130%); }
+html.aw-ui .btn:hover { transform: translateY(-2px); text-decoration: none; }
+html.aw-ui .btn:active { transform: translateY(0) scale(0.97); transition-duration: 0.1s; }
+html.aw-ui .btn:disabled, html.aw-ui .btn[aria-disabled="true"] { transform: none; opacity: 0.6; cursor: not-allowed; }
+html.aw-ui .btn i { transition: transform 0.35s var(--aw-spring); }
+html.aw-ui .btn:hover i { transform: scale(1.12) rotate(-6deg); }
+
+html.aw-ui .btn-primary {
+    background-color: var(--aw-rose-deep);
+    background-image: var(--aw-grad);
+    background-size: 220% 220%;
+    background-position: 0% 50%;
+    color: #fff;
+    border-color: transparent;
+    box-shadow: var(--aw-sh-1), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+html.aw-ui .btn-primary:hover {
+    background-position: 100% 50%;
+    color: #fff;
+    box-shadow: var(--aw-sh-2), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* outline: a rose gradient fills in from the left */
+html.aw-ui .btn-outline {
+    background: color-mix(in srgb, var(--card-bg) 82%, transparent);
+    border: 2px solid var(--aw-rose-deep);
+    color: var(--aw-ink);
+}
+html.aw-ui .btn-outline::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--aw-grad);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.45s var(--aw-ease);
+}
+html.aw-ui .btn-outline:hover { color: #fff; background: color-mix(in srgb, var(--card-bg) 82%, transparent); border-color: transparent; box-shadow: var(--aw-sh-2); }
+html.aw-ui .btn-outline:hover::before { transform: scaleX(1); }
+
+html.aw-ui .btn-secondary {
+    background: #3a2a2d;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--aw-sh-1);
+}
+html.aw-ui .btn-secondary:hover { background: #2a1d1f; color: #fff; border-color: var(--rose); box-shadow: var(--aw-sh-2); }
+html[data-theme="dark"].aw-ui .btn-secondary { background: #4a3538; }
+html[data-theme="dark"].aw-ui .btn-secondary:hover { background: #5a4044; }
+
+html.aw-ui :is(.btn-danger, .btn-success, .btn-warning, .btn-info):hover { box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.35); filter: saturate(1.1) brightness(1.03); }
+
+/* click ripple (added by aw-motion.js) */
+html.aw-ui .aw-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.28;
+    transform: scale(0);
+    pointer-events: none;
+    animation: awRipple 0.6s var(--aw-ease) forwards;
+}
+@keyframes awRipple { to { transform: scale(1); opacity: 0; } }
+
+/* working state while a form submits (added by aw-motion.js) */
+html.aw-ui .btn.is-loading { color: transparent !important; pointer-events: none; }
+html.aw-ui .btn.is-loading i { opacity: 0; }
+html.aw-ui .aw-spin {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 1.1em; height: 1.1em;
+    margin: -0.55em 0 0 -0.55em;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-top-color: #fff;
+    animation: awSpin 0.7s linear infinite;
+}
+html.aw-ui .btn-outline .aw-spin { border-color: rgba(168, 103, 106, 0.3); border-top-color: var(--aw-rose-deep); }
+@keyframes awSpin { to { transform: rotate(360deg); } }
+
+/* ===== D3: header and navigation ===== */
+html.aw-ui .site-header {
+    background: var(--aw-glass);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid var(--aw-hairline);
+    transition: box-shadow 0.4s var(--aw-ease), background-color 0.4s ease;
+}
+html.aw-ui .site-header.scrolled { box-shadow: 0 10px 34px -14px rgba(58, 38, 41, 0.32); }
+html.aw-ui .logo-img { transition: transform 0.5s var(--aw-spring), filter 0.4s ease; }
+html.aw-ui .logo:hover .logo-img { transform: scale(1.03) rotate(-0.6deg); filter: drop-shadow(0 6px 14px rgba(219, 161, 162, 0.45)); }
+
+/* the skip link peeked out as a pink sliver at the top; keep it fully hidden until focused */
+html.aw-ui .skip-link { top: 0; transform: translateY(-110%); transition: transform 0.25s var(--aw-ease); }
+html.aw-ui .skip-link:focus { transform: none; }
+
+/* reading progress across the top of the page (aw-motion.js) */
+.aw-progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    z-index: 1100;
+    background: linear-gradient(90deg, var(--rose), var(--aw-rose-deep), var(--aw-gold));
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+    pointer-events: none;
+    box-shadow: 0 0 10px rgba(219, 161, 162, 0.6);
+}
+
+/* desktop links: compact spacing so the icons on the right stay on screen,
+   and a gradient underline that grows from the centre */
+@media (min-width: 993px) {
+    html.aw-ui:not(.aw-nav-compact) .nav-links { gap: 2px; min-width: 0; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a { padding: 6px 10px; font-size: 0.9rem; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links .nav-separator { display: none; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:not(.btn-login):not(.btn-logout) > i { display: none; }
+    html.aw-ui .nav-links a { position: relative; transition: color 0.25s ease, background-color 0.25s ease; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:not(.btn-login):not(.btn-signup):not(.btn-logout)::after {
+        content: "";
+        position: absolute;
+        left: 10px; right: 10px; bottom: 1px;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--aw-grad);
+        transform: scaleX(0);
+        transition: transform 0.4s var(--aw-ease);
+    }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:hover { text-decoration: none; color: var(--aw-rose-deep); background: rgba(219, 161, 162, 0.1); }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:not(.btn-login):not(.btn-signup):not(.btn-logout):is(:hover, .active)::after { transform: scaleX(1); }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a.active { color: var(--aw-rose-deep); background: transparent; }
+    html[data-theme="dark"].aw-ui:not(.aw-nav-compact) .nav-links a:is(:hover, .active) { color: var(--rose); }
+}
+
+/* When the links still do not fit beside the logo and the icons (members and admins have more
+   links), aw-motion.js adds .aw-nav-compact and the menu uses the slide-in drawer, as on phones. */
+html.aw-nav-compact .hamburger { display: flex !important; }
+html.aw-nav-compact .nav-links {
+    position: fixed !important; top: 0 !important; right: -340px !important;
+    width: 320px !important; max-width: 85vw !important; height: 100vh !important;
+    background: var(--card-bg) !important; border-left: 1px solid var(--border) !important;
+    padding: 80px 24px 24px !important; box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
+    z-index: 1000 !important; overflow-y: auto !important; display: flex !important;
+    flex-direction: column !important; align-items: stretch !important; justify-content: flex-start !important;
+    gap: 4px !important; margin: 0 !important; flex: 0 0 auto !important;
+}
+html.aw-nav-compact .nav-links.open { right: 0 !important; }
+html.aw-nav-compact .nav-links li { width: 100% !important; padding: 6px 0 !important; border-bottom: 1px solid var(--border) !important; }
+html.aw-nav-compact .nav-links li:last-child { border-bottom: none !important; }
+html.aw-nav-compact .nav-links a { display: block !important; width: 100% !important; padding: 4px 0 !important; font-size: 1rem !important; }
+html.aw-nav-compact .nav-links .nav-separator { display: none !important; }
+html.aw-nav-compact .menu-overlay {
+    position: fixed !important; inset: 0 !important; z-index: 999 !important;
+    background: rgba(0, 0, 0, 0.5) !important; display: none !important;
+}
+html.aw-nav-compact .menu-overlay.open { display: block !important; }
+
+html.aw-ui .nav-links .btn-signup {
+    background: var(--aw-grad);
+    background-size: 200% 200%;
+    color: #fff;
+    box-shadow: 0 6px 16px -6px rgba(168, 103, 106, 0.6);
+    transition: background-position 0.5s var(--aw-ease), transform 0.3s var(--aw-spring), box-shadow 0.3s ease;
+}
+html.aw-ui .nav-links .btn-signup:hover { background-position: 100% 50%; color: #fff; transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(168, 103, 106, 0.7); }
+html.aw-ui .nav-links :is(.btn-login, .btn-logout) { transition: all 0.3s var(--aw-ease); }
+html.aw-ui .nav-links .btn-login:hover { background: var(--aw-rose-deep); border-color: var(--aw-rose-deep); color: #fff; }
+
+/* round action icons */
+html.aw-ui .nav-action-icon { transition: color 0.25s ease, background-color 0.25s ease, transform 0.35s var(--aw-spring); }
+html.aw-ui .nav-action-icon:hover { transform: translateY(-2px); color: var(--aw-rose-deep); background: rgba(219, 161, 162, 0.16); }
+html.aw-ui .nav-action-icon:active { transform: scale(0.92); }
+html.aw-ui .theme-toggle i { transition: transform 0.6s var(--aw-spring); }
+html.aw-ui .theme-toggle.aw-turn i { transform: rotate(360deg); }
+html.aw-ui .notification-badge {
+    background: var(--aw-grad);
+    box-shadow: 0 0 0 2px var(--bg);
+    animation: awBadge 2.4s ease-out infinite;
+}
+@keyframes awBadge {
+    0% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 2px rgba(219, 161, 162, 0.7); }
+    70% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 10px rgba(219, 161, 162, 0); }
+    100% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 10px rgba(219, 161, 162, 0); }
+}
+
+/* dropdowns fade and drop in instead of popping */
+html.aw-ui :is(.notification-dropdown, .user-dropdown) {
+    display: block;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px) scale(0.97);
+    transform-origin: top right;
+    pointer-events: none;
+    border-color: var(--aw-hairline);
+    border-radius: 16px;
+    box-shadow: var(--aw-sh-3);
+    transition: opacity 0.22s ease, transform 0.32s var(--aw-ease), visibility 0s linear 0.32s;
+}
+html.aw-ui :is(.notification-dropdown, .user-dropdown).open {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    pointer-events: auto;
+    transition: opacity 0.22s ease, transform 0.32s var(--aw-ease), visibility 0s;
+}
+html.aw-ui .user-dropdown a { transition: background-color 0.2s ease, padding-left 0.25s var(--aw-ease), color 0.2s ease; }
+html.aw-ui .user-dropdown a:hover { padding-left: 22px; color: var(--aw-rose-deep); text-decoration: none; }
+html.aw-ui .notification-dropdown .notif-item { transition: background-color 0.2s ease; border-radius: 8px; }
+html.aw-ui .notification-dropdown .notif-item:hover { background: rgba(219, 161, 162, 0.08); }
+
+/* mobile menu: smoother slide, blurred backdrop, links arrive one after another */
+html.aw-nav-compact .nav-links { transition: right 0.5s var(--aw-ease) !important; }
+html.aw-nav-compact .menu-overlay.open {
+    background: rgba(44, 30, 30, 0.38) !important;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    animation: awFade 0.35s ease both;
+}
+html.aw-nav-compact .nav-links.open > li { animation: awSlideIn 0.55s var(--aw-ease) both; animation-delay: calc(var(--aw-i, 0) * 45ms + 120ms); }
+html.aw-nav-compact .nav-links a:hover { padding-left: 6px !important; color: var(--aw-rose-deep) !important; text-decoration: none; transition: padding-left 0.25s var(--aw-ease), color 0.2s ease !important; }
+@media (max-width: 992px) {
+    html.aw-ui .nav-links { transition: right 0.5s var(--aw-ease) !important; }
+    html.aw-ui .menu-overlay.open {
+        background: rgba(44, 30, 30, 0.38) !important;
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+        animation: awFade 0.35s ease both;
+    }
+    html.aw-ui .nav-links.open > li {
+        animation: awSlideIn 0.55s var(--aw-ease) both;
+        animation-delay: calc(var(--aw-i, 0) * 45ms + 120ms);
+    }
+    html.aw-ui .nav-links a:hover { padding-left: 6px !important; color: var(--aw-rose-deep) !important; transition: padding-left 0.25s var(--aw-ease), color 0.2s ease !important; }
+}
+@keyframes awFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes awSlideIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+
+/* ===== D4: cards and images ===== */
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .about-feature, .stat-card, .stat-item, .admin-stat-card,
+    .question-card, .member-card, .aw-card) {
+    transition: transform 0.5s var(--aw-ease), box-shadow 0.5s var(--aw-ease), border-color 0.3s ease;
+}
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .about-feature, .stat-card, .stat-item, .admin-stat-card,
+    .question-card, .member-card, .aw-card):hover {
+    transform: translateY(-6px);
+    box-shadow: var(--aw-sh-3);
+    border-color: rgba(219, 161, 162, 0.6);
+}
+/* while the pointer tilts a card, follow it closely */
+html.aw-ui .aw-tilting { transition: transform 0.12s linear, box-shadow 0.5s var(--aw-ease), border-color 0.3s ease !important; }
+
+/* soft light that follows the pointer (class added by aw-motion.js) */
+html.aw-ui .aw-spot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(380px circle at var(--aw-mx, 50%) var(--aw-my, 50%), rgba(219, 161, 162, 0.2), transparent 45%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    z-index: 2;
+}
+html.aw-ui .aw-spot:hover::after { opacity: 1; }
+
+/* covers and thumbnails zoom gently inside their frame */
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .aw-card) :is([class*="cover"], [class*="thumb"], [class*="image"], [class*="img"]):has(> img) {
+    overflow: hidden;
+}
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .aw-card) :is([class*="cover"], [class*="thumb"], [class*="image"], [class*="img"]) > img {
+    transition: transform 0.9s var(--aw-ease), opacity 0.6s ease, filter 0.6s ease;
+}
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .aw-card):hover :is([class*="cover"], [class*="thumb"], [class*="image"], [class*="img"]) > img {
+    transform: scale(1.06);
+}
+
+/* pictures fade in as they arrive instead of popping (aw-motion.js) */
+html.aw-ui img.aw-img-wait { opacity: 0; }
+html.aw-ui img.aw-img-in { transition: opacity 0.6s ease; }
+
+/* form-holding cards (mostly admin) should not jump while being filled in */
+html.aw-ui .card:has(form, table, textarea, select):hover { transform: none; }
+
+/* table rows highlight softly */
+html.aw-ui :is(.admin-table, .data-table) tbody tr { transition: background-color 0.2s ease; }
+html.aw-ui :is(.admin-table, .data-table) tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+/* whole-card links: no underline across every line of text on hover */
+html.aw-ui a:is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .aw-card):hover,
+html.aw-ui a:is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .aw-card):hover * { text-decoration: none; }
+
+/* ===== D5: content rises in as it scrolls into view (classes added by aw-motion.js) ===== */
+html.aw-ui .aw-reveal {
+    opacity: 0;
+    translate: 0 24px;
+    transition: opacity 0.8s var(--aw-ease), translate 0.9s var(--aw-ease) !important;
+    transition-delay: var(--aw-d, 0ms) !important;
+}
+html.aw-ui .aw-reveal.aw-in { opacity: 1; translate: 0 0; }
+@media print {
+    html.aw-ui .aw-reveal { opacity: 1 !important; translate: none !important; }
+}
+
+/* ===== D6: gradient headline words, and the home page hero ===== */
+html.aw-ui :is(h1, h2, h3) .rose-text {
+    background: var(--aw-grad-text);
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: awShimmer 9s linear infinite;
+    text-shadow: none;
+}
+html[data-theme="dark"].aw-ui :is(h1, h2, h3) .rose-text {
+    background-image: linear-gradient(100deg, #e8b4b5 0%, #f3cfc4 35%, #e6c088 55%, #f3cfc4 75%, #e8b4b5 100%);
+}
+@keyframes awShimmer { from { background-position: 0% 50%; } to { background-position: 250% 50%; } }
+
+html.aw-ui .hero { position: relative; overflow: hidden; isolation: isolate; }
+html[data-theme="dark"].aw-ui .hero { background: var(--aw-grad-soft); }
+/* slowly drifting glow of rose, vanilla and gold behind the hero */
+html.aw-ui .hero::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    z-index: -1;
+    background:
+        radial-gradient(38% 42% at 18% 28%, rgba(255, 255, 255, 0.55), transparent 70%),
+        radial-gradient(34% 40% at 82% 32%, rgba(214, 168, 92, 0.22), transparent 70%),
+        radial-gradient(40% 46% at 62% 88%, rgba(192, 138, 139, 0.35), transparent 70%);
+    filter: blur(10px);
+    animation: awDrift 22s ease-in-out infinite alternate;
+}
+html.aw-ui .hero::after {
+    /* faint dotted texture for depth */
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.35) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+    opacity: 0.5;
+    pointer-events: none;
+}
+@keyframes awDrift {
+    0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+    50% { transform: translate3d(3%, -2%, 0) rotate(4deg) scale(1.05); }
+    100% { transform: translate3d(-3%, 3%, 0) rotate(-3deg) scale(1.02); }
+}
+
+/* staggered entrance */
+html.aw-ui .hero :is(.hero-badge, h1, .hero-sub, .hero-buttons, .hero-search, .hero-image) {
+    animation: awRise 1s var(--aw-ease) both;
+}
+html.aw-ui .hero h1 { animation-delay: 0.08s; }
+html.aw-ui .hero .hero-sub { animation-delay: 0.18s; }
+html.aw-ui .hero .hero-buttons { animation-delay: 0.28s; }
+html.aw-ui .hero .hero-search { animation-delay: 0.38s; }
+html.aw-ui .hero .hero-image { animation: awRise 1.2s var(--aw-ease) 0.2s both; }
+@keyframes awRise { from { opacity: 0; translate: 0 26px; } to { opacity: 1; translate: 0 0; } }
+
+html.aw-ui .hero .hero-badge {
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    color: var(--aw-rose-ink);
+    box-shadow: 0 6px 18px -8px rgba(168, 103, 106, 0.45);
+}
+html[data-theme="dark"].aw-ui .hero .hero-badge { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.16); color: var(--rose-light); }
+
+/* the heart emblem floats, glows, and leans toward the pointer */
+html.aw-ui .hero .hero-image-container { position: relative; translate: var(--aw-hx, 0) var(--aw-hy, 0); transition: translate 0.6s var(--aw-ease); }
+html.aw-ui .hero .hero-image-container::before {
+    content: "";
+    position: absolute;
+    inset: 12%;
+    z-index: -1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 214, 170, 0.75), rgba(219, 161, 162, 0.35) 45%, transparent 70%);
+    filter: blur(24px);
+    animation: awGlow 5s ease-in-out infinite alternate;
+}
+html.aw-ui .hero .hero-image-container img { animation: awFloat 7s ease-in-out infinite; filter: drop-shadow(0 24px 40px rgba(168, 103, 106, 0.35)); }
+@keyframes awFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-14px) rotate(1.2deg); } }
+@keyframes awGlow { from { opacity: 0.65; transform: scale(0.94); } to { opacity: 1; transform: scale(1.06); } }
+html.aw-ui .hero .hero-quote { position: relative; }
+
+/* twinkling sparkles (spans added by aw-motion.js) */
+html.aw-ui .aw-spark {
+    position: absolute;
+    z-index: 0;
+    width: var(--s, 6px);
+    height: var(--s, 6px);
+    pointer-events: none;
+    background: radial-gradient(circle, #fff 0 30%, rgba(255, 233, 196, 0.9) 45%, transparent 70%);
+    border-radius: 50%;
+    opacity: 0;
+    animation: awTwinkle var(--t, 6s) ease-in-out var(--dl, 0s) infinite;
+}
+@keyframes awTwinkle {
+    0% { opacity: 0; transform: translateY(0) scale(0.4); }
+    30% { opacity: 0.95; transform: translateY(-14px) scale(1); }
+    70% { opacity: 0.6; transform: translateY(-34px) scale(0.8); }
+    100% { opacity: 0; transform: translateY(-56px) scale(0.3); }
+}
+
+/* "scroll down" cue at the foot of the hero */
+html.aw-ui .aw-scroll-cue {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    translate: -50% 0;
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    color: var(--aw-rose-ink);
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    animation: awBob 2.2s ease-in-out infinite;
+    text-decoration: none;
+}
+html.aw-ui .aw-scroll-cue:hover { text-decoration: none; background: #fff; }
+@keyframes awBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(7px); } }
+@media (max-width: 768px) { html.aw-ui .aw-scroll-cue { display: none; } }
+
+/* home page sections */
+html[data-aw-page="index"].aw-ui .section-header h2::after {
+    content: "";
+    display: block;
+    width: 64px; height: 3px;
+    margin: 12px auto 0;
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, var(--aw-rose-deep), var(--aw-gold), var(--aw-rose-deep), transparent);
+}
+html[data-aw-page="index"].aw-ui .stat-number {
+    background: var(--aw-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    font-variant-numeric: tabular-nums;
+}
+html[data-theme="dark"][data-aw-page="index"].aw-ui .stat-number { background-image: linear-gradient(135deg, #e8b4b5, #e6c088); }
+html.aw-ui .about-feature i {
+    width: 52px; height: 52px;
+    margin: 0 auto 10px;
+    display: grid !important;
+    place-items: center;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(219, 161, 162, 0.22), rgba(214, 168, 92, 0.16));
+    transition: transform 0.5s var(--aw-spring), background 0.3s ease, color 0.3s ease;
+}
+html.aw-ui .about-feature:hover i { transform: translateY(-3px) rotate(-8deg) scale(1.08); background: var(--aw-grad); color: #fff; }
+html.aw-ui .gate-icon { display: inline-block; animation: awWiggle 4s ease-in-out infinite; }
+@keyframes awWiggle { 0%, 88%, 100% { transform: rotate(0); } 91% { transform: rotate(-12deg); } 94% { transform: rotate(10deg); } 97% { transform: rotate(-5deg); } }
+html.aw-ui :is(.cta-section, .content-gate, .newsletter-section) { position: relative; overflow: hidden; isolation: isolate; }
+html.aw-ui :is(.cta-section, .content-gate, .newsletter-section)::before {
+    content: "";
+    position: absolute;
+    width: 520px; height: 520px;
+    right: -160px; top: -220px;
+    z-index: -1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(219, 161, 162, 0.28), transparent 65%);
+    animation: awDrift 26s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+/* home page "Join free" bar: glass finish, slides up, and stays slim on phones
+   (it covered almost half of a phone screen) */
+html.aw-ui .sticky-cta {
+    background: linear-gradient(135deg, rgba(168, 103, 106, 0.94), rgba(194, 127, 130, 0.94));
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    animation: awUp 0.7s var(--aw-ease) 0.6s both;
+}
+@keyframes awUp { from { transform: translateY(100%); } to { transform: none; } }
+@media (max-width: 576px) {
+    html.aw-ui .sticky-cta { padding: 8px 0; }
+    html.aw-ui .sticky-cta .container { position: relative; flex-direction: row; justify-content: center; gap: 6px 10px; padding-right: 36px; }
+    html.aw-ui .sticky-cta p { width: 100%; font-size: 0.82rem; line-height: 1.35; text-align: center; }
+    html.aw-ui .sticky-cta .btn { padding: 6px 16px; font-size: 0.8rem; }
+    html.aw-ui .sticky-cta-close { position: absolute; top: 0; right: 8px; width: 32px; height: 32px; }
+}
+
+/* ===== D7: footer ===== */
+html.aw-ui .site-footer {
+    position: relative;
+    background:
+        radial-gradient(55% 90% at 8% 0%, rgba(219, 161, 162, 0.16), transparent 62%),
+        radial-gradient(45% 80% at 96% 0%, rgba(214, 168, 92, 0.1), transparent 60%),
+        var(--footer-bg);
+}
+html.aw-ui .site-footer::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--rose), var(--aw-gold), var(--rose), transparent);
+    background-size: 200% 100%;
+    animation: awShimmer 12s linear infinite;
+}
+html.aw-ui .site-footer :is(.footer-links, .footer-social) h4 { position: relative; padding-bottom: 8px; letter-spacing: 0.02em; }
+html.aw-ui .site-footer :is(.footer-links, .footer-social) h4::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 28px; height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--rose), var(--aw-gold));
+}
+html.aw-ui .footer-links ul li a { display: inline-flex; align-items: center; transition: color 0.25s ease, transform 0.35s var(--aw-ease); }
+html.aw-ui .footer-links ul li a::before {
+    content: "\203A";
+    width: 0;
+    overflow: hidden;
+    opacity: 0;
+    color: var(--rose);
+    transition: width 0.3s var(--aw-ease), opacity 0.3s ease, margin 0.3s var(--aw-ease);
+}
+html.aw-ui .footer-links ul li a:hover { color: #fff; text-decoration: none; transform: translateX(2px); }
+html.aw-ui .footer-links ul li a:hover::before { width: 0.7em; opacity: 1; }
+html.aw-ui .footer-legal a { transition: color 0.25s ease; }
+html.aw-ui .footer-legal a:hover { color: #fff; }
+
+html.aw-ui .social-icons a {
+    width: 40px; height: 40px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 1rem;
+    color: var(--footer-text);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    transition: transform 0.4s var(--aw-spring), background 0.3s ease, color 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+html.aw-ui .social-icons a:hover {
+    color: #fff;
+    text-decoration: none;
+    border-color: transparent;
+    background: var(--aw-grad);
+    transform: translateY(-4px) rotate(-8deg);
+    box-shadow: 0 10px 22px -8px rgba(219, 161, 162, 0.7);
+}
+
+html.aw-ui .footer-newsletter-form input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #f3eaea;
+    border-radius: 12px;
+}
+html.aw-ui .footer-newsletter-form input::placeholder { color: rgba(243, 234, 234, 0.55); }
+html.aw-ui .footer-newsletter-form input:focus { background: rgba(255, 255, 255, 0.1); border-color: var(--rose); box-shadow: 0 0 0 4px rgba(219, 161, 162, 0.2); }
+html.aw-ui .footer-newsletter-form button {
+    background: var(--aw-grad);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.35s var(--aw-spring), box-shadow 0.3s ease;
+}
+html.aw-ui .footer-newsletter-form button { min-width: 48px; min-height: 40px; }
+html.aw-ui .footer-newsletter-form button:hover { transform: translateY(-2px); box-shadow: 0 10px 22px -8px rgba(219, 161, 162, 0.7); }
+html.aw-ui .footer-newsletter-form button:hover i { animation: awFly 0.7s var(--aw-ease); }
+@keyframes awFly {
+    0% { transform: none; }
+    45% { transform: translate(18px, -18px) rotate(10deg); opacity: 0; }
+    46% { transform: translate(-18px, 18px); opacity: 0; }
+    100% { transform: none; opacity: 1; }
+}
+html.aw-ui .footer-heart i { display: inline-block; animation: awBeat 1.6s ease-in-out infinite; }
+@keyframes awBeat { 0%, 60%, 100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(1); } 45% { transform: scale(1.15); } }
+html.aw-ui .site-footer .logo-img { filter: drop-shadow(0 6px 18px rgba(219, 161, 162, 0.25)); }
+
+/* the floating "jump to section" button matches the buttons */
+html.aw-ui #tocFloatingBtn { background: var(--aw-grad); box-shadow: 0 10px 24px -8px rgba(168, 103, 106, 0.7); }
+html.aw-ui #tocFloatingBtn.visible:hover { transform: translateY(-3px) scale(1.06); }
+html.aw-ui #tocPanel { border-color: var(--aw-hairline); box-shadow: var(--aw-sh-3); border-radius: 18px; }
+
+/* ===== D8: page-to-page fades, messages, and reduced motion ===== */
+@view-transition { navigation: auto; }
+html.aw-ui .site-header { view-transition-name: aw-header; }
+::view-transition-old(root) { animation: awVtOut 0.22s ease both; }
+::view-transition-new(root) { animation: awVtIn 0.38s var(--aw-ease) both; }
+@keyframes awVtOut { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes awVtIn { from { opacity: 0; transform: translateY(10px); } }
+
+/* site messages slide in */
+html.aw-ui .global-notification {
+    background: var(--aw-grad);
+    box-shadow: 0 8px 24px -12px rgba(168, 103, 106, 0.6);
+    animation: awDrop 0.6s var(--aw-ease) both;
+}
+@keyframes awDrop { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
+html.aw-ui #awToast {
+    border-radius: 14px !important;
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.35) !important;
+    font-weight: 500;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+/* Visitors who ask their device for less motion get a still site:
+   no drifting, floating, shimmering, tilting or page fades. */
+@media (prefers-reduced-motion: reduce) {
+    @view-transition { navigation: none; }
+    html.aw-ui *, html.aw-ui *::before, html.aw-ui *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.001ms !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important;
+    }
+    html.aw-ui .btn::after, html.aw-ui .aw-spot::after { display: none; }
+    html.aw-ui .aw-progress { display: none; }
+}
