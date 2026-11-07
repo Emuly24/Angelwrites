@@ -75,9 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
 
         if ($user && password_verify($password, $user['password'])) {
             // S6 (F109): no username is exempt from email verification. (Usernames "admin" and
-            // "Test User" used to skip it.) The live admin account must have is_verified = 1
-            // before this deploys; see the fix/security PR.
-            if ($user['is_verified'] == 0) {
+            // "Test User" used to skip it.)
+            // AV1: accounts with the admin role do not need to verify their email. The exemption
+            // follows the role stored in the database, never the username, and registration only
+            // ever creates 'reader' accounts, so nobody can sign up into it.
+            if ($user['is_verified'] == 0 && $user['role'] !== 'admin') {
                 // F232: send the member straight to the verify page for their address, where a new code can be requested
                 $error = 'Please verify your email address before logging in. <a href="verify.php?email=' . urlencode($user['email']) . '">Enter your code or get a new one</a>';
             }

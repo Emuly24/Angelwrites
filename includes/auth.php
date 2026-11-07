@@ -23,7 +23,8 @@ if (!isset($_SESSION['user_id']) && !empty($_COOKIE['remember_token']) && isset(
         $aw_rm->execute([(string)$_COOKIE['remember_token'], date('Y-m-d H:i:s')]);
         $aw_ru = $aw_rm->fetch(PDO::FETCH_ASSOC);
         $aw_rm->closeCursor();
-        if ($aw_ru && (int)$aw_ru['is_verified'] === 1) {
+        // AV1: admins are not required to verify their email (same rule as login.php)
+        if ($aw_ru && ((int)$aw_ru['is_verified'] === 1 || $aw_ru['role'] === 'admin')) {
             session_regenerate_id(true);
             $_SESSION['user_id'] = $aw_ru['id'];
             $_SESSION['username'] = $aw_ru['username'];
