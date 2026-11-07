@@ -1,74 +1,39 @@
 <?php
-require_once '../includes/config.php';
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
-require_once '../includes/mail_helper.php';
+// ============================================================
+//  PROCESS_QUEUE.PHP – send scheduled newsletters (N7)
+// ============================================================
+// From the command line (a cron job, if the host ever offers one):  php admin/process_queue.php
+//   sends every scheduled campaign whose time has come, through the same batch sender as the admin
+//   page (each address once, unsubscribed people skipped, attachments included, archived at the end).
+// In the browser it was an admin GET that sent mail (so a link on another site could trigger it) and
+// a second sender that re-mailed everyone after a partial failure. It now only accepts the CSRF-protected
+// "Send queued now" button of the admin page, which sends in pages there.
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/newsletter.php';
 
-// Only CLI or admin
-if (php_sapi_name() !== 'cli' && !isAdmin()) {
-    header('Location: ' . SITE_URL . '/login.php');
+if (php_sapi_name() !== 'cli') {
+    if (!isAdmin()) {
+        header('Location: ' . SITE_URL . '/login.php');
+        exit;
+    }
+    header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue');
     exit;
 }
 
-echo "Processing email queue...\n";
-
-$stmt = $db->prepare("
-    SELECT * FROM email_queue 
-    WHERE status = 'pending' AND scheduled_at <= CURRENT_TIMESTAMP
-    ORDER BY scheduled_at ASC
-    LIMIT 10
-");
-$stmt->execute();
-$queue = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$sent_count = 0;
-$failed_count = 0;
-
-foreach ($queue as $q) {
-    $stmt = $db->prepare("UPDATE email_queue SET status = 'processing', attempt_count = attempt_count + 1 WHERE id = ?");
-    $stmt->execute([$q['id']]);
-
-    $stmt = $db->prepare("SELECT file_path FROM email_attachments WHERE email_queue_id = ?");
-    $stmt->execute([$q['id']]);
-    $attachments = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    $recipients = explode(',', $q['recipient_emails']);
-    $success = 0;
-    $fail = 0;
-
-    foreach ($recipients as $email) {
-        $email = trim($email);
-        $stmt = $db->prepare("SELECT unsubscribe_token FROM newsletter WHERE email = ?");
-        $stmt->execute([$email]);
-        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-        $token = $existing ? $existing['unsubscribe_token'] : bin2hex(random_bytes(32));
-        $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $token;
-        $full_message = $q['content'] . "\n\n<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
-
-        if (sendEmail($email, $q['subject'], $full_message, 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
-            $success++;
-            $stmt = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, 'sent')");
-            $stmt->execute([$q['id'], $email]);
-        } else {
-            $fail++;
-        }
-        usleep(500000);
-    }
-
-    if ($fail === 0) {
-        $stmt = $db->prepare("UPDATE email_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE id = ?");
-        $stmt->execute([$q['id']]);
-        $stmt = $db->prepare("INSERT INTO newsletter_archive (subject, content, recipient_count, sent_at, email_queue_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)");
-        $stmt->execute([$q['subject'], $q['content'], count($recipients), $q['id']]);
-        $sent_count++;
-        echo "✅ Sent: {$q['subject']} ({$success}/" . count($recipients) . ")\n";
-    } else {
-        $stmt = $db->prepare("UPDATE email_queue SET status = 'failed', last_error = ? WHERE id = ?");
-        $stmt->execute(["Failed $fail of " . count($recipients) . " recipients", $q['id']]);
-        $failed_count++;
-        echo "❌ Failed: {$q['subject']} (success: $success, fail: $fail)\n";
-    }
+$due = $db->prepare("SELECT id, subject FROM email_queue WHERE (status = 'pending' AND scheduled_at <= ?) OR status = 'processing' ORDER BY scheduled_at ASC");
+$due->execute([date('Y-m-d H:i:s')]);
+$rows = $due->fetchAll(PDO::FETCH_ASSOC);
+if (!$rows) {
+    echo "Nothing is due.\n";
+    exit(0);
 }
-
-echo "\nTotal sent: $sent_count, failed: $failed_count\n";
-echo "Queue processing complete.\n";
+foreach ($rows as $row) {
+    $db->prepare("UPDATE email_queue SET status = 'processing' WHERE id = ? AND status = 'pending'")->execute([$row['id']]);
+    do {
+        $p = aw_nl_send_batch($db, $row['id']);
+    } while ($p && !empty($p['remaining']) && $p['queue']['status'] === 'processing');
+    printf("Campaign #%d \"%s\": %d sent, %d failed, %d skipped of %d.\n", $row['id'], $row['subject'], $p['sent'] ?? 0, $p['failed'] ?? 0, $p['skipped'] ?? 0, $p['total'] ?? 0);
+    aw_nl_audit($db, 'cron_send', "Campaign #{$row['id']}");
+}

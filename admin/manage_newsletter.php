@@ -8,429 +8,369 @@ redirectIfNotAdmin();
 // S13 (F175): the newsletter_tabs/ partials refuse to render unless included from here.
 define('AW_NEWSLETTER_ADMIN', true);
 
-// ====== F169: SEND A QUEUED NEWSLETTER IN PAGES ======
-// One request sends at most NEWSLETTER_BATCH_SIZE recipients (20 × the 10 s SMTP timeout
-// stays under the host's execution limit). Every attempt is logged in newsletter_stats,
-// so a repeated or reloaded request never sends twice to the same address. The page then
-// posts itself again (see the progress box below) until every recipient has been tried.
-define('NEWSLETTER_BATCH_SIZE', 20);
-
-function newsletter_progress($db, $queue_id) {
-    $stmt = $db->prepare("SELECT * FROM email_queue WHERE id = ?");
-    $stmt->execute([$queue_id]);
-    $q = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$q) return null;
-    $recipients = array_values(array_unique(array_filter(array_map('trim', explode(',', $q['recipient_emails'])))));
-    $stmt = $db->prepare("SELECT recipient_email, status FROM newsletter_stats WHERE email_queue_id = ?");
-    $stmt->execute([$queue_id]);
-    $done = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-    $sent = 0; $failed = 0; $remaining = [];
-    foreach ($recipients as $e) {
-        if (!isset($done[$e])) { $remaining[] = $e; }
-        elseif ($done[$e] === 'sent') { $sent++; }
-        else { $failed++; }
-    }
-    return ['queue' => $q, 'total' => count($recipients), 'sent' => $sent, 'failed' => $failed, 'remaining' => $remaining];
-}
-
-function newsletter_send_batch($db, $queue_id) {
-    $p = newsletter_progress($db, $queue_id);
-    if (!$p || $p['queue']['status'] !== 'processing') return $p;
-    $q = $p['queue'];
-    $tok = $db->prepare("SELECT unsubscribe_token FROM newsletter WHERE email = ?");
-    $log = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, ?)");
-    foreach (array_slice($p['remaining'], 0, NEWSLETTER_BATCH_SIZE) as $email) {
-        $tok->execute([$email]);
-        $token = $tok->fetchColumn();
-        $unsubscribe_link = $token
-            ? SITE_URL . '/unsubscribe.php?token=' . urlencode($token)
-            : SITE_URL . '/unsubscribe.php?email=' . urlencode($email);
-        $full_message = $q['content'] . "\n\n<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
-        $ok = sendEmail($email, $q['subject'], $full_message, 'angelwrites@zohomail.com', 'AngelWrites Newsletter');
-        $log->execute([$queue_id, $email, $ok ? 'sent' : 'failed']);
-    }
-    $p = newsletter_progress($db, $queue_id);
-    if (empty($p['remaining'])) {
-        $stmt = $db->prepare("UPDATE email_queue SET status = ?, sent_at = CURRENT_TIMESTAMP, attempt_count = attempt_count + 1, last_error = ? WHERE id = ?");
-        $stmt->execute([$p['sent'] > 0 ? 'sent' : 'failed', $p['failed'] > 0 ? "Failed: {$p['failed']}, Sent: {$p['sent']}" : null, $queue_id]);
-        $stmt = $db->prepare("INSERT INTO newsletter_archive (subject, content, recipient_count, sent_at, email_queue_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)");
-        $stmt->execute([$q['subject'], $q['content'], $p['sent'], $queue_id]);
-    } else {
-        $stmt = $db->prepare("UPDATE email_queue SET attempt_count = attempt_count + 1 WHERE id = ?");
-        $stmt->execute([$queue_id]);
-    }
-    return newsletter_progress($db, $queue_id);
-}
-
-$error = '';
-$success = '';
-
-// ====== TAB NAVIGATION ======
-$active_tab = $_GET['tab'] ?? 'send';
-
-// ====== FETCH ALL DATA ======
-$stmt = $db->query("SELECT * FROM newsletter ORDER BY subscribed_at DESC");
-$subscribers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$stmt = $db->query("SELECT COUNT(*) FROM newsletter WHERE is_active = 1");
-$active_count = $stmt->fetchColumn();
-
-$stmt = $db->query("SELECT * FROM email_queue ORDER BY scheduled_at DESC");
-$queue = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$stmt = $db->query("SELECT * FROM subscriber_segments ORDER BY name ASC");
-$segments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$stmt = $db->query("SELECT * FROM newsletter_archive ORDER BY sent_at DESC");
-$archive = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// P18: the Subscribers, Queue and Archive tabs showed every row at once. Each table is paged
-// (25 per page, own parameter); the full lists are kept for counts and the Send tab's picker.
+// N2: the send engine (F169's paged sender, rendering, tracking, attachments) lives in
+// includes/newsletter.php. Every action below checks the CSRF token, then redirects back (so a
+// reload never repeats it and the lists are always current).
+require_once __DIR__ . '/../includes/newsletter.php';
+require_once __DIR__ . '/../includes/newsletter_optin.php';
 require_once __DIR__ . '/../includes/pagination.php';
-$aw_nl = [];
-foreach (['subscribers' => 'spage', 'queue' => 'qpage', 'archive' => 'apage'] as $aw_list => $aw_param) {
-    [$aw_p, $aw_per] = aw_page(25, $aw_param);
-    $aw_t = count($$aw_list);
-    [$aw_p, $aw_o] = aw_clamp($aw_t, $aw_p, $aw_per);
-    $aw_nl[$aw_list] = ['rows' => array_slice($$aw_list, $aw_o, $aw_per), 'total' => $aw_t, 'page' => $aw_p, 'per' => $aw_per, 'param' => $aw_param];
-}
+if (!defined('AW_NEWSLETTER_ADMIN')) define('AW_NEWSLETTER_ADMIN', true);
 
-$stmt = $db->query("SELECT * FROM newsletter_audit_log ORDER BY created_at DESC LIMIT 50");
-$audit_log = $stmt->fetchAll(PDO::FETCH_ASSOC);
+function aw_nl_flash($type, $msg) { $_SESSION['aw_nl_flash'] = [$type, $msg]; }
+function aw_nl_back($tab, array $extra = []) {
+    header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?' . http_build_query(array_merge(['tab' => $tab], $extra)));
+    exit;
+}
+function aw_nl_ids($csv) {
+    return array_values(array_unique(array_filter(array_map('intval', explode(',', (string)$csv)))));
+}
 
 // ====== HANDLE POST ACTIONS ======
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+        aw_nl_flash('error', 'The upload was larger than this host accepts. Use smaller attachments (5 MB each, 10 MB in total).');
+        aw_nl_back('send');
+    }
+    aw_csrf_require();
     $action = $_POST['action'] ?? '';
+    $is_ajax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
 
-    // ====== SEND NEWSLETTER ======
+    // ---- send or schedule a campaign
     if ($action === 'send_newsletter') {
-        $subject = trim($_POST['subject']);
-        $content = trim($_POST['content']);
-        $send_to = $_POST['send_to'] ?? 'all';
-        $segment_id = isset($_POST['segment_id']) ? (int)$_POST['segment_id'] : null;
-        $schedule = isset($_POST['schedule']) ? trim($_POST['schedule']) : '';
-        $attachments = [];
-
-        // Validate
-        if (empty($subject) || empty($content)) {
-            $error = 'Subject and content are required.';
-        } else {
-            // Handle attachments
-            if (!empty($_FILES['attachments']['name'][0])) {
-                $upload_dir = '../assets/uploads/attachments/';
-                if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-                foreach ($_FILES['attachments']['name'] as $key => $name) {
-                    if ($_FILES['attachments']['error'][$key] === UPLOAD_ERR_OK) {
-                        $ext = pathinfo($name, PATHINFO_EXTENSION);
-                        $filename = 'newsletter_' . time() . '_' . $key . '.' . $ext;
-                        $target = $upload_dir . $filename;
-                        if (move_uploaded_file($_FILES['attachments']['tmp_name'][$key], $target)) {
-                            $attachments[] = 'assets/uploads/attachments/' . $filename;
-                        }
-                    }
-                }
-            }
-
-            // Determine recipients
-            $recipients = [];
-            if ($send_to === 'all') {
-                $stmt = $db->prepare("SELECT email FROM newsletter WHERE is_active = 1");
-                $stmt->execute();
-                $recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            } elseif ($send_to === 'segment' && $segment_id) {
-                $stmt = $db->prepare("
-                    SELECT n.email FROM newsletter n
-                    JOIN subscriber_segment_assignments a ON n.id = a.subscriber_id
-                    WHERE a.segment_id = ? AND n.is_active = 1
-                ");
-                $stmt->execute([$segment_id]);
-                $recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            } elseif ($send_to === 'single') {
-                $email = trim($_POST['single_email']);
-                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $recipients[] = $email;
-                } else {
-                    $error = 'Invalid email address.';
-                }
-            } elseif ($send_to === 'selected' && !empty($_POST['selected_emails'])) {
-                $emails = explode(',', trim($_POST['selected_emails']));
-                foreach ($emails as $e) {
-                    if (filter_var(trim($e), FILTER_VALIDATE_EMAIL)) {
-                        $recipients[] = trim($e);
-                    }
-                }
-            }
-
-            if (empty($recipients)) {
-                $error = 'No valid recipients selected.';
-            }
-
-            if (empty($error)) {
-                $recipient_emails = implode(',', $recipients);
-                $scheduled_at = null;
-                $status = 'pending';
-
-                // F171: date() never returns false, so an unparseable value was stored as 1970.
-                // Check strtotime() itself, and only use the field when "Schedule" is chosen
-                // (a value left in the hidden field no longer overrides "Send Now").
-                $wants_schedule = ($_POST['schedule_type'] ?? (empty($schedule) ? 'now' : 'later')) === 'later';
-                if ($wants_schedule) {
-                    $ts = $schedule !== '' ? strtotime($schedule) : false;
-                    if ($ts === false) {
-                        $error = 'Invalid schedule date/time.';
-                    } else {
-                        $scheduled_at = date('Y-m-d H:i:s', $ts);
-                    }
-                } else {
-                    $status = 'processing'; // send immediately
-                }
-
-                if (empty($error)) {
-                    // Insert into queue
-                    $stmt = $db->prepare("
-                        INSERT INTO email_queue (subject, content, recipient_emails, send_to_type, segment_id, scheduled_at, status, attempt_count)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-                    ");
-                    $stmt->execute([$subject, $content, $recipient_emails, $send_to, $segment_id, $scheduled_at ?? date('Y-m-d H:i:s'), $status]);
-                    $queue_id = $db->lastInsertId();
-
-                    // Attachments
-                    foreach ($attachments as $path) {
-                        $stmt = $db->prepare("INSERT INTO email_attachments (email_queue_id, file_path, file_name, file_size) VALUES (?, ?, ?, ?)");
-                        $stmt->execute([$queue_id, $path, basename($path), filesize('../' . $path)]);
-                    }
-
-                    // F169: sending now goes through the paged sender (see newsletter_send_batch)
-                    if ($status === 'processing') {
-                        $send_redirect_id = $queue_id;
-                    } else {
-                        $success = "Newsletter scheduled for " . date('F j, Y, g:i a', strtotime($scheduled_at));
-                    }
-
-                    // Audit log
-                    $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
-                    $stmt->execute([$_SESSION['user_id'], 'send_newsletter', "Subject: $subject, Recipients: " . count($recipients)]);
-                    if (!empty($send_redirect_id)) {
-                        header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . (int)$send_redirect_id);
-                        exit;
-                    }
-                }
-            }
+        $subject = trim((string)($_POST['subject'] ?? ''));
+        $content = trim((string)($_POST['content'] ?? ''));
+        $send_to = in_array($_POST['send_to'] ?? '', ['all', 'segment', 'selected', 'single'], true) ? $_POST['send_to'] : 'all';
+        $segment_id = (int)($_POST['segment_id'] ?? 0);
+        $_SESSION['aw_nl_draft'] = ['subject' => $subject, 'content' => $content];
+        if ($subject === '' || trim(strip_tags($content, '<img>')) === '') {
+            aw_nl_flash('error', 'Please write a subject and a message.');
+            aw_nl_back('send');
         }
+        $recipients = aw_nl_resolve($db, $send_to, ['segment_id' => $segment_id, 'ids' => aw_nl_ids($_POST['selected_ids'] ?? ''), 'email' => $_POST['single_email'] ?? '']);
+        if (!$recipients) {
+            aw_nl_flash('error', $send_to === 'single' ? 'Please enter a valid email address.' : 'Nobody to send to: choose active subscribers, a segment with active members, or an email address.');
+            aw_nl_back('send');
+        }
+        $scheduled_at = null;
+        if (($_POST['schedule_type'] ?? 'now') === 'later') {
+            $ts = strtotime((string)($_POST['schedule'] ?? '')); // F171: an unparseable date is refused, not stored as 1970
+            if ($ts === false) { aw_nl_flash('error', 'Please choose a valid date and time.'); aw_nl_back('send'); }
+            $scheduled_at = date('Y-m-d H:i:s', $ts);
+        }
+        $files = []; $total = 0;
+        if (!empty($_FILES['attachments']['name'][0])) {
+            foreach ($_FILES['attachments']['name'] as $k => $name) {
+                if ($name === '') continue;
+                $r = aw_nl_save_attachment($name, $_FILES['attachments']['tmp_name'][$k], (int)$_FILES['attachments']['size'][$k], $_FILES['attachments']['error'][$k]);
+                if (is_string($r)) { aw_nl_flash('error', $r); aw_nl_back('send'); }
+                $total += $r['size'];
+                $files[] = $r;
+            }
+            if ($total > AW_NL_MAX_FILES_TOTAL) { aw_nl_flash('error', 'Attachments may be 10 MB in total.'); aw_nl_back('send'); }
+        }
+        $qid = aw_nl_queue($db, $subject, $content, $recipients, $send_to, $send_to === 'segment' ? $segment_id : null, $scheduled_at, $files);
+        aw_nl_audit($db, $scheduled_at ? 'schedule_newsletter' : 'send_newsletter', "Campaign #$qid \"$subject\" to " . count($recipients) . " ($send_to)");
+        unset($_SESSION['aw_nl_draft']);
+        if ($scheduled_at) {
+            aw_nl_flash('success', 'Scheduled for ' . date('F j, Y, g:i a', strtotime($scheduled_at)) . ' (' . count($recipients) . ' recipients). Press "Send queued now" on the Campaigns tab on or after that time.');
+            aw_nl_back('queue');
+        }
+        aw_nl_back('queue', ['sending' => $qid]);
     }
 
-    // ====== F169: SEND THE NEXT BATCH OF A QUEUED NEWSLETTER ======
+    // ---- test send: one email, nothing queued or archived
+    if ($action === 'test_send') {
+        $subject = trim((string)($_POST['subject'] ?? ''));
+        $content = trim((string)($_POST['content'] ?? ''));
+        $to = trim((string)($_POST['test_email'] ?? '')) ?: aw_admin_email();
+        $ok = false; $msg = '';
+        if ($subject === '' || $content === '') $msg = 'Please write a subject and a message first.';
+        elseif (!filter_var($to, FILTER_VALIDATE_EMAIL)) $msg = 'Please enter a valid test address.';
+        elseif (!aw_nl_rate_ok('test_' . ($_SESSION['user_id'] ?? 0), 10, 600)) $msg = 'Too many test emails; please wait a few minutes.';
+        else {
+            $sub = aw_nl_subscriber($db, $to) ?: ['email' => $to, 'name' => 'Angella', 'unsubscribe_token' => ''];
+            $m = aw_nl_render($db, '[Test] ' . $subject, $content, $sub, ['preview' => true]);
+            $ok = aw_nl_mail($to, '[Test] ' . $subject, $m['html'], $m['text']);
+            $msg = $ok ? "Test email sent to $to." : "The test email to $to could not be sent. Check the mail settings.";
+            aw_nl_audit($db, 'test_send', "To $to: $subject");
+        }
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['ok' => $ok, 'message' => $msg]); exit; }
+        aw_nl_flash($ok ? 'success' : 'error', $msg);
+        aw_nl_back('send');
+    }
+
+    // ---- paged sending, scheduled sends, retries (F169, F170, F172)
     if ($action === 'send_batch') {
-        $queue_id = (int)($_POST['queue_id'] ?? 0);
-        $progress = newsletter_send_batch($db, $queue_id);
-        if (!$progress) {
-            $error = 'Queue entry not found.';
-        } else {
-            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . $queue_id);
-            exit;
-        }
+        $qid = (int)($_POST['queue_id'] ?? 0);
+        if (!aw_nl_send_batch($db, $qid)) { aw_nl_flash('error', 'Campaign not found.'); aw_nl_back('queue'); }
+        aw_nl_back('queue', ['sending' => $qid]);
     }
-
-    // ====== SAVE TEMPLATE ======
-    if ($action === 'save_template') {
-        $name = trim($_POST['template_name']);
-        $subject = trim($_POST['subject']);
-        $content = trim($_POST['content']);
-        if (empty($name) || empty($subject) || empty($content)) {
-            $error = 'Name, subject, and content are required.';
-        } else {
-            $stmt = $db->prepare("INSERT INTO newsletter_templates (name, subject, content) VALUES (?, ?, ?)");
-            $stmt->execute([$name, $subject, $content]);
-            $success = 'Template saved.';
-            $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
-            $stmt->execute([$_SESSION['user_id'], 'save_template', "Name: $name"]);
-        }
-    }
-
-    // ====== DELETE TEMPLATE ======
-    if ($action === 'delete_template') {
-        $template_id = (int)$_POST['template_id'];
-        $stmt = $db->prepare("DELETE FROM newsletter_templates WHERE id = ?");
-        $stmt->execute([$template_id]);
-        $success = 'Template deleted.';
-        $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
-        $stmt->execute([$_SESSION['user_id'], 'delete_template', "ID: $template_id"]);
-    }
-
-    // ====== LOAD TEMPLATE ======
-    if ($action === 'load_template') {
-        $template_id = (int)$_POST['template_id'];
-        $stmt = $db->prepare("SELECT * FROM newsletter_templates WHERE id = ?");
-        $stmt->execute([$template_id]);
-        $template = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($template) {
-            $_SESSION['newsletter_template'] = $template;
-            $success = 'Template loaded.';
-        } else {
-            $error = 'Template not found.';
-        }
-    }
-
-    // ====== BULK ACTIONS ======
-    if ($action === 'bulk_subscribers') {
-        $ids = isset($_POST['selected_ids']) ? explode(',', $_POST['selected_ids']) : [];
-        $bulk_action = $_POST['bulk_action'] ?? '';
-        if (empty($ids) || empty($bulk_action)) {
-            $error = 'Please select at least one subscriber and an action.';
-        } else {
-            if ($bulk_action === 'unsubscribe') {
-                $stmt = $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP WHERE id = ?");
-                foreach ($ids as $id) {
-                    $stmt->execute([$id]);
-                }
-                $success = count($ids) . ' subscribers unsubscribed.';
-            } elseif ($bulk_action === 'delete') {
-                $stmt = $db->prepare("DELETE FROM newsletter WHERE id = ?");
-                foreach ($ids as $id) {
-                    $stmt->execute([$id]);
-                }
-                $success = count($ids) . ' subscribers deleted.';
-            } elseif ($bulk_action === 'add_segment') {
-                $segment_id = (int)$_POST['segment_id'];
-                if (!$segment_id) {
-                    $error = 'Please select a segment.';
-                } else {
-                    $stmt = $db->prepare("INSERT OR IGNORE INTO subscriber_segment_assignments (subscriber_id, segment_id) VALUES (?, ?)");
-                    foreach ($ids as $id) {
-                        $stmt->execute([$id, $segment_id]);
-                    }
-                    $success = count($ids) . ' subscribers added to segment.';
-                }
-            } elseif ($bulk_action === 'remove_segment') {
-                $segment_id = (int)$_POST['segment_id'];
-                if (!$segment_id) {
-                    $error = 'Please select a segment.';
-                } else {
-                    $stmt = $db->prepare("DELETE FROM subscriber_segment_assignments WHERE subscriber_id = ? AND segment_id = ?");
-                    foreach ($ids as $id) {
-                        $stmt->execute([$id, $segment_id]);
-                    }
-                    $success = count($ids) . ' subscribers removed from segment.';
-                }
-            }
-            if ($success) {
-                $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
-                $stmt->execute([$_SESSION['user_id'], 'bulk_' . $bulk_action, "Count: " . count($ids)]);
-            }
-        }
-    }
-
-    // ====== IMPORT CSV ======
-    if ($action === 'import_csv') {
-        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
-            $error = 'Please upload a valid CSV file.';
-        } else {
-            $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
-            if ($handle === false) {
-                $error = 'Failed to read CSV file.';
-            } else {
-                $headers = fgetcsv($handle);
-                $email_index = array_search('email', array_map('strtolower', $headers));
-                $name_index = array_search('name', array_map('strtolower', $headers));
-                if ($email_index === false) {
-                    $error = 'CSV must contain an "email" column.';
-                } else {
-                    $imported = 0;
-                    $skipped = 0;
-                    while (($row = fgetcsv($handle)) !== false) {
-                        if (!isset($row[$email_index])) continue;
-                        $email = trim($row[$email_index]);
-                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) continue;
-                        $name = ($name_index !== false && isset($row[$name_index])) ? trim($row[$name_index]) : '';
-                        $token = bin2hex(random_bytes(32));
-                        $stmt = $db->prepare("INSERT OR IGNORE INTO newsletter (email, name, unsubscribe_token, source) VALUES (?, ?, ?, 'import')");
-                        $stmt->execute([$email, $name, $token]);
-                        if ($stmt->rowCount() > 0) $imported++;
-                        else $skipped++;
-                    }
-                    fclose($handle);
-                    $success = "Import complete: $imported added, $skipped skipped.";
-                    $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
-                    $stmt->execute([$_SESSION['user_id'], 'import_csv', "Imported: $imported, Skipped: $skipped"]);
-                }
-            }
-        }
-    }
-
-    // ====== CREATE SEGMENT ======
-    if ($action === 'create_segment') {
-        $name = trim($_POST['segment_name']);
-        $description = trim($_POST['segment_description']);
-        if (empty($name)) {
-            $error = 'Segment name is required.';
-        } else {
-            $stmt = $db->prepare("INSERT OR IGNORE INTO subscriber_segments (name, description) VALUES (?, ?)");
-            $stmt->execute([$name, $description]);
-            if ($stmt->rowCount() > 0) {
-                $success = "Segment '$name' created.";
-            } else {
-                $error = 'Segment already exists.';
-            }
-        }
-    }
-
-    // ====== DELETE SEGMENT ======
-    if ($action === 'delete_segment') {
-        $segment_id = (int)$_POST['segment_id'];
-        $stmt = $db->prepare("DELETE FROM subscriber_segments WHERE id = ?");
-        $stmt->execute([$segment_id]);
-        $stmt = $db->prepare("DELETE FROM subscriber_segment_assignments WHERE segment_id = ?");
-        $stmt->execute([$segment_id]);
-        $success = 'Segment deleted.';
-    }
-
-    // ====== F172: SEND QUEUED NOW (this host has no cron) ======
-    // Scheduled newsletters wait in the queue until the admin presses "Send queued now" on or
-    // after their date. The oldest due row is moved to 'processing' and sent through the paged
-    // sender; when it finishes, the button sends the next due row.
     if ($action === 'send_due') {
-        $stmt = $db->prepare("SELECT id FROM email_queue WHERE status = 'pending' AND scheduled_at <= ? ORDER BY scheduled_at ASC LIMIT 1");
-        $stmt->execute([date('Y-m-d H:i:s')]);
-        $due_id = $stmt->fetchColumn();
-        if (!$due_id) {
-            $success = 'Nothing is due yet. Scheduled newsletters can be sent on or after their date.';
-        } else {
-            $db->prepare("UPDATE email_queue SET status = 'processing' WHERE id = ?")->execute([$due_id]);
-            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . (int)$due_id);
-            exit;
-        }
+        $st = $db->prepare("SELECT id FROM email_queue WHERE status = 'pending' AND scheduled_at <= ? ORDER BY scheduled_at ASC LIMIT 1");
+        $st->execute([date('Y-m-d H:i:s')]);
+        $due = (int)$st->fetchColumn();
+        if (!$due) { aw_nl_flash('success', 'Nothing is due yet. Scheduled newsletters can be sent on or after their date.'); aw_nl_back('queue'); }
+        $db->prepare("UPDATE email_queue SET status = 'processing' WHERE id = ?")->execute([$due]);
+        aw_nl_back('queue', ['sending' => $due]);
     }
-
-    // ====== F170: RESUME A STUCK SEND / RETRY FAILED RECIPIENTS ======
-    // A send interrupted mid-way (closed tab, timeout) stays 'processing'; "Resume" continues it
-    // through the paged sender. "Retry failed" forgets only the failed attempts, sets the row
-    // back to 'processing' and re-sends to those recipients; addresses already sent are kept.
     if ($action === 'resend_failed') {
-        $queue_id = (int)$_POST['queue_id'];
-        $stmt = $db->prepare("SELECT id FROM email_queue WHERE id = ? AND status IN ('failed', 'sent')");
-        $stmt->execute([$queue_id]);
-        if (!$stmt->fetchColumn()) {
-            $error = 'Failed email not found.';
-        } else {
-            $db->prepare("DELETE FROM newsletter_stats WHERE email_queue_id = ? AND status = 'failed'")->execute([$queue_id]);
-            $db->prepare("DELETE FROM newsletter_archive WHERE email_queue_id = ?")->execute([$queue_id]);
-            $db->prepare("UPDATE email_queue SET status = 'processing', last_error = NULL WHERE id = ?")->execute([$queue_id]);
-            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . $queue_id);
-            exit;
-        }
+        $qid = (int)($_POST['queue_id'] ?? 0);
+        $st = $db->prepare("SELECT id FROM email_queue WHERE id = ? AND status IN ('failed', 'sent')");
+        $st->execute([$qid]);
+        if (!$st->fetchColumn()) { aw_nl_flash('error', 'Campaign not found.'); aw_nl_back('queue'); }
+        $db->prepare("DELETE FROM newsletter_stats WHERE email_queue_id = ? AND status = 'failed'")->execute([$qid]);
+        $db->prepare("UPDATE email_queue SET status = 'processing', last_error = NULL WHERE id = ?")->execute([$qid]);
+        aw_nl_audit($db, 'retry_failed', "Campaign #$qid");
+        aw_nl_back('queue', ['sending' => $qid]);
     }
+    // These buttons were links to ?cancel_queue= / ?delete_queue= / ?delete_archive= that nothing handled.
+    if ($action === 'cancel_queue') {
+        $qid = (int)($_POST['queue_id'] ?? 0);
+        $db->prepare("UPDATE email_queue SET status = 'cancelled' WHERE id = ? AND status IN ('pending', 'processing')")->execute([$qid]);
+        aw_nl_audit($db, 'cancel_campaign', "Campaign #$qid");
+        aw_nl_flash('success', 'Campaign cancelled. Anyone not yet emailed will not receive it.');
+        aw_nl_back('queue');
+    }
+    if ($action === 'delete_queue') {
+        $qid = (int)($_POST['queue_id'] ?? 0);
+        $st = $db->prepare("SELECT file_path FROM email_attachments WHERE email_queue_id = ?");
+        $st->execute([$qid]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $f) {
+            if (strpos($f, 'data/newsletter_attachments/') === 0) @unlink(dirname(__DIR__) . '/' . $f);
+        }
+        foreach (['email_attachments', 'newsletter_stats', 'newsletter_archive'] as $t) {
+            $db->prepare("DELETE FROM $t WHERE email_queue_id = ?")->execute([$qid]);
+        }
+        $db->prepare("DELETE FROM email_queue WHERE id = ?")->execute([$qid]);
+        aw_nl_audit($db, 'delete_campaign', "Campaign #$qid");
+        aw_nl_flash('success', 'Campaign deleted.');
+        aw_nl_back('queue');
+    }
+    if ($action === 'delete_archive') {
+        $aid = (int)($_POST['archive_id'] ?? 0);
+        $db->prepare("DELETE FROM newsletter_archive WHERE id = ?")->execute([$aid]);
+        aw_nl_audit($db, 'delete_archive', "Archive #$aid");
+        aw_nl_flash('success', 'Removed from the archive (the campaign and its statistics stay on the Queue tab).');
+        aw_nl_back('archive');
+    }
+
+    // ---- templates
+    if ($action === 'save_template') {
+        $name = trim((string)($_POST['template_name'] ?? ''));
+        $subject = trim((string)($_POST['subject'] ?? ''));
+        $content = trim((string)($_POST['content'] ?? ''));
+        $_SESSION['aw_nl_draft'] = ['subject' => $subject, 'content' => $content];
+        if ($name === '' || $subject === '' || $content === '') { aw_nl_flash('error', 'A template needs a name, a subject and a message.'); aw_nl_back('send'); }
+        $st = $db->prepare("SELECT id FROM newsletter_templates WHERE name = ?");
+        $st->execute([$name]);
+        if ($tid = $st->fetchColumn()) {
+            $db->prepare("UPDATE newsletter_templates SET subject = ?, content = ? WHERE id = ?")->execute([$subject, $content, $tid]);
+        } else {
+            $db->prepare("INSERT INTO newsletter_templates (name, subject, content) VALUES (?, ?, ?)")->execute([$name, $subject, $content]);
+        }
+        aw_nl_audit($db, 'save_template', $name);
+        aw_nl_flash('success', "Template \"$name\" saved.");
+        aw_nl_back('send');
+    }
+    if ($action === 'delete_template') {
+        $db->prepare("DELETE FROM newsletter_templates WHERE id = ?")->execute([(int)($_POST['template_id'] ?? 0)]);
+        aw_nl_audit($db, 'delete_template', '#' . (int)($_POST['template_id'] ?? 0));
+        aw_nl_flash('success', 'Template deleted.');
+        aw_nl_back('send');
+    }
+
+    // ---- subscribers
+    $back_filters = array_intersect_key($_POST, array_flip(['q', 'status', 'segment']));
+    if ($action === 'add_subscriber') {
+        $email = strtolower(trim((string)($_POST['email'] ?? '')));
+        $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 100);
+        $mode = $_POST['mode'] ?? 'confirm';
+        $seg = (int)($_POST['segment_id'] ?? 0);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { aw_nl_flash('error', 'Please enter a valid email address.'); aw_nl_back('subscribers'); }
+        $existing = aw_nl_subscriber($db, $email);
+        if ($mode === 'consented') {
+            if (empty($_POST['consent'])) { aw_nl_flash('error', 'Tick the box to confirm this person agreed to receive the newsletter, or send them a confirmation email instead.'); aw_nl_back('subscribers'); }
+            if ($existing && aw_nl_status($existing) === 'unsubscribed') { aw_nl_flash('error', "$email unsubscribed earlier. Send them a confirmation email instead, so they choose to come back."); aw_nl_back('subscribers'); }
+            if ($existing) {
+                $db->prepare("UPDATE newsletter SET is_active = 1, name = COALESCE(NULLIF(?, ''), name) WHERE id = ?")->execute([$name, $existing['id']]);
+                $sid = $existing['id'];
+            } else {
+                $db->prepare("INSERT INTO newsletter (email, name, is_active, unsubscribe_token, source) VALUES (?, ?, 1, ?, 'admin')")->execute([$email, $name, bin2hex(random_bytes(32))]);
+                $sid = (int)$db->lastInsertId();
+            }
+            $msg = "$email added as an active subscriber.";
+        } else {
+            $r = newsletter_request_optin($db, $email, $name);
+            $sid = ($s = aw_nl_subscriber($db, $email)) ? $s['id'] : 0;
+            $msg = "A confirmation email was sent to $email. They become active when they click it.";
+        }
+        if ($seg && !empty($sid)) $db->prepare("INSERT OR IGNORE INTO subscriber_segment_assignments (subscriber_id, segment_id) VALUES (?, ?)")->execute([$sid, $seg]);
+        aw_nl_audit($db, 'add_subscriber', "$email ($mode)");
+        aw_nl_flash('success', $msg);
+        aw_nl_back('subscribers');
+    }
+    if ($action === 'edit_subscriber') {
+        $sid = (int)($_POST['subscriber_id'] ?? 0);
+        $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 100);
+        $db->prepare("UPDATE newsletter SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$name, $sid]);
+        $db->prepare("DELETE FROM subscriber_segment_assignments WHERE subscriber_id = ?")->execute([$sid]);
+        foreach ((array)($_POST['segments'] ?? []) as $seg) {
+            $db->prepare("INSERT OR IGNORE INTO subscriber_segment_assignments (subscriber_id, segment_id) VALUES (?, ?)")->execute([$sid, (int)$seg]);
+        }
+        aw_nl_audit($db, 'edit_subscriber', "#$sid");
+        aw_nl_flash('success', 'Subscriber updated.');
+        aw_nl_back('subscribers', $back_filters);
+    }
+    if ($action === 'bulk_subscribers') {
+        $ids = aw_nl_ids($_POST['selected_ids'] ?? '');
+        $bulk = $_POST['bulk_action'] ?? '';
+        $seg = (int)($_POST['segment_id'] ?? 0);
+        if (!$ids || $bulk === '') { aw_nl_flash('error', 'Select at least one subscriber and an action.'); aw_nl_back('subscribers', $back_filters); }
+        $n = 0;
+        foreach ($ids as $sid) {
+            if ($bulk === 'unsubscribe') {
+                $n += $db->prepare("UPDATE newsletter SET is_active = 0, unsubscribed_at = CURRENT_TIMESTAMP WHERE id = ? AND is_active = 1")->execute([$sid]) ? 1 : 0;
+            } elseif ($bulk === 'delete') {
+                foreach (["DELETE FROM subscriber_segment_assignments WHERE subscriber_id = ?", "DELETE FROM newsletter WHERE id = ?"] as $sql) $db->prepare($sql)->execute([$sid]);
+                $n++;
+            } elseif ($bulk === 'add_segment' && $seg) {
+                $db->prepare("INSERT OR IGNORE INTO subscriber_segment_assignments (subscriber_id, segment_id) VALUES (?, ?)")->execute([$sid, $seg]); $n++;
+            } elseif ($bulk === 'remove_segment' && $seg) {
+                $db->prepare("DELETE FROM subscriber_segment_assignments WHERE subscriber_id = ? AND segment_id = ?")->execute([$sid, $seg]); $n++;
+            } elseif ($bulk === 'resend_confirmation') {
+                $st = $db->prepare("SELECT * FROM newsletter WHERE id = ?");
+                $st->execute([$sid]);
+                $sub = $st->fetch(PDO::FETCH_ASSOC);
+                if ($sub && aw_nl_status($sub) === 'pending') { newsletter_request_optin($db, $sub['email'], $sub['name'] ?? ''); $n++; }
+            }
+        }
+        if (in_array($bulk, ['add_segment', 'remove_segment'], true) && !$seg) { aw_nl_flash('error', 'Choose a segment.'); aw_nl_back('subscribers', $back_filters); }
+        $labels = ['unsubscribe' => 'unsubscribed', 'delete' => 'deleted', 'add_segment' => 'added to the segment', 'remove_segment' => 'removed from the segment', 'resend_confirmation' => 'sent a new confirmation email'];
+        aw_nl_audit($db, 'bulk_' . $bulk, count($ids) . ' selected');
+        aw_nl_flash('success', count($ids) . ' selected: ' . ($labels[$bulk] ?? $bulk) . ($bulk === 'resend_confirmation' ? " ($n awaiting confirmation)" : '') . '.');
+        aw_nl_back('subscribers', $back_filters);
+    }
+
+    // ---- import
+    if ($action === 'import_csv') {
+        if (empty($_POST['consent'])) { aw_nl_flash('error', 'Please confirm that everyone in the file agreed to receive the newsletter.'); aw_nl_back('import'); }
+        $f = $_FILES['csv_file'] ?? null;
+        if (!$f || $f['error'] !== UPLOAD_ERR_OK) { aw_nl_flash('error', 'Please choose a CSV file.'); aw_nl_back('import'); }
+        if ($f['size'] > 2 * 1048576) { aw_nl_flash('error', 'The file is larger than 2 MB. Split it into smaller files.'); aw_nl_back('import'); }
+        $h = fopen($f['tmp_name'], 'r');
+        $headers = $h ? array_map(function ($x) { return strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', (string)$x))); }, (array)fgetcsv($h)) : [];
+        $ei = array_search('email', $headers, true);
+        $ni = array_search('name', $headers, true);
+        if ($ei === false) { aw_nl_flash('error', 'The CSV needs an "email" column (and optionally "name").'); aw_nl_back('import'); }
+        $seg = (int)($_POST['segment_id'] ?? 0);
+        $added = 0; $updated = 0; $invalid = 0; $kept_out = 0; $rows = 0;
+        $ins = $db->prepare("INSERT INTO newsletter (email, name, is_active, unsubscribe_token, source) VALUES (?, ?, 1, ?, 'import')");
+        $db->beginTransaction();
+        while (($row = fgetcsv($h)) !== false && $rows < 20000) {
+            $rows++;
+            $email = strtolower(trim((string)($row[$ei] ?? '')));
+            $name = $ni !== false ? mb_substr(trim((string)($row[$ni] ?? '')), 0, 100) : '';
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $invalid++; continue; }
+            $ex = aw_nl_subscriber($db, $email);
+            if ($ex) {
+                if (aw_nl_status($ex) === 'unsubscribed') { $kept_out++; }        // never re-subscribe someone who left
+                elseif ($name !== '' && empty($ex['name'])) { $db->prepare("UPDATE newsletter SET name = ? WHERE id = ?")->execute([$name, $ex['id']]); $updated++; }
+                $sid = $ex['id'];
+            } else {
+                $ins->execute([$email, $name, bin2hex(random_bytes(32))]);
+                $sid = (int)$db->lastInsertId();
+                $added++;
+            }
+            if ($seg && $sid) $db->prepare("INSERT OR IGNORE INTO subscriber_segment_assignments (subscriber_id, segment_id) VALUES (?, ?)")->execute([$sid, $seg]);
+        }
+        $db->commit();
+        fclose($h);
+        $msg = "Import finished: $added added, $updated names filled in, $invalid invalid rows skipped" . ($kept_out ? ", $kept_out who had unsubscribed were left unsubscribed" : '') . '.';
+        aw_nl_audit($db, 'import_csv', $msg);
+        aw_nl_flash('success', $msg);
+        aw_nl_back('subscribers');
+    }
+
+    // ---- segments
+    if ($action === 'create_segment') {
+        $name = mb_substr(trim((string)($_POST['segment_name'] ?? '')), 0, 60);
+        if ($name === '') { aw_nl_flash('error', 'A segment needs a name.'); aw_nl_back('segments'); }
+        $st = $db->prepare("INSERT OR IGNORE INTO subscriber_segments (name, description) VALUES (?, ?)");
+        $st->execute([$name, trim((string)($_POST['segment_description'] ?? ''))]);
+        aw_nl_audit($db, 'create_segment', $name);
+        aw_nl_flash($st->rowCount() ? 'success' : 'error', $st->rowCount() ? "Segment \"$name\" created." : 'A segment with that name already exists.');
+        aw_nl_back('segments');
+    }
+    if ($action === 'delete_segment') {
+        $sid = (int)($_POST['segment_id'] ?? 0);
+        $db->prepare("DELETE FROM subscriber_segment_assignments WHERE segment_id = ?")->execute([$sid]);
+        $db->prepare("DELETE FROM subscriber_segments WHERE id = ?")->execute([$sid]);
+        aw_nl_audit($db, 'delete_segment', "#$sid");
+        aw_nl_flash('success', 'Segment deleted (its subscribers stay on the list).');
+        aw_nl_back('segments');
+    }
+    aw_nl_back($_GET['tab'] ?? 'send');
 }
 
-// ====== LOAD TEMPLATE FROM SESSION ======
-$template_name = '';
-$subject = '';
-$content = '';
-if (isset($_SESSION['newsletter_template'])) {
-    $template = $_SESSION['newsletter_template'];
-    $template_name = $template['name'];
-    $subject = $template['subject'];
-    $content = $template['content'];
+// ====== DATA FOR THE TABS (read after any change) ======
+$active_tab = in_array($_GET['tab'] ?? '', ['send', 'subscribers', 'segments', 'queue', 'archive', 'audit', 'import'], true) ? $_GET['tab'] : 'send';
+[$flash_type, $flash_msg] = $_SESSION['aw_nl_flash'] ?? ['', ''];
+unset($_SESSION['aw_nl_flash']);
+$error = $flash_type === 'error' ? $flash_msg : '';
+$success = $flash_type === 'success' ? $flash_msg : '';
+
+$counts = $db->query("SELECT SUM(is_active = 1) a, SUM(is_active = 0 AND unsubscribed_at IS NULL) p, SUM(is_active = 0 AND unsubscribed_at IS NOT NULL) u, COUNT(*) t FROM newsletter")->fetch(PDO::FETCH_ASSOC);
+$active_count = (int)$counts['a'];
+$segments = $db->query("SELECT s.*, (SELECT COUNT(*) FROM subscriber_segment_assignments a JOIN newsletter n ON n.id = a.subscriber_id WHERE a.segment_id = s.id AND n.is_active = 1) AS active_members, (SELECT COUNT(*) FROM subscriber_segment_assignments a WHERE a.segment_id = s.id) AS members FROM subscriber_segments s ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$templates = $db->query("SELECT id, name, subject, content FROM newsletter_templates ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$queue_count = (int)$db->query("SELECT COUNT(*) FROM email_queue")->fetchColumn();
+$last = $db->query("SELECT id FROM email_queue WHERE status = 'sent' ORDER BY sent_at DESC, id DESC LIMIT 5")->fetchAll(PDO::FETCH_COLUMN);
+$avg_open = null;
+if ($last) { $rates = array_map(function ($id) use ($db) { return aw_nl_report($db, $id)['open_rate']; }, $last); $avg_open = round(array_sum($rates) / count($rates)); }
+
+// Subscribers: search, status and segment filters, paged in SQL (P18).
+$f_q = trim((string)($_GET['q'] ?? ''));
+$f_status = in_array($_GET['status'] ?? '', ['active', 'pending', 'unsubscribed'], true) ? $_GET['status'] : '';
+$f_segment = (int)($_GET['segment'] ?? 0);
+$where = '1=1'; $params = [];
+if ($f_q !== '') { $where .= " AND (n.email LIKE ? OR n.name LIKE ?)"; $params[] = "%$f_q%"; $params[] = "%$f_q%"; }
+if ($f_status === 'active') $where .= " AND n.is_active = 1";
+if ($f_status === 'pending') $where .= " AND n.is_active = 0 AND n.unsubscribed_at IS NULL";
+if ($f_status === 'unsubscribed') $where .= " AND n.is_active = 0 AND n.unsubscribed_at IS NOT NULL";
+if ($f_segment) { $where .= " AND n.id IN (SELECT subscriber_id FROM subscriber_segment_assignments WHERE segment_id = ?)"; $params[] = $f_segment; }
+$st = $db->prepare("SELECT COUNT(*) FROM newsletter n WHERE $where");
+$st->execute($params);
+$sub_total = (int)$st->fetchColumn();
+[$sub_page, $sub_per] = aw_page(25, 'spage');
+[$sub_page, $sub_off] = aw_clamp($sub_total, $sub_page, $sub_per);
+$st = $db->prepare("SELECT n.*, (SELECT MAX(s.opened_at) FROM newsletter_stats s WHERE lower(s.recipient_email) = lower(n.email)) AS last_open, (SELECT COUNT(*) FROM newsletter_stats s WHERE lower(s.recipient_email) = lower(n.email) AND s.status = 'sent') AS received FROM newsletter n WHERE $where ORDER BY n.subscribed_at DESC, n.id DESC LIMIT ? OFFSET ?");
+$st->execute(array_merge($params, [$sub_per, $sub_off]));
+$subscribers = $st->fetchAll(PDO::FETCH_ASSOC);
+$segment_names_by_subscriber = [];
+foreach ($db->query("SELECT a.subscriber_id, s.id, s.name FROM subscriber_segment_assignments a JOIN subscriber_segments s ON s.id = a.segment_id ORDER BY s.name") as $row) {
+    $segment_names_by_subscriber[$row['subscriber_id']][$row['id']] = $row['name'];
 }
+$active_list = $db->query("SELECT id, email, name FROM newsletter WHERE is_active = 1 ORDER BY email")->fetchAll(PDO::FETCH_ASSOC);
+
+[$q_page, $q_per] = aw_page(25, 'qpage');
+[$q_page, $q_off] = aw_clamp($queue_count, $q_page, $q_per);
+$st = $db->prepare("SELECT * FROM email_queue ORDER BY COALESCE(sent_at, scheduled_at) DESC, id DESC LIMIT ? OFFSET ?");
+$st->execute([$q_per, $q_off]);
+$queue = $st->fetchAll(PDO::FETCH_ASSOC);
+
+$archive_total = (int)$db->query("SELECT COUNT(*) FROM newsletter_archive")->fetchColumn();
+[$a_page, $a_per] = aw_page(25, 'apage');
+[$a_page, $a_off] = aw_clamp($archive_total, $a_page, $a_per);
+$st = $db->prepare("SELECT * FROM newsletter_archive ORDER BY sent_at DESC, id DESC LIMIT ? OFFSET ?");
+$st->execute([$a_per, $a_off]);
+$archive = $st->fetchAll(PDO::FETCH_ASSOC);
+
+$audit_log = $db->query("SELECT l.*, u.name AS user_name FROM newsletter_audit_log l LEFT JOIN users u ON u.id = l.user_id ORDER BY l.created_at DESC, l.id DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+
+$draft = $_SESSION['aw_nl_draft'] ?? ['subject' => '', 'content' => ''];
+$subject = $draft['subject'];
+$content = $draft['content'];
+$prefill_email = filter_var($_GET['to'] ?? '', FILTER_VALIDATE_EMAIL) ? $_GET['to'] : '';
 
 $pageTitle = 'Newsletter Management';
 require_once '../includes/header.php';
@@ -439,102 +379,58 @@ require_once '../includes/header.php';
 <div class="admin-newsletter">
     <div class="container">
         <div class="admin-header">
-            <h1>📨 Newsletter Management</h1>
+            <h1>📨 Newsletter</h1>
             <div class="admin-actions">
-                <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php" class="btn btn-outline btn-sm">
-                    <i class="fas fa-file-csv"></i> Export
-                </a>
-                <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
-                    <i class="fas fa-arrow-left"></i> Dashboard
-                </a>
+                <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export all</a>
+                <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php?status=active" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export active</a>
+                <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Dashboard</a>
             </div>
         </div>
 
-        <?php if ($error): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
+        <div class="nl-stats" role="list">
+            <div role="listitem"><strong><?php echo number_format($active_count); ?></strong><span>Active subscribers</span></div>
+            <div role="listitem"><strong><?php echo number_format((int)$counts['p']); ?></strong><span>Awaiting confirmation</span></div>
+            <div role="listitem"><strong><?php echo number_format((int)$counts['u']); ?></strong><span>Unsubscribed</span></div>
+            <div role="listitem"><strong><?php echo $avg_open === null ? '–' : $avg_open . '%'; ?></strong><span>Open rate (last 5)</span></div>
+        </div>
+
+        <?php if ($error): ?><div class="alert alert-error" role="alert"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
+        <?php if ($success): ?><div class="alert alert-success" role="status"><?php echo htmlspecialchars($success); ?></div><?php endif; ?>
 
         <?php
-        // F169: progress of a paged send. While recipients remain and the row is still
-        // 'processing', the form below re-posts itself after one second; the button is the
-        // fallback if scripts or refresh are blocked.
+        // F169: progress of a paged send; the form re-posts itself every second until it is done.
         if (isset($_GET['sending'])):
-            $progress = newsletter_progress($db, (int)$_GET['sending']);
+            $progress = aw_nl_progress($db, (int)$_GET['sending']);
             if ($progress):
                 $pq = $progress['queue'];
-                $attempted = $progress['sent'] + $progress['failed'];
+                $attempted = $progress['sent'] + $progress['failed'] + $progress['skipped'];
                 $more = !empty($progress['remaining']) && $pq['status'] === 'processing';
+                $pct = $progress['total'] ? round($attempted / $progress['total'] * 100) : 100;
         ?>
-            <div class="alert <?php echo $more ? 'alert-info' : 'alert-success'; ?>" id="sendProgress">
-                <?php if ($more): ?>
-                    Sent <?php echo $attempted; ?> of <?php echo $progress['total']; ?> to &ldquo;<?php echo htmlspecialchars($pq['subject']); ?>&rdquo;. Sending the next batch&hellip;
-                    <form method="POST" id="sendBatchForm" style="display:inline;margin-left:8px;">
-                        <input type="hidden" name="action" value="send_batch">
-                        <input type="hidden" name="queue_id" value="<?php echo (int)$pq['id']; ?>">
-                        <button type="submit" class="btn btn-sm btn-primary">Continue</button>
-                    </form>
-                    <script>setTimeout(function () { document.getElementById('sendBatchForm').submit(); }, 1000);</script>
-                <?php else: ?>
-                    Finished &ldquo;<?php echo htmlspecialchars($pq['subject']); ?>&rdquo;: sent <?php echo $progress['sent']; ?> of <?php echo $progress['total']; ?><?php echo $progress['failed'] ? ', ' . $progress['failed'] . ' failed' : ''; ?>.
-                <?php endif; ?>
+            <div class="alert <?php echo $more ? 'alert-info' : 'alert-success'; ?>" id="sendProgress" role="status">
+                <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                    <span><?php echo $more ? 'Sending' : 'Finished'; ?> &ldquo;<?php echo htmlspecialchars($pq['subject']); ?>&rdquo;: <?php echo $progress['sent']; ?> sent<?php echo $progress['failed'] ? ', ' . $progress['failed'] . ' failed' : ''; ?><?php echo $progress['skipped'] ? ', ' . $progress['skipped'] . ' skipped (unsubscribed)' : ''; ?> of <?php echo $progress['total']; ?>.</span>
+                    <?php if ($more): ?>
+                        <form method="POST" id="sendBatchForm" style="display:inline;">
+                            <?php echo aw_csrf_field(); ?>
+                            <input type="hidden" name="action" value="send_batch">
+                            <input type="hidden" name="queue_id" value="<?php echo (int)$pq['id']; ?>">
+                            <button type="submit" class="btn btn-sm btn-primary">Continue</button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+                <progress value="<?php echo $pct; ?>" max="100" style="width:100%;height:10px;margin-top:8px;accent-color:var(--rose);" aria-label="Sending progress"></progress>
+                <?php if ($more): ?><script>setTimeout(function () { document.getElementById('sendBatchForm').submit(); }, 800);</script><?php endif; ?>
             </div>
         <?php endif; endif; ?>
 
-        <div class="tabs">
-            <a href="?tab=send" class="tab <?php echo $active_tab === 'send' ? 'active' : ''; ?>">
-                <i class="fas fa-paper-plane"></i> Send
-            </a>
-            <a href="?tab=subscribers" class="tab <?php echo $active_tab === 'subscribers' ? 'active' : ''; ?>">
-                <i class="fas fa-users"></i> Subscribers (<?php echo count($subscribers); ?>)
-            </a>
-            <a href="?tab=segments" class="tab <?php echo $active_tab === 'segments' ? 'active' : ''; ?>">
-                <i class="fas fa-tags"></i> Segments
-            </a>
-            <a href="?tab=queue" class="tab <?php echo $active_tab === 'queue' ? 'active' : ''; ?>">
-                <i class="fas fa-clock"></i> Queue (<?php echo count($queue); ?>)
-            </a>
-            <a href="?tab=archive" class="tab <?php echo $active_tab === 'archive' ? 'active' : ''; ?>">
-                <i class="fas fa-archive"></i> Archive
-            </a>
-            <a href="?tab=audit" class="tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">
-                <i class="fas fa-history"></i> Audit Log
-            </a>
-            <a href="?tab=import" class="tab <?php echo $active_tab === 'import' ? 'active' : ''; ?>">
-                <i class="fas fa-upload"></i> Import
-            </a>
-        </div>
+        <nav class="tabs" aria-label="Newsletter sections">
+            <?php foreach (['send' => ['fa-paper-plane', 'Compose'], 'subscribers' => ['fa-users', 'Subscribers (' . (int)$counts['t'] . ')'], 'segments' => ['fa-tags', 'Segments'], 'queue' => ['fa-clock', 'Campaigns (' . $queue_count . ')'], 'archive' => ['fa-chart-line', 'Reports'], 'import' => ['fa-upload', 'Import'], 'audit' => ['fa-history', 'Audit log']] as $k => [$icon, $label]): ?>
+                <a href="?tab=<?php echo $k; ?>" class="tab <?php echo $active_tab === $k ? 'active' : ''; ?>"<?php echo $active_tab === $k ? ' aria-current="page"' : ''; ?>><i class="fas <?php echo $icon; ?>" aria-hidden="true"></i> <?php echo htmlspecialchars($label); ?></a>
+            <?php endforeach; ?>
+        </nav>
 
-        <?php
-        // Include tab content based on active tab
-        switch ($active_tab) {
-            case 'send':
-                require_once 'newsletter_tabs/send.php';
-                break;
-            case 'subscribers':
-                require_once 'newsletter_tabs/subscribers.php';
-                break;
-            case 'segments':
-                require_once 'newsletter_tabs/segments.php';
-                break;
-            case 'queue':
-                require_once 'newsletter_tabs/queue.php';
-                break;
-            case 'archive':
-                require_once 'newsletter_tabs/archive.php';
-                break;
-            case 'audit':
-                require_once 'newsletter_tabs/audit.php';
-                break;
-            case 'import':
-                require_once 'newsletter_tabs/import.php';
-                break;
-            default:
-                require_once 'newsletter_tabs/send.php';
-        }
-        ?>
+        <?php require __DIR__ . '/newsletter_tabs/' . $active_tab . '.php'; ?>
     </div>
 </div>
 
@@ -591,37 +487,33 @@ require_once '../includes/header.php';
     .tabs { gap: 4px; }
     .tab { padding: 8px 12px; font-size: 0.85rem; }
 }
-</style>
 
+.nl-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+.nl-stats > div { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:14px 16px; box-shadow:var(--shadow); }
+.nl-stats strong { display:block; font-size:1.6rem; color:var(--rose-dark, #c08a8b); font-family:'Playfair Display',Georgia,serif; }
+.nl-stats span { font-size:.82rem; color:var(--text-light); }
+.nl-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.nl-chip { display:inline-block; padding:2px 10px; border-radius:999px; background:var(--vanilla); font-size:.75rem; margin:1px; }
+.status-badge.awaiting { background:#e6a23c; color:#fff; }
+.nl-tokens button { font:500 .78rem Inter,sans-serif; border:1px dashed var(--rose); background:var(--fantasy); color:var(--text); border-radius:8px; padding:4px 8px; cursor:pointer; }
+.nl-report { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:8px; }
+.nl-report div { background:var(--fantasy); border-radius:10px; padding:8px 10px; text-align:center; font-size:.8rem; }
+.nl-report b { display:block; font-size:1.15rem; color:var(--dark); }
+.btn-danger, .btn-warning { color:#fff; }
+details.nl-edit summary { cursor:pointer; color:var(--rose-dark, #c08a8b); }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
 <script>
-tinymce.init({
-    selector: '#editor',
-    height: 500,
-    menubar: true,
-    plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
-    toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
-    content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
-    forced_root_block: 'p',
-    setup: function(editor) {
-        editor.on('change', function () { tinymce.triggerSave(); });
-    }
-});
-
-// Preview
-document.getElementById('previewBtn')?.addEventListener('click', function() {
-    const content = tinymce.get('editor').getContent();
-    const subject = document.getElementById('subject').value;
-    const w = window.open('', 'Preview', 'width=600,height=800');
-    w.document.write(`
-        <html><head><title>Newsletter Preview</title></head>
-        <body style="font-family: Inter, sans-serif; padding:20px; max-width:600px; margin:0 auto;">
-            <h2 style="color: var(--rose);">${subject}</h2>
-            <hr>
-            ${content}
-        </body></html>
-    `);
-});
+if (document.getElementById('editor') && window.tinymce) {
+    tinymce.init({
+        selector: '#editor',
+        height: 480,
+        menubar: false,
+        plugins: 'anchor autolink charmap emoticons image link lists media searchreplace table visualblocks wordcount code',
+        toolbar: 'undo redo | blocks | bold italic underline | forecolor | alignleft aligncenter alignright | bullist numlist | link image | table | removeformat code',
+        content_style: 'body { font-family: Georgia, serif; font-size: 16px; line-height: 1.7; color: #3d2e2e; }',
+        convert_urls: false,
+        setup: function (editor) { editor.on('change input', function () { tinymce.triggerSave(); }); }
+    });
+}
 </script>
-
-<?php require_once '../includes/footer.php'; ?>

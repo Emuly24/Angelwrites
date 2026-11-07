@@ -685,17 +685,13 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
-    --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    /* RF4: the brand palette (assets/css/style.css); these pages used their own red and vanilla */
+    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6; --fantasy: #F7F3ED; --white: #ffffff;
+    --dark: #2c1e1e; --text: #3d2e2e; --text-light: #6b5a5a;
+    --input-bg: #ffffff; --card-bg: #ffffff; --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08); --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
+    --bg: #F7F3ED;
 }
 body.dark-mode {
     --bg: #1a1a1a;

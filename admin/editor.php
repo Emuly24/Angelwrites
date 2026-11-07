@@ -129,24 +129,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
         }
 
-        // ===== NEWSLETTER BROADCAST (using Zoho SMTP) =====
+        // ===== NEWSLETTER BROADCAST =====
+        // N8: sends an announcement (image, title, excerpt, "Read" button) through the newsletter
+        // engine, only for a published post (a draft used to be mailed too), with the title escaped
+        // and the post's real link (the slug was unset when an existing post was edited).
         if (isset($_POST['send_newsletter'])) {
-            $subject = $title;
-            $full_message = "<h2>$title</h2>";
-            if (!empty($intro)) $full_message .= "<p><em>$intro</em></p>";
-            $full_message .= "<div>" . nl2br($content) . "</div>";
-
-            // F140: the broadcast used to mail every subscriber inside this request (0.5 s
-            // sleep each), which runs past the host's execution limit. It is now queued and
-            // sent in pages by admin/manage_newsletter.php (newsletter_send_batch), which also
-            // appends each subscriber's unsubscribe.php?token= link (F141).
-            $stmt = $db->prepare("SELECT email FROM newsletter WHERE is_active = 1");
-            $stmt->execute();
-            $broadcast_recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            if ($broadcast_recipients) {
-                $stmt = $db->prepare("INSERT INTO email_queue (subject, content, recipient_emails, send_to_type, scheduled_at, status, attempt_count) VALUES (?, ?, ?, 'all', ?, 'processing', 0)");
-                $stmt->execute([$subject, $full_message, implode(',', $broadcast_recipients), date('Y-m-d H:i:s')]);
-                header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . (int)$db->lastInsertId());
+            require_once __DIR__ . '/../includes/newsletter.php';
+            $ps = $db->prepare("SELECT * FROM blog_posts WHERE id = ?");
+            $ps->execute([$id]);
+            $saved = $ps->fetch(PDO::FETCH_ASSOC);
+            if (!$saved || $saved['status'] !== 'published') {
+                $_SESSION['aw_nl_flash'] = ['error', 'The post was saved, but it is not published, so it was not sent to subscribers. Publish it and press "Save & Send" again.'];
+                header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue');
+                exit;
+            }
+            $qid = aw_nl_announce_post($db, $saved, 'Read the full post');
+            if ($qid) {
+                header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . $qid);
                 exit;
             }
         }
