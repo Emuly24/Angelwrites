@@ -110,8 +110,8 @@ $pageTitle = 'Delete Question';
 .question-detail strong { color: var(--text); }
 .delete-actions { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
 .delete-actions .btn-large { padding: 14px 32px; font-size: 1.05rem; border-radius: 30px; }
-.btn-danger { background: #e74c3c; color: white; transition: background 0.3s; }
-.btn-danger:hover { background: #c0392b; }
+.btn-danger { background: #b4505a; color: white; transition: background 0.3s; }
+.btn-danger:hover { background: #94404a; }
 @media (max-width: 480px) { .delete-actions { flex-direction: column; align-items: center; } .delete-actions .btn-large { width: 100%; } }
 </style>
 

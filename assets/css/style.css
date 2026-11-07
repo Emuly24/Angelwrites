@@ -235,8 +235,8 @@ a:hover {
     transition: all var(--transition);
 }
 .nav-links .btn-logout:hover {
-    border-color: #e74c3c;
-    background: #e74c3c;
+    border-color: #b4505a;
+    background: #b4505a;
     color: var(--white);
     text-decoration: none;
 }
@@ -941,11 +941,11 @@ a:hover {
     text-transform: uppercase;
 }
 .badge.free {
-    background: #2ecc71;
+    background: #4f8a63;
     color: white;
 }
 .badge.sale {
-    background: #e67e22;
+    background: #a8783f;
     color: white;
 }
 
@@ -976,7 +976,7 @@ a:hover {
     color: var(--rose);
 }
 .book-price.free-text {
-    color: #2ecc71;
+    color: #4f8a63;
 }
 
 .no-content {
@@ -1182,10 +1182,10 @@ input:focus, textarea:focus, select:focus {
     gap: 2px;
 }
 .rating-stars .filled {
-    color: #f1c40f;
+    color: #c9965a;
 }
 .rating-stars .empty {
-    color: #ddd;
+    color: #e5d5d5;
 }
 .rating-score {
     font-weight: 700;
@@ -1221,16 +1221,16 @@ input:focus, textarea:focus, select:focus {
 }
 .stars label {
     font-size: 1.4rem;
-    color: #ddd;
+    color: #e5d5d5;
     cursor: pointer;
     transition: color 0.2s;
 }
 .stars label:hover,
 .stars label:hover ~ label {
-    color: #f1c40f;
+    color: #c9965a;
 }
 .stars input:checked ~ label {
-    color: #f1c40f;
+    color: #c9965a;
 }
 
 .review-form textarea {
@@ -1288,10 +1288,10 @@ input:focus, textarea:focus, select:focus {
     margin-bottom: 6px;
 }
 .review-rating .filled {
-    color: #f1c40f;
+    color: #c9965a;
 }
 .review-rating .empty {
-    color: #ddd;
+    color: #e5d5d5;
 }
 .review-comment {
     line-height: 1.6;

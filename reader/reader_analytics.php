@@ -177,7 +177,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 <div class="admin-page">
     <div class="container">
         <div class="admin-header">
-            <h1>📊 Reader Analytics</h1>
+            <h1>Reader Analytics</h1>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
                 <form method="GET" style="display:flex;gap:8px;align-items:center;">
                     <label for="range" style="font-size:0.9rem;">Date Range:</label>

@@ -87,8 +87,12 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 <div class="admin-page">
     <div class="container" style="max-width:1000px;margin:0 auto;padding:24px 16px;">
-        <h1>💳 Book orders and payments</h1>
-        <p><a href="<?php echo SITE_URL; ?>/admin/dashboard.php">← Admin dashboard</a></p>
+        <div class="admin-header"><!-- C3 -->
+            <div>
+                <h1>Book orders and payments</h1>
+                <p><a href="<?php echo SITE_URL; ?>/admin/dashboard.php">← Admin dashboard</a></p>
+            </div>
+        </div>
         <?php if (!empty($_GET['msg'])): ?>
             <div class="alert alert-success" style="padding:10px 14px;border-radius:8px;margin:10px 0;"><?php echo htmlspecialchars((string)$_GET['msg']); ?></div>
         <?php endif; ?>
@@ -108,7 +112,11 @@ require_once __DIR__ . '/../includes/header.php';
         </p>
 
         <?php if (!$orders): ?>
-            <p>No orders here.</p>
+            <div class="empty-state"><!-- C5 -->
+            <div class="empty-state-icon"><i class="fas fa-receipt" aria-hidden="true"></i></div>
+            <h3>No orders here</h3>
+            <p>Orders in this list will appear here.</p>
+        </div>
         <?php endif; ?>
         <?php foreach ($orders as $o): ?>
             <div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">

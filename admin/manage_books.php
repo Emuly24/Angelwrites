@@ -234,7 +234,7 @@ $pageTitle = 'Manage Books';
         <!-- ===== HERO / HEADER ===== -->
         <div class="admin-hero">
             <div class="admin-hero-content">
-                <h1>📚 Manage Books</h1>
+                <h1>Manage Books</h1>
                 <p class="admin-hero-sub">Add, edit, and manage all books on AngelWrites.</p>
             </div>
             <div class="admin-hero-actions">
@@ -603,7 +603,7 @@ document.addEventListener('DOMContentLoaded', function() {
             startCameraBtn.disabled = true;
             capturePhotoBtn.disabled = false;
             cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#27ae60';
+            cameraStatus.style.color = '#4f8a63';
         } catch (error) {
             alert('Camera access denied: ' + error.message);
         }
@@ -625,7 +625,7 @@ document.addEventListener('DOMContentLoaded', function() {
             retakePhotoBtn.disabled = false;
             confirmPhotoBtn.disabled = false;
             cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#3498db';
+            cameraStatus.style.color = '#8a6f86';
             cameraStream.getTracks().forEach(track => track.stop());
             cameraPreview.srcObject = null;
             cameraPreview.style.display = 'none';
@@ -655,7 +655,7 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmPhotoBtn.disabled = true;
         retakePhotoBtn.disabled = true;
         cameraStatus.textContent = '✅ Photo confirmed!';
-        cameraStatus.style.color = '#2ecc71';
+        cameraStatus.style.color = '#4f8a63';
     }
 
     startCameraBtn.addEventListener('click', startCamera);
@@ -758,8 +758,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* ===== ALERTS ===== */
 .alert { padding: 14px 20px; border-radius: 16px; margin-bottom: 20px; font-weight: 500; }
-.alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-.alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.alert-error { background: #f6e1e3; color: #6e2a31; border: 1px solid #ecc5c9; }
+.alert-success { background: #e3efe6; color: #2d5039; border: 1px solid #c5dccb; }
 
 /* ===== SEARCH BAR ===== */
 .search-bar { margin-bottom: 24px; }
@@ -783,14 +783,14 @@ document.addEventListener('DOMContentLoaded', function() {
 .btn-outline { background: transparent; border: 2px solid var(--rose); color: var(--rose); }
 .btn-outline:hover { background: var(--rose); color: var(--white); }
 .btn-sm { padding: 8px 20px; font-size: 0.85rem; }
-.btn-info { background: #17a2b8; color: white; border: 2px solid #17a2b8; }
-.btn-info:hover { background: #138496; border-color: #138496; }
-.btn-danger { background: #dc3545; color: white; border: 2px solid #dc3545; }
-.btn-danger:hover { background: #c82333; border-color: #c82333; }
-.btn-success { background: #28a745; color: white; border: 2px solid #28a745; }
-.btn-success:hover { background: #218838; border-color: #218838; }
-.btn-warning { background: #ffc107; color: #212529; border: 2px solid #ffc107; }
-.btn-warning:hover { background: #e0a800; border-color: #e0a800; }
+.btn-info { background: #8a6f86; color: white; border: 2px solid #8a6f86; }
+.btn-info:hover { background: #6f5770; border-color: #6f5770; }
+.btn-danger { background: #b4505a; color: white; border: 2px solid #b4505a; }
+.btn-danger:hover { background: #94404a; border-color: #94404a; }
+.btn-success { background: #4f8a63; color: white; border: 2px solid #4f8a63; }
+.btn-success:hover { background: #3e6f4f; border-color: #3e6f4f; }
+.btn-warning { background: #c9965a; color: #212529; border: 2px solid #c9965a; }
+.btn-warning:hover { background: #a8783f; border-color: #a8783f; }
 
 /* ===== CARDS ===== */
 .card { background: var(--card-bg); border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; transition: all var(--transition); }
@@ -805,7 +805,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .book-form-container .card-header { background: var(--vanilla); }
 .admin-form .form-group { margin-bottom: 16px; }
 .admin-form label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text); font-size: 0.9rem; }
-.admin-form .required { color: #dc3545; }
+.admin-form .required { color: #b4505a; }
 .admin-form input, .admin-form textarea, .admin-form select {
     width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px;
     font-size: 0.95rem; background: var(--input-bg); color: var(--text); transition: border-color 0.2s;
@@ -856,11 +856,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* ===== BADGES ===== */
 .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
-.badge.free { background: #28a745; color: white; }
-.badge.sale { background: #dc3545; color: white; }
+.badge.free { background: #4f8a63; color: white; }
+.badge.sale { background: #b4505a; color: white; }
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.available { background: #28a745; color: white; }
-.status-badge.missing { background: #dc3545; color: white; }
+.status-badge.available { background: #4f8a63; color: white; }
+.status-badge.missing { background: #b4505a; color: white; }
 
 /* ===== ACTIONS ===== */
 .actions-cell { display: flex; gap: 4px; flex-wrap: wrap; }

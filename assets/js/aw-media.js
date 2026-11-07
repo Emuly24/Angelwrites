@@ -193,11 +193,11 @@
 
     var STYLE = '\
 .awm-back{position:fixed;inset:0;background:rgba(10,8,12,.72);z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:12px;font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}\
-.awm{background:#1d1b22;color:#eee;border-radius:14px;width:min(920px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}\
+.awm{background:#1d1b22;color:#f0e8e8;border-radius:14px;width:min(920px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}\
 .awm *{box-sizing:border-box}\
-.awm-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #333}\
+.awm-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #3d2e2e}\
 .awm-head h2{font-size:1.05rem;margin:0;color:#fff;font-weight:600}\
-.awm-x{background:none;border:0;color:#ccc;font-size:1.5rem;cursor:pointer;width:40px;height:40px;border-radius:8px}\
+.awm-x{background:none;border:0;color:#d4c8c8;font-size:1.5rem;cursor:pointer;width:40px;height:40px;border-radius:8px}\
 .awm-x:hover{background:#2c2933}\
 .awm-body{overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}\
 .awm-stage{position:relative;background:#000;border-radius:10px;height:min(46vh,420px);overflow:hidden;touch-action:none}\
@@ -213,26 +213,26 @@
 .awm-crop i[data-h=sw]{left:-11px;bottom:-11px;cursor:nesw-resize}.awm-crop i[data-h=se]{right:-11px;bottom:-11px;cursor:nwse-resize}\
 .awm-audiocard{display:flex;align-items:center;justify-content:center;height:90px;background:linear-gradient(135deg,#3a2a35,#22202a);border-radius:10px;font-size:2rem}\
 .awm-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}\
-.awm-time{font-variant-numeric:tabular-nums;color:#ccc;min-width:120px}\
+.awm-time{font-variant-numeric:tabular-nums;color:#d4c8c8;min-width:120px}\
 .awm-tl{position:relative;height:72px;background:#26232c;border-radius:8px;cursor:crosshair;touch-action:none;outline-offset:2px}\
 .awm-tl canvas{width:100%;height:100%;display:block}\
-.awm-btn{background:#2f2b37;color:#eee;border:1px solid #444;border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit;min-height:40px}\
+.awm-btn{background:#2f2b37;color:#f0e8e8;border:1px solid #4a3a3a;border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit;min-height:40px}\
 .awm-btn:hover:not(:disabled){background:#3a3544}\
 .awm-btn:disabled{opacity:.45;cursor:default}\
 .awm-btn.on{background:#DBA1A2;color:#1d1b22;border-color:#DBA1A2;font-weight:600}\
 .awm-btn.pri{background:#DBA1A2;color:#1d1b22;border-color:#DBA1A2;font-weight:600}\
-.awm-tabs{display:flex;gap:4px;border-bottom:1px solid #333;flex-wrap:wrap}\
-.awm-tab{background:none;border:0;color:#bbb;padding:8px 12px;cursor:pointer;font:inherit;border-bottom:2px solid transparent}\
+.awm-tabs{display:flex;gap:4px;border-bottom:1px solid #3d2e2e;flex-wrap:wrap}\
+.awm-tab{background:none;border:0;color:#c8b8b8;padding:8px 12px;cursor:pointer;font:inherit;border-bottom:2px solid transparent}\
 .awm-tab[aria-selected=true]{color:#fff;border-bottom-color:#DBA1A2}\
 .awm-pane{display:none;flex-direction:column;gap:10px;padding-top:4px}\
 .awm-pane.show{display:flex}\
 .awm-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}\
-.awm-row label{min-width:120px;color:#ccc}\
+.awm-row label{min-width:120px;color:#d4c8c8}\
 .awm-row input[type=range]{flex:1;min-width:140px;accent-color:#DBA1A2}\
-.awm-row output{min-width:56px;text-align:right;color:#ddd;font-variant-numeric:tabular-nums}\
+.awm-row output{min-width:56px;text-align:right;color:#e5d5d5;font-variant-numeric:tabular-nums}\
 .awm-chips{display:flex;gap:6px;flex-wrap:wrap}\
-.awm-note{color:#aaa;font-size:.85rem;margin:0}\
-.awm-foot{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid #333;flex-wrap:wrap}\
+.awm-note{color:#b8a8a8;font-size:.85rem;margin:0}\
+.awm-foot{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid #3d2e2e;flex-wrap:wrap}\
 .awm-prog{position:absolute;inset:0;background:rgba(20,18,24,.92);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:5;padding:20px;text-align:center}\
 .awm-prog.show{display:flex}\
 .awm-prog progress{width:min(360px,80%);height:12px;accent-color:#DBA1A2}\

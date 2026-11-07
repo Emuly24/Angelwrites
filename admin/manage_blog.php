@@ -86,9 +86,6 @@ $pageTitle = 'Manage Blog';
         <div class="admin-header">
             <h1>Manage Blog</h1>
             <div class="admin-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
                 <button id="openCameraBtn" class="btn btn-secondary" title="Take a photo or record a video, then write the post around it">
                     <i class="fas fa-camera"></i> New post from camera
                 </button>
@@ -297,13 +294,13 @@ $pageTitle = 'Manage Blog';
     --input-bg: #ffffff;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
     --text: #e8dddd;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -331,9 +328,9 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.draft { background: #f1c40f; color: #fff; }
-.status-badge.published { background: #27ae60; color: #fff; }
-.status-badge.archived { background: #e74c3c; color: #fff; }
+.status-badge.draft { background: #c9965a; color: #fff; }
+.status-badge.published { background: #4f8a63; color: #fff; }
+.status-badge.archived { background: #b4505a; color: #fff; }
 
 .actions { display: flex; gap: 6px; }
 .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
@@ -525,7 +522,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 .camera-shutter-btn:hover .shutter-inner { opacity: 0.8; }
 .camera-shutter-btn.recording .shutter-inner {
-    background: #ff3b30; width: 24px; height: 24px; border-radius: 6px;
+    background: #b4505a; width: 24px; height: 24px; border-radius: 6px;
 }
 
 .camera-btn {

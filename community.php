@@ -750,25 +750,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -871,8 +871,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; }
 .modal-content { background: var(--card-bg); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
-.modal-close:hover { color: #333; }
+.modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #a08a8a; }
+.modal-close:hover { color: #3d2e2e; }
 .modal-body .form-group { margin-bottom: 12px; }
 .modal-body select, .modal-body textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); }
 .modal-body select:focus, .modal-body textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }

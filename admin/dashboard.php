@@ -60,21 +60,21 @@ $pageTitle = 'Admin Dashboard';
     --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
     --shadow: 0 4px 20px rgba(0,0,0,0.04);
 }
-body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #333; }
+body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #3d2e2e; }
 body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
 body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
 /* Hero */
 .admin-hero { background: linear-gradient(135deg, #fff, var(--rose-light)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--rose-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .admin-hero h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; margin:0; letter-spacing: -0.5px; }
-.admin-hero .sub { color: #666; margin-top: 4px; font-size: 0.95rem; }
+.admin-hero .sub { color: #6b5a5a; margin-top: 4px; font-size: 0.95rem; }
 
 /* Core Stats */
 .admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 28px; }
 .admin-stat-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); text-align: center; transition: 0.2s; }
 .admin-stat-card:hover { transform: translateY(-4px); border-color: var(--rose); }
 .admin-stat-card .num { font-size: 2.2rem; font-weight: 700; color: var(--rose); display: block; }
-.admin-stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-top: 6px; }
+.admin-stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #6b5a5a; margin-top: 6px; }
 
 /* Alerts */
 .alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
@@ -92,9 +92,9 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 /* Monitoring Stats */
 .monitoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
 .monitor-card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
-.monitor-card .title { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+.monitor-card .title { font-size: 0.75rem; color: #8a7878; text-transform: uppercase; }
 .monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); margin: 4px 0; }
-.monitor-card .sub { font-size: 0.75rem; color: #666; }
+.monitor-card .sub { font-size: 0.75rem; color: #6b5a5a; }
 
 /* Top Content */
 .top-content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
@@ -113,7 +113,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .admin-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .admin-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .admin-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #333; transition: 0.2s; text-align: center; }
+.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #3d2e2e; transition: 0.2s; text-align: center; }
 .admin-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
 .admin-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
 .admin-module-btn span { font-size: 0.75rem; font-weight: 500; }
@@ -134,7 +134,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <div class="sub">Your command center – real-time overview of your site.</div>
         </div>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-            <span style="background:#28a745; color:white; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; animation:pulse 2s infinite;"><i class="fas fa-circle"></i> Live</span>
+            <span style="background:#4f8a63; color:white; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; animation:pulse 2s infinite;"><i class="fas fa-circle"></i> Live</span>
             <!-- Theme toggle removed from here as header has it -->
             <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Quick Add</button>
         </div>
@@ -169,12 +169,12 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
         <div class="alert-card"><h4><i class="fas fa-clock" style="color:var(--rose);"></i> Pending Sessions</h4>
             <div class="alert-list"><?php if(count($recent_sessions)>0): foreach($recent_sessions as $s): ?>
                 <div class="alert-item"><span><?php echo date('M j, g:i a', strtotime($s['date'].' '.$s['time'])); ?> – <?php echo htmlspecialchars($s['user_name']); ?></span><span class="badge badge-warning">Pending</span></div>
-            <?php endforeach; else: ?><div class="alert-item" style="color:#999;">No pending sessions.</div><?php endif; ?></div>
+            <?php endforeach; else: ?><div class="alert-item" style="color:#a08a8a;">No pending sessions.</div><?php endif; ?></div>
         </div>
         <div class="alert-card"><h4><i class="fas fa-envelope" style="color:var(--rose);"></i> Unread Messages</h4>
             <div class="alert-list"><?php if(count($recent_messages)>0): foreach($recent_messages as $m): ?>
                 <div class="alert-item"><span><strong><?php echo htmlspecialchars($m['name']); ?></strong> – <?php echo htmlspecialchars(substr($m['message'],0,30)); ?>...</span><span class="badge badge-danger">Unread</span></div>
-            <?php endforeach; else: ?><div class="alert-item" style="color:#999;">No unread messages.</div><?php endif; ?></div>
+            <?php endforeach; else: ?><div class="alert-item" style="color:#a08a8a;">No unread messages.</div><?php endif; ?></div>
         </div>
     </div>
 
@@ -188,7 +188,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <div class="monitor-card" style="cursor: pointer;" onclick="openStatsModal('views')">
         <div class="title">Total Views</div>
         <div class="value" id="total_views"><?php echo number_format($stats['total_views'] ?? 0); ?></div>
-        <div class="sub">Poems + Books <span style="font-size:0.7rem; color:#ccc;">(Click to view)</span></div>
+        <div class="sub">Poems + Books <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
     </div>
         <div class="monitor-card"><div class="title">Active Today</div><div class="value" id="active_today"><?php echo $stats['active_today'] ?? 0; ?></div><div class="sub">Logged‑in users</div></div>
         <div class="monitor-card"><div class="title">Active Week</div><div class="value" id="active_week"><?php echo $stats['active_week'] ?? 0; ?></div><div class="sub">Last 7 days</div></div>
@@ -197,7 +197,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
         <div class="monitor-card" style="cursor: pointer;" onclick="openStatsModal('reading')">
         <div class="title">Reading Hours</div>
         <div class="value" id="reading_hours"><?php echo number_format($stats['total_reading_hours'] ?? 0); ?></div>
-        <div class="sub">All users <span style="font-size:0.7rem; color:#ccc;">(Click to view)</span></div>
+        <div class="sub">All users <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
     </div>
 </div>
     
@@ -206,10 +206,10 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <div class="modal-box">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
             <h2 id="statsModalTitle" style="font-family:'Playfair Display'; color: var(--rose-dark); margin:0;">Loading...</h2>
-            <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:#999;">&times;</button>
+            <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:#a08a8a;">&times;</button>
         </div>
         <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem; padding-bottom:10px;">
-            <p style="color:#999; text-align:center;">Fetching data...</p>
+            <p style="color:#a08a8a; text-align:center;">Fetching data...</p>
         </div>
     </div>
 </div>
@@ -286,7 +286,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <div class="modal-overlay" id="quickModal">
         <div class="modal-box">
                     <h2>Quick Create</h2>
-        <p style="color:#666; margin-bottom: 16px;">Select what you want to add</p>
+        <p style="color:#6b5a5a; margin-bottom: 16px;">Select what you want to add</p>
         <div style="display: flex; flex-direction: column; gap: 8px;">
             <a href="manage_books.php?action=new" class="btn btn-primary">+ New Book</a>
             <a href="manage_poems.php?action=new" class="btn btn-primary">+ New Poem</a>
@@ -295,7 +295,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <a href="reflection_editor.php" class="btn btn-primary">+ New Reflection</a>
             <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New Newsletter</a>
             
-            <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
+            <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #d4c8c8; color:#6b5a5a; margin-top: 8px;">Cancel</button>
         </div>
     </div>
 </div>
@@ -479,7 +479,7 @@ function openStatsModal(type) {
     document.getElementById('statsModal').classList.add('active');
     const body = document.getElementById('statsModalBody');
     const title = document.getElementById('statsModalTitle');
-    body.innerHTML = '<p style="color:#999; text-align:center;">Fetching data...</p>';
+    body.innerHTML = '<p style="color:#a08a8a; text-align:center;">Fetching data...</p>';
     const url = '<?php echo SITE_URL; ?>/ajax_admin.php?action=' + (type === 'views' ? 'get_view_details' : 'get_reading_details');
     title.textContent = type === 'views' ? '📊 Detailed Content Views' : '📖 Detailed Reading Sessions';
 
@@ -487,25 +487,25 @@ function openStatsModal(type) {
         .then(res => res.json())
         .then(data => {
             if (!data.success || !data.logs || data.logs.length === 0) {
-                body.innerHTML = '<p style="color:#999; text-align:center;">No data available yet.</p>';
+                body.innerHTML = '<p style="color:#a08a8a; text-align:center;">No data available yet.</p>';
                 return;
             }
             let html = '<table><thead><tr><th>Viewer / User</th><th>Content</th><th>Date & Time</th></tr></thead><tbody>';
             data.logs.forEach(row => {
                 if(type === 'views') {
                     let titleCol = htmlspecialchars(row.content_title || 'Unknown');
-                    let subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${htmlspecialchars(row.target_type)}</span>`;
+                    let subTitle = `<span style="color:#a08a8a;font-size:0.75rem;display:block;">${htmlspecialchars(row.target_type)}</span>`;
                     let viewer = htmlspecialchars(row.viewer_name);
                     if(viewer === 'Guest') {
-                        viewer = `<span style="color:#888;">Guest</span> <span style="font-size:0.75rem; color:#999;">(IP: ${htmlspecialchars(row.ip_address || 'N/A')})</span>`;
+                        viewer = `<span style="color:#8a7878;">Guest</span> <span style="font-size:0.75rem; color:#a08a8a;">(IP: ${htmlspecialchars(row.ip_address || 'N/A')})</span>`;
                     } else {
                         viewer = `<strong>${htmlspecialchars(row.viewer_name)}</strong>`;
                     }
-                    html += `<tr><td>${viewer}</td><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#666;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
+                    html += `<tr><td>${viewer}</td><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#6b5a5a;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
                 } else {
                     let dur = Math.floor((row.duration_seconds || 0) / 60);
                     let sec = (row.duration_seconds || 0) % 60;
-                    html += `<tr><td><strong>${htmlspecialchars(row.user_name)}</strong> <span style="font-size:0.75rem; color:#999;">(${htmlspecialchars(row.user_email)})</span></td><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#666;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#eee; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
+                    html += `<tr><td><strong>${htmlspecialchars(row.user_name)}</strong> <span style="font-size:0.75rem; color:#a08a8a;">(${htmlspecialchars(row.user_email)})</span></td><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#6b5a5a;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#f0e8e8; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
                 }
             });
             html += '</tbody></table>';

@@ -45,7 +45,11 @@ if (!$invite) {
 $pageTitle = 'Reading circle invitation';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="container" style="max-width:640px;margin:60px auto;padding:0 16px;">
+<div class="container" style="max-width:640px;margin:0 auto 60px;padding:0 16px;">
+    <div class="page-header"><!-- C5 -->
+        <h1>Reading Circle Invitation</h1>
+        <p>Join friends reading the same book together.</p>
+    </div>
     <div class="alert alert-error"><?php echo htmlspecialchars($message); ?></div>
     <p><a class="btn btn-primary" href="<?php echo SITE_URL; ?>/books.php">Browse books</a></p>
 </div>

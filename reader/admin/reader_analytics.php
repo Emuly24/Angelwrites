@@ -113,11 +113,8 @@ $pageTitle = 'Reader Analytics';
 <div class="analytics-page">
     <div class="container">
         <div class="page-header">
-            <h1>📊 Reader Analytics</h1>
+            <h1>Reader Analytics</h1>
             <div class="header-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
@@ -383,9 +380,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
 
 .badge { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.badge-success { background: #2ecc71; color: white; }
-.badge-warning { background: #f1c40f; color: white; }
-.badge-primary { background: #3498db; color: white; }
+.badge-success { background: #4f8a63; color: white; }
+.badge-warning { background: #c9965a; color: white; }
+.badge-primary { background: #8a6f86; color: white; }
 
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 

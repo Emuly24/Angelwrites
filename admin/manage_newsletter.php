@@ -380,7 +380,7 @@ require_once '../includes/header.php';
 <div class="admin-newsletter">
     <div class="container">
         <div class="admin-header">
-            <h1>📨 Newsletter</h1>
+            <h1>Newsletter</h1>
             <div class="admin-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export all</a>
                 <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php?status=active" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export active</a>
@@ -464,7 +464,7 @@ require_once '../includes/header.php';
 }
 .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
 .admin-form textarea { resize: vertical; min-height: 120px; }
-.required { color: #dc2626; }
+.required { color: #b4505a; }
 
 .table-responsive { overflow-x: auto; border-radius: 12px; }
 .admin-table { width: 100%; border-collapse: collapse; }
@@ -473,13 +473,13 @@ require_once '../includes/header.php';
 .admin-table tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
 
 .status-badge { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-.status-badge.active { background: #27ae60; color: #fff; }
-.status-badge.inactive { background: #95a5a6; color: #fff; }
-.status-badge.pending { background: #f1c40f; color: #fff; }
-.status-badge.processing { background: #3498db; color: #fff; }
-.status-badge.sent { background: #2ecc71; color: #fff; }
-.status-badge.failed { background: #e74c3c; color: #fff; }
-.status-badge.cancelled { background: #95a5a6; color: #fff; }
+.status-badge.active { background: #4f8a63; color: #fff; }
+.status-badge.inactive { background: #a08a8a; color: #fff; }
+.status-badge.pending { background: #c9965a; color: #fff; }
+.status-badge.processing { background: #8a6f86; color: #fff; }
+.status-badge.sent { background: #4f8a63; color: #fff; }
+.status-badge.failed { background: #b4505a; color: #fff; }
+.status-badge.cancelled { background: #a08a8a; color: #fff; }
 
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 

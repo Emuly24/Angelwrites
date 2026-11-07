@@ -229,7 +229,7 @@ $my_notes_count = $stmt->fetchColumn();
             transition: color 0.2s;
         }
         .note-footer .btn-danger:hover {
-            color: #e74c3c;
+            color: #b4505a;
         }
         #awAddNoteForm {
             border-top: 1px solid var(--border);

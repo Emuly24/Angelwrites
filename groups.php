@@ -88,7 +88,7 @@ $pageTitle = 'My Reading Groups';
     <div class="container">
         <!-- ===== PAGE HEADER ===== -->
         <div class="page-header">
-            <h1>📚 My Reading Groups</h1>
+            <h1>My Reading Groups</h1>
             <div class="header-actions">
                 <a href="create_group.php" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Create New Group
@@ -209,7 +209,7 @@ $pageTitle = 'My Reading Groups';
         <?php else: ?>
             <div class="groups-grid">
                 <?php foreach ($public_groups as $pg): ?>
-                    <div class="group-card">
+                    <div class="group-card group-card-simple"><!-- C6 -->
                         <h3><?php echo htmlspecialchars($pg['name']); ?></h3>
                         <p class="group-content"><?php echo htmlspecialchars(ucfirst($pg['content_type']) . ': ' . ($pg['book_title'] ?? $pg['poem_title'] ?? $pg['newsletter_title'] ?? '')); ?></p>
                         <?php if (!empty($pg['description'])): ?><p><?php echo htmlspecialchars(mb_substr($pg['description'], 0, 140)); ?></p><?php endif; ?>
@@ -287,6 +287,12 @@ document.getElementById('joinModal').addEventListener('click', function(e) {
     box-shadow: var(--shadow);
     transition: transform 0.2s, box-shadow 0.2s;
 }
+/* C6: the "Discover groups" cards had no inner spacing */
+.group-card-simple { padding: 18px 20px; display: flex; flex-direction: column; gap: 4px; }
+.group-card-simple h3 { font-size: 1.05rem; margin: 0 0 2px; }
+.group-card-simple p { margin: 0; color: var(--text-light); font-size: 0.9rem; }
+.group-card-simple .group-content { color: var(--text); font-weight: 500; }
+.group-card-simple form { margin-top: auto; padding-top: 10px; }
 .group-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-hover);
@@ -323,9 +329,9 @@ document.getElementById('joinModal').addEventListener('click', function(e) {
     display: inline-block; padding: 2px 12px; border-radius: 20px;
     font-size: 0.7rem; font-weight: 600; margin-bottom: 4px;
 }
-.badge-book { background: #e3f2fd; color: #0d47a1; }
-.badge-poem { background: #f3e5f5; color: #4a148c; }
-.badge-newsletter { background: #e8f5e9; color: #1b5e20; }
+.badge-book { background: #efe6ee; color: #6f5770; }
+.badge-poem { background: #efe6ee; color: #4e3a4c; }
+.badge-newsletter { background: #e3efe6; color: #2d5039; }
 .badge-other { background: #f1f3f5; color: #495057; }
 
 .content-info strong { color: var(--dark); }

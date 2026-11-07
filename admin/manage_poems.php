@@ -340,14 +340,14 @@ $pageTitle = 'Manage Poems';
                                                 <?php if ($poem['intro']): ?>
                                                     <span class="intro-preview" style="color:var(--text-light);font-size:0.9rem;"><?php echo htmlspecialchars(substr($poem['intro'], 0, 60)); ?>...</span>
                                                 <?php else: ?>
-                                                    <span class="text-muted" style="color:#999;font-size:0.9rem;">No introduction</span>
+                                                    <span class="text-muted" style="color:#a08a8a;font-size:0.9rem;">No introduction</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php if ($poem['audio_path']): ?>
                                                     <span style="display:flex;align-items:center;gap:6px;color:var(--rose);"><i class="fas fa-music"></i> Yes</span>
                                                 <?php else: ?>
-                                                    <span style="color:#999;font-size:0.9rem;">No</span>
+                                                    <span style="color:#a08a8a;font-size:0.9rem;">No</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
@@ -479,7 +479,7 @@ $pageTitle = 'Manage Poems';
                 <h4>🎙️ Or Record Audio Directly</h4>
                 <div class="recorder-controls">
                     <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                    <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                    <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                     <form id="recordingForm" style="display:none;">
                         <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
                     </form>
@@ -728,7 +728,7 @@ document.addEventListener('DOMContentLoaded', function() {
             content = document.getElementById('editor').value;
         }
         
-        if(content.trim() === '') content = '<p style="color:#999;font-style:italic;">No content entered yet.</p>';
+        if(content.trim() === '') content = '<p style="color:#a08a8a;font-style:italic;">No content entered yet.</p>';
 
         prevTitle.textContent = title;
         prevIntro.textContent = intro;
@@ -850,7 +850,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (currentMode === 'photo' && capturedBlob) {
             const file = new File([capturedBlob], 'live_photo.jpg', { type: 'image/jpeg' });
             const dt = new DataTransfer(); dt.items.add(file); livePhotoInput.files = dt.files;
-            photoStatus.textContent = '✅ Photo confirmed!'; photoStatus.style.color = '#2ecc71'; closeCamera();
+            photoStatus.textContent = '✅ Photo confirmed!'; photoStatus.style.color = '#4f8a63'; closeCamera();
         } else if (currentMode === 'video' && recordedBlob) {
             const file = new File([recordedBlob], 'live_video.webm', { type: 'video/webm' });
             const dt = new DataTransfer(); dt.items.add(file); audioInput.files = dt.files;
@@ -1002,14 +1002,14 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
 .btn-block { width:100%; justify-content:center; }
-.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
-.btn-danger:hover { background:#c82333; border-color:#c82333; }
-.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
-.btn-success:hover { background:#218838; border-color:#218838; }
-.btn-info { background:#17a2b8; color:white; border:2px solid #17a2b8; }
-.btn-info:hover { background:#138496; border-color:#138496; }
-.btn-warning { background:#ffc107; color:#212529; border:2px solid #ffc107; }
-.btn-warning:hover { background:#e0a800; border-color:#e0a800; }
+.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
+.btn-danger:hover { background:#94404a; border-color:#94404a; }
+.btn-success { background:#4f8a63; color:white; border:2px solid #4f8a63; }
+.btn-success:hover { background:#3e6f4f; border-color:#3e6f4f; }
+.btn-info { background:#8a6f86; color:white; border:2px solid #8a6f86; }
+.btn-info:hover { background:#6f5770; border-color:#6f5770; }
+.btn-warning { background:#c9965a; color:#212529; border:2px solid #c9965a; }
+.btn-warning:hover { background:#a8783f; border-color:#a8783f; }
 
 /* ===== ADMIN PAGE ===== */
 .admin-page { padding:32px 0 60px; }
@@ -1026,8 +1026,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 
 /* ===== TOAST NOTIFICATIONS ===== */
 #toastContainer { position: fixed; top: 30px; right: 30px; z-index: 9999999; display: flex; flex-direction: column; gap: 12px; align-items: flex-end; pointer-events: none; }
-.toast-notification { background: #fff; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 40px rgba(44,30,30,0.15); display: flex; align-items: center; gap: 12px; border-left: 6px solid #28a745; font-size: 0.95rem; animation: slideInRight 0.4s ease forwards; pointer-events: auto; min-width: 280px; max-width: 450px; border: 1px solid rgba(0,0,0,0.05); color: var(--text); }
-.toast-notification.toast-error { border-left-color: #dc3545; }
+.toast-notification { background: #fff; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 40px rgba(44,30,30,0.15); display: flex; align-items: center; gap: 12px; border-left: 6px solid #4f8a63; font-size: 0.95rem; animation: slideInRight 0.4s ease forwards; pointer-events: auto; min-width: 280px; max-width: 450px; border: 1px solid rgba(0,0,0,0.05); color: var(--text); }
+.toast-notification.toast-error { border-left-color: #b4505a; }
 .toast-notification .toast-icon { font-size: 1.2rem; }
 .toast-notification .toast-message { flex: 1; font-weight: 500; }
 .toast-notification .toast-close { cursor: pointer; color: var(--text-light); font-size: 1.2rem; line-height: 1; transition: color 0.2s; }
@@ -1036,8 +1036,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 
 /* ===== STATUS BADGE ===== */
 .status-badge { padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }
-.status-published { background: #d4edda; color: #155724; }
-.status-draft { background: #fff3cd; color: #856404; }
+.status-published { background: #e3efe6; color: #2d5039; }
+.status-draft { background: #f7ecdc; color: #6f4e22; }
 
 /* ===== CARD ===== */
 .card { background:var(--card-bg); border-radius:20px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; margin-bottom:24px; transition:all var(--transition); }
@@ -1078,7 +1078,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 /* ===== FORM & UPLOADS ===== */
 .poem-form .form-group { margin-bottom:16px; }
 .poem-form label { display:block; font-weight:600; margin-bottom:6px; font-size:0.9rem; color:var(--text); }
-.poem-form .required { color:#dc3545; }
+.poem-form .required { color:#b4505a; }
 .poem-form input, .poem-form textarea { width:100%; padding:12px 16px; border:1px solid var(--border); border-radius:12px; font-size:0.95rem; background:var(--input-bg); color:var(--text); transition:border-color 0.2s; }
 .poem-form input:focus, .poem-form textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
 .poem-form textarea { resize:vertical; min-height:60px; font-family:'Inter',sans-serif; }
@@ -1094,7 +1094,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .recorder-section h4 { margin-bottom:8px; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
 .recorder-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
 .recorder-controls .btn { padding:8px 16px; border-radius:50px; }
-#recordingStatus { font-weight:600; color:#e74c3c; }
+#recordingStatus { font-weight:600; color:#b4505a; }
 
 /* ===== FULL-SCREEN CAMERA MODAL ===== */
 .camera-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:999999; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -1114,7 +1114,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .camera-shutter-btn .shutter-ring { position:absolute; width:100%; height:100%; border-radius:50%; border:4px solid rgba(255,255,255,0.3); top:-4px; left:-4px; pointer-events:none; }
 .camera-shutter-btn .shutter-inner { width:56px; height:56px; border-radius:50%; background:#fff; transition:all 0.2s; }
 .camera-shutter-btn:hover .shutter-inner { opacity:0.8; }
-.camera-shutter-btn.recording .shutter-inner { background:#ff3b30; width:24px; height:24px; border-radius:6px; }
+.camera-shutter-btn.recording .shutter-inner { background:#b4505a; width:24px; height:24px; border-radius:6px; }
 .camera-btn { background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:#fff; padding:8px 16px; border-radius:30px; font-size:0.85rem; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:6px; }
 .camera-btn:disabled { opacity:0.4; cursor:not-allowed; }
 .camera-btn:hover:not(:disabled) { background:rgba(255,255,255,0.3); }

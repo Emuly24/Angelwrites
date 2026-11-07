@@ -147,16 +147,13 @@ $pageTitle = 'Book a Session';
 <div class="session-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <!-- ===== READING PROGRESS BAR ===== -->
         <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
 
         <!-- Page Header -->
         <div class="session-header">
-            <h1>📅 Book a Session</h1>
+            <h1>Book a Session</h1>
             <p>Connect with Angella for guidance, encouragement, or a conversation about faith, writing, or life's journey.</p>
         </div>
 
@@ -417,10 +414,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .session-date, .session-time, .session-type { font-weight: 500; font-size: 0.9rem; }
 .session-status { padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-.session-status.pending { background: #f1c40f; color: white; }
-.session-status.confirmed { background: #2ecc71; color: white; }
-.session-status.cancelled { background: #e74c3c; color: white; }
-.session-status.completed { background: #3498db; color: white; }
+.session-status.pending { background: #c9965a; color: white; }
+.session-status.confirmed { background: #4f8a63; color: white; }
+.session-status.cancelled { background: #b4505a; color: white; }
+.session-status.completed { background: #8a6f86; color: white; }
 
 .session-message { width: 100%; font-size: 0.85rem; color: var(--text-light); margin: 4px 0 0; }
 .session-actions { display: flex; gap: 6px; }
@@ -472,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .time-slot-btn.booked { background: var(--vanilla); color: var(--text-light); cursor: not-allowed; opacity: 0.6; }
 .time-slot-btn.booked small { display: block; font-size: 0.6rem; }
 
-.required { color: #e74c3c; }
+.required { color: #b4505a; }
 .field-hint { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--text-light); }
 
 .booking-form .btn-large { padding: 14px 32px; font-size: 1.05rem; border-radius: 30px; width: 100%; justify-content: center; }

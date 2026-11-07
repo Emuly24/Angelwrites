@@ -503,12 +503,12 @@ function renderBookFromParsed($parsed, $book) {
 function renderTOCSidebar($toc_json) {
     $toc = json_decode($toc_json, true);
     if (!$toc) return '';
-    $html = '<div class="toc-sidebar" style="position:sticky;top:20px;max-height:80vh;overflow-y:auto;padding:12px;background:#f8f9fa;border-radius:8px;border:1px solid #ddd;">';
+    $html = '<div class="toc-sidebar" style="position:sticky;top:20px;max-height:80vh;overflow-y:auto;padding:12px;background:#fdf9f8;border-radius:8px;border:1px solid #e5d5d5;">';
     $html .= '<h4 style="margin-top:0;">📑 Contents</h4>';
     foreach ($toc as $entry) {
         $indent = ($entry['level'] ?? 1) > 1 ? 'padding-left:20px;' : '';
         $html .= '<div style="' . $indent . 'padding:4px 0;">';
-        $html .= '<a href="#chapter-' . ($entry['page'] ?? 1) . '" style="text-decoration:none;color:#333;display:block;padding:4px 8px;border-radius:4px;transition:background 0.2s;">' . htmlspecialchars($entry['title']) . '</a>';
+        $html .= '<a href="#chapter-' . ($entry['page'] ?? 1) . '" style="text-decoration:none;color:#3d2e2e;display:block;padding:4px 8px;border-radius:4px;transition:background 0.2s;">' . htmlspecialchars($entry['title']) . '</a>';
         $html .= '</div>';
     }
     $html .= '</div>';
@@ -520,13 +520,13 @@ function renderVersionSideBySide($old_html, $new_html, $label_old, $label_new) {
         <div class="diff-columns">
             <div class="diff-column">
                 <div class="column-header">' . htmlspecialchars($label_old) . '</div>
-                <div class="column-content" style="max-height:500px;overflow-y:auto;padding:24px;background:#ffffff;border:1px solid #eee;border-radius:0 0 12px 12px;font-family:Georgia, serif;line-height:1.8;font-size:16px;color:#333;">
+                <div class="column-content" style="max-height:500px;overflow-y:auto;padding:24px;background:#ffffff;border:1px solid #f0e8e8;border-radius:0 0 12px 12px;font-family:Georgia, serif;line-height:1.8;font-size:16px;color:#3d2e2e;">
                     ' . $old_html . '
                 </div>
             </div>
             <div class="diff-column">
                 <div class="column-header">' . htmlspecialchars($label_new) . '</div>
-                <div class="column-content" style="max-height:500px;overflow-y:auto;padding:24px;background:#ffffff;border:1px solid #eee;border-radius:0 0 12px 12px;font-family:Georgia, serif;line-height:1.8;font-size:16px;color:#333;">
+                <div class="column-content" style="max-height:500px;overflow-y:auto;padding:24px;background:#ffffff;border:1px solid #f0e8e8;border-radius:0 0 12px 12px;font-family:Georgia, serif;line-height:1.8;font-size:16px;color:#3d2e2e;">
                     ' . $new_html . '
                 </div>
             </div>
@@ -1753,7 +1753,7 @@ if (isset($_POST['action'])) {
         $published_version = $stmt->fetchColumn() ?? 0;
         $html = '<div style="max-height:400px;overflow-y:auto;">';
         $html .= '<table style="width:100%;border-collapse:collapse;">';
-        $html .= '<thead><tr style="background:#f1f3f5;border-bottom:2px solid #ddd;">';
+        $html .= '<thead><tr style="background:#f1f3f5;border-bottom:2px solid #e5d5d5;">';
         $html .= '<th style="padding:8px 12px;text-align:left;">Version</th>';
         $html .= '<th style="padding:8px 12px;text-align:left;">Date</th>';
         $html .= '<th style="padding:8px 12px;text-align:left;">Note</th>';
@@ -1761,15 +1761,15 @@ if (isset($_POST['action'])) {
         $html .= '</tr></thead><tbody>';
         foreach ($versions as $version) {
             $is_published = ($version['version'] == $published_version);
-            $row_class = $is_published ? 'style="background:#d4edda;"' : '';
+            $row_class = $is_published ? 'style="background:#e3efe6;"' : '';
             $html .= '<tr ' . $row_class . '>';
-            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">';
+            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #f0e8e8;">';
             $html .= $is_published ? '<strong>v' . $version['version'] . ' (published)</strong>' : 'v' . $version['version'];
             $html .= '</td>';
             $created_at = $version['created_at'] ?? date('Y-m-d H:i:s');
-            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' . date('Y-m-d H:i:s', strtotime($created_at)) . '</td>';
-            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' . htmlspecialchars($version['note'] ?? '—') . '</td>';
-            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">';
+            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #f0e8e8;">' . date('Y-m-d H:i:s', strtotime($created_at)) . '</td>';
+            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #f0e8e8;">' . htmlspecialchars($version['note'] ?? '—') . '</td>';
+            $html .= '<td style="padding:8px 12px;border-bottom:1px solid #f0e8e8;">';
             $html .= '<button class="btn btn-sm btn-info" onclick="previewVersion(' . $version['version'] . ')">👁️ Preview</button> ';
             $html .= '<a class="btn btn-sm btn-info" target="_blank" href="' . SITE_URL . '/reader/reader.php?id=' . (int)$book_id . '&preview=' . (int)$version['version'] . '">📖 Open in reader</a> '; // R5
             if (!$is_published) {
@@ -1822,7 +1822,7 @@ if (isset($_POST['action'])) {
         $stmt = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ?");
         $stmt->execute([$book_id]);
         $current_html = $stmt->fetchColumn();
-        $html = '<div style="padding:12px;background:#f8f9fa;border-bottom:1px solid #ddd;margin-bottom:12px;">';
+        $html = '<div style="padding:12px;background:#fdf9f8;border-bottom:1px solid #e5d5d5;margin-bottom:12px;">';
         $html .= '<strong>Version v' . $version . '</strong> – ' . date('Y-m-d H:i:s', strtotime($version_data['created_at']));
         if ($version_data['note']) {
             $html .= ' – <em>' . htmlspecialchars($version_data['note']) . '</em>';
@@ -2047,14 +2047,14 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
 .btn-block { width:100%; justify-content:center; }
-.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
-.btn-danger:hover { background:#c82333; border-color:#c82333; }
-.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
-.btn-success:hover { background:#218838; border-color:#218838; }
-.btn-info { background:#17a2b8; color:white; border:2px solid #17a2b8; }
-.btn-info:hover { background:#138496; border-color:#138496; }
-.btn-warning { background:#ffc107; color:#212529; border:2px solid #ffc107; }
-.btn-warning:hover { background:#e0a800; border-color:#e0a800; }
+.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
+.btn-danger:hover { background:#94404a; border-color:#94404a; }
+.btn-success { background:#4f8a63; color:white; border:2px solid #4f8a63; }
+.btn-success:hover { background:#3e6f4f; border-color:#3e6f4f; }
+.btn-info { background:#8a6f86; color:white; border:2px solid #8a6f86; }
+.btn-info:hover { background:#6f5770; border-color:#6f5770; }
+.btn-warning { background:#c9965a; color:#212529; border:2px solid #c9965a; }
+.btn-warning:hover { background:#a8783f; border-color:#a8783f; }
 
 .admin-process-book { padding:32px 0 60px; }
 .admin-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px; }
@@ -2068,8 +2068,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .card-body { padding:24px; }
 
 .alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
-.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
+.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
 
 .form-group { margin-bottom:16px; }
 .form-group label { display:block; font-weight:600; margin-bottom:6px; font-size:0.9rem; color:var(--text); }
@@ -2154,7 +2154,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
                 <button onclick="processNextQueued()" class="btn btn-secondary btn-large"><!-- F89 -->
                     <i class="fas fa-play"></i> Process next queued book
                 </button>
-                <div id="extract-status" style="display:none;padding:12px;border-radius:8px;margin-top:12px;background:#f8f9fa;"></div>
+                <div id="extract-status" style="display:none;padding:12px;border-radius:8px;margin-top:12px;background:#fdf9f8;"></div>
             </div>
         </div>
 
@@ -2281,7 +2281,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
             <div class="card-body">
                 <button class="btn btn-secondary" onclick="runHealthCheck()"><i class="fas fa-heartbeat"></i> Run Health Check</button>
                 <div id="healthCheckResults" style="margin-top:12px;font-size:0.9rem;color:var(--text-light);">
-                    <span style="color:#999;">Click the button to scan the book.</span>
+                    <span style="color:#a08a8a;">Click the button to scan the book.</span>
                 </div>
             </div>
         </div>
@@ -2306,7 +2306,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
                 <button class="btn btn-secondary" onclick="generateIndex()"><i class="fas fa-list"></i> Generate Book Index</button>
                 <button class="btn btn-outline" onclick="showReadingTime()"><i class="fas fa-clock"></i> Show Reading Time</button>
                 <div id="indexResults" style="margin-top:12px;font-size:0.9rem;color:var(--text-light);">
-                    <span style="color:#999;">Click to generate index.</span>
+                    <span style="color:#a08a8a;">Click to generate index.</span>
                 </div>
                 <div id="readingTimeResult" style="margin-top:12px;font-size:0.9rem;color:var(--text-light);"></div>
             </div>
@@ -2396,7 +2396,7 @@ tinymce.init({
     menubar: true,
     plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount code',
     toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
-    content_style: 'body { font-family: Inter, sans-serif; font-size: 18px; line-height: 2; } .page-break { display: block; width: 100%; border-top: 2px dashed #c0392b; margin: 20px 0; text-align: center; color: #c0392b; font-size: 0.8rem; } .page-break::before { content: "⏎ Page Break"; }',
+    content_style: 'body { font-family: Inter, sans-serif; font-size: 18px; line-height: 2; } .page-break { display: block; width: 100%; border-top: 2px dashed #94404a; margin: 20px 0; text-align: center; color: #94404a; font-size: 0.8rem; } .page-break::before { content: "⏎ Page Break"; }',
     forced_root_block: 'p'
 });
 
@@ -2407,8 +2407,8 @@ function extractAndParse() {
     statusDiv.innerHTML = '⏳ Extracting and parsing content… <span id="awElapsed">0</span> s (large books can take a minute; keep this page open)';
     const awStart = Date.now();
     window.awTimer = setInterval(() => { const e = document.getElementById('awElapsed'); if (e) e.textContent = Math.round((Date.now() - awStart) / 1000); }, 1000); // R4
-    statusDiv.style.background = '#e9ecef';
-    statusDiv.style.color = '#333';
+    statusDiv.style.background = '#f0e8e8';
+    statusDiv.style.color = '#3d2e2e';
     const formData = new FormData();
     formData.append('extract', '1');
     const pl = document.getElementById('pageLength'); if (pl) formData.append('page_length', pl.value); // R3
@@ -2425,25 +2425,25 @@ function extractAndParse() {
             const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
             let html = '<strong>' + esc(data.message) + '</strong><br>'
                 + esc((sm.pages ?? '?') + ' pages · ' + (sm.words ?? '?').toLocaleString() + ' words · ' + (sm.chapters ?? '?') + ' chapters · ' + (sm.seconds ?? '?') + ' s');
-            (data.warnings || []).forEach(w => { html += '<div style="margin-top:6px;color:#856404;">⚠️ ' + esc(w) + '</div>'; });
+            (data.warnings || []).forEach(w => { html += '<div style="margin-top:6px;color:#6f4e22;">⚠️ ' + esc(w) + '</div>'; });
             html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
                 + '<a class="btn btn-sm btn-info" target="_blank" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$book_id; ?>&preview=' + data.version + '">👁️ Preview in the reader</a>'
                 + '<button class="btn btn-sm btn-success" onclick="publishVersion(' + data.version + ')">📢 Publish this version</button>'
                 + '<button class="btn btn-sm btn-outline" onclick="location.reload()">Refresh page</button></div>';
             statusDiv.innerHTML = html;
-            statusDiv.style.background = (data.warnings || []).length ? '#fff3cd' : '#d4edda';
-            statusDiv.style.color = '#155724';
+            statusDiv.style.background = (data.warnings || []).length ? '#f7ecdc' : '#e3efe6';
+            statusDiv.style.color = '#2d5039';
         } else {
             statusDiv.innerHTML = '❌ ' + (data.error || 'Unknown error');
-            statusDiv.style.background = '#f8d7da';
-            statusDiv.style.color = '#721c24';
+            statusDiv.style.background = '#f6e1e3';
+            statusDiv.style.color = '#6e2a31';
         }
     })
     .catch(error => {
         clearInterval(window.awTimer);
         statusDiv.innerHTML = '❌ The server did not answer properly (it may have run out of time on a very large file). Try a smaller file or try again. (' + error.message + ')';
-        statusDiv.style.background = '#f8d7da';
-        statusDiv.style.color = '#721c24';
+        statusDiv.style.background = '#f6e1e3';
+        statusDiv.style.color = '#6e2a31';
         console.error('Fetch error:', error);
     });
 }
@@ -2460,10 +2460,10 @@ function queueBook() {
     }).then(r => r.json()).then(data => {
         if (data.success) {
             statusDiv.innerHTML = '✅ ' + data.message;
-            statusDiv.style.background = '#d4edda';
+            statusDiv.style.background = '#e3efe6';
         } else {
             statusDiv.innerHTML = '❌ ' + (data.error || 'Unknown error');
-            statusDiv.style.background = '#f8d7da';
+            statusDiv.style.background = '#f6e1e3';
         }
     });
 }
@@ -2486,7 +2486,7 @@ function processNextQueued() {
                 .then(r => r.json())
                 .then(data => {
                     statusDiv.innerHTML = (data.success ? '✅ "' + next.title + '": ' + data.message : '❌ "' + next.title + '": ' + (data.error || 'Unknown error'));
-                    statusDiv.style.background = data.success ? '#d4edda' : '#f8d7da';
+                    statusDiv.style.background = data.success ? '#e3efe6' : '#f6e1e3';
                 });
         })
         .catch(err => { statusDiv.innerHTML = '❌ ' + err.message; });
@@ -2838,9 +2838,9 @@ function runHealthCheck() {
             let html = '';
             html += '<strong>Reading Time:</strong> ' + data.reading_time + ' (' + data.word_count + ' words)<br>';
             if (data.errors.length === 0) {
-                html += '<span style="color:#28a745;">✅ No issues found.</span>';
+                html += '<span style="color:#4f8a63;">✅ No issues found.</span>';
             } else {
-                html += '<span style="color:#dc3545;">⚠️ Issues found:</span><ul>';
+                html += '<span style="color:#b4505a;">⚠️ Issues found:</span><ul>';
                 data.errors.forEach(e => { html += '<li>' + e + '</li>'; });
                 html += '</ul>';
             }
@@ -2886,12 +2886,12 @@ function loadComments(paraIdx = null) {
             const list = document.getElementById('commentList');
             list.innerHTML = '';
             if (data.comments.length === 0) {
-                list.innerHTML = '<span style="color:#999;">No comments yet.</span>';
+                list.innerHTML = '<span style="color:#a08a8a;">No comments yet.</span>';
                 return;
             }
             data.comments.forEach(c => {
                 list.innerHTML += `<div style="padding:8px;border-bottom:1px solid var(--border);${c.resolved ? 'opacity:0.6;' : ''}">`;
-                list.innerHTML += `<strong>Paragraph ${c.paragraph_index}</strong> <span style="color:#999;">${c.created_at}</span>`;
+                list.innerHTML += `<strong>Paragraph ${c.paragraph_index}</strong> <span style="color:#a08a8a;">${c.created_at}</span>`;
                 list.innerHTML += `<p>${c.comment}</p>`;
                 if (!c.resolved) {
                     list.innerHTML += `<button class="btn btn-sm btn-success" onclick="resolveComment(${c.id})">✓ Resolve</button> `;

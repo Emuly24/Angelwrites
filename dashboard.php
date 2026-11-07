@@ -129,21 +129,21 @@ $pageTitle = 'My Dashboard';
     --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
     --shadow: 0 4px 20px rgba(0,0,0,0.04);
 }
-body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #333; }
+body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #3d2e2e; }
 body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
 body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
 
 /* User Hero */
 .user-hero { background: linear-gradient(135deg, #fff, var(--rose-light)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--rose-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .user-hero h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; margin:0; letter-spacing: -0.5px; }
-.user-hero .sub { color: #666; margin-top: 4px; font-size: 0.95rem; }
+.user-hero .sub { color: #6b5a5a; margin-top: 4px; font-size: 0.95rem; }
 
 /* Core Stats */
 .user-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 28px; }
 .user-stat-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); text-align: center; transition: 0.2s; }
 .user-stat-card:hover { transform: translateY(-4px); border-color: var(--rose); }
 .user-stat-card .num { font-size: 2.2rem; font-weight: 700; color: var(--rose); display: block; }
-.user-stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-top: 6px; }
+.user-stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #6b5a5a; margin-top: 6px; }
 
 /* Alerts Row */
 .user-alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
@@ -161,9 +161,9 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
 /* User Monitoring Stats */
 .user-monitoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
 .user-monitor-card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
-.user-monitor-card .title { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+.user-monitor-card .title { font-size: 0.75rem; color: #8a7878; text-transform: uppercase; }
 .user-monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); margin: 4px 0; }
-.user-monitor-card .sub { font-size: 0.75rem; color: #666; }
+.user-monitor-card .sub { font-size: 0.75rem; color: #6b5a5a; }
 
 /* Recent Content */
 .user-content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
@@ -175,7 +175,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .user-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .user-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .user-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.user-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #333; transition: 0.2s; text-align: center; }
+.user-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #3d2e2e; transition: 0.2s; text-align: center; }
 .user-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
 .user-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
 .user-module-btn span { font-size: 0.75rem; font-weight: 500; }
@@ -208,10 +208,10 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
                 $aw_level = (int)($stats['level'] ?? 1); $aw_points = (int)($stats['points'] ?? 0);
                 ?>
                 <?php if ((int)$stats['current_streak'] > 0): ?>
-                <span style="background: #f1c40f; color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo (int)$stats['current_streak']; ?> Day Streak</span>
+                <span style="background: #c9965a; color: #3d2e2e; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo (int)$stats['current_streak']; ?> Day Streak</span>
                 <?php endif; ?>
                 <?php if ($aw_level > 1 || $aw_points > 0): ?>
-                <span style="background: var(--bg); color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🏆 Level <?php echo $aw_level; ?><?php echo $aw_points > 0 ? ' (' . $aw_points . ' pts)' : ''; ?></span>
+                <span style="background: var(--bg); color: #3d2e2e; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🏆 Level <?php echo $aw_level; ?><?php echo $aw_points > 0 ? ' (' . $aw_points . ' pts)' : ''; ?></span>
                 <?php endif; ?>
             </div>
         </div>
@@ -219,7 +219,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <a href="notifications.php" class="btn btn-outline btn-sm" style="position:relative; border-radius:30px; text-decoration:none;">
                 <i class="fas fa-bell"></i> Alerts
                 <?php if ($unread_count > 0): ?>
-                    <span style="position:absolute; top:-8px; right:-8px; background:#e74c3c; color:white; border-radius:50%; padding:2px 8px; font-size:0.65rem; font-weight:700;"><?php echo $unread_count; ?></span>
+                    <span style="position:absolute; top:-8px; right:-8px; background:#b4505a; color:white; border-radius:50%; padding:2px 8px; font-size:0.65rem; font-weight:700;"><?php echo $unread_count; ?></span>
                 <?php endif; ?>
             </a>
             <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-bolt"></i> Quick Actions</button>
@@ -242,9 +242,9 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <div class="user-alert-list"><?php if(count($notifications)>0): foreach($notifications as $n): ?>
                 <div class="user-alert-item" style="<?php echo $n['is_read'] ? '' : 'background:rgba(219,161,162,0.05); border-left:3px solid var(--rose); padding-left:8px;'; ?>">
                     <span><strong><?php echo htmlspecialchars($n['title']); ?></strong> – <?php echo htmlspecialchars(substr($n['message'],0,30)); ?>...</span>
-                    <span style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($n['created_at'])); ?></span>
+                    <span style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($n['created_at'])); ?></span>
                 </div>
-            <?php endforeach; else: ?><div class="user-alert-item" style="color:#999;">All caught up!</div><?php endif; ?></div>
+            <?php endforeach; else: ?><div class="user-alert-item" style="color:#a08a8a;">All caught up!</div><?php endif; ?></div>
             <div style="display:flex; gap:8px; margin-top:8px;">
                 <a href="notifications.php" class="btn btn-sm btn-outline">View All</a>
                 <form method="POST" style="display:inline;">
@@ -256,7 +256,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
         <div class="user-alert-card"><h4><i class="fas fa-calendar-check" style="color:var(--rose);"></i> Upcoming Sessions</h4>
             <div class="user-alert-list"><?php if(count($upcoming_sessions)>0): foreach($upcoming_sessions as $s): ?>
                 <div class="user-alert-item"><span><?php echo date('M j, g:i a', strtotime($s['date'].' '.$s['time'])); ?> – <?php echo htmlspecialchars($s['message'] ?: 'Booked Session'); ?></span><span class="badge badge-info"><?php echo ucfirst($s['status']); ?></span></div>
-            <?php endforeach; else: ?><div class="user-alert-item" style="color:#999;">No upcoming sessions.</div><?php endif; ?></div>
+            <?php endforeach; else: ?><div class="user-alert-item" style="color:#a08a8a;">No upcoming sessions.</div><?php endif; ?></div>
             <a href="book_session.php" class="btn btn-sm btn-primary" style="margin-top:8px;">Book a Session</a>
         </div>
     </div>
@@ -272,7 +272,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
         <div class="user-monitor-card" style="cursor: pointer;" onclick="openStatsModal('views')">
             <div class="title">My Total Views</div>
             <div class="value" id="my_total_views"><?php echo number_format($stats['my_views'] ?? 0); ?></div>
-            <div class="sub">My Poems + Books <span style="font-size:0.7rem; color:#ccc;">(Click to view)</span></div>
+            <div class="sub">My Poems + Books <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
         </div>
         <div class="user-monitor-card"><div class="title">Read Today</div><div class="value" id="my_today"><?php echo $stats['my_minutes_today'] ?? 0; ?>m</div><div class="sub">Last 24 hours</div></div>
         <div class="user-monitor-card"><div class="title">Read This Week</div><div class="value" id="my_week"><?php echo $stats['my_minutes_week'] ?? 0; ?>m</div><div class="sub">Last 7 days</div></div>
@@ -281,7 +281,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
         <div class="user-monitor-card" style="cursor: pointer;" onclick="openStatsModal('reading')">
             <div class="title">My Reading Hours</div>
             <div class="value" id="my_hours"><?php echo number_format($stats['my_reading_hours'] ?? 0); ?></div>
-            <div class="sub">Lifetime <span style="font-size:0.7rem; color:#ccc;">(Click to view)</span></div>
+            <div class="sub">Lifetime <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
         </div>
     </div>
 
@@ -289,10 +289,10 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <div style="margin-bottom: 20px;">
         <h3 style="font-family:'Playfair Display'; margin-bottom:12px;">📚 My Recent Activity</h3>
         <div class="user-content-grid">
-            <div class="user-content-card"><h4>Currently Reading</h4><?php foreach($reading_books as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['title']); ?></a></div><div style="font-size:0.7rem; color:#999;"><?php echo (int)($b['progress'] ?? 0); ?>% complete<?php if (!empty($b['last_page'])): ?> · page <?php echo (int)$b['last_page']; ?><?php endif; ?></div></div><a class="btn btn-sm btn-primary" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>">Continue</a></div><?php endforeach; ?><?php if (!$reading_books): ?><div style="font-size:0.8rem;color:#999;">Open a book to see it here.</div><?php endif; ?></div>
-            <div class="user-content-card"><h4>Recent Poems</h4><?php foreach($recent_poems as $p): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($p['title']); ?></div><div style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($p['created_at'])); ?></div></div></div><?php endforeach; ?></div>
-            <div class="user-content-card"><h4>Recent Videos</h4><?php foreach($recent_videos as $v): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($v['title']); ?></div><div style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($v['created_at'])); ?></div></div></div><?php endforeach; ?></div>
-            <div class="user-content-card"><h4>Recent Blog</h4><?php foreach($recent_blog as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($b['title']); ?></div><div style="font-size:0.7rem; color:#999;"><?php echo date('M j', strtotime($b['created_at'])); ?></div></div></div><?php endforeach; ?></div>
+            <div class="user-content-card"><h4>Currently Reading</h4><?php foreach($reading_books as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['title']); ?></a></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo (int)($b['progress'] ?? 0); ?>% complete<?php if (!empty($b['last_page'])): ?> · page <?php echo (int)$b['last_page']; ?><?php endif; ?></div></div><a class="btn btn-sm btn-primary" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>">Continue</a></div><?php endforeach; ?><?php if (!$reading_books): ?><div style="font-size:0.8rem;color:#a08a8a;">Open a book to see it here.</div><?php endif; ?></div>
+            <div class="user-content-card"><h4>Recent Poems</h4><?php foreach($recent_poems as $p): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($p['title']); ?></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($p['created_at'])); ?></div></div></div><?php endforeach; ?></div>
+            <div class="user-content-card"><h4>Recent Videos</h4><?php foreach($recent_videos as $v): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($v['title']); ?></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($v['created_at'])); ?></div></div></div><?php endforeach; ?></div>
+            <div class="user-content-card"><h4>Recent Blog</h4><?php foreach($recent_blog as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($b['title']); ?></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($b['created_at'])); ?></div></div></div><?php endforeach; ?></div>
         </div>
     </div>
 
@@ -334,13 +334,13 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <div class="modal-overlay" id="quickModal">
         <div class="modal-box">
             <h2>Quick Actions</h2>
-            <p style="color:#666; margin-bottom: 16px;">Select what you want to do.</p>
+            <p style="color:#6b5a5a; margin-bottom: 16px;">Select what you want to do.</p>
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 <a href="books.php" class="btn btn-primary">📖 Browse Books</a>
                 <a href="poetry.php" class="btn btn-primary">✍️ Read a Poem</a>
                 <a href="groups.php" class="btn btn-primary">👥 Join a Group</a>
                 <a href="profile.php" class="btn btn-primary">⚙️ Update Profile</a>
-                <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #ccc; color:#666; margin-top: 8px;">Cancel</button>
+                <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #d4c8c8; color:#6b5a5a; margin-top: 8px;">Cancel</button>
             </div>
         </div>
     </div>
@@ -353,7 +353,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
                 <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
             </div>
             <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem;">
-                <p style="color:#999; text-align:center;">Loading your personal data...</p>
+                <p style="color:#a08a8a; text-align:center;">Loading your personal data...</p>
             </div>
         </div>
     </div>
@@ -428,7 +428,7 @@ function openStatsModal(type) {
     document.getElementById('statsModal').classList.add('active');
     const body = document.getElementById('statsModalBody');
     const title = document.getElementById('statsModalTitle');
-    body.innerHTML = '<p style="color:#999; text-align:center;">Loading your history...</p>';
+    body.innerHTML = '<p style="color:#a08a8a; text-align:center;">Loading your history...</p>';
 
     const url = '<?php echo SITE_URL; ?>/ajax_user.php?action=' + (type === 'views' ? 'get_my_view_details' : 'get_my_reading_details');
     title.textContent = type === 'views' ? '📊 My Viewed Content' : '📖 My Reading Sessions';
@@ -437,19 +437,19 @@ function openStatsModal(type) {
         .then(res => res.json())
         .then(data => {
             if (!data.success || data.logs.length === 0) {
-                body.innerHTML = '<p style="color:#999; text-align:center;">You haven\'t recorded any activity yet. Start reading!</p>';
+                body.innerHTML = '<p style="color:#a08a8a; text-align:center;">You haven\'t recorded any activity yet. Start reading!</p>';
                 return;
             }
             let html = '<table><thead><tr><th>Content</th><th>Date & Time</th></tr></thead><tbody>';
             data.logs.forEach(row => {
                 let titleCol = row.target_type === 'poem' ? htmlspecialchars(row.poem_title) : htmlspecialchars(row.book_title);
-                let subTitle = `<span style="color:#999;font-size:0.75rem;display:block;">${row.target_type}</span>`;
+                let subTitle = `<span style="color:#a08a8a;font-size:0.75rem;display:block;">${row.target_type}</span>`;
                 if(type === 'views') {
-                    html += `<tr><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#666;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
+                    html += `<tr><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#6b5a5a;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
                 } else {
                     let dur = Math.floor(row.duration_seconds / 60);
                     let sec = row.duration_seconds % 60;
-                    html += `<tr><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#666;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#eee; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
+                    html += `<tr><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#6b5a5a;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#f0e8e8; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
                 }
             });
             html += '</tbody></table>';

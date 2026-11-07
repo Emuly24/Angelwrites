@@ -65,9 +65,6 @@ $pageTitle = 'Cancel Session';
 <div class="session-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <div class="session-wrapper">
             <div class="session-header">
@@ -147,15 +144,15 @@ function toggleTheme() {
 .session-detail strong { color: var(--text); }
 
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.pending { background: #f1c40f; color: white; }
-.status-badge.confirmed { background: #2ecc71; color: white; }
-.status-badge.cancelled { background: #e74c3c; color: white; }
-.status-badge.completed { background: #3498db; color: white; }
+.status-badge.pending { background: #c9965a; color: white; }
+.status-badge.confirmed { background: #4f8a63; color: white; }
+.status-badge.cancelled { background: #b4505a; color: white; }
+.status-badge.completed { background: #8a6f86; color: white; }
 
 .cancel-actions { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
 .cancel-actions .btn-large { padding: 14px 32px; font-size: 1.05rem; border-radius: 30px; }
-.btn-danger { background: #e74c3c; color: white; transition: background 0.3s; }
-.btn-danger:hover { background: #c0392b; }
+.btn-danger { background: #b4505a; color: white; transition: background 0.3s; }
+.btn-danger:hover { background: #94404a; }
 
 @media (max-width: 480px) {
     .cancel-actions { flex-direction: column; align-items: center; }

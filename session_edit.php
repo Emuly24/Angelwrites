@@ -101,9 +101,6 @@ $pageTitle = 'Edit Session';
 <div class="session-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <div class="session-wrapper">
             <div class="session-header">
@@ -220,7 +217,7 @@ function toggleTheme() {
     box-shadow: 0 0 0 3px rgba(219,161,162,0.15);
 }
 .session-form textarea { resize: vertical; min-height: 100px; }
-.required { color: #e74c3c; }
+.required { color: #b4505a; }
 .session-form .btn-block { width: 100%; padding: 14px; font-size: 1.05rem; justify-content: center; }
 
 @media (max-width: 480px) {

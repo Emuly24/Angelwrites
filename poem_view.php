@@ -340,7 +340,7 @@ require_once 'includes/header.php';
     --shadow: 0 4px 16px rgba(44,30,30,0.08); --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
     --input-bg: #ffffff;
 }
-body.dark-mode { --bg: #1a1a1a; --card-bg: #2a2a2a; --border: #444; --text: #e8dddd; --text-light: #aaa; --vanilla: #2a2a2a; --fantasy: #1a1a1a; --shadow: 0 4px 20px rgba(0,0,0,0.4); --shadow-hover: 0 12px 40px rgba(0,0,0,0.5); --input-bg: #333; }
+body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; --text: #e8dddd; --text-light: #b8a8a8; --vanilla: #2c1e1e; --fantasy: #1a1212; --shadow: 0 4px 20px rgba(0,0,0,0.4); --shadow-hover: 0 12px 40px rgba(0,0,0,0.5); --input-bg: #3d2e2e; }
 body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 .poem-view-page { padding: 32px 0 60px; }
 .poem-nav { margin-bottom: 24px; }
@@ -382,8 +382,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .reviews-section h3 { font-size: 1.4rem; margin-bottom: 16px; }
 .rating-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .rating-stars { display: flex; gap: 2px; }
-.rating-stars .filled { color: #f1c40f; }
-.rating-stars .empty { color: #ddd; }
+.rating-stars .filled { color: #c9965a; }
+.rating-stars .empty { color: #e5d5d5; }
 .rating-score { font-weight: 700; font-size: 1.1rem; }
 .rating-count { color: var(--text-light); font-size: 0.9rem; }
 
@@ -497,8 +497,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     font-size: 0.9rem;
 }
 #recordBtn:hover { background: var(--rose-dark); transform: translateY(-2px); }
-#recordBtn.btn-danger { background: #e74c3c; }
-#recordBtn.btn-danger:hover { background: #c0392b; }
+#recordBtn.btn-danger { background: #b4505a; }
+#recordBtn.btn-danger:hover { background: #94404a; }
 
 /* ============================================================
    ADMIN REPLY SECTION (New Modern Styling)
@@ -546,7 +546,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
 .reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
 .reply-link:hover { color: var(--rose-dark); }
-.private-badge { background: #ffd700; color: #333; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: 6px; }
+.private-badge { background: #ffd700; color: #3d2e2e; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: 6px; }
 .tag-suggestions { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; z-index: 99999; min-width: 150px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 4px 0; }
 .tag-suggestions div { padding: 8px 16px; cursor: pointer; font-size: 0.95rem; color: var(--text); }
 .tag-suggestions div:hover { background: var(--vanilla); }
@@ -559,8 +559,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .admin-badge { background: var(--rose); color: white; font-size: 0.7rem; padding: 2px 10px; border-radius: 12px; font-weight: 600; }
 .review-date { font-size: 0.85rem; color: var(--text-light); margin: 2px 0 6px; }
 .review-rating { margin-bottom: 6px; }
-.review-rating .filled { color: #f1c40f; }
-.review-rating .empty { color: #ddd; }
+.review-rating .filled { color: #c9965a; }
+.review-rating .empty { color: #e5d5d5; }
 .review-comment { line-height: 1.6; color: var(--text); }
 .voice-comment-player { margin: 6px 0; }
 .voice-comment-player audio { width: 100%; border-radius: 8px; }
@@ -670,7 +670,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
                     <h4>🎙️ Record a Voice Comment</h4>
                     <div class="recorder-wrapper">
                         <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                        <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                        <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                         <form method="POST" enctype="multipart/form-data" id="voiceForm" style="display:none; margin-top:10px;">
                             <input type="hidden" name="submit_voice_comment" value="1">
                             <input type="hidden" name="target_id" value="<?php echo $id; ?>">

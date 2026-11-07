@@ -591,7 +591,7 @@ $pageTitle = 'Manage Videos';
 }
 .camera-shutter-btn:hover .shutter-inner { opacity: 0.8; }
 .camera-shutter-btn.recording .shutter-inner {
-    background: #ff3b30; width: 24px; height: 24px; border-radius: 6px;
+    background: #b4505a; width: 24px; height: 24px; border-radius: 6px;
 }
 
 .camera-btn {
@@ -643,7 +643,7 @@ $pageTitle = 'Manage Videos';
 .table-responsive { overflow-x: auto; margin-bottom: 16px; border-radius: 12px; }
 .no-items { text-align: center; padding: 40px 0; color: var(--text-light); }
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; background: var(--vanilla); color: var(--text); }
-.source-local { color: #27ae60; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px; }
+.source-local { color: #4f8a63; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px; }
 .source-link { color: var(--rose); font-size: 0.85rem; text-decoration: none; }
 .source-link:hover { text-decoration: underline; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -655,7 +655,7 @@ $pageTitle = 'Manage Videos';
     width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; background: var(--input-bg); color: var(--text);
 }
 .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
-.required { color: #dc2626; }
+.required { color: #b4505a; }
 .admin-form .form-actions { display: flex; gap: 12px; margin-top: 16px; }
 .admin-form .btn-large { padding: 14px 28px; border-radius: 30px; font-size: 1.05rem; }
 .video-upload-section { border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; background: var(--fantasy); }
@@ -993,7 +993,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dt.items.add(file);
             liveThumbnailInput.files = dt.files;
             photoStatus.textContent = '✅ Photo confirmed!';
-            photoStatus.style.color = '#2ecc71';
+            photoStatus.style.color = '#4f8a63';
             closeCamera();
         } else if (currentMode === 'video' && recordedBlob) {
             const file = new File([recordedBlob], 'recorded_video.webm', { type: 'video/webm' });
@@ -1002,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', function() {
             videoFileInput.files = dt.files;
             fileChosen.textContent = '✅ Video confirmed!';
             videoStatus.textContent = '✅ Video confirmed!';
-            videoStatus.style.color = '#2ecc71';
+            videoStatus.style.color = '#4f8a63';
             closeCamera();
         }
     }

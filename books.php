@@ -83,7 +83,7 @@ $pageTitle = 'Books';
         <!-- ===== PAGE HEADER ===== -->
         <div class="books-header">
             <div class="books-header-content">
-                <h1>📖 All Books</h1>
+                <h1>All Books</h1>
                 <p>Explore Angella's writings — available for reading, download, or purchase.</p>
             </div>
             <div class="books-header-stats">
@@ -419,22 +419,22 @@ document.addEventListener('keydown', function(e) {
     --rose-dark: #c08a8b;
     --rose-light: #f5e0df;
     --vanilla: #EFD8D6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -521,8 +521,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     padding: 4px 14px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.5px; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
-.badge.free { background: #27ae60; }
-.badge.sale { background: #e74c3c; }
+.badge.free { background: #4f8a63; }
+.badge.sale { background: #b4505a; }
 
 /* ===== BOOK DETAILS ===== */
 .book-details { padding: 20px 24px 24px; flex: 1; display: flex; flex-direction: column; }
@@ -542,8 +542,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
 }
 .book-price { font-weight: 700; font-size: 1rem; color: var(--text); }
-.free-text { color: #27ae60; }
-.sale-text { color: #e74c3c; }
+.free-text { color: #4f8a63; }
+.sale-text { color: #b4505a; }
 .book-actions { display: flex; gap: 8px; }
 .book-actions .btn { padding: 6px 16px; border-radius: 30px; font-size: 0.8rem; font-weight: 600; transition: all 0.2s ease; }
 .book-actions .btn-primary { background: var(--rose); color: white; border: none; }
@@ -606,8 +606,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 #paymentForm input[readonly] { background: var(--vanilla); cursor: not-allowed; }
 .payment-status { margin: 12px 0; text-align: center; font-weight: 500; font-size: 0.95rem; }
 .payment-status .loading { color: var(--text-light); }
-.payment-status .success { color: #2ecc71; }
-.payment-status .error { color: #e74c3c; }
+.payment-status .success { color: #4f8a63; }
+.payment-status .error { color: #b4505a; }
 .payment-status i { margin-right: 6px; }
 
 /* ===== MODAL ACTIONS ===== */

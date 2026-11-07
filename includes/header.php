@@ -291,11 +291,11 @@ if ($isLoggedIn) {
                         <li role="none"><a href="<?php echo SITE_URL; ?>/register.php" class="btn-signup" role="menuitem">Sign Up</a></li>
                     <?php elseif ($isAdmin): ?>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_books.php" role="menuitem">📖 Books</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" role="menuitem">📝 Poems</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" role="menuitem">📅 Sessions</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_users.php" role="menuitem">👥 Users</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/settings.php" role="menuitem">⚙️ Settings</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_books.php" role="menuitem"><i class="fas fa-book"></i> Books</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" role="menuitem"><i class="fas fa-feather-pointed"></i> Poems</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" role="menuitem"><i class="fas fa-calendar-check"></i> Sessions</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_users.php" role="menuitem"><i class="fas fa-users"></i> Users</a></li>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/settings.php" role="menuitem"><i class="fas fa-gear"></i> Settings</a></li>
                         <li class="nav-separator" role="separator">|</li>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                     <?php else: ?>
@@ -366,7 +366,7 @@ if ($isLoggedIn) {
                                 <a href="<?php echo SITE_URL; ?>/library.php">My Library</a>
                                 <a href="<?php echo SITE_URL; ?>/profile.php">Profile</a>
                                 <hr>
-                                <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #e74c3c;">Logout</a>
+                                <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #b4505a;">Logout</a>
                             </div>
                         </div>
                     <?php else: ?>

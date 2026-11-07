@@ -109,9 +109,6 @@ $pageTitle = 'Reset Password';
 <div class="auth-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <div class="auth-wrapper">
             <div class="auth-card">
@@ -212,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (password.match(/[^a-zA-Z0-9]/)) strength++;
 
         const levels = ['None', 'Weak', 'Fair', 'Good', 'Strong'];
-        const colors = ['#ddd', '#e74c3c', '#f39c12', '#3498db', '#2ecc71'];
+        const colors = ['#e5d5d5', '#b4505a', '#c9965a', '#8a6f86', '#4f8a63'];
         const widths = ['0%', '20%', '40%', '60%', '100%'];
 
         strengthBar.style.width = widths[strength];
@@ -277,25 +274,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -315,17 +312,17 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .form-group input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 
 .field-status { font-size: 0.8rem; margin-top: 4px; }
-.field-status.success { color: #27ae60; }
-.field-status.error { color: #e74c3c; }
-.field-status.info { color: #3498db; }
+.field-status.success { color: #4f8a63; }
+.field-status.error { color: #b4505a; }
+.field-status.info { color: #8a6f86; }
 
 .password-wrapper { position: relative; }
 .password-wrapper input { padding-right: 40px; }
-.password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; }
-.password-toggle:hover { color: #333; }
+.password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6b5a5a; }
+.password-toggle:hover { color: #3d2e2e; }
 
 .password-strength-meter { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.strength-bar { height: 4px; width: 0%; background: #ddd; border-radius: 2px; transition: width 0.3s; }
+.strength-bar { height: 4px; width: 0%; background: #e5d5d5; border-radius: 2px; transition: width 0.3s; }
 #strengthText { font-size: 0.8rem; color: var(--text-light); }
 
 .btn-block { width: 100%; justify-content: center; padding: 12px; font-size: 1rem; }
@@ -334,7 +331,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .auth-footer a { color: var(--rose); font-weight: 600; }
 
 .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
-.alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+.alert-error { background: #f6e1e3; color: #94404a; border: 1px solid #f87171; }
 .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
 
 @media (max-width: 480px) {

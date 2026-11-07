@@ -51,10 +51,18 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 <div class="admin-page">
     <div class="container" style="max-width:960px;margin:0 auto;padding:24px 16px;">
-        <h1>💬 Testimonials</h1>
-        <p><a href="<?php echo SITE_URL; ?>/admin/dashboard.php">← Admin dashboard</a> · Approved testimonials appear on the homepage.</p>
+        <div class="admin-header"><!-- C3 -->
+            <div>
+                <h1>Testimonials</h1>
+                <p><a href="<?php echo SITE_URL; ?>/admin/dashboard.php">← Admin dashboard</a> · Approved testimonials appear on the homepage.</p>
+            </div>
+        </div>
         <?php if (!$items): ?>
-            <p>No testimonials yet.</p>
+            <div class="empty-state"><!-- C5 -->
+            <div class="empty-state-icon"><i class="fas fa-comment-dots" aria-hidden="true"></i></div>
+            <h3>No testimonials yet</h3>
+            <p>Testimonies shared by members will wait here for your review.</p>
+        </div>
         <?php endif; ?>
         <?php foreach ($items as $t): ?>
             <div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">

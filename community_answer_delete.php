@@ -74,8 +74,8 @@ $pageTitle = 'Delete Answer';
 <style>
 .delete-actions { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
 .delete-actions .btn-large { padding: 14px 32px; font-size: 1.05rem; border-radius: 30px; }
-.btn-danger { background: #e74c3c; color: white; }
-.btn-danger:hover { background: #c0392b; }
+.btn-danger { background: #b4505a; color: white; }
+.btn-danger:hover { background: #94404a; }
 @media (max-width: 480px) { .delete-actions { flex-direction: column; align-items: center; } }
 </style>
 <?php require_once 'includes/footer.php'; ?>

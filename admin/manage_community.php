@@ -77,7 +77,7 @@ $pageTitle = 'Manage Community';
 <div class="admin-page">
     <div class="container">
         <div class="admin-header">
-            <h1>⚖️ Community reports</h1>
+            <h1>Community reports</h1>
             <div>
                 <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php" class="btn btn-outline">💬 Questions &amp; answers</a><!-- Q35 -->
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">Back to Dashboard</a>
@@ -173,9 +173,9 @@ $pageTitle = 'Manage Community';
 
 <style>
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-.status-badge.pending { background: #f1c40f; color: #fff; }
-.status-badge.dismissed { background: #95a5a6; color: #fff; }
-.status-badge.action_taken { background: #2ecc71; color: #fff; }
+.status-badge.pending { background: #c9965a; color: #fff; }
+.status-badge.dismissed { background: #a08a8a; color: #fff; }
+.status-badge.action_taken { background: #4f8a63; color: #fff; }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

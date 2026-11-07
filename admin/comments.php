@@ -340,15 +340,15 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
 .comment-poem a { color: var(--rose); text-decoration: none; }
 .comment-poem a:hover { text-decoration: underline; }
 .comment-views { font-size: 0.8rem; color: var(--text-light); margin-left: 8px; }
-.comment-rating .filled { color: #f1c40f; }
-.comment-rating .empty { color: #ddd; }
+.comment-rating .filled { color: #c9965a; }
+.comment-rating .empty { color: #e5d5d5; }
 .comment-text { margin: 8px 0; line-height: 1.6; }
 .comment-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .comment-actions .btn { padding: 4px 12px; font-size: 0.8rem; }
 .reply-form-container { margin-top: 8px; padding: 12px; background: var(--vanilla); border-radius: 8px; display: none; }
 .reply-form-container textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; min-height: 60px; background: var(--card-bg); color: var(--text); }
 .reply-form-container .btn { margin-top: 6px; }
-.private-badge { background: #ffd700; color: #333; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.private-badge { background: #ffd700; color: #3d2e2e; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
 .admin-badge { background: var(--rose); color: white; font-size: 0.7rem; padding: 2px 10px; border-radius: 12px; font-weight: 600; }
 .reaction-count { font-size: 0.8rem; color: var(--text-light); }
 .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 20px; flex-wrap: wrap; }
@@ -364,7 +364,9 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
 
 <div class="dashboard-page">
     <div class="container">
-        <h2><i class="fas fa-comments" style="color: var(--rose);"></i> Comment Management</h2>
+        <div class="admin-header"><!-- C3 -->
+            <h1>Comment Management</h1>
+        </div>
 
         <!-- Tab Navigation -->
         <div class="tab-nav">

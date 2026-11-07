@@ -78,9 +78,6 @@ $pageTitle = 'Contact';
 <div class="contact-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <!-- ===== HERO / PAGE HEADER ===== -->
         <div class="contact-hero">
@@ -253,8 +250,8 @@ p { line-height: 1.6; }
 
 /* ===== ALERTS ===== */
 .alert { padding: 14px 20px; border-radius: 16px; margin-bottom: 20px; font-weight: 500; }
-.alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-.alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.alert-error { background: #f6e1e3; color: #6e2a31; border: 1px solid #ecc5c9; }
+.alert-success { background: #e3efe6; color: #2d5039; border: 1px solid #c5dccb; }
 
 /* ===== LAYOUT ===== */
 .contact-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 1000px; margin: 0 auto; }
@@ -268,7 +265,7 @@ p { line-height: 1.6; }
 
 .contact-form .form-group { margin-bottom: 16px; }
 .contact-form label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: var(--text); }
-.contact-form .required { color: #dc3545; }
+.contact-form .required { color: #b4505a; }
 .contact-form input, .contact-form textarea {
     width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px;
     font-size: 0.95rem; background: var(--input-bg); color: var(--text); transition: border-color 0.2s;

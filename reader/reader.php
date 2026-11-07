@@ -117,7 +117,7 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 .theme-light { --bg: #F7F3ED; --card-bg: #ffffff; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
 .theme-dark { --bg: #1a1212; --card-bg: #2c1e1e; --text: #e8dddd; --border: #4a3a3a; --input-bg: #2c1e1e; }
 /* R13: high contrast – black on white, strong borders and darker accents (WCAG AAA text contrast) */
-.theme-contrast { --bg: #ffffff; --card-bg: #ffffff; --text: #000000; --text-light: #1a1a1a; --dark: #000000; --border: #000000; --input-bg: #ffffff; --rose: #7a1f22; --rose-dark: #5c1215; --vanilla: #f2f2f2; }
+.theme-contrast { --bg: #ffffff; --card-bg: #ffffff; --text: #000000; --text-light: #1a1212; --dark: #000000; --border: #000000; --input-bg: #ffffff; --rose: #7a1f22; --rose-dark: #5c1215; --vanilla: #f2f2f2; }
 .theme-contrast .page-content-inner, .theme-contrast .flip-page-custom { color:#000!important; background:#fff!important; }
 .theme-contrast a { text-decoration:underline; }
 .theme-sepia { --bg: #fbf3e9; --card-bg: #fdf5ec; --text: #4a3d36; --border: #d9c9b8; --input-bg: #fdf5ec; }
@@ -344,7 +344,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     <div id="awPageAnnounce" class="aw-sr-only" aria-live="polite" aria-atomic="true"></div><!-- R12 -->
 <?php if (!empty($preview_version)): ?>
     <!-- R5: draft preview banner (admin only) -->
-    <div id="previewBanner" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff3cd;color:#5c4400;border-top:2px solid #e0b100;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;">
+    <div id="previewBanner" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:#f7ecdc;color:#5c4400;border-top:2px solid #e0b100;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;">
         <strong>Preview of draft version <?php echo (int)$preview_version; ?></strong>
         <span><?php echo $live_version ? 'Members currently read version ' . (int)$live_version . '.' : 'Members cannot read this book yet.'; ?> Nothing is saved while previewing.</span>
         <span style="flex:1"></span>
@@ -645,7 +645,7 @@ if (function_exists('renderAchievementToastJS')) {
     function awOfflineNotice() {
         let n = document.getElementById('awOffline');
         if (!navigator.onLine) {
-            if (!n) { n = document.createElement('div'); n.id = 'awOffline'; n.setAttribute('role', 'status'); n.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:100002;background:#333;color:#fff;padding:6px 14px;border-radius:16px;font-size:0.85rem;'; document.body.appendChild(n); }
+            if (!n) { n = document.createElement('div'); n.id = 'awOffline'; n.setAttribute('role', 'status'); n.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:100002;background:#3d2e2e;color:#fff;padding:6px 14px;border-radius:16px;font-size:0.85rem;'; document.body.appendChild(n); }
             n.textContent = 'You are offline. Reading the saved copy; your place will be saved when you reconnect.';
         } else if (n) { n.remove(); savePosition && savePosition(); }
     }
@@ -918,7 +918,7 @@ if (function_exists('renderAchievementToastJS')) {
             const bookTitle = <?php echo json_encode((string)$book['title'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
             w.document.write('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(bookTitle + ' – ' + getChapterTitle(ch)) + '</title>'
                 + '<style>body{font-family:Georgia,"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#000;max-width:42em;margin:2em auto;padding:0 1em}'
-                + 'header{border-bottom:1px solid #999;margin-bottom:1.5em;font-size:10pt;color:#444}section{margin-bottom:1em}'
+                + 'header{border-bottom:1px solid #a08a8a;margin-bottom:1.5em;font-size:10pt;color:#4a3a3a}section{margin-bottom:1em}'
                 + 'img{max-width:100%}[class^="highlight-"],mark{background:none!important;text-decoration:underline}'
                 + '@media print{body{margin:0}a{color:#000;text-decoration:none}}</style></head><body>'
                 + '<header>' + esc(bookTitle) + ' · ' + esc(getChapterTitle(ch)) + ' · pages ' + nums[0] + '–' + nums[nums.length - 1] + '</header>'
@@ -1056,7 +1056,7 @@ if (function_exists('renderAchievementToastJS')) {
         if (isBookmarked) {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
             const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); xhr.send(fd); // F235
-            isBookmarked = false; bookmarkBtn.querySelector('i').className = 'far fa-bookmark'; bookmarkBtn.style.color = '#555';
+            isBookmarked = false; bookmarkBtn.querySelector('i').className = 'far fa-bookmark'; bookmarkBtn.style.color = '#5a4848';
         } else {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
             const fd = new FormData(); fd.append('action','add_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); fd.append('offset',0); xhr.send(fd);
@@ -1077,7 +1077,7 @@ if (function_exists('renderAchievementToastJS')) {
                 data.bookmarks.forEach(b => { if (b.chapter_index == currentPage) exists = true; });
                 isBookmarked = exists;
                 bookmarkBtn.querySelector('i').className = exists ? 'fas fa-bookmark' : 'far fa-bookmark';
-                bookmarkBtn.style.color = exists ? 'var(--rose)' : '#555';
+                bookmarkBtn.style.color = exists ? 'var(--rose)' : '#5a4848';
             })
             .catch(() => {});
     }

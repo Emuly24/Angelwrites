@@ -730,3 +730,256 @@ html.aw-ui #awToast {
     html.aw-ui .btn::after, html.aw-ui .aw-spot::after { display: none; }
     html.aw-ui .aw-progress { display: none; }
 }
+
+/* ===== C3: one page-header style for every page =====
+   Each page had its own title block (plain, pink card, left or centred, with or without emoji).
+   They now share one look: a soft vanilla card with a rose and gold glow, a faint heart, the
+   title in Playfair with a gradient ornament, and the subtitle in the light text colour.
+   Existing layouts (title left with buttons right, or centred) are kept. */
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero, .group-header) {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+        radial-gradient(55% 120% at 100% 0%, rgba(214, 168, 92, 0.16), transparent 62%),
+        radial-gradient(60% 140% at 0% 100%, rgba(219, 161, 162, 0.24), transparent 62%),
+        linear-gradient(135deg, color-mix(in srgb, var(--vanilla) 72%, var(--card-bg)), var(--card-bg));
+    border: 1px solid var(--aw-hairline);
+    border-radius: var(--aw-r-lg);
+    box-shadow: var(--aw-sh-1);
+    padding: clamp(22px, 3.6vw, 38px) clamp(20px, 4vw, 44px);
+    margin-top: 28px;
+    margin-bottom: 28px;
+}
+/* faint heart in the corner */
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero)::before {
+    content: "\f004";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    right: clamp(-10px, 2vw, 28px);
+    top: 50%;
+    translate: 0 -50%;
+    z-index: -1;
+    font-size: 132px;
+    line-height: 1;
+    color: var(--rose);
+    opacity: 0.13;
+    transform: rotate(-12deg);
+    pointer-events: none;
+    animation: awFloat 9s ease-in-out infinite;
+}
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero) :is(h1, h2):first-of-type {
+    font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+    line-height: 1.15;
+    margin: 0 0 6px;
+    color: var(--dark);
+}
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero) h1::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 3px;
+    margin: 12px 0 4px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--aw-rose-deep), var(--aw-gold));
+}
+/* centred headers keep their ornament centred */
+html.aw-ui :is(.about-hero, .contact-hero, .blog-header, .reflections-header, .videos-header, .privacy-header,
+    .terms-header, .accessibility-header, .search-header, .profile-header, .notifications-header,
+    .community-header, .session-header, .bible-reader-page .page-header) h1::after { margin-left: auto; margin-right: auto; }
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero) > :is(p, div > p) {
+    color: var(--text-light);
+}
+/* a page's own ornament under its header would double ours */
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero)::after,
+html.aw-ui :is(.about-hero, .contact-hero, .blog-header, .reflections-header, .videos-header, .privacy-header,
+    .terms-header, .accessibility-header, .search-header, .profile-header, .notifications-header,
+    .community-header, .session-header) :is(p, div)::after { content: none; }
+/* old pages drew their own borders under the title; the card replaces them */
+html.aw-ui :is(.admin-header, .page-header) { border-bottom: 1px solid var(--aw-hairline); }
+/* the header's buttons sit above the decorative heart */
+html.aw-ui :is(.admin-header, .admin-hero, .page-header, .books-header, .library-header, .user-hero) :is(.btn, a, button, select) { position: relative; z-index: 1; }
+@media (max-width: 600px) {
+    html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+        .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+        .notifications-header, .community-header, .session-header, .library-header, .page-header,
+        .admin-header, .admin-hero, .user-hero) { margin-top: 16px; margin-bottom: 20px; border-radius: var(--aw-r); }
+    html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+        .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+        .notifications-header, .community-header, .session-header, .library-header, .page-header,
+        .admin-header, .admin-hero, .user-hero)::before { font-size: 96px; }
+}
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero, .group-header) :is(.hero-divider, .header-decoration, .header-divider, .title-divider) { display: none; }
+
+/* ===== C4: admin tables — one style of action button ===== */
+html.aw-ui .admin-table td:last-child { white-space: nowrap; }
+html.aw-ui .admin-table .aw-iconbtn {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    padding: 0;
+    margin: 2px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--aw-ink);
+    background: var(--card-bg);
+    border: 1px solid rgba(168, 103, 106, 0.28);
+    box-shadow: 0 1px 2px rgba(58, 38, 41, 0.06);
+    text-decoration: none;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: transform 0.3s var(--aw-spring), background-color 0.25s ease, color 0.2s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+html.aw-ui .admin-table .aw-iconbtn::after { display: none; }
+html.aw-ui .admin-table .aw-iconbtn:hover {
+    color: #fff;
+    background: var(--aw-rose-deep);
+    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(168, 103, 106, 0.7);
+    text-decoration: none;
+}
+html.aw-ui .admin-table .aw-iconbtn.aw-danger { color: #b4505a; border-color: rgba(180, 80, 90, 0.35); }
+html.aw-ui .admin-table .aw-iconbtn.aw-danger:hover { color: #fff; background: #b4505a; box-shadow: 0 8px 18px -8px rgba(180, 80, 90, 0.7); }
+html.aw-ui .admin-table .aw-iconbtn.aw-good { color: #3e6f4f; border-color: rgba(79, 138, 99, 0.35); }
+html.aw-ui .admin-table .aw-iconbtn.aw-good:hover { color: #fff; background: #4f8a63; }
+html[data-theme="dark"].aw-ui .admin-table .aw-iconbtn { color: var(--text); border-color: rgba(219, 161, 162, 0.28); }
+html.aw-ui .admin-table td:last-child form { display: inline; margin: 0; }
+/* table heads and rows read as one family */
+html.aw-ui .admin-table thead th {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+html.aw-ui .admin-table tbody td { vertical-align: middle; }
+html.aw-ui .admin-table td:last-child > div:not(.dropdown) { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 2px; width: auto; }
+
+/* ===== C5: messages and "nothing here yet" panels look the same everywhere ===== */
+html.aw-ui .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 18px;
+    margin: 0 0 18px;
+    border: 1px solid transparent;
+    border-left-width: 4px;
+    border-radius: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    box-shadow: 0 6px 18px -12px rgba(58, 38, 41, 0.35);
+    animation: awRise 0.5s var(--aw-ease) both;
+}
+html.aw-ui .alert::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    flex-shrink: 0;
+    line-height: 1.5;
+}
+html.aw-ui .alert:has(> i:first-child)::before { content: none; }
+html.aw-ui .alert-success { background: #e3efe6; color: #2d5039; border-color: #c5dccb; border-left-color: #4f8a63; }
+html.aw-ui .alert-success::before { content: "\f058"; color: #4f8a63; }
+html.aw-ui :is(.alert-error, .alert-danger) { background: #f6e1e3; color: #6e2a31; border-color: #ecc5c9; border-left-color: #b4505a; }
+html.aw-ui :is(.alert-error, .alert-danger)::before { content: "\f06a"; color: #b4505a; }
+html.aw-ui .alert-info { background: #efe6ee; color: #4e3a4c; border-color: #dccfdb; border-left-color: #8a6f86; }
+html.aw-ui .alert-info::before { content: "\f05a"; color: #8a6f86; }
+html.aw-ui .alert-warning { background: #f7ecdc; color: #6f4e22; border-color: #ead6b8; border-left-color: #c9965a; }
+html.aw-ui .alert-warning::before { content: "\f071"; color: #c9965a; }
+html[data-theme="dark"].aw-ui .alert-success { background: rgba(79, 138, 99, 0.16); color: #cfe6d6; border-color: rgba(79, 138, 99, 0.35); }
+html[data-theme="dark"].aw-ui :is(.alert-error, .alert-danger) { background: rgba(180, 80, 90, 0.16); color: #f3d0d4; border-color: rgba(180, 80, 90, 0.4); }
+html[data-theme="dark"].aw-ui .alert-info { background: rgba(138, 111, 134, 0.18); color: #e6d9e4; border-color: rgba(138, 111, 134, 0.4); }
+html[data-theme="dark"].aw-ui .alert-warning { background: rgba(201, 150, 90, 0.16); color: #f0dcc0; border-color: rgba(201, 150, 90, 0.4); }
+
+html.aw-ui .empty-state {
+    text-align: center;
+    padding: clamp(32px, 6vw, 56px) 20px;
+    border: 1.5px dashed rgba(168, 103, 106, 0.32);
+    border-radius: var(--aw-r-lg);
+    background:
+        radial-gradient(50% 80% at 50% 0%, rgba(219, 161, 162, 0.14), transparent 70%),
+        color-mix(in srgb, var(--card-bg) 85%, transparent);
+    color: var(--text-light);
+}
+html.aw-ui :is(.empty-state-icon, .empty-icon) {
+    width: 76px;
+    height: 76px;
+    margin: 0 auto 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 1.9rem;
+    color: #fff;
+    background: var(--aw-grad);
+    box-shadow: 0 14px 30px -12px rgba(168, 103, 106, 0.65);
+    animation: awFloat 6s ease-in-out infinite;
+}
+html.aw-ui .empty-state-icon i { color: #fff; }
+html.aw-ui .empty-state h3 { color: var(--dark); font-size: 1.3rem; margin: 0 0 6px; }
+html.aw-ui .empty-state p { max-width: 460px; margin: 0 auto 18px; }
+html.aw-ui :is(.no-items, .empty-message, .no-results, .no-comments, .no-reviews, .no-content, .empty-notes) {
+    text-align: center;
+    padding: 28px 20px;
+    border: 1.5px dashed rgba(168, 103, 106, 0.3);
+    border-radius: var(--aw-r);
+    color: var(--text-light);
+    background: color-mix(in srgb, var(--card-bg) 80%, transparent);
+}
+html.aw-ui :is(.no-items, .empty-message, .no-comments, .no-reviews, .empty-notes)::before {
+    content: "\f004";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1.4rem;
+    color: var(--rose);
+}
+
+/* ===== C7: the closed slide-out menu is really closed =====
+   It sat just off the right edge, so keyboard users could tab into invisible links and some phones
+   could be panned sideways onto it. Hidden while closed; hidden overflow is clipped. */
+@supports (overflow: clip) {
+    html.aw-ui, html.aw-ui body { overflow-x: clip; }
+}
+@media (max-width: 992px) {
+    html.aw-ui .nav-links:not(.open) { visibility: hidden; transition: right 0.5s var(--aw-ease), visibility 0s linear 0.5s !important; }
+    html.aw-ui .nav-links.open { visibility: visible; transition: right 0.5s var(--aw-ease), visibility 0s !important; }
+}
+html.aw-nav-compact .nav-links:not(.open) { visibility: hidden; transition: right 0.5s var(--aw-ease), visibility 0s linear 0.5s !important; }
+html.aw-nav-compact .nav-links.open { visibility: visible; transition: right 0.5s var(--aw-ease), visibility 0s !important; }
+
+/* ===== C8: dark mode reads well everywhere ===== */
+html[data-theme="dark"].aw-ui .hero :is(.hero-sub, .hero-quote, p) { color: var(--text); }
+/* form fields some pages hard-coded white stay dark and readable in dark mode */
+html[data-theme="dark"].aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"], input[type="date"],
+    input[type="datetime-local"], input[type="time"], select, textarea) {
+    background-color: var(--input-bg);
+    color: var(--text);
+    border-color: var(--border);
+}
+html[data-theme="dark"].aw-ui ::placeholder { color: #a08a8a; }

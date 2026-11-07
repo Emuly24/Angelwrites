@@ -131,9 +131,6 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
         <div class="admin-header">
             <h1><?php echo $id > 0 ? 'Edit Poem' : 'Add New Poem'; ?></h1>
             <div class="admin-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
                 <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Poems
                 </a>
@@ -257,7 +254,7 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
                         <h4>🎙️ Or Record Directly</h4>
                         <div class="recorder-controls">
                             <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                             <div id="recordingForm" style="display:none;"><!-- M3: was a nested <form>, which ended the page form early -->
                                 <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
                             </div>
@@ -378,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
             startCameraBtn.disabled = true;
             capturePhotoBtn.disabled = false;
             cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#27ae60';
+            cameraStatus.style.color = '#4f8a63';
         } catch (error) {
             alert('Camera access denied: ' + error.message);
         }
@@ -400,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function() {
             retakePhotoBtn.disabled = false;
             confirmPhotoBtn.disabled = false;
             cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#3498db';
+            cameraStatus.style.color = '#8a6f86';
             cameraStream.getTracks().forEach(track => track.stop());
             cameraPreview.srcObject = null;
             cameraPreview.style.display = 'none';
@@ -430,7 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmPhotoBtn.disabled = true;
         retakePhotoBtn.disabled = true;
         cameraStatus.textContent = '✅ Photo confirmed!';
-        cameraStatus.style.color = '#2ecc71';
+        cameraStatus.style.color = '#4f8a63';
     }
 
     startCameraBtn.addEventListener('click', startCamera);
@@ -595,25 +592,25 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
+    --rose: #94404a;
+    --rose-dark: #94404a;
     --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --input-bg: #f9f9f9;
+    --dark: #1a1212;
+    --text-light: #6b5a5a;
+    --input-bg: #fdf9f8;
     --card-bg: #ffffff;
-    --border: #e0e0e0;
+    --border: #ece0de;
     --shadow: 0 4px 20px rgba(0,0,0,0.06);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    --bg: #fdf9f8;
 }
 body.dark-mode {
-    --bg: #1a1a1a;
-    --card-bg: #2a2a2a;
-    --border: #444;
-    --text-light: #aaa;
-    --input-bg: #333;
-    --vanilla: #2a2a2a;
+    --bg: #1a1212;
+    --card-bg: #2c1e1e;
+    --border: #4a3a3a;
+    --text-light: #b8a8a8;
+    --input-bg: #3d2e2e;
+    --vanilla: #2c1e1e;
     --shadow: 0 4px 20px rgba(0,0,0,0.4);
     --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
 }
@@ -659,7 +656,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .recorder-section h4 { margin-bottom: 8px; }
 .recorder-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .recorder-controls .btn { padding: 8px 16px; }
-#recordingStatus { font-weight: 600; color: #e74c3c; }
+#recordingStatus { font-weight: 600; color: #b4505a; }
 .recorder-section audio { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
 
 /* ===== FORM ACTIONS ===== */

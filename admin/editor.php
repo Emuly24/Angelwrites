@@ -282,7 +282,7 @@ $pageTitle = $id > 0 ? 'Edit Blog Post' : 'Add New Blog';
                         <h3>🎙️ Record Audio</h3>
                         <div class="recorder-controls">
                             <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                             <div id="recordingForm" style="display:none;"><!-- M3: was a nested <form>, which ended the page form early -->
                                 <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
                             </div>
@@ -298,7 +298,7 @@ $pageTitle = $id > 0 ? 'Edit Blog Post' : 'Add New Blog';
                         <h3>🎥 Record Video</h3>
                         <div class="recorder-controls">
                             <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
-                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
+                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                             <div id="videoRecordingForm" style="display:none;"><!-- M4: was a nested <form>, which ended the page form early -->
                                 <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
                             </div>
@@ -432,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
             startCameraBtn.disabled = true;
             capturePhotoBtn.disabled = false;
             cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#27ae60';
+            cameraStatus.style.color = '#4f8a63';
         } catch (error) {
             alert('Camera access denied: ' + error.message);
         }
@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
             retakePhotoBtn.disabled = false;
             confirmPhotoBtn.disabled = false;
             cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#3498db';
+            cameraStatus.style.color = '#8a6f86';
             // Stop camera stream
             cameraStream.getTracks().forEach(track => track.stop());
             cameraPreview.srcObject = null;
@@ -486,7 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmPhotoBtn.disabled = true;
         retakePhotoBtn.disabled = true;
         cameraStatus.textContent = '✅ Photo confirmed!';
-        cameraStatus.style.color = '#2ecc71';
+        cameraStatus.style.color = '#4f8a63';
     }
 
     startCameraBtn.addEventListener('click', startCamera);
@@ -649,7 +649,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 capturedPhotoPreview.src = URL.createObjectURL(file);
                 capturedPhotoContainer.style.display = 'block';
                 cameraStatus.textContent = '✅ Photo from the camera will be the featured image';
-                cameraStatus.style.color = '#2ecc71';
+                cameraStatus.style.color = '#4f8a63';
                 target = capturedPhotoContainer;
             }
             const note = document.createElement('div');
@@ -686,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 .admin-form input:focus, .admin-form textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219, 161, 162, 0.15); }
 .admin-form textarea { resize: vertical; min-height: 60px; }
-.required { color: #dc2626; }
+.required { color: #b4505a; }
 
 .form-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 12px; }
 .form-row .form-group { flex: 1; min-width: 150px; }
@@ -715,7 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .recorder-section h3 { margin-bottom: 12px; }
 .recorder-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; }
 .recorder-controls .btn { padding: 8px 16px; }
-#recordingStatus, #videoRecordingStatus { font-weight: 600; color: #e74c3c; }
+#recordingStatus, #videoRecordingStatus { font-weight: 600; color: #b4505a; }
 .recorder-section audio, .recorder-section video { width: 100%; border-radius: 8px; margin-top: 8px; background: var(--bg); }
 
 .form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
@@ -724,8 +724,8 @@ document.addEventListener('DOMContentLoaded', function() {
 .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
 .btn-secondary { background: var(--dark); color: white; }
 .btn-secondary:hover { background: #1e1414; transform: translateY(-2px); }
-.btn-info { background: #3498db; color: white; }
-.btn-info:hover { background: #2980b9; transform: translateY(-2px); }
+.btn-info { background: #8a6f86; color: white; }
+.btn-info:hover { background: #6f5770; transform: translateY(-2px); }
 .btn-block { width: 100%; }
 
 @media (max-width: 768px) {

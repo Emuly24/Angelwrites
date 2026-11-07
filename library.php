@@ -150,7 +150,7 @@ $pageTitle = 'My Library';
         <!-- ===== PAGE HEADER ===== -->
         <div class="library-header">
             <div class="library-header-content">
-                <h1>📚 My Library</h1>
+                <h1>My Library</h1>
                 <p>Your reading journey, all in one place.</p>
             </div>
             <div class="library-header-stats">
@@ -160,12 +160,12 @@ $pageTitle = 'My Library';
                     <small>Reading</small>
                 </div>
                 <div class="stat-pill">
-                    <i class="fas fa-bookmark" style="color: #3498db;"></i>
+                    <i class="fas fa-bookmark" style="color: #8a6f86;"></i>
                     <span><?php echo $stats['want_to_read']; ?></span>
                     <small>Want to Read</small>
                 </div>
                 <div class="stat-pill">
-                    <i class="fas fa-check-circle" style="color: #27ae60;"></i>
+                    <i class="fas fa-check-circle" style="color: #4f8a63;"></i>
                     <span><?php echo $stats['finished']; ?></span>
                     <small>Finished</small>
                 </div>
@@ -539,10 +539,10 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-success { background:#28a745; color:white; border:2px solid #28a745; }
-.btn-success:hover { background:#218838; border-color:#218838; }
-.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
-.btn-danger:hover { background:#c82333; border-color:#c82333; }
+.btn-success { background:#4f8a63; color:white; border:2px solid #4f8a63; }
+.btn-success:hover { background:#3e6f4f; border-color:#3e6f4f; }
+.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
+.btn-danger:hover { background:#94404a; border-color:#94404a; }
 
 /* ===== PAGE LAYOUT ===== */
 .library-page { padding:40px 0 80px; }
@@ -629,10 +629,10 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
     box-shadow:0 2px 8px rgba(0,0,0,0.15);
 }
 .badge.status-reading { background:var(--rose); }
-.badge.status-want { background:#3498db; }
-.badge.status-finished { background:#27ae60; }
-.badge.free { background:#27ae60; top:12px; left:12px; right:auto; }
-.badge.sale { background:#e74c3c; top:12px; left:12px; right:auto; }
+.badge.status-want { background:#8a6f86; }
+.badge.status-finished { background:#4f8a63; }
+.badge.free { background:#4f8a63; top:12px; left:12px; right:auto; }
+.badge.sale { background:#b4505a; top:12px; left:12px; right:auto; }
 
 .finished-check {
     position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
@@ -678,8 +678,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
     padding:12px 20px; border-radius:16px; margin-bottom:16px; font-size:0.95rem;
     display:flex; align-items:center; gap:10px;
 }
-.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
+.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width:1024px) {

@@ -110,7 +110,7 @@ try {
         <!-- Header -->
         <div class="admin-header">
             <div>
-                <h1>📚 Manage Reading Groups</h1>
+                <h1>Manage Reading Groups</h1>
                 <p class="subtitle">Overview of all reading groups across books, poems, and newsletters.</p>
             </div>
             <div class="header-actions">
@@ -136,7 +136,7 @@ try {
         <?php endif; ?>
 
         <!-- ===== TAB: GROUPS ===== -->
-        <div class="tab-content" id="tab-groups">
+        <div class="tab-content active" id="tab-groups"><!-- C6: the default tab was never shown -->
             <?php if (empty($groups)): ?>
                 <div class="empty-state">
                     <div class="empty-icon">📖</div>
@@ -230,13 +230,13 @@ try {
                     <button class="btn btn-sm btn-outline" onclick="loadActivityFeed()">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
-                    <button class="btn btn-sm btn-outline" onclick="clearAllActivity()" style="color:#dc3545;">
+                    <button class="btn btn-sm btn-outline" onclick="clearAllActivity()" style="color:#b4505a;">
                         <i class="fas fa-trash"></i> Clear All
                     </button>
                 </div>
             </div>
             <div id="activityFeedContainer">
-                <p style="text-align:center;color:#999;">Loading activity feed...</p>
+                <p style="text-align:center;color:#a08a8a;">Loading activity feed...</p>
             </div>
         </div>
     </div>
@@ -289,7 +289,7 @@ try {
 // View Group Details
 function viewGroupDetails(groupId) {
     document.getElementById('modalGroupTitle').textContent = '📚 Group Details';
-    document.getElementById('groupDetailsContent').innerHTML = '<p style="text-align:center;color:#999;">Loading...</p>';
+    document.getElementById('groupDetailsContent').innerHTML = '<p style="text-align:center;color:#a08a8a;">Loading...</p>';
     document.getElementById('groupDetailsModal').style.display = 'flex';
 
     const formData = new FormData();
@@ -325,7 +325,7 @@ document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
 // Load Activity Feed
 function loadActivityFeed() {
     const container = document.getElementById('activityFeedContainer');
-    container.innerHTML = '<p style="text-align:center;color:#999;">Loading activity feed...</p>';
+    container.innerHTML = '<p style="text-align:center;color:#a08a8a;">Loading activity feed...</p>';
 
     const formData = new FormData();
     formData.append('action', 'get_activity_feed');
@@ -494,8 +494,8 @@ document.addEventListener('DOMContentLoaded', function() {
 .tab-content.active { display: block; }
 
 .alert-danger {
-    background: #f8d7da; color: #721c24; padding: 12px 16px;
-    border-radius: 8px; border: 1px solid #f5c6cb; margin-bottom: 20px;
+    background: #f6e1e3; color: #6e2a31; padding: 12px 16px;
+    border-radius: 8px; border: 1px solid #ecc5c9; margin-bottom: 20px;
 }
 
 .groups-table-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
@@ -520,9 +520,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Badges for Content Type */
 .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-.badge-book { background: #e3f2fd; color: #0d47a1; }
-.badge-poem { background: #f3e5f5; color: #4a148c; }
-.badge-newsletter { background: #e8f5e9; color: #1b5e20; }
+.badge-book { background: #efe6ee; color: #6f5770; }
+.badge-poem { background: #efe6ee; color: #4e3a4c; }
+.badge-newsletter { background: #e3efe6; color: #2d5039; }
 
 .action-buttons { display: flex; gap: 4px; flex-wrap: nowrap; }
 .action-buttons .btn { padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; }

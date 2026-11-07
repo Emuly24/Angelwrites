@@ -128,7 +128,7 @@ $pageTitle = 'Manage Messages';
         <!-- ===== HERO ===== -->
         <div class="admin-hero">
             <div class="admin-hero-content">
-                <h1>📩 Manage Messages</h1>
+                <h1>Manage Messages</h1>
                 <p class="admin-hero-sub">View, search, and manage all contact form submissions.</p>
             </div>
             <div class="admin-hero-actions">
@@ -367,8 +367,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
 .btn-outline:hover { background:var(--rose); color:var(--white); }
 .btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-danger { background:#dc3545; color:white; border:2px solid #dc3545; }
-.btn-danger:hover { background:#c82333; border-color:#c82333; }
+.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
+.btn-danger:hover { background:#94404a; border-color:#94404a; }
 
 /* ===== PAGE ===== */
 .admin-page { padding:32px 0 60px; }
@@ -384,8 +384,8 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 
 /* ===== ALERTS ===== */
 .alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
-.alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
-.alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
+.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
 
 /* ===== SEARCH BAR ===== */
 .search-bar { margin-bottom:24px; }
@@ -422,7 +422,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 /* ===== STATUS BADGES ===== */
 .status-badge { padding:2px 12px; border-radius:20px; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
 .status-unread { background:var(--rose); color:white; }
-.status-read { background:#2ecc71; color:white; }
+.status-read { background:#4f8a63; color:white; }
 
 /* ===== ACTIONS ===== */
 .actions-cell { display:flex; gap:4px; }
