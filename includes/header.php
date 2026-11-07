@@ -46,10 +46,8 @@ if ($isLoggedIn) {
     <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : 'AngelWrites — Christian writing and community platform by Angella Bottoman.'; ?>">
     <meta name="keywords" content="AngelWrites, Christian writing, faith, poetry, books, reflections, Angella Bottoman">
     <meta name="robots" content="index, follow">
-    <meta property="og:title" content="<?php echo htmlspecialchars(isset($pageTitle) ? $pageTitle . ' - ' . aw_site_name() : aw_site_name()); /* F191 */ ?>">
-    <meta property="og:description" content="AngelWrites — Christian writing and community platform by Angella Bottoman.">
-    <meta property="og:url" content="<?php echo SITE_URL . $_SERVER['REQUEST_URI']; ?>">
-    <meta name="twitter:card" content="summary_large_image">
+    <!-- Q32: og:title/description/url and twitter:card were printed here and again in the Open Graph
+         block below, so pages that set their own $og_* values were shadowed by these generic ones. -->
     
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
@@ -246,12 +244,12 @@ if ($isLoggedIn) {
         /* ===== MOBILE FIXES (extra) ===== */
         @media (max-width: 768px) {
             .nav-actions { gap: 4px; }
-            .nav-action-icon { width: 32px; height: 32px; font-size: 0.9rem; }
+            .nav-action-icon { width: 44px; height: 44px; font-size: 0.9rem; } /* Q52: was 32 px */
             .notification-dropdown { width: 240px; }
         }
         @media (max-width: 480px) {
             .nav-actions { gap: 4px; }
-            .nav-action-icon { width: 28px; height: 28px; font-size: 0.8rem; }
+            .nav-action-icon { width: 36px; height: 36px; font-size: 0.85rem; } /* Q52: was 28 px (36 keeps room for the logo) */
             .hamburger { width: 24px; height: 18px; }
             .user-wrapper span { display: none; } /* hide username on tiny screens to prevent overflow */
         }

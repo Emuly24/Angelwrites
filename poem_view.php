@@ -312,14 +312,18 @@ $total_reviews = $rating_data['total'] ?? 0;
 // 12. OUTPUT PAGE
 // ============================================================
 ?>
-<?php require_once 'includes/header.php'; ?>
-<meta property="og:title" content="<?php echo $og_title; ?>">
-<meta property="og:description" content="<?php echo $og_desc; ?>">
-<meta property="og:image" content="<?php echo $og_image; ?>">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:url" content="<?php echo $share_url; ?>">
-<meta name="twitter:card" content="summary_large_image">
+<?php
+// Q32: the page had no $pageTitle (browser tab showed only the site name) and printed its Open Graph
+// tags after the header, inside <body>, where share previews ignore them, while the header printed
+// generic ones. The header now gets the poem's title, description, URL and image (it escapes them).
+$pageTitle = $poem['title'];
+$og_title = $poem['title'];
+$og_description = mb_substr(trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags((string)(($poem['intro'] ?? '') !== '' ? $poem['intro'] : $poem['content'])), ENT_QUOTES, 'UTF-8'))), 0, 150);
+$og_url = $share_url;
+$og_image_width = 1200;
+$og_image_height = 630;
+require_once 'includes/header.php';
+?>
 
 <style>
 :root {
@@ -571,6 +575,12 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     .poem-body { font-size: 1rem; line-height: 2; }
     .audio-controls-bar { gap: 6px; }
     .volume-control input[type="range"] { width: 40px; }
+}
+
+/* Q32: tap targets at least 44 px on phones (reactions, back link, share and small buttons) */
+@media (max-width:768px) {
+    .reaction-btn, .poem-nav .back-link, .share-btn, .btn-sm { min-height:44px; min-width:44px; display:inline-flex; align-items:center; justify-content:center; }
+    .checkbox-group input[type="checkbox"] { width:22px; height:22px; }
 }
 </style>
 

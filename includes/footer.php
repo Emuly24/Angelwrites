@@ -388,19 +388,39 @@ ADDED: Cookie Consent Banner (GDPR compliance)
         </div>
     </div>
 </div>
+<style>
+/* Q11: the banner covered controls fixed to the bottom of the screen (e.g. the Bible notes panel's
+   "Post Note") until it was dismissed. While it shows, bottom-fixed panels sit above it and the page
+   gets matching bottom padding; on phones the banner is compact. */
+body .bible-notes-panel, body .sticky-cta { bottom:var(--cookie-bar-h, 0px); }
+@media (max-width:480px) {
+    #cookieConsent { padding:8px 12px !important; }
+    #cookieConsent p { font-size:0.8rem !important; }
+    #cookieConsent .btn { padding:6px 16px; min-height:40px; }
+}
+</style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    if (!localStorage.getItem('cookieConsent')) {
-        document.getElementById('cookieConsent').style.display = 'block';
+    var bar = document.getElementById('cookieConsent');
+    function awCookieSpace() {
+        var h = bar.style.display === 'none' ? 0 : bar.offsetHeight;
+        document.documentElement.style.setProperty('--cookie-bar-h', h + 'px');
+        document.body.style.paddingBottom = h ? h + 'px' : '';
     }
-    document.getElementById('cookieAccept').addEventListener('click', function() {
-        localStorage.setItem('cookieConsent', 'accepted');
-        document.getElementById('cookieConsent').style.display = 'none';
-    });
-    document.getElementById('cookieDecline').addEventListener('click', function() {
-        localStorage.setItem('cookieConsent', 'declined');
-        document.getElementById('cookieConsent').style.display = 'none';
-    });
+    function awCookieHide(choice) {
+        try { localStorage.setItem('cookieConsent', choice); } catch (e) {}
+        bar.style.display = 'none';
+        awCookieSpace();
+    }
+    var seen = null;
+    try { seen = localStorage.getItem('cookieConsent'); } catch (e) {}
+    if (!seen) {
+        bar.style.display = 'block';
+        awCookieSpace();
+        window.addEventListener('resize', awCookieSpace);
+    }
+    document.getElementById('cookieAccept').addEventListener('click', function() { awCookieHide('accepted'); });
+    document.getElementById('cookieDecline').addEventListener('click', function() { awCookieHide('declined'); });
 });
 </script>
 
