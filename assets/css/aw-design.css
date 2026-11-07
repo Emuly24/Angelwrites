@@ -971,3 +971,15 @@ html.aw-ui :is(.no-items, .empty-message, .no-comments, .no-reviews, .empty-note
 }
 html.aw-nav-compact .nav-links:not(.open) { visibility: hidden; transition: right 0.5s var(--aw-ease), visibility 0s linear 0.5s !important; }
 html.aw-nav-compact .nav-links.open { visibility: visible; transition: right 0.5s var(--aw-ease), visibility 0s !important; }
+
+/* ===== C8: dark mode reads well everywhere ===== */
+html[data-theme="dark"].aw-ui .hero :is(.hero-sub, .hero-quote, p) { color: var(--text); }
+/* form fields some pages hard-coded white stay dark and readable in dark mode */
+html[data-theme="dark"].aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"], input[type="date"],
+    input[type="datetime-local"], input[type="time"], select, textarea) {
+    background-color: var(--input-bg);
+    color: var(--text);
+    border-color: var(--border);
+}
+html[data-theme="dark"].aw-ui ::placeholder { color: #a08a8a; }
