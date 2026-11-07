@@ -339,3 +339,63 @@ html.aw-nav-compact .nav-links a:hover { padding-left: 6px !important; color: va
 }
 @keyframes awFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes awSlideIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+
+/* ===== D4: cards and images ===== */
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .about-feature, .stat-card, .stat-item, .admin-stat-card,
+    .question-card, .member-card, .aw-card) {
+    transition: transform 0.5s var(--aw-ease), box-shadow 0.5s var(--aw-ease), border-color 0.3s ease;
+}
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .about-feature, .stat-card, .stat-item, .admin-stat-card,
+    .question-card, .member-card, .aw-card):hover {
+    transform: translateY(-6px);
+    box-shadow: var(--aw-sh-3);
+    border-color: rgba(219, 161, 162, 0.6);
+}
+/* while the pointer tilts a card, follow it closely */
+html.aw-ui .aw-tilting { transition: transform 0.12s linear, box-shadow 0.5s var(--aw-ease), border-color 0.3s ease !important; }
+
+/* soft light that follows the pointer (class added by aw-motion.js) */
+html.aw-ui .aw-spot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(380px circle at var(--aw-mx, 50%) var(--aw-my, 50%), rgba(219, 161, 162, 0.2), transparent 45%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    z-index: 2;
+}
+html.aw-ui .aw-spot:hover::after { opacity: 1; }
+
+/* covers and thumbnails zoom gently inside their frame */
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .aw-card) :is([class*="cover"], [class*="thumb"], [class*="image"], [class*="img"]):has(> img) {
+    overflow: hidden;
+}
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .aw-card) :is([class*="cover"], [class*="thumb"], [class*="image"], [class*="img"]) > img {
+    transition: transform 0.9s var(--aw-ease), opacity 0.6s ease, filter 0.6s ease;
+}
+html.aw-ui :is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .aw-card):hover :is([class*="cover"], [class*="thumb"], [class*="image"], [class*="img"]) > img {
+    transform: scale(1.06);
+}
+
+/* pictures fade in as they arrive instead of popping (aw-motion.js) */
+html.aw-ui img.aw-img-wait { opacity: 0; }
+html.aw-ui img.aw-img-in { transition: opacity 0.6s ease; }
+
+/* form-holding cards (mostly admin) should not jump while being filled in */
+html.aw-ui .card:has(form, table, textarea, select):hover { transform: none; }
+
+/* table rows highlight softly */
+html.aw-ui :is(.admin-table, .data-table) tbody tr { transition: background-color 0.2s ease; }
+html.aw-ui :is(.admin-table, .data-table) tbody tr:hover { background: rgba(219, 161, 162, 0.08); }
+/* whole-card links: no underline across every line of text on hover */
+html.aw-ui a:is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .aw-card):hover,
+html.aw-ui a:is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
+    .featured-card, .related-card, .feature-card, .aw-card):hover * { text-decoration: none; }

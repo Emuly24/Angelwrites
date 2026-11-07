@@ -107,6 +107,60 @@
         update();
     });
 
+    /* ===== D4: cards and images ===== */
+    var CARDS = '.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card, ' +
+        '.featured-card, .related-card, .feature-card, .about-feature, .stat-card, .stat-item, .admin-stat-card, ' +
+        '.question-card, .member-card, .aw-card';
+    var TILT = '.book-card, .poem-card, .aw-card';
+    AW.CARDS = CARDS;
+
+    function enhanceCards(scope) {
+        if (page === 'reader') return;
+        (scope || document).querySelectorAll(CARDS).forEach(function (card) {
+            if (card.dataset.awCard) return;
+            card.dataset.awCard = '1';
+            var cs = getComputedStyle(card);
+            // only add the pointer light where the page has not drawn its own ::after
+            if (finePointer && !reduce && getComputedStyle(card, '::after').content === 'none') {
+                if (cs.position === 'static') card.style.position = 'relative';
+                card.classList.add('aw-spot');
+            }
+            if (!finePointer || reduce) return;
+            var tilt = card.matches(TILT);
+            card.addEventListener('pointermove', function (e) {
+                var r = card.getBoundingClientRect();
+                var x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+                card.style.setProperty('--aw-mx', (x * 100).toFixed(1) + '%');
+                card.style.setProperty('--aw-my', (y * 100).toFixed(1) + '%');
+                if (tilt) {
+                    card.classList.add('aw-tilting');
+                    card.style.transform = 'perspective(900px) rotateX(' + ((0.5 - y) * 6).toFixed(2) + 'deg) rotateY(' +
+                        ((x - 0.5) * 7).toFixed(2) + 'deg) translateY(-6px)';
+                }
+            });
+            if (tilt) card.addEventListener('pointerleave', function () {
+                card.classList.remove('aw-tilting');
+                card.style.transform = '';
+            });
+        });
+    }
+
+    function fadeImages(scope) {
+        if (reduce) return;
+        (scope || document).querySelectorAll('main img:not([data-aw-img])').forEach(function (img) {
+            img.setAttribute('data-aw-img', '1');
+            if (img.complete) return;
+            img.classList.add('aw-img-wait', 'aw-img-in');
+            var done = function () { img.classList.remove('aw-img-wait'); };
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+            setTimeout(done, 4000);
+        });
+    }
+
+    ready(function () { enhanceCards(); fadeImages(); });
+    AW.enhance = function (scope) { enhanceCards(scope); fadeImages(scope); };
+
     AW.ready = ready;
     AW.finePointer = finePointer;
 })();
