@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     if (empty($email) || empty($code)) {
         $error = 'Please fill in all fields.';
     } else {
-        $stmt = $db->prepare("SELECT id, verification_code, verification_code_expiry, is_verified, name FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, verification_code, verification_code_expiry, is_verified, name FROM users WHERE email = ? COLLATE NOCASE ORDER BY is_verified ASC, id DESC LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Invalid email address.';
     } else {
-        $stmt = $db->prepare("SELECT id, first_name, is_verified FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, first_name, is_verified FROM users WHERE email = ? COLLATE NOCASE ORDER BY is_verified ASC, id DESC LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 

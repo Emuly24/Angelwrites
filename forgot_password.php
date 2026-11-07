@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
-        $stmt = $db->prepare("SELECT id, first_name FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, first_name FROM users WHERE email = ? COLLATE NOCASE");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 

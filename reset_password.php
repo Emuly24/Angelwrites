@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reset_password']) && 
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } else {
-        $stmt = $db->prepare("SELECT id, reset_code, reset_code_expiry, name FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, reset_code, reset_code_expiry, name FROM users WHERE email = ? COLLATE NOCASE");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 

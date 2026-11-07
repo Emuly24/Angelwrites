@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
     if (empty($login) || empty($password)) {
         $error = 'Please fill in all fields.';
     } else {
-        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name, first_name, last_name FROM users WHERE username = ? OR email = ?");
+        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name, first_name, last_name FROM users WHERE username = ? OR email = ? COLLATE NOCASE");
         $stmt->execute([$login, $login]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 

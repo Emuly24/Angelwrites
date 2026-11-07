@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_email_change'
         $pending_email = $_SESSION['pending_email_change'];
         $error = 'That code is not correct.';
     } else {
-        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE AND id != ?");
         $stmt->execute([$pending_email['email'], $user_id]);
         if ($stmt->fetch()) {
             $error = 'This email is already in use by another account.';
@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         $error = 'Please enter a valid email address.';
     } else {
         // Check if email exists for another user
-        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE AND id != ?");
         $stmt->execute([$email, $user_id]);
         if ($stmt->fetch()) {
             $error = 'This email is already in use by another account.';

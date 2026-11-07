@@ -247,7 +247,7 @@ switch ($action) {
         }
 
         // Check if invitee already exists and is a member
-        $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE");
         $stmt->execute([$email]);
         $invitee_id = $stmt->fetchColumn();
         if ($invitee_id && isInCircle($db, $invitee_id, $book_id)) {

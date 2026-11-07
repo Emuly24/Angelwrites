@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $first_name = trim($_POST['first_name']);
     $last_name = trim($_POST['last_name']);
     $username = trim($_POST['username']);
-    $email = trim($_POST['email']);
+    $email = strtolower(trim($_POST['email'])); // VF1: stored in lower case; every lookup ignores case
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     $gender = $_POST['gender'] ?? '';
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         $error = 'Passwords do not match.';
     } else {
         // Check if email already exists
-        $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE");
         $stmt->execute([$email]);
         if ($stmt->fetch()) {
             $error = 'This email is already registered. You already have an account. Please <a href="login.php">go to login</a>.';
