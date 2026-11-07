@@ -78,7 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
             // "Test User" used to skip it.) The live admin account must have is_verified = 1
             // before this deploys; see the fix/security PR.
             if ($user['is_verified'] == 0) {
-                $error = 'Please verify your email address before logging in. <a href="resend_verification.php">Resend verification email</a>';
+                // F232: send the member straight to the verify page for their address, where a new code can be requested
+                $error = 'Please verify your email address before logging in. <a href="verify.php?email=' . urlencode($user['email']) . '">Enter your code or get a new one</a>';
             }
 
             // If error is set, stop here

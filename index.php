@@ -11,9 +11,16 @@ $cacheFile = __DIR__ . '/cache/index.html';
 $cacheTime = 300; // 5 minutes
 
 // If user is not logged in, serve cached version if available
-if (!isLoggedIn()) {
+// F174: GET only. A guest POST (newsletter form with its CSRF token) was answered from the
+// cache and never reached its handler.
+if (!isLoggedIn() && $_SERVER['REQUEST_METHOD'] === 'GET') {
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTime) {
-        readfile($cacheFile);
+        // F174: the cached page holds a placeholder instead of the CSRF token of whoever
+        // filled the cache; give this visitor their own session token.
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        echo str_replace('__AW_CSRF_TOKEN__', $_SESSION['csrf_token'], file_get_contents($cacheFile));
         exit;
     }
     ob_start();
@@ -128,36 +135,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['newsletter_email'])) 
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $newsletter_error = 'Please enter a valid email address.';
         } else {
-            $stmt = $db->prepare("SELECT id, is_active, unsubscribe_token FROM newsletter WHERE email = ?");
-            $stmt->execute([$email]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($existing) {
-                if ($existing['is_active'] == 1) {
-                    $newsletter_error = 'This email is already subscribed.';
-                } else {
-                    $stmt = $db->prepare("UPDATE newsletter SET is_active = 1, unsubscribed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                    $stmt->execute([$existing['id']]);
-                    $newsletter_success = 'Your subscription has been reactivated. Welcome back!';
-                    
-                    $admin_email = 'angelwrites@zohomail.com';
-                    $subject = 'Newsletter Subscription Reactivated';
-                    $body = "A user has reactivated their newsletter subscription.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
-                    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
-                }
+            // F176: double opt-in (includes/newsletter_optin.php)
+            require_once 'includes/newsletter_optin.php';
+            $optin = newsletter_request_optin($db, $email, $name);
+            if ($optin['ok']) {
+                $newsletter_success = $optin['message'];
             } else {
-                $token = bin2hex(random_bytes(32));
-                $stmt = $db->prepare("INSERT INTO newsletter (email, name, is_active, unsubscribe_token) VALUES (?, ?, 1, ?)");
-                if ($stmt->execute([$email, $name, $token])) {
-                    $newsletter_success = 'Thank you for subscribing! You will receive updates from Angella.';
-                    
-                    $admin_email = 'angelwrites@zohomail.com';
-                    $subject = 'New Newsletter Subscriber';
-                    $body = "A new user has subscribed to the newsletter.\n\nEmail: $email\nName: " . ($name ?: 'Not provided');
-                    sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', SITE_NAME . ' Admin');
-                } else {
-                    $newsletter_error = 'Something went wrong. Please try again.';
-                }
+                $newsletter_error = $optin['message'];
             }
         }
     }
@@ -1225,6 +1209,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================
 if ($doCache) {
     $content = ob_get_contents();
+    // F174: never store this visitor's CSRF token in the shared cache file.
+    if (!empty($_SESSION['csrf_token'])) {
+        $content = str_replace($_SESSION['csrf_token'], '__AW_CSRF_TOKEN__', $content);
+    }
     file_put_contents($cacheFile, $content);
     ob_end_flush();
 }

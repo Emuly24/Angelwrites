@@ -77,6 +77,7 @@
                 <div id="scheduleGroup" style="display:none;margin-top:8px;">
                     <label for="schedule">Date & Time</label>
                     <input type="datetime-local" id="schedule" name="schedule">
+                    <small class="field-hint">There is no automatic timer on this host. Scheduled newsletters wait in the Queue until you press <strong>Send queued now</strong> on or after their date.</small>
                 </div>
             </div>
 

@@ -25,6 +25,16 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         $mail->Timeout    = 10; // PHPMailer's default is 300 s, longer than the host allows a request to run
         $mail->setFrom($fromEmail, $fromName);
         $mail->addAddress($to);
+        // F217: mail goes through Gmail's SMTP, so From must be the Gmail account itself
+        // (SPF/DKIM/DMARC then align with gmail.com). The caller's address (normally the
+        // Zoho mailbox) becomes Reply-To, so replies still arrive there.
+        $smtpUser = getenv('GMAIL_USERNAME');
+        $mail->setFrom($smtpUser ?: $fromEmail, $fromName);
+        $mail->Sender = $smtpUser ?: $fromEmail; // envelope sender too (the setFrom above already set it)
+        $replyTo = (stripos($fromEmail, 'no-reply@') === 0) ? 'angelwrites@zohomail.com' : $fromEmail;
+        if (strcasecmp($replyTo, (string)$smtpUser) !== 0) {
+            $mail->addReplyTo($replyTo, $fromName);
+        }
         $mail->Subject = $subject;
         $mail->Body    = $message;
         $mail->isHTML($isHTML);

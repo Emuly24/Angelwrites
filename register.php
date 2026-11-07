@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                     
                     // Generate 6-digit verification code
                     $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-                    $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+                    $expiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // F232: was 15 minutes
                     $stmt = $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?");
                     $stmt->execute([$code, $expiry, $user_id]);
 
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
 
                     // ===== SEND VERIFICATION EMAIL WITH 6-DIGIT CODE (via Zoho SMTP) =====
                     $subject = "Verify your AngelWrites account";
-                    $body = "Hello $first_name,\n\nYour verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not create an account, please ignore this email.\n\n— AngelWrites Team";
+                    $body = "Hello $first_name,\n\nYour verification code is: $code\n\nThis code will expire in 24 hours.\n\nIf you did not create an account, please ignore this email.\n\n— AngelWrites Team";
                     
                     // The account exists from this point on, so registration has succeeded even if
                     // the email can't be sent; the success screen then points to "Request a new code".

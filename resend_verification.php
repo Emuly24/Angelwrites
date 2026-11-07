@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Generate new 6-digit code
             $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+            $expiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // F232: was 15 minutes
             $stmt = $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?");
             $stmt->execute([$code, $expiry, $user['id']]);
 
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $subject = "Your AngelWrites verification code";
-            $body = "Hello $greetingName,\n\nYour new verification code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.\n\n— AngelWrites Team";
+            $body = "Hello $greetingName,\n\nYour new verification code is: $code\n\nThis code will expire in 24 hours.\n\nIf you did not request this, please ignore this email.\n\n— AngelWrites Team";
 
             if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
                 $message = "A new verification code has been sent to your email address. Please check your inbox and spam folder.";

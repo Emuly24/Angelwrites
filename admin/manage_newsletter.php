@@ -8,6 +8,60 @@ redirectIfNotAdmin();
 // S13 (F175): the newsletter_tabs/ partials refuse to render unless included from here.
 define('AW_NEWSLETTER_ADMIN', true);
 
+// ====== F169: SEND A QUEUED NEWSLETTER IN PAGES ======
+// One request sends at most NEWSLETTER_BATCH_SIZE recipients (20 × the 10 s SMTP timeout
+// stays under the host's execution limit). Every attempt is logged in newsletter_stats,
+// so a repeated or reloaded request never sends twice to the same address. The page then
+// posts itself again (see the progress box below) until every recipient has been tried.
+define('NEWSLETTER_BATCH_SIZE', 20);
+
+function newsletter_progress($db, $queue_id) {
+    $stmt = $db->prepare("SELECT * FROM email_queue WHERE id = ?");
+    $stmt->execute([$queue_id]);
+    $q = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$q) return null;
+    $recipients = array_values(array_unique(array_filter(array_map('trim', explode(',', $q['recipient_emails'])))));
+    $stmt = $db->prepare("SELECT recipient_email, status FROM newsletter_stats WHERE email_queue_id = ?");
+    $stmt->execute([$queue_id]);
+    $done = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $sent = 0; $failed = 0; $remaining = [];
+    foreach ($recipients as $e) {
+        if (!isset($done[$e])) { $remaining[] = $e; }
+        elseif ($done[$e] === 'sent') { $sent++; }
+        else { $failed++; }
+    }
+    return ['queue' => $q, 'total' => count($recipients), 'sent' => $sent, 'failed' => $failed, 'remaining' => $remaining];
+}
+
+function newsletter_send_batch($db, $queue_id) {
+    $p = newsletter_progress($db, $queue_id);
+    if (!$p || $p['queue']['status'] !== 'processing') return $p;
+    $q = $p['queue'];
+    $tok = $db->prepare("SELECT unsubscribe_token FROM newsletter WHERE email = ?");
+    $log = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, ?)");
+    foreach (array_slice($p['remaining'], 0, NEWSLETTER_BATCH_SIZE) as $email) {
+        $tok->execute([$email]);
+        $token = $tok->fetchColumn();
+        $unsubscribe_link = $token
+            ? SITE_URL . '/unsubscribe.php?token=' . urlencode($token)
+            : SITE_URL . '/unsubscribe.php?email=' . urlencode($email);
+        $full_message = $q['content'] . "\n\n<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
+        $ok = sendEmail($email, $q['subject'], $full_message, 'angelwrites@zohomail.com', 'AngelWrites Newsletter');
+        $log->execute([$queue_id, $email, $ok ? 'sent' : 'failed']);
+    }
+    $p = newsletter_progress($db, $queue_id);
+    if (empty($p['remaining'])) {
+        $stmt = $db->prepare("UPDATE email_queue SET status = ?, sent_at = CURRENT_TIMESTAMP, attempt_count = attempt_count + 1, last_error = ? WHERE id = ?");
+        $stmt->execute([$p['sent'] > 0 ? 'sent' : 'failed', $p['failed'] > 0 ? "Failed: {$p['failed']}, Sent: {$p['sent']}" : null, $queue_id]);
+        $stmt = $db->prepare("INSERT INTO newsletter_archive (subject, content, recipient_count, sent_at, email_queue_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)");
+        $stmt->execute([$q['subject'], $q['content'], $p['sent'], $queue_id]);
+    } else {
+        $stmt = $db->prepare("UPDATE email_queue SET attempt_count = attempt_count + 1 WHERE id = ?");
+        $stmt->execute([$queue_id]);
+    }
+    return newsletter_progress($db, $queue_id);
+}
+
 $error = '';
 $success = '';
 
@@ -105,10 +159,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $scheduled_at = null;
                 $status = 'pending';
 
-                if (!empty($schedule)) {
-                    $scheduled_at = date('Y-m-d H:i:s', strtotime($schedule));
-                    if ($scheduled_at === false) {
+                // F171: date() never returns false, so an unparseable value was stored as 1970.
+                // Check strtotime() itself, and only use the field when "Schedule" is chosen
+                // (a value left in the hidden field no longer overrides "Send Now").
+                $wants_schedule = ($_POST['schedule_type'] ?? (empty($schedule) ? 'now' : 'later')) === 'later';
+                if ($wants_schedule) {
+                    $ts = $schedule !== '' ? strtotime($schedule) : false;
+                    if ($ts === false) {
                         $error = 'Invalid schedule date/time.';
+                    } else {
+                        $scheduled_at = date('Y-m-d H:i:s', $ts);
                     }
                 } else {
                     $status = 'processing'; // send immediately
@@ -129,40 +189,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$queue_id, $path, basename($path), filesize('../' . $path)]);
                     }
 
-                    // If sending immediately, process now
+                    // F169: sending now goes through the paged sender (see newsletter_send_batch)
                     if ($status === 'processing') {
-                        // Send immediately (limited to 10 recipients per cycle)
-                        $sent = 0;
-                        $failed = 0;
-                        $limit = 10;
-                        foreach ($recipients as $idx => $email) {
-                            if ($idx >= $limit) break;
-                            $stmt = $db->prepare("SELECT unsubscribe_token FROM newsletter WHERE email = ?");
-                            $stmt->execute([$email]);
-                            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-                            $token = $existing ? $existing['unsubscribe_token'] : bin2hex(random_bytes(32));
-                            $unsubscribe_link = SITE_URL . '/unsubscribe.php?token=' . $token;
-                            $full_message = $content . "\n\n<hr><p style='font-size:0.8rem;'>To unsubscribe, <a href=\"$unsubscribe_link\">click here</a>.</p>";
-
-                            if (sendEmail($email, $subject, $full_message, 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
-                                $sent++;
-                                // Log stats
-                                $stmt = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, 'sent')");
-                                $stmt->execute([$queue_id, $email]);
-                            } else {
-                                $failed++;
-                            }
-                            usleep(500000);
-                        }
-                        // Update queue
-                        $stmt = $db->prepare("UPDATE email_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?");
-                        $stmt->execute([$failed > 0 ? "Failed: $failed, Sent: $sent" : null, $queue_id]);
-
-                        // Archive
-                        $stmt = $db->prepare("INSERT INTO newsletter_archive (subject, content, recipient_count, sent_at, email_queue_id) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)");
-                        $stmt->execute([$subject, $content, count($recipients), $queue_id]);
-
-                        $success = "Newsletter sent! Sent: $sent, Failed: $failed.";
+                        $send_redirect_id = $queue_id;
                     } else {
                         $success = "Newsletter scheduled for " . date('F j, Y, g:i a', strtotime($scheduled_at));
                     }
@@ -170,8 +199,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Audit log
                     $stmt = $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)");
                     $stmt->execute([$_SESSION['user_id'], 'send_newsletter', "Subject: $subject, Recipients: " . count($recipients)]);
+                    if (!empty($send_redirect_id)) {
+                        header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . (int)$send_redirect_id);
+                        exit;
+                    }
                 }
             }
+        }
+    }
+
+    // ====== F169: SEND THE NEXT BATCH OF A QUEUED NEWSLETTER ======
+    if ($action === 'send_batch') {
+        $queue_id = (int)($_POST['queue_id'] ?? 0);
+        $progress = newsletter_send_batch($db, $queue_id);
+        if (!$progress) {
+            $error = 'Queue entry not found.';
+        } else {
+            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . $queue_id);
+            exit;
         }
     }
 
@@ -328,32 +373,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Segment deleted.';
     }
 
-    // ====== RESEND FAILED ======
+    // ====== F172: SEND QUEUED NOW (this host has no cron) ======
+    // Scheduled newsletters wait in the queue until the admin presses "Send queued now" on or
+    // after their date. The oldest due row is moved to 'processing' and sent through the paged
+    // sender; when it finishes, the button sends the next due row.
+    if ($action === 'send_due') {
+        $stmt = $db->prepare("SELECT id FROM email_queue WHERE status = 'pending' AND scheduled_at <= ? ORDER BY scheduled_at ASC LIMIT 1");
+        $stmt->execute([date('Y-m-d H:i:s')]);
+        $due_id = $stmt->fetchColumn();
+        if (!$due_id) {
+            $success = 'Nothing is due yet. Scheduled newsletters can be sent on or after their date.';
+        } else {
+            $db->prepare("UPDATE email_queue SET status = 'processing' WHERE id = ?")->execute([$due_id]);
+            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . (int)$due_id);
+            exit;
+        }
+    }
+
+    // ====== F170: RESUME A STUCK SEND / RETRY FAILED RECIPIENTS ======
+    // A send interrupted mid-way (closed tab, timeout) stays 'processing'; "Resume" continues it
+    // through the paged sender. "Retry failed" forgets only the failed attempts, sets the row
+    // back to 'processing' and re-sends to those recipients; addresses already sent are kept.
     if ($action === 'resend_failed') {
         $queue_id = (int)$_POST['queue_id'];
-        $stmt = $db->prepare("SELECT * FROM email_queue WHERE id = ? AND status = 'failed'");
+        $stmt = $db->prepare("SELECT id FROM email_queue WHERE id = ? AND status IN ('failed', 'sent')");
         $stmt->execute([$queue_id]);
-        $q = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$q) {
+        if (!$stmt->fetchColumn()) {
             $error = 'Failed email not found.';
         } else {
-            $recipients = explode(',', $q['recipient_emails']);
-            $sent = 0;
-            $failed = 0;
-            foreach ($recipients as $email) {
-                $email = trim($email);
-                if (sendEmail($email, $q['subject'], $q['content'], 'angelwrites@zohomail.com', 'AngelWrites Newsletter')) {
-                    $sent++;
-                    $stmt = $db->prepare("INSERT INTO newsletter_stats (email_queue_id, recipient_email, status) VALUES (?, ?, 'sent')");
-                    $stmt->execute([$queue_id, $email]);
-                } else {
-                    $failed++;
-                }
-                usleep(500000);
-            }
-            $stmt = $db->prepare("UPDATE email_queue SET status = 'sent', sent_at = CURRENT_TIMESTAMP, last_error = ? WHERE id = ?");
-            $stmt->execute([$failed > 0 ? "Resent: $sent, Failed: $failed" : null, $queue_id]);
-            $success = "Resent: $sent, Failed: $failed.";
+            $db->prepare("DELETE FROM newsletter_stats WHERE email_queue_id = ? AND status = 'failed'")->execute([$queue_id]);
+            $db->prepare("DELETE FROM newsletter_archive WHERE email_queue_id = ?")->execute([$queue_id]);
+            $db->prepare("UPDATE email_queue SET status = 'processing', last_error = NULL WHERE id = ?")->execute([$queue_id]);
+            header('Location: ' . SITE_URL . '/admin/manage_newsletter.php?tab=queue&sending=' . $queue_id);
+            exit;
         }
     }
 }
@@ -393,6 +445,32 @@ require_once '../includes/header.php';
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
+
+        <?php
+        // F169: progress of a paged send. While recipients remain and the row is still
+        // 'processing', the form below re-posts itself after one second; the button is the
+        // fallback if scripts or refresh are blocked.
+        if (isset($_GET['sending'])):
+            $progress = newsletter_progress($db, (int)$_GET['sending']);
+            if ($progress):
+                $pq = $progress['queue'];
+                $attempted = $progress['sent'] + $progress['failed'];
+                $more = !empty($progress['remaining']) && $pq['status'] === 'processing';
+        ?>
+            <div class="alert <?php echo $more ? 'alert-info' : 'alert-success'; ?>" id="sendProgress">
+                <?php if ($more): ?>
+                    Sent <?php echo $attempted; ?> of <?php echo $progress['total']; ?> to &ldquo;<?php echo htmlspecialchars($pq['subject']); ?>&rdquo;. Sending the next batch&hellip;
+                    <form method="POST" id="sendBatchForm" style="display:inline;margin-left:8px;">
+                        <input type="hidden" name="action" value="send_batch">
+                        <input type="hidden" name="queue_id" value="<?php echo (int)$pq['id']; ?>">
+                        <button type="submit" class="btn btn-sm btn-primary">Continue</button>
+                    </form>
+                    <script>setTimeout(function () { document.getElementById('sendBatchForm').submit(); }, 1000);</script>
+                <?php else: ?>
+                    Finished &ldquo;<?php echo htmlspecialchars($pq['subject']); ?>&rdquo;: sent <?php echo $progress['sent']; ?> of <?php echo $progress['total']; ?><?php echo $progress['failed'] ? ', ' . $progress['failed'] . ' failed' : ''; ?>.
+                <?php endif; ?>
+            </div>
+        <?php endif; endif; ?>
 
         <div class="tabs">
             <a href="?tab=send" class="tab <?php echo $active_tab === 'send' ? 'active' : ''; ?>">
