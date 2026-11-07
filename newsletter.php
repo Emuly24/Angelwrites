@@ -24,8 +24,8 @@ if (isset($_GET['confirm'])) {
             $sub['unsubscribe_token'] = trim((string)$_GET['confirm']);
             $welcome = aw_nl_render($db, 'Welcome to the AngelWrites newsletter',
                 '<p>Dear {{first_name}},</p><p>Thank you for joining the AngelWrites family. You will receive new reflections, poems and news about books and reading groups, written with love by Angella.</p>'
-                . '<p>While you wait for the next letter, you are welcome to <a href="' . SITE_URL . '/reflections.php">read the latest reflections</a> or <a href="' . SITE_URL . '/poetry.php">a poem</a>.</p><p>With blessings,<br>Angella Bottoman</p>',
-                $sub, ['preview' => true]);
+                . '<p>While you wait for the next letter, you are welcome to <a href="' . SITE_URL . '/reflections.php">read the latest reflections</a> or <a href="' . SITE_URL . '/poetry.php">a poem</a>.</p>',
+                $sub, ['preview' => true, 'signature' => true]);
             aw_nl_mail($sub['email'], 'Welcome to the AngelWrites newsletter', $welcome['html'], $welcome['text'], aw_nl_unsubscribe_url($sub['unsubscribe_token']));
             aw_nl_audit($db, 'confirm_subscription', $sub['email']);
         }

@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$item) { http_response_code(404); exit('Archive not found.'); }
     [$subject, $content] = [$item['subject'], $item['content']];
 }
-$msg = aw_nl_render($db, $subject, $content, $sample, ['preview' => true]);
+$msg = aw_nl_render($db, $subject, $content, $sample, ['preview' => true, 'signature' => !empty($_POST['add_signature'])]);
 header('Content-Type: text/html; charset=utf-8');
 header('X-Frame-Options: SAMEORIGIN');
 echo '<div style="font:13px Arial,sans-serif;background:#2c1e1e;color:#fff;padding:8px 12px;text-align:center;">Preview · personalised for a sample reader “Grace Banda” · links are not tracked</div>';

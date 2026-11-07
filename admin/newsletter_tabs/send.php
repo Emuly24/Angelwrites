@@ -38,6 +38,7 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
                 </div>
                 <textarea id="editor" name="content" rows="12"><?php echo htmlspecialchars($content); ?></textarea>
                 <small class="field-hint">Your logo, the colours, a "view in browser" link and an unsubscribe link are added automatically. Someone without a name on file is greeted as "friend".</small>
+                <label style="display:block;margin-top:8px;font-weight:400;"><input type="checkbox" name="add_signature" id="addSignature" value="1" checked> Add my signature (“With love and blessings, Angella Bottoman”)</label>
             </div>
 
             <fieldset class="form-group" style="border:0;padding:0;">
@@ -123,7 +124,7 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
         <?php endif; ?>
         <form method="POST" action="<?php echo SITE_URL; ?>/admin/newsletter_preview.php" target="nlPreview" id="previewForm">
             <?php echo aw_csrf_field(); ?>
-            <input type="hidden" name="subject"><input type="hidden" name="content">
+            <input type="hidden" name="subject"><input type="hidden" name="content"><input type="hidden" name="add_signature">
         </form>
     </div>
 </div>
@@ -181,7 +182,7 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
 
     document.getElementById('previewBtn').addEventListener('click', function () {
         const pf = document.getElementById('previewForm');
-        pf.subject.value = subj.value || '(no subject)'; pf.content.value = content();
+        pf.subject.value = subj.value || '(no subject)'; pf.content.value = content(); pf.add_signature.value = document.getElementById('addSignature').checked ? '1' : '';
         window.open('', 'nlPreview', 'width=680,height=860'); pf.submit();
     });
     document.getElementById('testSendBtn').addEventListener('click', function () {

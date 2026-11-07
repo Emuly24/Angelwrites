@@ -25,6 +25,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 if (!defined('AW_NL_BATCH')) define('AW_NL_BATCH', 20);           // 20 × the 10 s SMTP timeout stays under the host limit
 if (!defined('AW_NL_MAX_FILE')) define('AW_NL_MAX_FILE', 5 * 1048576);
 if (!defined('AW_NL_MAX_FILES_TOTAL')) define('AW_NL_MAX_FILES_TOTAL', 10 * 1048576);
+if (!defined('AW_NL_SIG_MARK')) define('AW_NL_SIG_MARK', '<!--aw-signature-->'); // E2: "add my signature" in a campaign
 
 // ---------------------------------------------------------------- CSRF (same key as includes/csrf.php)
 if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
@@ -140,28 +141,25 @@ function aw_nl_render(PDO $db, $subject, $content, array $sub, array $opts = [])
     $web = $qid ? aw_nl_web_url($db, $qid) : '';
     $e = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 
-    $html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-        . '<meta name="color-scheme" content="light"><title>' . $e($subject) . '</title></head>'
-        . '<body style="margin:0;padding:0;background:#F7F3ED;">'
-        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F7F3ED;">' . $e($pre) . '</div>'
-        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F3ED;"><tr><td align="center" style="padding:24px 12px;">'
-        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #EFD8D6;">'
-        . ($web ? '<tr><td style="padding:10px 24px;background:#F7F3ED;font:12px Arial,sans-serif;color:#6b5a5a;text-align:right;"><a href="' . $e($web) . '" style="color:#c08a8b;">View in your browser</a></td></tr>' : '')
-        . '<tr><td style="padding:26px 28px 18px;text-align:center;background:#EFD8D6;border-bottom:4px solid #DBA1A2;">'
-        . '<img src="' . $e($logo) . '" alt="' . $e($site) . '" width="150" style="max-width:150px;height:auto;border:0;display:inline-block;">'
-        . '<div style="font:600 11px Arial,sans-serif;letter-spacing:3px;text-transform:uppercase;color:#c08a8b;margin-top:10px;">' . $e($site) . ' Newsletter</div></td></tr>'
-        . '<tr><td style="padding:30px 32px 10px;font:16px/1.7 Georgia,\'Times New Roman\',serif;color:#3d2e2e;">'
-        . '<h1 style="font:700 24px/1.3 Georgia,serif;color:#2c1e1e;margin:0 0 18px;">' . $e($subject) . '</h1>'
-        . $body
-        . '</td></tr>'
-        . '<tr><td style="padding:10px 32px 28px;text-align:center;font:22px Georgia,serif;color:#DBA1A2;">&#9829;</td></tr>'
-        . '<tr><td style="padding:20px 28px;background:#F7F3ED;border-top:1px solid #EFD8D6;font:12px/1.6 Arial,sans-serif;color:#6b5a5a;text-align:center;">'
-        . 'You are receiving this because you subscribed to the ' . $e($site) . ' newsletter at <a href="' . $e($base) . '" style="color:#c08a8b;">' . $e(preg_replace('#^https?://#', '', $base)) . '</a>.<br>'
-        . ($unsub ? '<a href="' . $e($unsub) . '" style="color:#c08a8b;">Unsubscribe</a> · ' : '')
-        . '<a href="mailto:angelwrites@zohomail.com" style="color:#c08a8b;">Reply to Angella</a><br>' . $e($site) . ', Malawi'
-        . '</td></tr></table></td></tr></table>'
-        . ($track ? '<img src="' . $e(aw_nl_open_url($db, $qid, $sub['email'] ?? '')) . '" width="1" height="1" alt="" style="display:block;border:0;width:1px;height:1px;">' : '')
-        . '</body></html>';
+    // E2: the same layout as every other AngelWrites email (includes/email_template.php). Angella's
+    // signature is added when the composer ticked it (stored as <!--aw-signature--> in the content).
+    require_once __DIR__ . '/email_template.php';
+    $sig = !empty($opts['signature']) || strpos((string)$content, AW_NL_SIG_MARK) !== false;
+    $body = str_replace(AW_NL_SIG_MARK, '', $body);
+    $text_body = str_replace(AW_NL_SIG_MARK, '', $text_body);
+    $html = aw_email_layout([
+        'subject' => $subject,
+        'body' => '<div class="aw-email-layout">' . $body . '</div>',
+        'preheader' => $pre,
+        'signature' => $sig,
+        'web_url' => $web,
+        'kicker' => $site . ' Newsletter',
+        'pixel' => $track ? aw_nl_open_url($db, $qid, $sub['email'] ?? '') : '',
+        'footer' => 'You are receiving this because you subscribed to the ' . $e($site) . ' newsletter at <a href="' . $e($base) . '" style="color:#c08a8b;">' . $e(preg_replace('#^https?://#', '', $base)) . '</a>.<br>'
+            . ($unsub ? '<a href="' . $e($unsub) . '" style="color:#c08a8b;">Unsubscribe</a> · ' : '')
+            . '<a href="mailto:angelwrites@zohomail.com" style="color:#c08a8b;">Reply to Angella</a>',
+    ]);
+    if ($sig) $text_body .= "\n\nWith love and blessings,\nAngella Bottoman\nFounder, $site";
 
     $text = $subject . "\n" . str_repeat('=', min(60, mb_strlen($subject))) . "\n\n" . $text_body . "\n\n"
         . ($web ? "Read it in your browser: $web\n" : '')
@@ -422,7 +420,7 @@ function aw_nl_announce_post(PDO $db, array $post, $label = 'Read the full post'
     $html .= '<h2 style="font:700 21px/1.3 Georgia,serif;color:#2c1e1e;margin:18px 0 8px;">' . $e($post['title']) . '</h2>'
         . '<p style="font-style:italic;color:#6b5a5a;">' . $e($excerpt) . '</p>'
         . '<p><a href="' . $e($url) . '" style="display:inline-block;background:#DBA1A2;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-family:Arial,sans-serif;">' . $e($label) . ' →</a></p>'
-        . '<p>With love,<br>Angella</p>';
+        . AW_NL_SIG_MARK;
     $recipients = aw_nl_resolve($db, 'all');
     if (!$recipients) return 0;
     $qid = aw_nl_queue($db, $post['title'], $html, $recipients, 'all');

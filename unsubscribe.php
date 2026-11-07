@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $token !== '') {
                 $db->prepare("UPDATE newsletter SET unsubscribe_token = ? WHERE id = ?")->execute([$sub['unsubscribe_token'], $sub['id']]);
             }
             $link = aw_nl_unsubscribe_url($sub['unsubscribe_token']);
-            $m = aw_nl_render($db, 'Unsubscribe from the AngelWrites newsletter', '<p>Hello {{first_name}},</p><p>Someone (hopefully you) asked to stop receiving the AngelWrites newsletter at this address.</p><p><a href="' . htmlspecialchars($link) . '" style="display:inline-block;background:#DBA1A2;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;">Unsubscribe</a></p><p>If you did not ask for this, simply ignore this email and nothing will change.</p>', $sub, ['preview' => true]);
+            $m = aw_nl_render($db, 'Unsubscribe from the AngelWrites newsletter', '<p>Hello {{first_name}},</p><p>Someone (hopefully you) asked to stop receiving the AngelWrites newsletter at this address.</p><p><a href="' . htmlspecialchars($link) . '" style="display:inline-block;background:#DBA1A2;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;">Unsubscribe</a></p><p>If you did not ask for this, simply ignore this email and nothing will change.</p>', $sub, ['preview' => true, 'signature' => true]);
             aw_nl_mail($sub['email'], 'Unsubscribe from the AngelWrites newsletter', $m['html'], $m['text']);
         }
         $success = 'If this address receives our newsletter, we have emailed it a link to unsubscribe. Please check your inbox.';

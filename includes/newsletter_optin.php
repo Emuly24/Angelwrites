@@ -43,8 +43,8 @@ function newsletter_request_optin($db, $email, $name = '') {
     if (function_exists('aw_nl_render')) { // N6: the branded email when includes/newsletter.php is loaded
         $m = aw_nl_render($db, $subject, '<p>Hello {{first_name}},</p><p>Please confirm that you would like to receive the AngelWrites newsletter.</p>'
             . '<p><a href="' . htmlspecialchars($link) . '" style="display:inline-block;background:#DBA1A2;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-family:Arial,sans-serif;">Yes, subscribe me</a></p>'
-            . '<p style="font-size:14px;color:#6b5a5a;">If you did not ask for this, ignore this email and you will not be subscribed.</p><p>Blessings,<br>Angella Bottoman</p>',
-            ['email' => $email, 'name' => $name], ['preview' => true]);
+            . '<p style="font-size:14px;color:#6b5a5a;">If you did not ask for this, ignore this email and you will not be subscribed.</p>',
+            ['email' => $email, 'name' => $name], ['preview' => true, 'signature' => true]);
         aw_nl_mail($email, $subject, $m['html'], $m['text']);
     } else {
         $body = "Hello " . ($name ?: 'friend') . ",\n\n"
