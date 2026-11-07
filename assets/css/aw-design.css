@@ -184,3 +184,158 @@ html.aw-ui .aw-spin {
 }
 html.aw-ui .btn-outline .aw-spin { border-color: rgba(168, 103, 106, 0.3); border-top-color: var(--aw-rose-deep); }
 @keyframes awSpin { to { transform: rotate(360deg); } }
+
+/* ===== D3: header and navigation ===== */
+html.aw-ui .site-header {
+    background: var(--aw-glass);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid var(--aw-hairline);
+    transition: box-shadow 0.4s var(--aw-ease), background-color 0.4s ease;
+}
+html.aw-ui .site-header.scrolled { box-shadow: 0 10px 34px -14px rgba(58, 38, 41, 0.32); }
+html.aw-ui .logo-img { transition: transform 0.5s var(--aw-spring), filter 0.4s ease; }
+html.aw-ui .logo:hover .logo-img { transform: scale(1.03) rotate(-0.6deg); filter: drop-shadow(0 6px 14px rgba(219, 161, 162, 0.45)); }
+
+/* the skip link peeked out as a pink sliver at the top; keep it fully hidden until focused */
+html.aw-ui .skip-link { top: 0; transform: translateY(-110%); transition: transform 0.25s var(--aw-ease); }
+html.aw-ui .skip-link:focus { transform: none; }
+
+/* reading progress across the top of the page (aw-motion.js) */
+.aw-progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    z-index: 1100;
+    background: linear-gradient(90deg, var(--rose), var(--aw-rose-deep), var(--aw-gold));
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+    pointer-events: none;
+    box-shadow: 0 0 10px rgba(219, 161, 162, 0.6);
+}
+
+/* desktop links: compact spacing so the icons on the right stay on screen,
+   and a gradient underline that grows from the centre */
+@media (min-width: 993px) {
+    html.aw-ui:not(.aw-nav-compact) .nav-links { gap: 2px; min-width: 0; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a { padding: 6px 10px; font-size: 0.9rem; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links .nav-separator { display: none; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:not(.btn-login):not(.btn-logout) > i { display: none; }
+    html.aw-ui .nav-links a { position: relative; transition: color 0.25s ease, background-color 0.25s ease; }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:not(.btn-login):not(.btn-signup):not(.btn-logout)::after {
+        content: "";
+        position: absolute;
+        left: 10px; right: 10px; bottom: 1px;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--aw-grad);
+        transform: scaleX(0);
+        transition: transform 0.4s var(--aw-ease);
+    }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:hover { text-decoration: none; color: var(--aw-rose-deep); background: rgba(219, 161, 162, 0.1); }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a:not(.btn-login):not(.btn-signup):not(.btn-logout):is(:hover, .active)::after { transform: scaleX(1); }
+    html.aw-ui:not(.aw-nav-compact) .nav-links a.active { color: var(--aw-rose-deep); background: transparent; }
+    html[data-theme="dark"].aw-ui:not(.aw-nav-compact) .nav-links a:is(:hover, .active) { color: var(--rose); }
+}
+
+/* When the links still do not fit beside the logo and the icons (members and admins have more
+   links), aw-motion.js adds .aw-nav-compact and the menu uses the slide-in drawer, as on phones. */
+html.aw-nav-compact .hamburger { display: flex !important; }
+html.aw-nav-compact .nav-links {
+    position: fixed !important; top: 0 !important; right: -340px !important;
+    width: 320px !important; max-width: 85vw !important; height: 100vh !important;
+    background: var(--card-bg) !important; border-left: 1px solid var(--border) !important;
+    padding: 80px 24px 24px !important; box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1) !important;
+    z-index: 1000 !important; overflow-y: auto !important; display: flex !important;
+    flex-direction: column !important; align-items: stretch !important; justify-content: flex-start !important;
+    gap: 4px !important; margin: 0 !important; flex: 0 0 auto !important;
+}
+html.aw-nav-compact .nav-links.open { right: 0 !important; }
+html.aw-nav-compact .nav-links li { width: 100% !important; padding: 6px 0 !important; border-bottom: 1px solid var(--border) !important; }
+html.aw-nav-compact .nav-links li:last-child { border-bottom: none !important; }
+html.aw-nav-compact .nav-links a { display: block !important; width: 100% !important; padding: 4px 0 !important; font-size: 1rem !important; }
+html.aw-nav-compact .nav-links .nav-separator { display: none !important; }
+html.aw-nav-compact .menu-overlay {
+    position: fixed !important; inset: 0 !important; z-index: 999 !important;
+    background: rgba(0, 0, 0, 0.5) !important; display: none !important;
+}
+html.aw-nav-compact .menu-overlay.open { display: block !important; }
+
+html.aw-ui .nav-links .btn-signup {
+    background: var(--aw-grad);
+    background-size: 200% 200%;
+    color: #fff;
+    box-shadow: 0 6px 16px -6px rgba(168, 103, 106, 0.6);
+    transition: background-position 0.5s var(--aw-ease), transform 0.3s var(--aw-spring), box-shadow 0.3s ease;
+}
+html.aw-ui .nav-links .btn-signup:hover { background-position: 100% 50%; color: #fff; transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(168, 103, 106, 0.7); }
+html.aw-ui .nav-links :is(.btn-login, .btn-logout) { transition: all 0.3s var(--aw-ease); }
+html.aw-ui .nav-links .btn-login:hover { background: var(--aw-rose-deep); border-color: var(--aw-rose-deep); color: #fff; }
+
+/* round action icons */
+html.aw-ui .nav-action-icon { transition: color 0.25s ease, background-color 0.25s ease, transform 0.35s var(--aw-spring); }
+html.aw-ui .nav-action-icon:hover { transform: translateY(-2px); color: var(--aw-rose-deep); background: rgba(219, 161, 162, 0.16); }
+html.aw-ui .nav-action-icon:active { transform: scale(0.92); }
+html.aw-ui .theme-toggle i { transition: transform 0.6s var(--aw-spring); }
+html.aw-ui .theme-toggle.aw-turn i { transform: rotate(360deg); }
+html.aw-ui .notification-badge {
+    background: var(--aw-grad);
+    box-shadow: 0 0 0 2px var(--bg);
+    animation: awBadge 2.4s ease-out infinite;
+}
+@keyframes awBadge {
+    0% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 2px rgba(219, 161, 162, 0.7); }
+    70% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 10px rgba(219, 161, 162, 0); }
+    100% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 10px rgba(219, 161, 162, 0); }
+}
+
+/* dropdowns fade and drop in instead of popping */
+html.aw-ui :is(.notification-dropdown, .user-dropdown) {
+    display: block;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px) scale(0.97);
+    transform-origin: top right;
+    pointer-events: none;
+    border-color: var(--aw-hairline);
+    border-radius: 16px;
+    box-shadow: var(--aw-sh-3);
+    transition: opacity 0.22s ease, transform 0.32s var(--aw-ease), visibility 0s linear 0.32s;
+}
+html.aw-ui :is(.notification-dropdown, .user-dropdown).open {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    pointer-events: auto;
+    transition: opacity 0.22s ease, transform 0.32s var(--aw-ease), visibility 0s;
+}
+html.aw-ui .user-dropdown a { transition: background-color 0.2s ease, padding-left 0.25s var(--aw-ease), color 0.2s ease; }
+html.aw-ui .user-dropdown a:hover { padding-left: 22px; color: var(--aw-rose-deep); text-decoration: none; }
+html.aw-ui .notification-dropdown .notif-item { transition: background-color 0.2s ease; border-radius: 8px; }
+html.aw-ui .notification-dropdown .notif-item:hover { background: rgba(219, 161, 162, 0.08); }
+
+/* mobile menu: smoother slide, blurred backdrop, links arrive one after another */
+html.aw-nav-compact .nav-links { transition: right 0.5s var(--aw-ease) !important; }
+html.aw-nav-compact .menu-overlay.open {
+    background: rgba(44, 30, 30, 0.38) !important;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    animation: awFade 0.35s ease both;
+}
+html.aw-nav-compact .nav-links.open > li { animation: awSlideIn 0.55s var(--aw-ease) both; animation-delay: calc(var(--aw-i, 0) * 45ms + 120ms); }
+html.aw-nav-compact .nav-links a:hover { padding-left: 6px !important; color: var(--aw-rose-deep) !important; text-decoration: none; transition: padding-left 0.25s var(--aw-ease), color 0.2s ease !important; }
+@media (max-width: 992px) {
+    html.aw-ui .nav-links { transition: right 0.5s var(--aw-ease) !important; }
+    html.aw-ui .menu-overlay.open {
+        background: rgba(44, 30, 30, 0.38) !important;
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+        animation: awFade 0.35s ease both;
+    }
+    html.aw-ui .nav-links.open > li {
+        animation: awSlideIn 0.55s var(--aw-ease) both;
+        animation-delay: calc(var(--aw-i, 0) * 45ms + 120ms);
+    }
+    html.aw-ui .nav-links a:hover { padding-left: 6px !important; color: var(--aw-rose-deep) !important; transition: padding-left 0.25s var(--aw-ease), color 0.2s ease !important; }
+}
+@keyframes awFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes awSlideIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }

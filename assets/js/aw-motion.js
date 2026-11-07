@@ -60,6 +60,53 @@
         document.querySelectorAll('.btn.is-loading').forEach(clearLoading);
     });
 
+    /* ===== D3: navigation ===== */
+    ready(function () {
+        // stagger index for the mobile menu links
+        document.querySelectorAll('#navLinks > li').forEach(function (li, i) { li.style.setProperty('--aw-i', i); });
+
+        // Collapse the desktop menu into the drawer whenever its links would push the icons off screen.
+        var bar0 = document.querySelector('.nav-container'), links = document.getElementById('navLinks'), acts = document.querySelector('.nav-actions');
+        function fitNav() {
+            if (!bar0 || !links || !acts) return;
+            if (window.innerWidth <= 992) { root.classList.remove('aw-nav-compact'); return; }
+            var wasOpen = links.classList.contains('open');
+            root.classList.remove('aw-nav-compact');
+            var tooWide = links.scrollWidth > links.clientWidth + 1 || acts.getBoundingClientRect().right > bar0.getBoundingClientRect().right + 1;
+            root.classList.toggle('aw-nav-compact', tooWide);
+            if (!tooWide && wasOpen && typeof window.closeMobileMenu === 'function') window.closeMobileMenu();
+        }
+        fitNav();
+        var fitT;
+        window.addEventListener('resize', function () { clearTimeout(fitT); fitT = setTimeout(fitNav, 120); }, { passive: true });
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitNav);
+
+        // theme button gives a little turn when pressed
+        var tt = document.getElementById('themeToggle');
+        if (tt && !reduce) tt.addEventListener('click', function () {
+            tt.classList.remove('aw-turn'); void tt.offsetWidth; tt.classList.add('aw-turn');
+            setTimeout(function () { tt.classList.remove('aw-turn'); }, 650);
+        });
+
+        // reading progress bar on long pages (not in the book reader, which has its own)
+        if (page === 'reader') return;
+        var bar = document.createElement('div');
+        bar.className = 'aw-progress';
+        bar.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(bar);
+        var ticking = false;
+        function update() {
+            ticking = false;
+            var max = document.documentElement.scrollHeight - window.innerHeight;
+            var long = max > window.innerHeight * 0.6;
+            bar.style.display = long ? '' : 'none';
+            if (long) bar.style.transform = 'scaleX(' + Math.min(1, Math.max(0, window.scrollY / max)) + ')';
+        }
+        window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+        window.addEventListener('resize', update, { passive: true });
+        update();
+    });
+
     AW.ready = ready;
     AW.finePointer = finePointer;
 })();
