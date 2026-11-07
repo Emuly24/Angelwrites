@@ -33,7 +33,7 @@ if ($isLoggedIn) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="aw-ui" data-aw-page="<?php echo htmlspecialchars(basename($_SERVER['PHP_SELF'] ?? '', '.php')); ?>"><!-- D1 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -254,6 +254,8 @@ if ($isLoggedIn) {
             .user-wrapper span { display: none; } /* hide username on tiny screens to prevent overflow */
         }
     </style>
+    <!-- D1: site-wide design layer, after the header styles so it applies on every page -->
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=1">
 </head>
 <body>
     <a href="#mainContent" class="skip-link">Skip to main content</a>

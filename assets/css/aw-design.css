@@ -1,0 +1,84 @@
+/* ============================================================
+   AngelWrites design layer (D1–D8)
+   Loaded after every page's own styles through includes/header.php.
+   Rules are scoped to html.aw-ui so they win over the per-page <style>
+   blocks without !important, and the brand colours (rose, vanilla,
+   fantasy) stay exactly as defined in style.css.
+   ============================================================ */
+
+/* ===== D1: tokens ===== */
+:root {
+    --aw-ink: #3a2629;
+    --aw-rose-deep: #a8676a;
+    --aw-rose-ink: #9a5a5e;
+    --aw-gold: #d6a85c;
+    --aw-grad: linear-gradient(135deg, #a8676a 0%, #c27f82 45%, #b8706f 100%);
+    --aw-grad-soft: linear-gradient(135deg, #DBA1A2 0%, #EFD8D6 55%, #F7F3ED 100%);
+    --aw-grad-text: linear-gradient(100deg, #a8676a 0%, #d48f92 35%, #c9965a 55%, #d48f92 75%, #a8676a 100%);
+    --aw-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --aw-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --aw-r-sm: 10px;
+    --aw-r: 18px;
+    --aw-r-lg: 26px;
+    --aw-sh-1: 0 1px 2px rgba(58, 38, 41, 0.06), 0 4px 14px rgba(58, 38, 41, 0.06);
+    --aw-sh-2: 0 2px 6px rgba(58, 38, 41, 0.06), 0 14px 34px -8px rgba(168, 103, 106, 0.28);
+    --aw-sh-3: 0 4px 10px rgba(58, 38, 41, 0.08), 0 26px 60px -14px rgba(168, 103, 106, 0.38);
+    --aw-ring: 0 0 0 4px rgba(219, 161, 162, 0.32);
+    --aw-glass: rgba(247, 243, 237, 0.72);
+    --aw-hairline: rgba(168, 103, 106, 0.16);
+}
+html[data-theme="dark"] {
+    --aw-ink: #f0e8e8;
+    --aw-sh-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.3);
+    --aw-sh-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 14px 34px -8px rgba(0, 0, 0, 0.6);
+    --aw-sh-3: 0 4px 10px rgba(0, 0, 0, 0.4), 0 26px 60px -14px rgba(219, 161, 162, 0.22);
+    --aw-glass: rgba(26, 18, 18, 0.72);
+    --aw-hairline: rgba(219, 161, 162, 0.14);
+    --aw-grad-soft: linear-gradient(135deg, #3d2a2b 0%, #2c1e1e 55%, #1a1212 100%);
+}
+
+/* ===== D1: base polish ===== */
+html.aw-ui body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+html.aw-ui :is(h1, h2, h3) { letter-spacing: -0.012em; }
+html.aw-ui ::selection { background: rgba(219, 161, 162, 0.45); color: var(--aw-ink); }
+
+html.aw-ui { scrollbar-color: var(--rose) transparent; scrollbar-width: thin; }
+html.aw-ui ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.aw-ui ::-webkit-scrollbar-track { background: transparent; }
+html.aw-ui ::-webkit-scrollbar-thumb {
+    background: linear-gradient(var(--rose), var(--rose-dark));
+    border-radius: 10px; border: 2px solid var(--bg);
+}
+
+/* keyboard focus: one clear, on-brand ring everywhere */
+html.aw-ui :is(a, button, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--aw-rose-deep);
+    outline-offset: 3px;
+    border-radius: 8px;
+}
+
+/* form fields: soft hover, glowing focus */
+html.aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"],
+    input[type="date"], input[type="datetime-local"], input[type="time"], select, textarea) {
+    transition: border-color 0.2s ease, box-shadow 0.25s var(--aw-ease), background-color 0.2s ease;
+}
+html.aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"],
+    input[type="date"], input[type="datetime-local"], input[type="time"], select, textarea):hover:not(:focus):not(:disabled) {
+    border-color: var(--rose);
+}
+html.aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"],
+    input[type="search"], input[type="url"], input[type="tel"], input[type="number"],
+    input[type="date"], input[type="datetime-local"], input[type="time"], select, textarea):focus {
+    outline: none;
+    border-color: var(--aw-rose-deep);
+    box-shadow: var(--aw-ring);
+}
+html.aw-ui :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) {
+    accent-color: var(--aw-rose-deep);
+}
