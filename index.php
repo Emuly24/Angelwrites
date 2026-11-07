@@ -72,7 +72,7 @@ $stmt->execute();
 $featured_books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Latest Poems (latest 3)
-$stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 3");
+$stmt = $db->prepare("SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft') ORDER BY created_at DESC LIMIT 3"); // F122: no drafts
 $stmt->execute();
 $latest_poems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -199,6 +199,7 @@ $stmt = $db->prepare("
     FROM poems p
     JOIN reviews r ON r.target_type = 'poem' AND r.target_id = p.id
     WHERE r.deleted_at IS NULL AND r.is_private = 0
+      AND p.id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft') -- F122
     GROUP BY p.id
     ORDER BY comment_count DESC
     LIMIT 1
@@ -218,7 +219,7 @@ if ($carousel_poem) {
     $stmt->execute([$carousel_poem['id']]);
     $carousel_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if (empty($carousel_comments)) {
-        $stmt = $db->prepare("SELECT * FROM poems ORDER BY created_at DESC LIMIT 1");
+        $stmt = $db->prepare("SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft') ORDER BY created_at DESC LIMIT 1"); // F122
         $stmt->execute();
         $carousel_poem = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($carousel_poem) {

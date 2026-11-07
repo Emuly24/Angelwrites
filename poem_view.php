@@ -88,6 +88,15 @@ $poem = $stmt->fetch(PDO::FETCH_ASSOC);
 // open, concurrent views failed at once with "database is locked" (WAL snapshot conflict;
 // the busy timeout cannot help that case). 60 concurrent views: ~40 failed before, 0 after.
 $stmt->closeCursor();
+// F122: a draft is visible to the admin only (it used to be public by direct link too).
+if ($poem && !isAdmin()) {
+    $ds = $db->prepare("SELECT 1 FROM poem_status WHERE poem_id = ? AND status = 'draft'");
+    $ds->execute([$id]);
+    if ($ds->fetchColumn()) {
+        $poem = false;
+    }
+    $ds->closeCursor();
+}
 if (!$poem) {
     header('Location: ' . SITE_URL . '/poetry.php');
     exit;
@@ -159,6 +168,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
         $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, parent_id, is_private, target_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$target_type, $target_id, $_SESSION['user_id'], $rating, $comment, $parent_id, $is_private, $target_user_id]);
         $comment_id = $db->lastInsertId();
+
+        // F126: notify each member mentioned as "@Display Name" (mentions notified no one).
+        require_once __DIR__ . '/includes/notifications.php';
+        $mstmt = $db->query("SELECT id, name, first_name, last_name, username FROM users");
+        foreach ($mstmt->fetchAll(PDO::FETCH_ASSOC) as $mu) {
+            $mname = awDisplayName($mu);
+            if ((int)$mu['id'] !== (int)$_SESSION['user_id'] && $mname !== 'Friend' && mb_stripos($comment, '@' . $mname) !== false) {
+                awNotify($db, $mu['id'], 'mention', 'You were mentioned in a comment',
+                    awDisplayName(['name' => $_SESSION['name'] ?? '']) . ' mentioned you on "' . mb_substr($poem['title'], 0, 80) . '".',
+                    SITE_URL . '/poem_view.php?id=' . $target_id);
+            }
+        }
 
         $payload = json_encode([
             'comment_id' => $comment_id,

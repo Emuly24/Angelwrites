@@ -24,6 +24,11 @@ $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'verify_attempts_' . $ip;
 $attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
 $attempts = 0;
+// F104: the counter never expired, so five wrong codes locked that address out for good while
+// the message promised 15 minutes. A counter last written 15+ minutes ago is discarded.
+if (file_exists($attempts_file) && filemtime($attempts_file) < time() - 900) {
+    @unlink($attempts_file);
+}
 if (file_exists($attempts_file)) {
     $attempts = (int)file_get_contents($attempts_file);
 }

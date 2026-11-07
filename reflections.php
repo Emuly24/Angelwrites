@@ -10,11 +10,17 @@ $offset = ($page - 1) * $limit;
 // ===== SEARCH =====
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
+// F71: admin/reflection_editor.php saves reflections as blog_posts (category 'Christian
+// Reflections'); this page read the separate reflections table, which nothing writes, so
+// published reflections never appeared. Read the published reflection posts instead; the
+// alias keeps the column names the rest of the page uses (image_path = featured_image).
+$refl_src = "(SELECT id, title, content, excerpt, featured_image AS image_path, created_at, updated_at, views, tags, slug, featured, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published' AND category = 'Christian Reflections') reflections";
+
 // ===== SORT =====
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'newest';
 
 // ===== FETCH TAGS =====
-$stmt = $db->query("SELECT DISTINCT tags FROM reflections WHERE tags != ''");
+$stmt = $db->query("SELECT DISTINCT tags FROM $refl_src WHERE tags != ''");
 $tags = [];
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $tag_list = explode(',', $row['tags']);
@@ -27,7 +33,7 @@ $tags = array_unique($tags);
 sort($tags);
 
 // ===== FETCH TOTAL REFLECTIONS =====
-$count_sql = "SELECT COUNT(*) FROM reflections";
+$count_sql = "SELECT COUNT(*) FROM $refl_src";
 $count_params = [];
 if ($search) {
     $count_sql .= " WHERE (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)";
@@ -41,7 +47,7 @@ $total_reflections = $stmt->fetchColumn();
 $total_pages = ceil($total_reflections / $limit);
 
 // ===== FETCH REFLECTIONS =====
-$sql = "SELECT * FROM reflections";
+$sql = "SELECT * FROM $refl_src";
 $params = [];
 if ($search) {
     $sql .= " WHERE (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)";
@@ -74,11 +80,11 @@ $stmt->execute($params);
 $reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH RECENT REFLECTIONS (for sidebar) =====
-$stmt = $db->query("SELECT id, title, slug, created_at, comment_count FROM reflections ORDER BY created_at DESC LIMIT 5");
+$stmt = $db->query("SELECT id, title, slug, created_at, comment_count FROM $refl_src ORDER BY created_at DESC LIMIT 5");
 $recent_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH FEATURED REFLECTIONS =====
-$stmt = $db->prepare("SELECT * FROM reflections WHERE featured = 1 ORDER BY created_at DESC LIMIT 3");
+$stmt = $db->prepare("SELECT * FROM $refl_src WHERE featured = 1 ORDER BY created_at DESC LIMIT 3");
 $stmt->execute();
 $featured_reflections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -155,7 +161,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                         <div class="featured-grid">
                             <?php foreach ($featured_reflections as $fr): ?>
                                 <div class="featured-card">
-                                    <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $fr['id']; ?>">
+                                    <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($fr['slug']); /* F72 */ ?>">
                                         <div class="featured-card-content">
                                             <span class="featured-badge"><i class="fas fa-star"></i> Featured</span>
                                             <h4><?php echo htmlspecialchars($fr['title']); ?></h4>
@@ -190,7 +196,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                                         </span>
                                     </div>
                                     <h3>
-                                        <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>">
+                                        <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($reflection['slug']); /* F72 */ ?>">
                                             <?php echo htmlspecialchars($reflection['title']); ?>
                                         </a>
                                     </h3>
@@ -212,7 +218,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                                         </div>
                                         <div class="reflection-actions">
                                             <span class="comment-count"><i class="fas fa-comment"></i> <?php echo number_format($reflection['comment_count'] ?? 0); ?></span>
-                                            <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $reflection['id']; ?>" class="read-more">
+                                            <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($reflection['slug']); /* F72 */ ?>" class="read-more">
                                                 Read <i class="fas fa-arrow-right"></i>
                                             </a>
                                         </div>
@@ -260,7 +266,7 @@ $pageTitle = $search ? 'Search Results: ' . htmlspecialchars($search) : 'Christi
                         <ul class="recent-posts-list">
                             <?php foreach ($recent_reflections as $rr): ?>
                                 <li>
-                                    <a href="<?php echo SITE_URL; ?>/reflection.php?id=<?php echo $rr['id']; ?>">
+                                    <a href="<?php echo SITE_URL; ?>/blog_post.php?slug=<?php echo urlencode($rr['slug']); /* F72 */ ?>">
                                         <?php echo htmlspecialchars($rr['title']); ?>
                                     </a>
                                     <small><?php echo date('M j, Y', strtotime($rr['created_at'])); ?> • <?php echo $rr['comment_count'] ?? 0; ?> comments</small>
@@ -377,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.length > 0) {
                     let html = '<ul>';
                     data.forEach(item => {
-                        html += '<li><a href="<?php echo SITE_URL; ?>/reflection.php?id=' + item.id + '">' + item.title + '</a></li>';
+                        html += '<li><a href="<?php echo SITE_URL; ?>/blog_post.php?slug=' + encodeURIComponent(item.slug || '') + '">' + item.title + '</a></li>'; // F72
                     });
                     html += '</ul>';
                     searchResults.innerHTML = html;

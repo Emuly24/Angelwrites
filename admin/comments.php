@@ -45,6 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_reply'])) {
             $stmt = $db->prepare("INSERT INTO book_comments (book_id, user_id, paragraph_index, comment, parent_id, is_admin_reply) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute([$target_id, $_SESSION['user_id'], 0, $reply, $parent_id, 1]);
         }
+        // F114: tell the member whose comment was answered
+        require_once __DIR__ . '/../includes/notifications.php';
+        $ptable = $target_type === 'poem' ? 'reviews' : 'book_comments';
+        $pstmt = $db->prepare("SELECT user_id FROM $ptable WHERE id = ?");
+        $pstmt->execute([$parent_id]);
+        $parent_author = $pstmt->fetchColumn();
+        $pstmt->closeCursor();
+        if ($parent_author && (int)$parent_author !== (int)$_SESSION['user_id']) {
+            $plink = $target_type === 'poem' ? SITE_URL . '/poem_view.php?id=' . $target_id : SITE_URL . '/book.php?id=' . $target_id;
+            awNotify($db, $parent_author, 'admin_reply', 'Angella replied to your comment', mb_substr($reply, 0, 140), $plink);
+        }
         header('Location: ' . SITE_URL . '/admin/comments.php');
         exit;
     }

@@ -15,7 +15,10 @@ $success = '';
 $title = '';
 $intro = '';
 $content = '';
-$category = 'Christian Reflections';
+// F73: a blog post defaulted to the category 'Christian Reflections', which is what marks a post
+// as a reflection (admin/manage_reflections.php, reflections.php since F71), so every blog post
+// became a reflection. Blog posts now default to 'General'; reflections keep their category.
+$category = 'General';
 $tags = '';
 $status = 'draft';
 $featured_image = '';
@@ -45,7 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
     $content = trim($_POST['content']);
-    $category = trim($_POST['category'] ?? 'Christian Reflections');
+    $category = trim($_POST['category'] ?? '');
+    if ($category === '') {
+        $category = ($type === 'reflection') ? 'Christian Reflections' : 'General'; // F73
+    }
     $tags = trim($_POST['tags'] ?? '');
     $status = trim($_POST['status'] ?? 'draft');
     $action = $_POST['action'] ?? 'save';
@@ -199,7 +205,7 @@ $pageTitle = $id > 0 ? 'Edit Blog Post' : 'Add New Blog';
                     <div class="form-row">
                         <div class="form-group">
                             <label for="category">Category</label>
-                            <input type="text" id="category" name="category" value="<?php echo htmlspecialchars($category); ?>" placeholder="e.g. Christian Reflections">
+                            <input type="text" id="category" name="category" value="<?php echo htmlspecialchars($category); ?>" placeholder="e.g. General">
                         </div>
                         <div class="form-group">
                             <label for="tags">Tags (comma separated)</label>

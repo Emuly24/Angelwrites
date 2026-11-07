@@ -53,25 +53,28 @@ if ($type === 'all' || $type === 'books') {
 if ($type === 'all' || $type === 'poems') {
     $search_configs[] = [
         'type' => 'poem',
-        'table' => 'poems',
+        // F122: drafts are not searchable
+        'table' => "(SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')) poems",
         'columns' => ['title', 'intro', 'content'],
-        'select' => "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt, 0 as comment_count, 0 as likes, 0 as loves, 0 as prays FROM poems"
+        'select' => "SELECT 'poem' as type, id, title, NULL as author, intro as description, image_path as image, created_at, NULL as slug, content, NULL as excerpt, 0 as comment_count, 0 as likes, 0 as loves, 0 as prays FROM (SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')) poems"
     ];
 }
 if ($type === 'all' || $type === 'blog') {
     $search_configs[] = [
         'type' => 'blog',
-        'table' => 'blog_posts',
+        // F71: reflection posts are listed as reflections below; leave them out here (no duplicates)
+        'table' => "(SELECT * FROM blog_posts WHERE COALESCE(category, '') != 'Christian Reflections') blog_posts",
         'columns' => ['title', 'content', 'excerpt', 'category'],
-        'select' => "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published'"
+        'select' => "SELECT 'blog' as type, id, title, NULL as author, content as description, featured_image as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM (SELECT * FROM blog_posts WHERE COALESCE(category, '') != 'Christian Reflections') blog_posts WHERE status = 'published'"
     ];
 }
 if ($type === 'all' || $type === 'reflections') {
     $search_configs[] = [
         'type' => 'reflection',
-        'table' => 'reflections',
+        // F71: reflections are blog_posts with category 'Christian Reflections' (see reflections.php)
+        'table' => "(SELECT id, title, content, excerpt, featured_image AS image_path, created_at, updated_at, views, tags, slug, featured, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published' AND category = 'Christian Reflections') reflections",
         'columns' => ['title', 'content', 'excerpt'],
-        'select' => "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM reflections"
+        'select' => "SELECT 'reflection' as type, id, title, NULL as author, content as description, image_path as image, created_at, slug, content, excerpt, comment_count, likes, loves, prays FROM (SELECT id, title, content, excerpt, featured_image AS image_path, created_at, updated_at, views, tags, slug, featured, comment_count, likes, loves, prays FROM blog_posts WHERE status = 'published' AND category = 'Christian Reflections') reflections"
     ];
 }
 if ($type === 'all' || $type === 'videos') {
@@ -252,8 +255,9 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                             $link = SITE_URL . '/blog_post.php?slug=' . ($item['slug'] ?? $item['id']);
                             break;
                         case 'reflection':
-                            // Item 5 (F54): reflection.php does not exist; open the reflections list filtered to this one.
-                            $link = SITE_URL . '/reflections.php?search=' . urlencode($item['title']);
+                            // F72: reflections are blog posts (F71); open the post itself. (Item 5 / F54 had
+                            // pointed at the filtered list while there was no detail page to open.)
+                            $link = SITE_URL . '/blog_post.php?slug=' . urlencode($item['slug']);
                             break;
                         case 'video':
                             $link = SITE_URL . '/video_watch.php?id=' . $item['id'];

@@ -305,12 +305,14 @@ $pageTitle = 'Sign Up';
                     </form>
 
                     <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
+                    <?php if (getenv('SOCIAL_LOGIN_ENABLED') === '1'): // F102: off unless enabled (decision D-M3) ?>
                     <div class="social-login-section">
                         <p>Or continue with:</p>
                         <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
                             <i class="fab fa-google"></i> Google
                         </a>
                     </div>
+                    <?php endif; ?>
 
                     <div class="auth-footer">
                         <p>Already have an account? <a href="<?php echo SITE_URL; ?>/login.php">Sign in here</a></p>

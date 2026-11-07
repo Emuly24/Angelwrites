@@ -156,7 +156,7 @@ if (isLoggedIn()) {
         
         $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
         $stmt->execute([$user_id]);
-        $reading_streak = $stmt->fetchColumn() ?? 0;
+        $reading_streak = (int)$stmt->fetchColumn(); // F87: fetchColumn() returns false with no row; ?? 0 kept the false (blank)
     } catch (Exception $e) {
         // Tables might not exist – skip
     }
@@ -252,6 +252,27 @@ $pageTitle = htmlspecialchars($book['title']);
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
+                    <?php if (isLoggedIn()):
+                        // F111: add this book to the member's library from its own page (the catalogue
+                        // and book page had no way to do so). Posts to library.php's existing handler.
+                        $ls = $db->prepare("SELECT status FROM reading_status WHERE user_id = ? AND book_id = ?");
+                        $ls->execute([$_SESSION['user_id'], $book_id]);
+                        $my_status = (string)$ls->fetchColumn();
+                        $ls->closeCursor();
+                    ?>
+                        <form method="POST" action="<?php echo SITE_URL; ?>/library.php" class="library-add-form" style="margin-top:10px;text-align:center;">
+                            <input type="hidden" name="book_id" value="<?php echo (int)$book_id; ?>">
+                            <input type="hidden" name="update_status" value="1">
+                            <label for="libraryStatus" style="font-size:0.9rem;">My library:</label>
+                            <select id="libraryStatus" name="status" onchange="this.form.submit()">
+                                <option value=""<?php echo $my_status === '' ? ' selected' : ''; ?>>Add to my library…</option>
+                                <option value="want to read"<?php echo $my_status === 'want to read' ? ' selected' : ''; ?>>Want to Read</option>
+                                <option value="currently reading"<?php echo $my_status === 'currently reading' ? ' selected' : ''; ?>>Currently Reading</option>
+                                <option value="finished"<?php echo $my_status === 'finished' ? ' selected' : ''; ?>>Finished</option>
+                            </select>
+                            <noscript><button type="submit" class="btn btn-sm btn-outline">Save</button></noscript>
+                        </form>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Meta Info -->

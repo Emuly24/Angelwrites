@@ -65,7 +65,7 @@ try { $stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?
 try { $stmt = $db->prepare("SELECT COUNT(*) FROM questions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['questions_asked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['sessions_booked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
 // Streak & Rep
-try { $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['current_streak'] = $stmt->fetchColumn() ?? 0; } catch (Exception $e) {}
+try { $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['current_streak'] = (int)$stmt->fetchColumn(); /* F118: false (no row) printed as blank */ } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT points, level FROM user_reputations WHERE user_id = ?"); $stmt->execute([$user_id]); $rep = $stmt->fetch(PDO::FETCH_ASSOC); $stats['points'] = $rep['points'] ?? 0; $stats['level'] = $rep['level'] ?? 1; } catch (Exception $e) {}
 
 // My total view counts
@@ -198,7 +198,7 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <!-- User Hero -->
     <div class="user-hero">
         <div>
-            <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars($user['name']); ?></span></h1>
+            <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars(awDisplayName($user)); /* F100 */ ?></span></h1>
             <div class="sub">Your personal dashboard – track your reading journey.</div>
             <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <span style="background: #f1c40f; color: #333; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo $stats['current_streak']; ?> Day Streak</span>
@@ -290,8 +290,9 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <div class="user-actions-grid">
         <div class="user-module"><h3>📖 My Library</h3><div class="user-module-grid">
             <a href="books.php" class="user-module-btn"><i class="fas fa-book"></i><span>Browse Books</span></a>
-            <a href="reader/reader.php" class="user-module-btn"><i class="fas fa-book-open"></i><span>Open Reader</span></a>
-            <a href="reader/reader_export.php" class="user-module-btn"><i class="fas fa-file-export"></i><span>Export Data</span></a>
+            <!-- F10: "Open Reader" opened the reader with no book (redirect) and "Export Data" needed a book id
+                 (raw JSON error). The library lists the member's books; each book opens in the reader. -->
+            <a href="library.php" class="user-module-btn"><i class="fas fa-book-open"></i><span>Continue Reading</span></a>
         </div></div>
         
         <div class="user-module"><h3>✍️ Poetry & Blogs</h3><div class="user-module-grid">
@@ -301,7 +302,6 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
         </div></div>
         
         <div class="user-module"><h3>👥 Community</h3><div class="user-module-grid">
-            <a href="reader/reader_circles.php" class="user-module-btn"><i class="fas fa-circle"></i><span>Reading Circles</span></a>
             <a href="groups.php" class="user-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
             <a href="community.php" class="user-module-btn"><i class="fas fa-comments"></i><span>Community Q&A</span></a>
         </div></div>
@@ -310,17 +310,12 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <a href="videos.php" class="user-module-btn"><i class="fas fa-video"></i><span>Watch Videos</span></a>
         </div></div>
 
-        <div class="user-module"><h3>📊 Reader Tools</h3><div class="user-module-grid">
-            <a href="reader/reader_analytics.php" class="user-module-btn"><i class="fas fa-chart-line"></i><span>My Analytics</span></a>
-            <a href="reader/reader_challenges.php" class="user-module-btn"><i class="fas fa-trophy"></i><span>Challenges</span></a>
-            <a href="reader/reader_notes.php" class="user-module-btn"><i class="fas fa-sticky-note"></i><span>My Notes</span></a>
-            <a href="reader/reader_tts.php" class="user-module-btn"><i class="fas fa-volume-up"></i><span>Text to Speech</span></a>
-            <a href="reader/reader_gamification.php" class="user-module-btn"><i class="fas fa-gamepad"></i><span>Gamification</span></a>
-        </div></div>
-        
+        <!-- F10: the "Reader Tools" tiles linked raw partials and endpoints (reader_challenges, reader_notes,
+             reader_tts, reader_gamification: unstyled fragments; reader_analytics: admin-only). These tools
+             live inside the reader itself, so the tiles are removed. -->
+
         <div class="user-module"><h3>⚙️ My Account</h3><div class="user-module-grid">
             <a href="profile.php" class="user-module-btn"><i class="fas fa-user"></i><span>My Profile</span></a>
-            <a href="achievements.php" class="user-module-btn"><i class="fas fa-trophy"></i><span>Achievements</span></a>
         </div></div>
     </div>
 

@@ -35,10 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $subject = "Reset your AngelWrites password";
             $body = "Hello " . $user['first_name'] . ",\n\nYour password reset code is: $code\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.\n\n— AngelWrites Team";
 
+            // F105: the answer must not depend on whether the account exists (it used to say
+            // "a code has been sent" or "failed to send" only for real accounts).
             if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
-                $message = "A reset code has been sent to your email address. Please check your inbox and spam folder.";
-                // Set rate limit
-                file_put_contents($attempts_file, time());
                 
                 // ===== SEND ADMIN NOTIFICATION =====
                 $admin_email = 'angelwrites@zohomail.com';
@@ -46,12 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                 $admin_body = "A user requested a password reset code.\n\nEmail: $email\nName: " . $user['first_name'];
                 sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
             } else {
-                $error = "Failed to send reset code. Please try again later.";
+                error_log('forgot_password: reset code email failed for user ' . $user['id']);
             }
-        } else {
-            // For security, don't reveal if email exists
-            $message = 'If an account with that email exists, a reset code has been sent.';
         }
+        // F105: same message and same rate limit whether or not the account exists
+        $message = 'If an account with that email exists, a reset code has been sent. Please check your inbox and spam folder.';
+        file_put_contents($attempts_file, time());
     }
 }
 

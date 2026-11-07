@@ -16,6 +16,17 @@ if (!$video) {
 // F64: nothing ever counted views, so "Most viewed" and the view counts were meaningless.
 $db->prepare("UPDATE videos SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")->execute([$id]);
 $video['view_count'] = (int)($video['view_count'] ?? 0) + 1;
+// F117: the dashboard's "Videos watched" tile counts video_watches, which nothing ever wrote.
+// Record the first watch of each video per member.
+if (isLoggedIn()) {
+    $vw = $db->prepare("SELECT 1 FROM video_watches WHERE user_id = ? AND video_id = ?");
+    $vw->execute([$_SESSION['user_id'], $id]);
+    $seen = $vw->fetchColumn();
+    $vw->closeCursor();
+    if (!$seen) {
+        $db->prepare("INSERT INTO video_watches (user_id, video_id, watched_at) VALUES (?, ?, CURRENT_TIMESTAMP)")->execute([$_SESSION['user_id'], $id]);
+    }
+}
 
 /* 
  * ===== FOR FULL INTERACTION SUPPORT, RUN THESE SQL QUERIES IN YOUR DATABASE =====

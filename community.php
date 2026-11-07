@@ -136,6 +136,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                 
                 // Award reputation to answer author
                 awardReputation($user_id, 5, 'Answered a question');
+
+                // F114: tell the person who asked
+                require_once __DIR__ . '/includes/notifications.php';
+                $qstmt = $db->prepare("SELECT user_id, title FROM questions WHERE id = ?");
+                $qstmt->execute([$question_id]);
+                $qrow = $qstmt->fetch(PDO::FETCH_ASSOC);
+                $qstmt->closeCursor();
+                if ($qrow && (int)$qrow['user_id'] !== (int)$user_id) {
+                    awNotify($db, $qrow['user_id'], 'answer', 'New answer to your question',
+                        'Someone answered "' . mb_substr($qrow['title'], 0, 80) . '".', SITE_URL . '/community.php?id=' . $question_id);
+                }
                 
                 // Admin notification
                 $admin_email = 'angelwrites@zohomail.com';

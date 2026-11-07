@@ -6,12 +6,23 @@ require_once 'includes/mail_helper.php';
 
 // ===== CAPTURE REDIRECT URL (if present) =====
 $redirect = isset($_GET['redirect']) ? trim($_GET['redirect']) : '';
+// F38: accept a same-site path ("/download.php?book_id=1", as download.php sends) as well as
+// an absolute SITE_URL link. The old prefix test ignored relative paths (members landed on
+// the dashboard) and also accepted look-alike hosts such as SITE_URL . '.evil.example'.
+$redirect_target = '';
+if ($redirect !== '' && !preg_match('/[\\\x00-\x1f\x7f]/', $redirect)) {
+    if ($redirect[0] === '/' && substr($redirect, 0, 2) !== '//') {
+        $redirect_target = SITE_URL . $redirect;
+    } elseif (strpos($redirect, SITE_URL . '/') === 0) {
+        $redirect_target = $redirect;
+    }
+}
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
     // If already logged in, obey the redirect or default dashboard
-    if (!empty($redirect) && strpos($redirect, SITE_URL) === 0) {
-        header('Location: ' . $redirect);
+    if ($redirect_target !== '') {
+        header('Location: ' . $redirect_target);
     } elseif (isAdmin()) {
         header('Location: ' . SITE_URL . '/admin/dashboard.php');
     } else {
@@ -21,6 +32,10 @@ if (isLoggedIn()) {
 }
 
 $error = '';
+// F102: message from social_login.php when Google sign-in is off or failed
+if (isset($_GET['social']) && $_GET['social'] === 'unavailable') {
+    $error = 'Google sign-in is not available right now. Please log in with your email or username.';
+}
 $success = '';
 $login_value = isset($_POST['login']) ? trim($_POST['login']) : '';
 
@@ -54,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
     if (empty($login) || empty($password)) {
         $error = 'Please fill in all fields.';
     } else {
-        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name FROM users WHERE username = ? OR email = ?");
+        $stmt = $db->prepare("SELECT id, username, email, password, role, is_verified, name, first_name, last_name FROM users WHERE username = ? OR email = ?");
         $stmt->execute([$login, $login]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -76,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
                 // Set session
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
-                $_SESSION['name'] = $user['name'];
+                $_SESSION['name'] = awDisplayName($user); // F100: NULL name for self-registered members
                 $_SESSION['role'] = $user['role'];
 
                 // ===== REMEMBER ME LOGIC =====
@@ -106,7 +121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
                     $stmt->execute([$user['id'], $token, $expiry_date]);
 
                     // Set secure HTTP-only cookie
-                    setcookie('remember_token', $token, $expires, '/', '', false, true);
+                    // F101: secure flag (the site is HTTPS-only), HttpOnly as before
+                    setcookie('remember_token', $token, ['expires' => $expires, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
                 }
 
                 // Update last login timestamp
@@ -115,8 +131,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
 
                 // ===== 🚀 REDIRECT LOGIC =====
                 // If a valid redirect URL was passed, send them there; otherwise go to dashboard
-                if (!empty($redirect) && strpos($redirect, SITE_URL) === 0) {
-                    header('Location: ' . $redirect);
+                if ($redirect_target !== '') {
+                    header('Location: ' . $redirect_target);
                 } elseif ($user['role'] === 'admin') {
                     header('Location: ' . SITE_URL . '/admin/dashboard.php');
                 } else {
@@ -210,12 +226,14 @@ $pageTitle = 'Sign In';
                 </form>
 
                 <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
+                <?php if (getenv('SOCIAL_LOGIN_ENABLED') === '1'): // F102: off unless enabled (decision D-M3) ?>
                 <div class="social-login-section">
                     <p>Or continue with:</p>
                     <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
                         <i class="fab fa-google"></i> Google
                     </a>
                 </div>
+                <?php endif; ?>
 
                 <div class="auth-footer">
                     <p>Don't have an account? <a href="<?php echo SITE_URL; ?>/register.php">Sign up here</a></p>

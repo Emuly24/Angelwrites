@@ -105,14 +105,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         
         $data = $_POST['cropped_image_data'];
-        list($type, $data) = explode(';', $data);
-        list(, $data) = explode(',', $data);
-        $data = base64_decode($data);
-        
-        $filename = 'user_' . $user_id . '_' . time() . '.jpg';
+        $data = base64_decode((string)substr($data, (int)strpos($data, ',') + 1), true);
+        // F119: the decoded data was written as .jpg without checking it was an image.
+        $img = $data !== false ? @getimagesizefromstring($data) : false;
+        $img_ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$img['mime'] ?? ''] ?? null;
+        if (!$img_ext || strlen($data) > 5 * 1024 * 1024) {
+            $error = 'The profile picture must be a JPG, PNG, WebP or GIF image of at most 5 MB.';
+        }
+        $filename = 'user_' . $user_id . '_' . time() . '.' . ($img_ext ?: 'jpg');
         $filepath = $upload_dir . $filename;
         
-        if (file_put_contents($filepath, $data)) {
+        if (!empty($error)) {
+            // rejected above
+        } elseif (file_put_contents($filepath, $data)) {
             $profile_pic = $upload_dir . $filename;
         } else {
             $error = 'Failed to save cropped image.';
@@ -123,10 +128,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     if (empty($error) && empty($_POST['cropped_image_data']) && !empty($_FILES['profile_pic']['name'])) {
         $upload_dir = 'assets/uploads/profiles/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $ext = pathinfo($_FILES['profile_pic']['name'], PATHINFO_EXTENSION);
-        $filename = 'user_' . $user_id . '.' . $ext;
+        // F119: the original extension was kept (user_<id>.php would be stored in a public
+        // folder); only real images of at most 5 MB are accepted, saved under a fixed extension.
+        $ext = strtolower(pathinfo($_FILES['profile_pic']['name'], PATHINFO_EXTENSION));
+        $img = @getimagesize($_FILES['profile_pic']['tmp_name']);
+        $img_ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$img['mime'] ?? ''] ?? null;
+        $filename = 'user_' . $user_id . '_' . time() . '.' . ($img_ext ?: 'jpg');
         $target = $upload_dir . $filename;
-        if (move_uploaded_file($_FILES['profile_pic']['tmp_name'], $target)) {
+        if (!$img_ext || !in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) || $_FILES['profile_pic']['size'] > 5 * 1024 * 1024) {
+            $error = 'The profile picture must be a JPG, PNG, WebP or GIF image of at most 5 MB.';
+        } elseif (move_uploaded_file($_FILES['profile_pic']['tmp_name'], $target)) {
             $profile_pic = $upload_dir . $filename;
         } else {
             $error = 'Failed to upload profile picture.';
@@ -160,6 +171,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 $stmt->execute([$name, $user['email'], $username, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
                 $_SESSION['name'] = $name;
                 $success = 'Profile updated successfully!';
+
+                // F119: old avatars were never deleted; remove the previous file once replaced.
+                $old_pic = (string)($user['profile_pic'] ?? '');
+                if ($old_pic !== '' && $old_pic !== $profile_pic
+                    && preg_match('#^assets/uploads/profiles/user_' . (int)$user_id . '[._][A-Za-z0-9_]*\.?(jpe?g|png|webp|gif)$#', $old_pic)
+                    && is_file(__DIR__ . '/' . $old_pic)) {
+                    @unlink(__DIR__ . '/' . $old_pic);
+                }
 
                 if (strcasecmp($email, $user['email']) !== 0) {
                     $code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
