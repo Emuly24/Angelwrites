@@ -100,67 +100,39 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 ?>
 <?php require_once __DIR__ . '/../includes/header.php'; ?>
 
-<!-- ===== READING PROGRESS BAR ===== -->
-<div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
 
 <div class="poem-view-page">
     <div class="container">
         <!-- Navigation -->
-        <div class="poem-nav">
-            <a href="<?php echo SITE_URL; ?>/poetry.php" class="back-link">
-                <i class="fas fa-arrow-left"></i> Back to Poetry
-            </a>
+        <?php
+        // V3: the preview shows exactly what readers get (the shared reader), with a banner for the admin.
+        require_once __DIR__ . '/../includes/poem_reader.php';
+        $aw_is_draft = false;
+        try {
+            $st = $db->prepare("SELECT 1 FROM poem_status WHERE poem_id = ? AND status = 'draft'");
+            $st->execute([$id]);
+            $aw_is_draft = (bool)$st->fetchColumn();
+        } catch (PDOException $e) {}
+        $aw_audio_note = trim((string)($poem['audio_path'] ?? '')) === '' ? 'no recording'
+            : (aw_poem_audio_url($poem) === '' ? '⚠️ the recording file is missing, so no player is shown' : 'recording attached');
+        ?>
+        <div class="aw-preview-banner aw-hide-focus" role="status">
+            <span>👁️ <strong>Preview</strong> — this is how readers see the poem ·
+                <?php echo $aw_is_draft ? '📝 Draft (not public yet)' : '✅ Published'; ?> ·
+                <?php echo htmlspecialchars($aw_audio_note); ?></span>
+            <span class="aw-actions">
+                <a class="btn btn-sm btn-primary" href="<?php echo SITE_URL; ?>/admin/poem_editor.php?id=<?php echo (int)$id; ?>"><i class="fas fa-pen"></i> Edit</a>
+                <?php if (!$aw_is_draft): ?><a class="btn btn-sm btn-outline" href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$id; ?>"><i class="fas fa-external-link-alt"></i> Public page</a><?php endif; ?>
+                <a class="btn btn-sm btn-outline" href="<?php echo SITE_URL; ?>/admin/manage_poems.php"><i class="fas fa-list"></i> All poems</a>
+            </span>
         </div>
-
-        <!-- Poem Header -->
-        <header class="poem-header">
-            <h1><?php echo htmlspecialchars($poem['title']); ?></h1>
-            <div class="poem-meta">
-                <span class="poem-date"><?php echo date('F j, Y', strtotime($poem['created_at'])); ?></span>
-                <span class="poem-views"><i class="fas fa-eye"></i> <?php echo number_format($poem['view_count'] ?? 1); ?> views</span>
-                <span class="poem-reading-time"><i class="fas fa-clock"></i> <?php echo readingTime($poem['content']); ?></span>
-            </div>
-        </header>
-
-        <!-- Poem Image -->
-        <?php if ($poem['image_path']): ?>
-            <div class="poem-image-container">
-                <img src="<?php echo SITE_URL . '/' . $poem['image_path']; ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" class="poem-feature-image">
-            </div>
-        <?php endif; ?>
-
-        <!-- Audio Player -->
-        <?php if ($poem['audio_path']): ?>
-            <div class="poem-audio-player">
-                <div class="audio-label">
-                    <i class="fas fa-headphones"></i>
-                    <span>Listen to this poem</span>
-                </div>
-                <audio controls>
-                    <source src="<?php echo SITE_URL . '/' . $poem['audio_path']; ?>" type="audio/mpeg">
-                </audio>
-            </div>
-        <?php endif; ?>
-
-        <!-- Poem Introduction -->
-        <?php if ($poem['intro']): ?>
-            <div class="poem-intro-section">
-                <div class="intro-label">✧ Purpose of this poem</div>
-                <div class="intro-body">
-                    <?php echo nl2br(htmlspecialchars($poem['intro'])); ?>
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <!-- Poem Content -->
-        <div class="poem-content-section">
-            <div class="poem-body">
-                <?php echo $poem['content']; ?>
-            </div>
-        </div>
+        <?php
+        echo aw_poem_assets();
+        echo aw_poem_reader($poem, $db, ['no_neighbours' => true]);
+        ?>
 
         <!-- ===== REVIEWS & COMMENTS ===== -->
-        <div class="reviews-section">
+        <div class="reviews-section aw-hide-focus">
             <h3><i class="fas fa-comments" style="color: var(--rose);"></i> Comments & Ratings</h3>
             
             <div class="rating-summary">
@@ -277,7 +249,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
         </div>
 
         <!-- Poem Footer Actions -->
-        <div class="poem-footer-actions">
+        <div class="poem-footer-actions aw-hide-focus">
             <div class="share-section">
                 <span>Share:</span>
                 <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>" target="_blank" class="share-btn facebook">
@@ -308,13 +280,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
 <script src="<?php echo SITE_URL; ?>/assets/js/aw-media.js?v=1"></script><!-- M2: noise reduction + editor for voice recordings -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== READING PROGRESS BAR =====
-    window.addEventListener('scroll', function() {
-        const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercent = (scrollTop / docHeight) * 100;
-        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
-    });
+    // V3: the reading progress bar is drawn by assets/js/aw-poem.js.
 
     // ===== BACK TO TOP BUTTON =====
     const backToTopBtn = document.getElementById('backToTop');
@@ -408,16 +374,12 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 /* ===== DARK MODE SUPPORT ===== */
 :root {
-    --rose: #c0392b;
-    --rose-dark: #a93226;
-    --vanilla: #fdf5e6;
-    --dark: #1a1a1a;
-    --text-light: #666;
-    --card-bg: #ffffff;
-    --border: #e0e0e0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdfdfd;
+    /* V7: the brand colours (as in assets/css/style.css); this page used a different red and vanilla */
+    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #e8c0c0;
+    --vanilla: #EFD8D6; --fantasy: #F7F3ED; --white: #ffffff;
+    --dark: #2c1e1e; --text: #3d2e2e; --text-light: #6b5a5a;
+    --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
+    --shadow: 0 4px 16px rgba(44,30,30,0.08); --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
 }
 body.dark-mode {
     --bg: #1a1a1a;
