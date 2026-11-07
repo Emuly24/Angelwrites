@@ -246,10 +246,6 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                     <i class="fas fa-th"></i>
                 </button>
 
-                <!-- Dark Mode Toggle -->
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
             </div>
         </div>
 

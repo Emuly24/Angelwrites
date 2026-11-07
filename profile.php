@@ -241,9 +241,6 @@ $pageTitle = 'My Profile';
 <div class="profile-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <!-- ===== READING PROGRESS BAR ===== -->
         <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>

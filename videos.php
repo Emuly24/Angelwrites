@@ -152,10 +152,6 @@ $pageTitle = 'Videos';
                     <i class="fas fa-th"></i>
                 </button>
 
-                <!-- Dark Mode Toggle -->
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
 
                 <!-- Video Count -->
                 <span class="video-count"><?php echo $total_videos; ?> video<?php echo $total_videos != 1 ? 's' : ''; ?></span>

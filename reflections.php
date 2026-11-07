@@ -132,10 +132,6 @@ $pageTitle = htmlspecialchars($search !== '' ? 'Search: ' . $search : ($tag !== 
                     <i class="fas fa-th"></i>
                 </button>
 
-                <!-- Dark Mode Toggle -->
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
 
                 <!-- Post Count -->
                 <span class="post-count"><?php echo $total_reflections; ?> reflection<?php echo $total_reflections != 1 ? 's' : ''; ?><?php echo $search !== '' ? ' matching “' . htmlspecialchars($search) . '”' : ''; ?></span>

@@ -65,9 +65,6 @@ $pageTitle = 'Cancel Session';
 <div class="session-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <div class="session-wrapper">
             <div class="session-header">

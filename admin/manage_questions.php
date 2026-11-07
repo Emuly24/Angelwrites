@@ -180,9 +180,6 @@ $pageTitle = 'Manage Questions';
             <h1>Community Q&A Management</h1>
             <div class="admin-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/manage_community.php" class="btn btn-outline">⚖️ Reports</a><!-- Q35 -->
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>

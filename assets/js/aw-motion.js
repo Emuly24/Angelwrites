@@ -269,6 +269,37 @@
         }
     });
 
+    /* ===== C2: one theme for the whole site =====
+       Older pages kept their own dark mode (body.dark-mode, saved under their own keys such as
+       'blogTheme'), separate from the site's theme switch. Their dark styles now simply follow the
+       site theme, and the header's theme icon cannot be overwritten by those old page scripts. */
+    function siteDark() { return root.getAttribute('data-theme') === 'dark'; }
+    function themeIcon() {
+        var t = 'light';
+        try { t = localStorage.getItem('angelwrites_theme') || 'light'; } catch (e) {}
+        return t === 'dark' ? 'fas fa-sun' : (t === 'system' ? 'fas fa-circle-half-stroke' : 'fas fa-moon');
+    }
+    function syncTheme() {
+        if (document.body && document.body.classList.contains('dark-mode') !== siteDark()) {
+            document.body.classList.toggle('dark-mode', siteDark());
+        }
+        var btn = document.getElementById('themeToggle');
+        if (btn) {
+            var i = btn.querySelector('i');
+            var want = themeIcon();
+            if (!i || btn.children.length !== 1) { btn.innerHTML = '<i class="' + want + '"></i>'; }
+            else if (i.className !== want) { i.className = want; }
+        }
+    }
+    ready(function () {
+        syncTheme();
+        var mo = new MutationObserver(syncTheme);
+        mo.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+        mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        var btn = document.getElementById('themeToggle');
+        if (btn) mo.observe(btn, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    });
+
     AW.ready = ready;
     AW.finePointer = finePointer;
 })();

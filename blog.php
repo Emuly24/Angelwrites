@@ -164,10 +164,6 @@ $pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog'
                     <i class="fas fa-th"></i>
                 </button>
 
-                <!-- Dark Mode Toggle -->
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
 
                 <!-- Post Count -->
                 <span class="post-count"><?php echo $total_posts; ?> post<?php echo $total_posts != 1 ? 's' : ''; ?></span>

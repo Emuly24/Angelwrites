@@ -86,9 +86,6 @@ $pageTitle = 'Manage Blog';
         <div class="admin-header">
             <h1>Manage Blog</h1>
             <div class="admin-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
                 <button id="openCameraBtn" class="btn btn-secondary" title="Take a photo or record a video, then write the post around it">
                     <i class="fas fa-camera"></i> New post from camera
                 </button>

@@ -131,9 +131,6 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
         <div class="admin-header">
             <h1><?php echo $id > 0 ? 'Edit Poem' : 'Add New Poem'; ?></h1>
             <div class="admin-actions">
-                <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()">
-                    <i class="fas fa-moon"></i>
-                </button>
                 <a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Poems
                 </a>

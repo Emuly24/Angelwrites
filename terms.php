@@ -39,9 +39,6 @@ $pageTitle = htmlspecialchars($terms_content['title'] ?? 'Terms of Service');
 <div class="terms-page">
     <div class="container">
         <!-- ===== DARK MODE TOGGLE ===== -->
-        <button id="themeToggle" class="btn btn-sm btn-outline" onclick="toggleTheme()" style="position:fixed;bottom:20px;right:20px;z-index:1000;">
-            <i class="fas fa-moon"></i>
-        </button>
 
         <!-- ===== FONT SIZE CONTROLS ===== -->
         <div class="font-size-controls">
