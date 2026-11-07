@@ -684,6 +684,7 @@ $pageTitle = 'Manage Videos';
 }
 </style>
 
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-media.js?v=1"></script><!-- M5: noise reduction + editor for camera recordings -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ============================================================
@@ -823,7 +824,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cameraStatus.textContent = '❌ Camera not supported';
                 return;
             }
-            cameraStream = await navigator.mediaDevices.getUserMedia({ 
+            cameraStream = await AWMedia.getStream({ // M5: noise reduction while recording
                 video: { facingMode: currentFacingMode }, 
                 audio: currentMode === 'video' 
             });
@@ -935,15 +936,19 @@ document.addEventListener('DOMContentLoaded', function() {
         mediaRecorder.ondataavailable = function(e) {
             if (e.data.size > 0) recordedChunks.push(e.data);
         };
-        mediaRecorder.onstop = function() {
+        mediaRecorder.onstop = async function() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             if (blob.size > 0) {
-                recordedBlob = blob;
+                if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+                cameraPreview.srcObject = null;
+                if (cameraModal.style.display === 'none') return; // the camera was closed while recording
+                // M5: trim, cut, crop, filters and sound before the video is used. The live camera filter
+                // only changed the preview; it is passed on so it is part of the saved video.
+                cameraStatus.textContent = '✂️ Editing…';
+                recordedBlob = await AWMedia.review(blob, { kind: 'video', filter: currentFilter });
                 retakeBtn.disabled = false;
                 confirmBtn.disabled = false;
                 cameraStatus.textContent = '✅ Recording complete';
-                cameraStream.getTracks().forEach(track => track.stop());
-                cameraPreview.srcObject = null;
             }
         };
         mediaRecorder.start();

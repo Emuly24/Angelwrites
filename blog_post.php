@@ -488,6 +488,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 </button>
 
 <!-- ===== JAVASCRIPT ===== -->
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-media.js?v=1"></script><!-- M2: noise reduction + editor for voice recordings -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ===== THEME TOGGLE =====
@@ -629,7 +630,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const stream = await AWMedia.getStream({ audio: true }); // M2: noise reduction while recording
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
 
@@ -637,8 +638,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     audioChunks.push(event.data);
                 };
 
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                mediaRecorder.onstop = async () => {
+                    stream.getTracks().forEach(t => t.stop()); // M2: release the microphone
+                    // M2: trim, cut and clean up the recording before it is sent
+                    const audioBlob = await AWMedia.review(new Blob(audioChunks, { type: 'audio/webm' }), { kind: 'audio', title: 'Edit your voice comment' });
                     const file = new File([audioBlob], 'voice_comment.webm', { type: 'audio/webm' });
                     const dt = new DataTransfer();
                     dt.items.add(file);

@@ -86,9 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $rec_filename = 'rec_' . time() . '.webm';
         if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
-            // Store audio path – you may need to add a field to blog_posts or handle separately
-            // For now, we'll just store it in a custom field or session
-            $_SESSION['audio_path'] = 'assets/uploads/audio/' . $rec_filename;
+            // CAM2: show the recording in the post (it was saved to disk and never attached)
+            $content .= "\n" . '<figure class="aw-post-media"><audio controls preload="metadata" src="' . SITE_URL . '/assets/uploads/audio/' . $rec_filename . '"></audio></figure>';
         } else {
             $error = 'Failed to upload recorded audio.';
         }
@@ -100,7 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
         $video_filename = 'vid_' . time() . '.webm';
         if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
-            $_SESSION['video_path'] = 'assets/uploads/videos/' . $video_filename;
+            // CAM2: show the video in the post (it was saved to disk and never attached)
+            $content .= "\n" . '<figure class="aw-post-media"><video controls preload="metadata" playsinline style="max-width:100%;" src="' . SITE_URL . '/assets/uploads/videos/' . $video_filename . '"></video></figure>';
         } else {
             $error = 'Failed to upload recorded video.';
         }
@@ -263,9 +263,9 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                         <div class="recorder-controls">
                             <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
                             <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
+                            <div id="recordingForm" style="display:none;"><!-- M3: was a nested <form>, which ended the page form early -->
                                 <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
+                            </div>
                             <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
                                 <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
                             </div>
@@ -279,9 +279,9 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                         <div class="recorder-controls">
                             <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
                             <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="videoRecordingForm" style="display:none;">
+                            <div id="videoRecordingForm" style="display:none;"><!-- M4: was a nested <form>, which ended the page form early -->
                                 <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
-                            </form>
+                            </div>
                             <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
                                 <video controls width="100%"><source src="" type="video/webm"></video>
                             </div>
@@ -328,6 +328,7 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
 </script>
 
 <!-- ===== RECORDER JAVASCRIPT (Camera, Audio, Video) ===== -->
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-media.js?v=1"></script><!-- M3: noise reduction + editor for recordings -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ============================================================
@@ -493,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                audioRecorder.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioRecorder.stream = await AWMedia.getStream({ audio: true }); // M3: noise reduction while recording
                 audioRecorder.mediaRecorder = new MediaRecorder(audioRecorder.stream);
                 audioRecorder.chunks = [];
 
@@ -501,54 +502,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     audioRecorder.chunks.push(event.data);
                 };
 
-                audioRecorder.mediaRecorder.onstop = () => {
-                    audioRecorder.blob = new Blob(audioRecorder.chunks, { type: 'audio/webm' });
-                    const url = URL.createObjectURL(audioRecorder.blob);
-                    audioPreviewRecorder.src = url;
+                audioRecorder.mediaRecorder.onstop = async () => {
+                    audioRecorder.stream.getTracks().forEach(t => t.stop()); // M3: release the microphone
+                    // M3: edit the recording, then put it straight into the form. "Use This" used to reload
+                    // the page, which threw the recording away; "Record Again" now replaces it instead.
+                    audioRecorder.blob = await AWMedia.review(new Blob(audioRecorder.chunks, { type: 'audio/webm' }), { kind: 'audio' });
+                    const dt = new DataTransfer();
+                    dt.items.add(new File([audioRecorder.blob], 'audio_recording.webm', { type: 'audio/webm' }));
+                    recordingInput.files = dt.files;
+                    audioPreviewRecorder.src = URL.createObjectURL(audioRecorder.blob);
                     audioPreviewRecorder.load();
                     audioPreviewRecorderContainer.style.display = 'block';
-
-                    document.querySelector('.recorder-controls').innerHTML = `
-                        <audio controls src="${url}" style="width:100%;"></audio>
-                        <div style="display:flex; gap:12px; margin-top:10px;">
-                            <button type="button" id="confirmAudioBtn" class="btn btn-success btn-sm">✅ Use This</button>
-                            <button type="button" id="retakeAudioBtn" class="btn btn-warning btn-sm">🔄 Retake</button>
-                        </div>
-                    `;
-
-                    document.getElementById('confirmAudioBtn').addEventListener('click', function() {
-                        const dt = new DataTransfer();
-                        dt.items.add(new File([audioRecorder.blob], 'audio_recording.webm', { type: 'audio/webm' }));
-                        recordingInput.files = dt.files;
-                        document.getElementById('recordingForm').style.display = 'block';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
-                            <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        `;
-                        location.reload();
-                    });
-
-                    document.getElementById('retakeAudioBtn').addEventListener('click', function() {
-                        audioRecorder.blob = null;
-                        audioPreviewRecorderContainer.style.display = 'none';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
-                            <span id="recordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="recordingForm" style="display:none;">
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
-                            </form>
-                            <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
-                                <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
-                            </div>
-                        `;
-                        location.reload();
-                    });
+                    AWMedia.attachEditButton(recordingInput, audioPreviewRecorder, 'audio', 'audio_recording.webm');
+                    recordBtn.textContent = '🎙️ Record Again';
                 };
 
                 audioRecorder.mediaRecorder.start();
@@ -587,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                videoRecorder.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                videoRecorder.stream = await AWMedia.getStream({ video: true, audio: true }); // M4: noise reduction while recording
                 videoRecorder.mediaRecorder = new MediaRecorder(videoRecorder.stream);
                 videoRecorder.chunks = [];
 
@@ -603,59 +569,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     videoRecorder.chunks.push(event.data);
                 };
 
-                videoRecorder.mediaRecorder.onstop = () => {
-                    videoRecorder.blob = new Blob(videoRecorder.chunks, { type: 'video/webm' });
-                    const url = URL.createObjectURL(videoRecorder.blob);
+                videoRecorder.mediaRecorder.onstop = async () => {
+                    videoRecorder.stream.getTracks().forEach(t => t.stop()); // M4: release camera and microphone
+                    if (videoPreview) videoPreview.srcObject = null;
+                    // M4: edit the video (trim, cut, crop, filters, sound), then put it straight into the form.
+                    // "Use This" used to reload the page, which threw the recording away.
+                    videoRecorder.blob = await AWMedia.review(new Blob(videoRecorder.chunks, { type: 'video/webm' }), { kind: 'video' });
+                    const dt = new DataTransfer();
+                    dt.items.add(new File([videoRecorder.blob], 'video_recording.webm', { type: 'video/webm' }));
+                    videoRecordingInput.files = dt.files;
                     if (videoPreview) {
-                        videoPreview.srcObject = null;
-                        videoPreview.src = url;
+                        videoPreview.src = URL.createObjectURL(videoRecorder.blob);
                         videoPreview.muted = false;
                         videoPreview.load();
                         videoPreview.style.display = 'block';
+                        AWMedia.attachEditButton(videoRecordingInput, videoPreview, 'video', 'video_recording.webm');
                     }
                     videoPreviewContainer.style.display = 'block';
-
-                    document.querySelector('.recorder-controls').innerHTML = `
-                        <video controls src="${url}" width="100%"></video>
-                        <div style="display:flex; gap:12px; margin-top:10px;">
-                            <button type="button" id="confirmVideoBtn" class="btn btn-success btn-sm">✅ Use This</button>
-                            <button type="button" id="retakeVideoBtn" class="btn btn-warning btn-sm">🔄 Retake</button>
-                        </div>
-                    `;
-
-                    document.getElementById('confirmVideoBtn').addEventListener('click', function() {
-                        const dt = new DataTransfer();
-                        dt.items.add(new File([videoRecorder.blob], 'video_recording.webm', { type: 'video/webm' }));
-                        videoRecordingInput.files = dt.files;
-                        document.getElementById('videoRecordingForm').style.display = 'block';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
-                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="videoRecordingForm" style="display:none;">
-                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
-                            </form>
-                            <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
-                                <video controls width="100%"><source src="" type="video/webm"></video>
-                            </div>
-                        `;
-                        location.reload();
-                    });
-
-                    document.getElementById('retakeVideoBtn').addEventListener('click', function() {
-                        videoRecorder.blob = null;
-                        videoPreviewContainer.style.display = 'none';
-                        document.querySelector('.recorder-controls').innerHTML = `
-                            <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
-                            <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#e74c3c;">🔴 Recording...</span>
-                            <form id="videoRecordingForm" style="display:none;">
-                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
-                            </form>
-                            <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
-                                <video controls width="100%"><source src="" type="video/webm"></video>
-                            </div>
-                        `;
-                        location.reload();
-                    });
+                    videoRecordBtn.textContent = '🎥 Record Again';
                 };
 
                 videoRecorder.mediaRecorder.start();
