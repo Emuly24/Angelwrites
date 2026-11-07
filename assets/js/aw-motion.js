@@ -227,6 +227,48 @@
     var enhance0 = AW.enhance;
     AW.enhance = function (scope) { enhance0(scope); reveal(scope); };
 
+    /* ===== D6: home page hero ===== */
+    ready(function () {
+        var hero = document.querySelector('main .hero');
+        if (!hero || reduce) return;
+        // sparkles rising across the hero
+        for (var i = 0; i < 18; i++) {
+            var sp = document.createElement('span');
+            sp.className = 'aw-spark';
+            sp.setAttribute('aria-hidden', 'true');
+            sp.style.left = (4 + Math.random() * 92).toFixed(1) + '%';
+            sp.style.top = (12 + Math.random() * 80).toFixed(1) + '%';
+            sp.style.setProperty('--s', (4 + Math.random() * 7).toFixed(1) + 'px');
+            sp.style.setProperty('--t', (5 + Math.random() * 5).toFixed(2) + 's');
+            sp.style.setProperty('--dl', (-Math.random() * 8).toFixed(2) + 's');
+            hero.appendChild(sp);
+        }
+        // a cue to scroll on, when the next section has an anchor
+        var next = hero.nextElementSibling;
+        while (next && next.tagName !== 'SECTION') next = next.nextElementSibling;
+        if (next && next.id && !hero.querySelector('.aw-scroll-cue')) {
+            var cue = document.createElement('a');
+            cue.className = 'aw-scroll-cue';
+            cue.href = '#' + next.id;
+            cue.setAttribute('aria-label', 'Scroll to the next section');
+            cue.innerHTML = '<i class="fas fa-chevron-down" aria-hidden="true"></i>';
+            hero.appendChild(cue);
+        }
+        // the emblem leans gently toward the pointer
+        var emblem = hero.querySelector('.hero-image-container');
+        if (emblem && finePointer) {
+            hero.addEventListener('pointermove', function (e) {
+                var r = hero.getBoundingClientRect();
+                emblem.style.setProperty('--aw-hx', (((e.clientX - r.left) / r.width - 0.5) * 18).toFixed(1) + 'px');
+                emblem.style.setProperty('--aw-hy', (((e.clientY - r.top) / r.height - 0.5) * 14).toFixed(1) + 'px');
+            });
+            hero.addEventListener('pointerleave', function () {
+                emblem.style.setProperty('--aw-hx', '0px');
+                emblem.style.setProperty('--aw-hy', '0px');
+            });
+        }
+    });
+
     AW.ready = ready;
     AW.finePointer = finePointer;
 })();

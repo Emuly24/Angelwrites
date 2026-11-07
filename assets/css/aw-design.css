@@ -411,3 +411,191 @@ html.aw-ui .aw-reveal.aw-in { opacity: 1; translate: 0 0; }
 @media print {
     html.aw-ui .aw-reveal { opacity: 1 !important; translate: none !important; }
 }
+
+/* ===== D6: gradient headline words, and the home page hero ===== */
+html.aw-ui :is(h1, h2, h3) .rose-text {
+    background: var(--aw-grad-text);
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: awShimmer 9s linear infinite;
+    text-shadow: none;
+}
+html[data-theme="dark"].aw-ui :is(h1, h2, h3) .rose-text {
+    background-image: linear-gradient(100deg, #e8b4b5 0%, #f3cfc4 35%, #e6c088 55%, #f3cfc4 75%, #e8b4b5 100%);
+}
+@keyframes awShimmer { from { background-position: 0% 50%; } to { background-position: 250% 50%; } }
+
+html.aw-ui .hero { position: relative; overflow: hidden; isolation: isolate; }
+html[data-theme="dark"].aw-ui .hero { background: var(--aw-grad-soft); }
+/* slowly drifting glow of rose, vanilla and gold behind the hero */
+html.aw-ui .hero::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    z-index: -1;
+    background:
+        radial-gradient(38% 42% at 18% 28%, rgba(255, 255, 255, 0.55), transparent 70%),
+        radial-gradient(34% 40% at 82% 32%, rgba(214, 168, 92, 0.22), transparent 70%),
+        radial-gradient(40% 46% at 62% 88%, rgba(192, 138, 139, 0.35), transparent 70%);
+    filter: blur(10px);
+    animation: awDrift 22s ease-in-out infinite alternate;
+}
+html.aw-ui .hero::after {
+    /* faint dotted texture for depth */
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.35) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+    opacity: 0.5;
+    pointer-events: none;
+}
+@keyframes awDrift {
+    0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+    50% { transform: translate3d(3%, -2%, 0) rotate(4deg) scale(1.05); }
+    100% { transform: translate3d(-3%, 3%, 0) rotate(-3deg) scale(1.02); }
+}
+
+/* staggered entrance */
+html.aw-ui .hero :is(.hero-badge, h1, .hero-sub, .hero-buttons, .hero-search, .hero-image) {
+    animation: awRise 1s var(--aw-ease) both;
+}
+html.aw-ui .hero h1 { animation-delay: 0.08s; }
+html.aw-ui .hero .hero-sub { animation-delay: 0.18s; }
+html.aw-ui .hero .hero-buttons { animation-delay: 0.28s; }
+html.aw-ui .hero .hero-search { animation-delay: 0.38s; }
+html.aw-ui .hero .hero-image { animation: awRise 1.2s var(--aw-ease) 0.2s both; }
+@keyframes awRise { from { opacity: 0; translate: 0 26px; } to { opacity: 1; translate: 0 0; } }
+
+html.aw-ui .hero .hero-badge {
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    color: var(--aw-rose-ink);
+    box-shadow: 0 6px 18px -8px rgba(168, 103, 106, 0.45);
+}
+html[data-theme="dark"].aw-ui .hero .hero-badge { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.16); color: var(--rose-light); }
+
+/* the heart emblem floats, glows, and leans toward the pointer */
+html.aw-ui .hero .hero-image-container { position: relative; translate: var(--aw-hx, 0) var(--aw-hy, 0); transition: translate 0.6s var(--aw-ease); }
+html.aw-ui .hero .hero-image-container::before {
+    content: "";
+    position: absolute;
+    inset: 12%;
+    z-index: -1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 214, 170, 0.75), rgba(219, 161, 162, 0.35) 45%, transparent 70%);
+    filter: blur(24px);
+    animation: awGlow 5s ease-in-out infinite alternate;
+}
+html.aw-ui .hero .hero-image-container img { animation: awFloat 7s ease-in-out infinite; filter: drop-shadow(0 24px 40px rgba(168, 103, 106, 0.35)); }
+@keyframes awFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-14px) rotate(1.2deg); } }
+@keyframes awGlow { from { opacity: 0.65; transform: scale(0.94); } to { opacity: 1; transform: scale(1.06); } }
+html.aw-ui .hero .hero-quote { position: relative; }
+
+/* twinkling sparkles (spans added by aw-motion.js) */
+html.aw-ui .aw-spark {
+    position: absolute;
+    z-index: 0;
+    width: var(--s, 6px);
+    height: var(--s, 6px);
+    pointer-events: none;
+    background: radial-gradient(circle, #fff 0 30%, rgba(255, 233, 196, 0.9) 45%, transparent 70%);
+    border-radius: 50%;
+    opacity: 0;
+    animation: awTwinkle var(--t, 6s) ease-in-out var(--dl, 0s) infinite;
+}
+@keyframes awTwinkle {
+    0% { opacity: 0; transform: translateY(0) scale(0.4); }
+    30% { opacity: 0.95; transform: translateY(-14px) scale(1); }
+    70% { opacity: 0.6; transform: translateY(-34px) scale(0.8); }
+    100% { opacity: 0; transform: translateY(-56px) scale(0.3); }
+}
+
+/* "scroll down" cue at the foot of the hero */
+html.aw-ui .aw-scroll-cue {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    translate: -50% 0;
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    color: var(--aw-rose-ink);
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    animation: awBob 2.2s ease-in-out infinite;
+    text-decoration: none;
+}
+html.aw-ui .aw-scroll-cue:hover { text-decoration: none; background: #fff; }
+@keyframes awBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(7px); } }
+@media (max-width: 768px) { html.aw-ui .aw-scroll-cue { display: none; } }
+
+/* home page sections */
+html[data-aw-page="index"].aw-ui .section-header h2::after {
+    content: "";
+    display: block;
+    width: 64px; height: 3px;
+    margin: 12px auto 0;
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, var(--aw-rose-deep), var(--aw-gold), var(--aw-rose-deep), transparent);
+}
+html[data-aw-page="index"].aw-ui .stat-number {
+    background: var(--aw-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    font-variant-numeric: tabular-nums;
+}
+html[data-theme="dark"][data-aw-page="index"].aw-ui .stat-number { background-image: linear-gradient(135deg, #e8b4b5, #e6c088); }
+html.aw-ui .about-feature i {
+    width: 52px; height: 52px;
+    margin: 0 auto 10px;
+    display: grid !important;
+    place-items: center;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(219, 161, 162, 0.22), rgba(214, 168, 92, 0.16));
+    transition: transform 0.5s var(--aw-spring), background 0.3s ease, color 0.3s ease;
+}
+html.aw-ui .about-feature:hover i { transform: translateY(-3px) rotate(-8deg) scale(1.08); background: var(--aw-grad); color: #fff; }
+html.aw-ui .gate-icon { display: inline-block; animation: awWiggle 4s ease-in-out infinite; }
+@keyframes awWiggle { 0%, 88%, 100% { transform: rotate(0); } 91% { transform: rotate(-12deg); } 94% { transform: rotate(10deg); } 97% { transform: rotate(-5deg); } }
+html.aw-ui :is(.cta-section, .content-gate, .newsletter-section) { position: relative; overflow: hidden; isolation: isolate; }
+html.aw-ui :is(.cta-section, .content-gate, .newsletter-section)::before {
+    content: "";
+    position: absolute;
+    width: 520px; height: 520px;
+    right: -160px; top: -220px;
+    z-index: -1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(219, 161, 162, 0.28), transparent 65%);
+    animation: awDrift 26s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+/* home page "Join free" bar: glass finish, slides up, and stays slim on phones
+   (it covered almost half of a phone screen) */
+html.aw-ui .sticky-cta {
+    background: linear-gradient(135deg, rgba(168, 103, 106, 0.94), rgba(194, 127, 130, 0.94));
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    animation: awUp 0.7s var(--aw-ease) 0.6s both;
+}
+@keyframes awUp { from { transform: translateY(100%); } to { transform: none; } }
+@media (max-width: 576px) {
+    html.aw-ui .sticky-cta { padding: 8px 0; }
+    html.aw-ui .sticky-cta .container { position: relative; flex-direction: row; justify-content: center; gap: 6px 10px; padding-right: 36px; }
+    html.aw-ui .sticky-cta p { width: 100%; font-size: 0.82rem; line-height: 1.35; text-align: center; }
+    html.aw-ui .sticky-cta .btn { padding: 6px 16px; font-size: 0.8rem; }
+    html.aw-ui .sticky-cta-close { position: absolute; top: 0; right: 8px; width: 32px; height: 32px; }
+}
