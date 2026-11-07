@@ -256,6 +256,7 @@ if ($isLoggedIn) {
     </style>
     <!-- D1: site-wide design layer, after the header styles so it applies on every page -->
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=1">
+    <script src="<?php echo SITE_URL; ?>/assets/js/aw-motion.js?v=1" defer></script><!-- D2 -->
 </head>
 <body>
     <a href="#mainContent" class="skip-link">Skip to main content</a>

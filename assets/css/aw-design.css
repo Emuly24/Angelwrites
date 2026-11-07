@@ -82,3 +82,105 @@ html.aw-ui :is(input:not([type]), input[type="text"], input[type="email"], input
 html.aw-ui :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) {
     accent-color: var(--aw-rose-deep);
 }
+
+/* ===== D2: buttons ===== */
+html.aw-ui .btn {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.01em;
+    transition: transform 0.35s var(--aw-spring), box-shadow 0.35s var(--aw-ease),
+                background-position 0.6s var(--aw-ease), background-color 0.25s ease,
+                color 0.25s ease, border-color 0.25s ease;
+}
+/* light sweep across the button on hover */
+html.aw-ui .btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.42) 50%, transparent 70%);
+    transform: translateX(-130%);
+    transition: transform 0.85s var(--aw-ease);
+    pointer-events: none;
+}
+html.aw-ui .btn:hover::after { transform: translateX(130%); }
+html.aw-ui .btn:hover { transform: translateY(-2px); text-decoration: none; }
+html.aw-ui .btn:active { transform: translateY(0) scale(0.97); transition-duration: 0.1s; }
+html.aw-ui .btn:disabled, html.aw-ui .btn[aria-disabled="true"] { transform: none; opacity: 0.6; cursor: not-allowed; }
+html.aw-ui .btn i { transition: transform 0.35s var(--aw-spring); }
+html.aw-ui .btn:hover i { transform: scale(1.12) rotate(-6deg); }
+
+html.aw-ui .btn-primary {
+    background-color: var(--aw-rose-deep);
+    background-image: var(--aw-grad);
+    background-size: 220% 220%;
+    background-position: 0% 50%;
+    color: #fff;
+    border-color: transparent;
+    box-shadow: var(--aw-sh-1), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+html.aw-ui .btn-primary:hover {
+    background-position: 100% 50%;
+    color: #fff;
+    box-shadow: var(--aw-sh-2), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* outline: a rose gradient fills in from the left */
+html.aw-ui .btn-outline {
+    background: color-mix(in srgb, var(--card-bg) 82%, transparent);
+    border: 2px solid var(--aw-rose-deep);
+    color: var(--aw-ink);
+}
+html.aw-ui .btn-outline::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--aw-grad);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.45s var(--aw-ease);
+}
+html.aw-ui .btn-outline:hover { color: #fff; background: color-mix(in srgb, var(--card-bg) 82%, transparent); border-color: transparent; box-shadow: var(--aw-sh-2); }
+html.aw-ui .btn-outline:hover::before { transform: scaleX(1); }
+
+html.aw-ui .btn-secondary {
+    background: #3a2a2d;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--aw-sh-1);
+}
+html.aw-ui .btn-secondary:hover { background: #2a1d1f; color: #fff; border-color: var(--rose); box-shadow: var(--aw-sh-2); }
+html[data-theme="dark"].aw-ui .btn-secondary { background: #4a3538; }
+html[data-theme="dark"].aw-ui .btn-secondary:hover { background: #5a4044; }
+
+html.aw-ui :is(.btn-danger, .btn-success, .btn-warning, .btn-info):hover { box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.35); filter: saturate(1.1) brightness(1.03); }
+
+/* click ripple (added by aw-motion.js) */
+html.aw-ui .aw-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.28;
+    transform: scale(0);
+    pointer-events: none;
+    animation: awRipple 0.6s var(--aw-ease) forwards;
+}
+@keyframes awRipple { to { transform: scale(1); opacity: 0; } }
+
+/* working state while a form submits (added by aw-motion.js) */
+html.aw-ui .btn.is-loading { color: transparent !important; pointer-events: none; }
+html.aw-ui .btn.is-loading i { opacity: 0; }
+html.aw-ui .aw-spin {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 1.1em; height: 1.1em;
+    margin: -0.55em 0 0 -0.55em;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-top-color: #fff;
+    animation: awSpin 0.7s linear infinite;
+}
+html.aw-ui .btn-outline .aw-spin { border-color: rgba(168, 103, 106, 0.3); border-top-color: var(--aw-rose-deep); }
+@keyframes awSpin { to { transform: rotate(360deg); } }
