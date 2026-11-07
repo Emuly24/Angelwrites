@@ -958,3 +958,16 @@ html.aw-ui :is(.no-items, .empty-message, .no-comments, .no-reviews, .empty-note
     font-size: 1.4rem;
     color: var(--rose);
 }
+
+/* ===== C7: the closed slide-out menu is really closed =====
+   It sat just off the right edge, so keyboard users could tab into invisible links and some phones
+   could be panned sideways onto it. Hidden while closed; hidden overflow is clipped. */
+@supports (overflow: clip) {
+    html.aw-ui, html.aw-ui body { overflow-x: clip; }
+}
+@media (max-width: 992px) {
+    html.aw-ui .nav-links:not(.open) { visibility: hidden; transition: right 0.5s var(--aw-ease), visibility 0s linear 0.5s !important; }
+    html.aw-ui .nav-links.open { visibility: visible; transition: right 0.5s var(--aw-ease), visibility 0s !important; }
+}
+html.aw-nav-compact .nav-links:not(.open) { visibility: hidden; transition: right 0.5s var(--aw-ease), visibility 0s linear 0.5s !important; }
+html.aw-nav-compact .nav-links.open { visibility: visible; transition: right 0.5s var(--aw-ease), visibility 0s !important; }
