@@ -136,7 +136,7 @@ try {
         <?php endif; ?>
 
         <!-- ===== TAB: GROUPS ===== -->
-        <div class="tab-content" id="tab-groups">
+        <div class="tab-content active" id="tab-groups"><!-- C6: the default tab was never shown -->
             <?php if (empty($groups)): ?>
                 <div class="empty-state">
                     <div class="empty-icon">📖</div>
