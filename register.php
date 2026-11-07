@@ -342,17 +342,17 @@ $pageTitle = 'Sign Up';
                             Please check your inbox, enter the code on the verification page to activate your account.
                             <?php else: ?>
                             <strong>Your account is created, but we couldn't send the verification email just now.</strong>
-                            Please use <a href="<?php echo SITE_URL; ?>/resend_verification.php">Request a new code</a> in a few minutes.
+                            Please use <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>">Request a new code</a> in a few minutes.
                             <?php endif; ?>
                         </p>
                         <div class="success-actions">
-                            <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary btn-block">
+                            <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>" class="btn btn-primary btn-block">
                                 <i class="fas fa-sign-in-alt"></i>
                                 Go to Verification
                             </a>
                             <p class="small-note">
                                 📧 Didn't receive the email? Check your spam folder or 
-                                <a href="<?php echo SITE_URL; ?>/verify.php">Request a new code</a>.
+                                <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>">Request a new code</a>.
                             </p>
                         </div>
                     </div>
@@ -365,6 +365,9 @@ $pageTitle = 'Sign Up';
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // VF2: the "Account Created" screen has no form; the form scripts below must not run there
+    if (!document.getElementById('password')) return;
+
     // ===== GENERATE STRONG PASSWORD =====
     const genBtn = document.getElementById('generatePassword');
     const passwordInput = document.getElementById('password');
