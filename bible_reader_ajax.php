@@ -153,6 +153,55 @@ if ($action === 'toggle_reaction' && $user_id > 0) {
     exit;
 }
 
+// ===== F28: HIGHLIGHTS (per member and verse; the page posted add_highlight with no handler) =====
+$aw_highlight_colors = ['yellow', 'green', 'blue', 'pink'];
+if ($action === 'get_highlights' && $user_id > 0) {
+    $stmt = $db->prepare("SELECT verse, color, note FROM bible_highlights WHERE user_id = ? AND book = ? AND chapter = ?");
+    $stmt->execute([$user_id, sanitize($_GET['book'] ?? ''), (int)($_GET['chapter'] ?? 0)]);
+    echo json_encode(['success' => true, 'highlights' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    exit;
+}
+if ($action === 'add_highlight' && $user_id > 0) {
+    $verse = (int)($_POST['verse'] ?? 0);
+    $color = in_array($_POST['color'] ?? '', $aw_highlight_colors, true) ? $_POST['color'] : 'yellow';
+    $note = trim((string)($_POST['note'] ?? ''));
+    if ($verse < 1) {
+        echo json_encode(['success' => false, 'error' => 'Select text inside a verse to highlight it.']);
+        exit;
+    }
+    $book = sanitize($_POST['book'] ?? '');
+    $chapter = (int)($_POST['chapter'] ?? 0);
+    $note = $note !== '' ? sanitize($note) : null;
+    // No UPSERT syntax: the host's SQLite version is unknown (ON CONFLICT DO UPDATE needs 3.24+).
+    $stmt = $db->prepare("SELECT id FROM bible_highlights WHERE user_id = ? AND book = ? AND chapter = ? AND verse = ?");
+    $stmt->execute([$user_id, $book, $chapter, $verse]);
+    $hid = $stmt->fetchColumn();
+    $stmt->closeCursor();
+    if ($hid) {
+        $db->prepare("UPDATE bible_highlights SET color = ?, note = COALESCE(?, note) WHERE id = ?")->execute([$color, $note, $hid]);
+    } else {
+        $db->prepare("INSERT INTO bible_highlights (user_id, book, chapter, verse, color, note) VALUES (?, ?, ?, ?, ?, ?)")
+           ->execute([$user_id, $book, $chapter, $verse, $color, $note]);
+    }
+    echo json_encode(['success' => true]);
+    exit;
+}
+if ($action === 'toggle_highlight' && $user_id > 0) {
+    $book = sanitize($_POST['book'] ?? '');
+    $chapter = (int)($_POST['chapter'] ?? 0);
+    $verse = (int)($_POST['verse'] ?? 0);
+    $stmt = $db->prepare("DELETE FROM bible_highlights WHERE user_id = ? AND book = ? AND chapter = ? AND verse = ?");
+    $stmt->execute([$user_id, $book, $chapter, $verse]);
+    if ($stmt->rowCount() === 0 && $verse > 0) {
+        $db->prepare("INSERT INTO bible_highlights (user_id, book, chapter, verse, color) VALUES (?, ?, ?, ?, 'yellow')")
+           ->execute([$user_id, $book, $chapter, $verse]);
+        echo json_encode(['success' => true, 'highlighted' => true]);
+    } else {
+        echo json_encode(['success' => true, 'highlighted' => false]);
+    }
+    exit;
+}
+
 // ===== BOOKMARKS =====
 if ($action === 'add_bookmark' && $user_id > 0) {
     $book = sanitize($_POST['book'] ?? '');

@@ -8,10 +8,14 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $stmt = $db->prepare("SELECT * FROM videos WHERE id = ?");
 $stmt->execute([$id]);
 $video = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->closeCursor(); // release the read snapshot before the write below (see F205)
 if (!$video) {
     header('Location: ' . SITE_URL . '/videos.php');
     exit;
 }
+// F64: nothing ever counted views, so "Most viewed" and the view counts were meaningless.
+$db->prepare("UPDATE videos SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")->execute([$id]);
+$video['view_count'] = (int)($video['view_count'] ?? 0) + 1;
 
 /* 
  * ===== FOR FULL INTERACTION SUPPORT, RUN THESE SQL QUERIES IN YOUR DATABASE =====
@@ -82,7 +86,7 @@ $stmt->execute([$id]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH RELATED VIDEOS =====
-$stmt = $db->prepare("SELECT id, title, thumbnail, views FROM videos WHERE id != ? ORDER BY created_at DESC LIMIT 4");
+$stmt = $db->prepare("SELECT id, title, thumbnail, view_count FROM videos WHERE id != ? ORDER BY created_at DESC LIMIT 4"); // F64: views column is missing in production
 $stmt->execute([$id]);
 $relatedVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -111,8 +115,17 @@ $pageTitle = htmlspecialchars($video['title']);
                         <?php 
                         // Embed logic for YouTube/Vimeo
                         $embed_url = $video['video_url'];
-                        if (strpos($embed_url, 'watch?v=') !== false) {
-                            $embed_url = str_replace('watch?v=', 'embed/', $embed_url);
+                        // F67: only "watch?v=" links were turned into embeds; youtu.be/, /shorts/,
+                        // /embed/, m.youtube.com and "&t=" links did not play. Take the 11-character
+                        // video id from any of these (and a t= start time), plus vimeo.com/<id>.
+                        if (preg_match('~(?:youtube(?:-nocookie)?\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|live/|v/)|youtu\.be/)([A-Za-z0-9_-]{11})~', $embed_url, $yt)) {
+                            $start = 0;
+                            if (preg_match('~[?&#](?:t|start)=(?:(\d+)h)?(?:(\d+)m)?(\d+)s?~', $embed_url, $tm)) {
+                                $start = (int)($tm[1] ?? 0) * 3600 + (int)($tm[2] ?? 0) * 60 + (int)($tm[3] ?? 0);
+                            }
+                            $embed_url = 'https://www.youtube.com/embed/' . $yt[1] . ($start > 0 ? '?start=' . $start : '');
+                        } elseif (preg_match('~vimeo\.com/(?:video/)?(\d+)~', $embed_url, $vm)) {
+                            $embed_url = 'https://player.vimeo.com/video/' . $vm[1];
                         }
                         ?>
                         <div class="plyr__video-embed" id="player">
@@ -126,7 +139,7 @@ $pageTitle = htmlspecialchars($video['title']);
                     
                     <div class="video-meta">
                         <div class="meta-left">
-                            <span class="views"><i class="fas fa-eye"></i> <?php echo number_format($video['views'] ?? 0); ?> views</span>
+                            <span class="views"><i class="fas fa-eye"></i> <?php echo number_format($video['view_count'] ?? 0); ?> views</span>
                             <span class="date"><i class="fas fa-calendar-alt"></i> <?php echo time_ago($video['created_at']); ?></span>
                         </div>
                         <div class="meta-right">
@@ -231,7 +244,7 @@ $pageTitle = htmlspecialchars($video['title']);
                                 </div>
                                 <div class="rel-info">
                                     <h4><?php echo htmlspecialchars($rel['title']); ?></h4>
-                                    <span><?php echo number_format($rel['views'] ?? 0); ?> views</span>
+                                    <span><?php echo number_format($rel['view_count'] ?? 0); ?> views</span>
                                 </div>
                             </a>
                         <?php endforeach; ?>

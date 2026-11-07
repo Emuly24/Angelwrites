@@ -212,7 +212,6 @@ $pageTitle = 'Bible Reader';
                         <option value="AMP">Amplified Bible (AMP)</option>
                         <option value="ASV">American Standard Version (ASV)</option>
                         <option value="WEB">World English Bible (WEB)</option>
-                        <option value="YLT">Young's Literal Translation (YLT)</option>
                     </select>
                 </div>
 
@@ -234,7 +233,6 @@ $pageTitle = 'Bible Reader';
                         <option value="AMP">Amplified Bible (AMP)</option>
                         <option value="ASV">American Standard Version (ASV)</option>
                         <option value="WEB">World English Bible (WEB)</option>
-                        <option value="YLT">Young's Literal Translation (YLT)</option>
                     </select>
                 </div>
 
@@ -353,8 +351,8 @@ $pageTitle = 'Bible Reader';
         'NKJV': 'bible_NKJV.db',
         'AMP': 'bible_AMP.db',
         'ASV': 'bible_ASV.db',
-        'WEB': 'bible_WEB.db',
-        'YLT': 'bible_YLT.db'
+        'WEB': 'bible_WEB.db'
+        // F24: YLT removed (decision D-I1): there is no bible_YLT.db, and the lookup served KJV under the YLT label.
     };
 
     const BOOKS = [
@@ -522,7 +520,9 @@ $pageTitle = 'Bible Reader';
                 if (data.success && data.data && data.data.length > 0) {
                     return data.data;
                 } else {
-                    return `[${version} ${book} ${chapter} not found]`;
+                    // F25: some translations on this site are incomplete (the ASV file stops at
+                    // Proverbs 28). Say so plainly instead of "[ASV Isaiah 1 not found]".
+                    return `${book} ${chapter} is not available in the ${version} text on this site. Please choose another version for this passage.`;
                 }
             })
             .catch(error => {
@@ -644,7 +644,10 @@ $pageTitle = 'Bible Reader';
         }
 
         chapterDisplay.textContent = `${b} ${c}`;
-        document.getElementById('notesVerseRef').textContent = `${b} ${c}`;
+        // F23: #notesVerseRef is not in the markup; the null access threw on every chapter load
+        // and the "Go to" box below was never updated.
+        const notesVerseRef = document.getElementById('notesVerseRef');
+        if (notesVerseRef) notesVerseRef.textContent = `${b} ${c}`;
         goToInput.value = `${b} ${c}:${v}`;
     }
 
@@ -665,7 +668,35 @@ $pageTitle = 'Bible Reader';
     // ================================================================
     // 7. HIGHLIGHTS
     // ================================================================
+    // F28: verse number of the paragraph a selection starts in ("16. For God so loved…" → 16).
+    function verseNumberFromRange(range) {
+        if (!range) return 0;
+        let n = range.startContainer;
+        if (n && n.nodeType === 3) n = n.parentElement;
+        const p = n && n.closest ? n.closest('p') : null;
+        const m = p ? p.textContent.trim().match(/^(\d+)\./) : null;
+        return m ? parseInt(m[1], 10) : 0;
+    }
+
     function applyHighlights(container) {
+        // F28: members' highlights are stored on the server per verse; draw them on every load.
+        if (userId > 0) {
+            const hb = book, hc = chapter;
+            fetch(`/bible_reader_ajax.php?action=get_highlights&book=${encodeURIComponent(hb)}&chapter=${hc}`)
+                .then(r => r.json())
+                .then(d => {
+                    const map = {};
+                    (d.highlights || []).forEach(h => { map[h.verse] = h.color; });
+                    container.querySelectorAll('p').forEach(p => {
+                        const m = p.textContent.trim().match(/^(\d+)\./);
+                        const color = m ? map[m[1]] : null;
+                        p.classList.remove('highlighted', 'highlight-yellow', 'highlight-green', 'highlight-blue', 'highlight-pink');
+                        if (color) p.classList.add('highlighted', 'highlight-' + color);
+                    });
+                })
+                .catch(() => {});
+            return;
+        }
         const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
         const paragraphs = container.querySelectorAll('p');
         paragraphs.forEach(p => {
@@ -686,7 +717,19 @@ $pageTitle = 'Bible Reader';
             alert('Please select a verse to highlight.');
             return;
         }
-        const key = `${book}-${chapter}-${verse}`;
+        // F27: highlight the verse the selection is in (it used the verse dropdown, so the
+        // wrong verse lit up), and save members' highlights on the server (all devices).
+        const selVerse = verseNumberFromRange(range) || verse;
+        if (userId > 0) {
+            const fd = new FormData();
+            fd.append('action', 'toggle_highlight');
+            fd.append('book', book);
+            fd.append('chapter', chapter);
+            fd.append('verse', selVerse);
+            fetch('/bible_reader_ajax.php', { method: 'POST', body: fd }).then(() => renderVerse());
+            return;
+        }
+        const key = `${book}-${chapter}-${selVerse}`;
         const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
         if (saved[key]) {
             delete saved[key];
@@ -1194,6 +1237,7 @@ $pageTitle = 'Bible Reader';
                 formData.append('action', 'add_highlight');
                 formData.append('book', book);
                 formData.append('chapter', chapter);
+                formData.append('verse', verseNumberFromRange(selectedRange)); // F28: stored per verse
                 formData.append('text', selectedText);
                 formData.append('color', color);
                 fetch('/bible_reader_ajax.php', {
@@ -1228,6 +1272,7 @@ $pageTitle = 'Bible Reader';
             formData.append('action', 'add_highlight');
             formData.append('book', book);
             formData.append('chapter', chapter);
+            formData.append('verse', verseNumberFromRange(selectedRange)); // F28: stored per verse
             formData.append('text', selectedText);
             formData.append('color', 'yellow');
             formData.append('note', note);
@@ -1547,6 +1592,19 @@ $pageTitle = 'Bible Reader';
     // ================================================================
     // 34. INITIAL LOAD
     // ================================================================
+    // F29: open the passage named in the link (?book=John&chapter=3&verse=16, as built by the
+    // share buttons); the page used to ignore it and always open the default passage.
+    (function applyLinkedPassage() {
+        const q = new URLSearchParams(window.location.search);
+        const qb = q.get('book');
+        if (!qb || !BOOKS.includes(qb)) return;
+        book = qb;
+        const maxCh = CHAPTER_COUNTS[qb] || 21;
+        const qc = parseInt(q.get('chapter'), 10);
+        chapter = (qc >= 1 && qc <= maxCh) ? qc : 1;
+        const qv = parseInt(q.get('verse'), 10);
+        verse = qv >= 1 ? qv : 1;
+    })();
     populateBooks();
     populateChapters();
     populateVerses();
@@ -1722,6 +1780,11 @@ body.dark-mode {
 .verse-content p { margin-bottom:12px; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s; }
 .verse-content p:hover { background:rgba(219,161,162,0.1); }
 .verse-content p.highlighted { background:#fff3b0; }
+/* F28: the colour classes the highlight picker applies had no styles */
+.verse-content .highlight-yellow { background:#fff3b0; }
+.verse-content .highlight-green { background:#d4f5d4; }
+.verse-content .highlight-blue { background:#d6e8ff; }
+.verse-content .highlight-pink { background:#fbd9e3; }
 .bible-chapter-nav-bottom { display:flex; justify-content:center; align-items:center; gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
 .bible-chapter-nav-bottom .btn { padding:6px 16px; font-size:0.85rem; }
 #bibleChapterDisplay { font-weight:600; color:var(--text); font-family:'Playfair Display',Georgia,serif; }
