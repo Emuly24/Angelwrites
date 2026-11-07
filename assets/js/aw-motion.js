@@ -161,6 +161,72 @@
     ready(function () { enhanceCards(); fadeImages(); });
     AW.enhance = function (scope) { enhanceCards(scope); fadeImages(scope); };
 
+    /* ===== D5: reveal on scroll, and numbers that count up ===== */
+    var REVEAL = '.section-header, .section-title, .page-header, .cta-content, .newsletter-content, ' +
+        '.testimonial-card, .comment-card, .empty-state, [data-aw-reveal], ' + CARDS;
+
+    function reveal(scope) {
+        // not in the book reader, and not in admin screens, which are for work rather than browsing
+        if (reduce || page === 'reader' || /\/admin\//.test(location.pathname) || !('IntersectionObserver' in window)) return;
+        var io = AW._io || (AW._io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                var el = en.target;
+                io.unobserve(el);
+                el.classList.add('aw-in');
+                // hand the element back to its own transitions once it has arrived
+                setTimeout(function () {
+                    el.classList.remove('aw-reveal', 'aw-in');
+                    el.style.removeProperty('--aw-d');
+                }, 1000 + (parseInt(el.style.getPropertyValue('--aw-d'), 10) || 0));
+            });
+        }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 }));
+        (scope || document).querySelectorAll('main ' + REVEAL.split(', ').join(', main ')).forEach(function (el) {
+            if (el.dataset.awRev || el.closest('.hero, .aw-reveal')) return;
+            el.dataset.awRev = '1';
+            // siblings in the same grid arrive one after another
+            var sibs = el.parentElement ? Array.prototype.filter.call(el.parentElement.children, function (c) { return c.matches(REVEAL); }) : [el];
+            var i = Math.max(0, sibs.indexOf(el));
+            el.style.setProperty('--aw-d', (i % 6) * 80 + 'ms');
+            el.classList.add('aw-reveal');
+            io.observe(el);
+        });
+    }
+
+    function countUp(scope) {
+        if (reduce || !('IntersectionObserver' in window)) return;
+        var nodes = (scope || document).querySelectorAll('.stat-number:not([data-target]), .stat-value:not([data-target]), .admin-stat-card h3, .stat-card h3');
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                io.unobserve(en.target);
+                var el = en.target, end = +el.dataset.awTo, t0 = null, grouped = el.dataset.awGrouped === '1';
+                function step(t) {
+                    if (!t0) t0 = t;
+                    var p = Math.min(1, (t - t0) / 1300), v = Math.round(end * (1 - Math.pow(1 - p, 3)));
+                    el.textContent = grouped ? v.toLocaleString('en-US') : String(v);
+                    if (p < 1) requestAnimationFrame(step);
+                }
+                requestAnimationFrame(step);
+            });
+        }, { threshold: 0.4 });
+        nodes.forEach(function (el) {
+            var txt = el.textContent.trim();
+            // only plain whole numbers like 42 or 1,250; anything else ("3h 20m", "4.5") is left as it is
+            if (el.children.length || !/^\d{1,3}(,\d{3})*$|^\d+$/.test(txt)) return;
+            var n = parseInt(txt.replace(/,/g, ''), 10);
+            if (!n || n < 2) return;
+            el.dataset.awTo = n;
+            el.dataset.awGrouped = txt.indexOf(',') > -1 ? '1' : '0';
+            el.textContent = '0';
+            io.observe(el);
+        });
+    }
+
+    ready(function () { reveal(); countUp(); });
+    var enhance0 = AW.enhance;
+    AW.enhance = function (scope) { enhance0(scope); reveal(scope); };
+
     AW.ready = ready;
     AW.finePointer = finePointer;
 })();

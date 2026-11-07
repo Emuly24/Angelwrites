@@ -399,3 +399,15 @@ html.aw-ui a:is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .r
     .featured-card, .related-card, .feature-card, .aw-card):hover,
 html.aw-ui a:is(.book-card, .poem-card, .blog-card, .video-card, .group-card, .reflection-card, .post-card,
     .featured-card, .related-card, .feature-card, .aw-card):hover * { text-decoration: none; }
+
+/* ===== D5: content rises in as it scrolls into view (classes added by aw-motion.js) ===== */
+html.aw-ui .aw-reveal {
+    opacity: 0;
+    translate: 0 24px;
+    transition: opacity 0.8s var(--aw-ease), translate 0.9s var(--aw-ease) !important;
+    transition-delay: var(--aw-d, 0ms) !important;
+}
+html.aw-ui .aw-reveal.aw-in { opacity: 1; translate: 0 0; }
+@media print {
+    html.aw-ui .aw-reveal { opacity: 1 !important; translate: none !important; }
+}
