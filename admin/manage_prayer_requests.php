@@ -56,8 +56,12 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 <div class="admin-page">
     <div class="container" style="max-width:960px;margin:0 auto;padding:24px 16px;">
-        <h1>🙏 Prayer Requests</h1>
-        <p><a href="<?php echo SITE_URL; ?>/admin/dashboard.php">← Admin dashboard</a></p>
+        <div class="admin-header"><!-- C3 -->
+            <div>
+                <h1>Prayer Requests</h1>
+                <p><a href="<?php echo SITE_URL; ?>/admin/dashboard.php">← Admin dashboard</a></p>
+            </div>
+        </div>
         <?php if (!$requests): ?>
             <p>No prayer requests yet.</p>
         <?php endif; ?>

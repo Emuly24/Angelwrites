@@ -364,7 +364,9 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-ser
 
 <div class="dashboard-page">
     <div class="container">
-        <h2><i class="fas fa-comments" style="color: var(--rose);"></i> Comment Management</h2>
+        <div class="admin-header"><!-- C3 -->
+            <h1>Comment Management</h1>
+        </div>
 
         <!-- Tab Navigation -->
         <div class="tab-nav">

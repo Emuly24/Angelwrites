@@ -55,7 +55,7 @@ $pageTitle = 'Create a Reading Group';
 <div class="create-group-page">
     <div class="container">
         <div class="page-header">
-            <h1>📚 Create a Reading Group</h1>
+            <h1>Create a Reading Group</h1>
             <a href="groups.php" class="btn btn-outline">
                 <i class="fas fa-arrow-left"></i> Back to Groups
             </a>

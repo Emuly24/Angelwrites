@@ -113,7 +113,7 @@ $pageTitle = 'Reader Analytics';
 <div class="analytics-page">
     <div class="container">
         <div class="page-header">
-            <h1>📊 Reader Analytics</h1>
+            <h1>Reader Analytics</h1>
             <div class="header-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard

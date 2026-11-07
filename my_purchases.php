@@ -36,8 +36,10 @@ $pageTitle = 'My purchases';
 require_once __DIR__ . '/includes/header.php';
 ?>
 <div class="container" style="max-width:800px;margin:0 auto;padding:24px 16px;">
-    <h1>🧾 My purchases</h1>
-    <p><a href="<?php echo SITE_URL; ?>/dashboard.php">← Dashboard</a> · <a href="<?php echo SITE_URL; ?>/books.php">Browse books</a></p>
+    <div class="page-header"><!-- C3 -->
+        <h1>My Purchases</h1>
+        <p><a href="<?php echo SITE_URL; ?>/dashboard.php">← Dashboard</a> · <a href="<?php echo SITE_URL; ?>/books.php">Browse books</a></p>
+    </div>
     <?php if (!$orders): ?>
         <p>You have not ordered any books yet.</p>
     <?php endif; ?>

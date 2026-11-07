@@ -110,7 +110,7 @@ try {
         <!-- Header -->
         <div class="admin-header">
             <div>
-                <h1>📚 Manage Reading Groups</h1>
+                <h1>Manage Reading Groups</h1>
                 <p class="subtitle">Overview of all reading groups across books, poems, and newsletters.</p>
             </div>
             <div class="header-actions">

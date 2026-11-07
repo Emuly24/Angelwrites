@@ -12,7 +12,7 @@ $pageTitle = 'Bible Reader';
     <div class="container">
         <!-- Page Header -->
         <div class="page-header">
-            <h1>📖 Bible Reader</h1>
+            <h1>Bible Reader</h1>
             <p>Read, copy, compare, highlight, take notes, and track your reading journey.</p>
         </div>
 

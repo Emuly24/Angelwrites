@@ -380,7 +380,7 @@ require_once '../includes/header.php';
 <div class="admin-newsletter">
     <div class="container">
         <div class="admin-header">
-            <h1>📨 Newsletter</h1>
+            <h1>Newsletter</h1>
             <div class="admin-actions">
                 <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export all</a>
                 <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php?status=active" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export active</a>

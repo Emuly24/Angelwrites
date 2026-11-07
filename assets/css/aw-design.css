@@ -730,3 +730,105 @@ html.aw-ui #awToast {
     html.aw-ui .btn::after, html.aw-ui .aw-spot::after { display: none; }
     html.aw-ui .aw-progress { display: none; }
 }
+
+/* ===== C3: one page-header style for every page =====
+   Each page had its own title block (plain, pink card, left or centred, with or without emoji).
+   They now share one look: a soft vanilla card with a rose and gold glow, a faint heart, the
+   title in Playfair with a gradient ornament, and the subtitle in the light text colour.
+   Existing layouts (title left with buttons right, or centred) are kept. */
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero, .group-header) {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+        radial-gradient(55% 120% at 100% 0%, rgba(214, 168, 92, 0.16), transparent 62%),
+        radial-gradient(60% 140% at 0% 100%, rgba(219, 161, 162, 0.24), transparent 62%),
+        linear-gradient(135deg, color-mix(in srgb, var(--vanilla) 72%, var(--card-bg)), var(--card-bg));
+    border: 1px solid var(--aw-hairline);
+    border-radius: var(--aw-r-lg);
+    box-shadow: var(--aw-sh-1);
+    padding: clamp(22px, 3.6vw, 38px) clamp(20px, 4vw, 44px);
+    margin-top: 28px;
+    margin-bottom: 28px;
+}
+/* faint heart in the corner */
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero)::before {
+    content: "\f004";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    right: clamp(-10px, 2vw, 28px);
+    top: 50%;
+    translate: 0 -50%;
+    z-index: -1;
+    font-size: 132px;
+    line-height: 1;
+    color: var(--rose);
+    opacity: 0.13;
+    transform: rotate(-12deg);
+    pointer-events: none;
+    animation: awFloat 9s ease-in-out infinite;
+}
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero) :is(h1, h2):first-of-type {
+    font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+    line-height: 1.15;
+    margin: 0 0 6px;
+    color: var(--dark);
+}
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero) h1::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 3px;
+    margin: 12px 0 4px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--aw-rose-deep), var(--aw-gold));
+}
+/* centred headers keep their ornament centred */
+html.aw-ui :is(.about-hero, .contact-hero, .blog-header, .reflections-header, .videos-header, .privacy-header,
+    .terms-header, .accessibility-header, .search-header, .profile-header, .notifications-header,
+    .community-header, .session-header, .bible-reader-page .page-header) h1::after { margin-left: auto; margin-right: auto; }
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero) > :is(p, div > p) {
+    color: var(--text-light);
+}
+/* a page's own ornament under its header would double ours */
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero)::after,
+html.aw-ui :is(.about-hero, .contact-hero, .blog-header, .reflections-header, .videos-header, .privacy-header,
+    .terms-header, .accessibility-header, .search-header, .profile-header, .notifications-header,
+    .community-header, .session-header) :is(p, div)::after { content: none; }
+/* old pages drew their own borders under the title; the card replaces them */
+html.aw-ui :is(.admin-header, .page-header) { border-bottom: 1px solid var(--aw-hairline); }
+/* the header's buttons sit above the decorative heart */
+html.aw-ui :is(.admin-header, .admin-hero, .page-header, .books-header, .library-header, .user-hero) :is(.btn, a, button, select) { position: relative; z-index: 1; }
+@media (max-width: 600px) {
+    html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+        .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+        .notifications-header, .community-header, .session-header, .library-header, .page-header,
+        .admin-header, .admin-hero, .user-hero) { margin-top: 16px; margin-bottom: 20px; border-radius: var(--aw-r); }
+    html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+        .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+        .notifications-header, .community-header, .session-header, .library-header, .page-header,
+        .admin-header, .admin-hero, .user-hero)::before { font-size: 96px; }
+}
+html.aw-ui :is(.about-hero, .contact-hero, .books-header, .blog-header, .reflections-header, .videos-header,
+    .privacy-header, .terms-header, .accessibility-header, .search-header, .profile-header,
+    .notifications-header, .community-header, .session-header, .library-header, .page-header,
+    .admin-header, .admin-hero, .user-hero, .group-header) :is(.hero-divider, .header-decoration, .header-divider, .title-divider) { display: none; }

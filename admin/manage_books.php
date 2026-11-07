@@ -234,7 +234,7 @@ $pageTitle = 'Manage Books';
         <!-- ===== HERO / HEADER ===== -->
         <div class="admin-hero">
             <div class="admin-hero-content">
-                <h1>📚 Manage Books</h1>
+                <h1>Manage Books</h1>
                 <p class="admin-hero-sub">Add, edit, and manage all books on AngelWrites.</p>
             </div>
             <div class="admin-hero-actions">

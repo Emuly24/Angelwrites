@@ -128,7 +128,7 @@ $pageTitle = 'Manage Messages';
         <!-- ===== HERO ===== -->
         <div class="admin-hero">
             <div class="admin-hero-content">
-                <h1>📩 Manage Messages</h1>
+                <h1>Manage Messages</h1>
                 <p class="admin-hero-sub">View, search, and manage all contact form submissions.</p>
             </div>
             <div class="admin-hero-actions">

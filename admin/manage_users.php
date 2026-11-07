@@ -141,7 +141,7 @@ $pageTitle = 'Manage Users';
         <!-- ===== HERO / HEADER ===== -->
         <div class="admin-hero">
             <div class="admin-hero-content">
-                <h1>👥 Manage Users</h1>
+                <h1>Manage Users</h1>
                 <p class="admin-hero-sub">View, edit, and manage all user accounts on AngelWrites.</p>
             </div>
             <div class="admin-hero-actions">

@@ -77,7 +77,7 @@ $pageTitle = 'Manage Community';
 <div class="admin-page">
     <div class="container">
         <div class="admin-header">
-            <h1>⚖️ Community reports</h1>
+            <h1>Community reports</h1>
             <div>
                 <a href="<?php echo SITE_URL; ?>/admin/manage_questions.php" class="btn btn-outline">💬 Questions &amp; answers</a><!-- Q35 -->
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">Back to Dashboard</a>

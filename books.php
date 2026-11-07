@@ -83,7 +83,7 @@ $pageTitle = 'Books';
         <!-- ===== PAGE HEADER ===== -->
         <div class="books-header">
             <div class="books-header-content">
-                <h1>📖 All Books</h1>
+                <h1>All Books</h1>
                 <p>Explore Angella's writings — available for reading, download, or purchase.</p>
             </div>
             <div class="books-header-stats">

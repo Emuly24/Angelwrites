@@ -150,7 +150,7 @@ $pageTitle = 'My Library';
         <!-- ===== PAGE HEADER ===== -->
         <div class="library-header">
             <div class="library-header-content">
-                <h1>📚 My Library</h1>
+                <h1>My Library</h1>
                 <p>Your reading journey, all in one place.</p>
             </div>
             <div class="library-header-stats">

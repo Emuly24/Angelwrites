@@ -153,7 +153,7 @@ $pageTitle = 'Book a Session';
 
         <!-- Page Header -->
         <div class="session-header">
-            <h1>📅 Book a Session</h1>
+            <h1>Book a Session</h1>
             <p>Connect with Angella for guidance, encouragement, or a conversation about faith, writing, or life's journey.</p>
         </div>
 

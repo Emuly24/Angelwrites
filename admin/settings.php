@@ -94,7 +94,7 @@ $pageTitle = 'Site Settings';
         <!-- ===== HERO / HEADER ===== -->
         <div class="admin-hero">
             <div class="admin-hero-content">
-                <h1>⚙️ Site Settings</h1>
+                <h1>Site Settings</h1>
                 <p class="admin-hero-sub">Manage your site's general settings and branding.</p>
             </div>
             <div class="admin-hero-actions">

@@ -88,7 +88,7 @@ $pageTitle = 'My Reading Groups';
     <div class="container">
         <!-- ===== PAGE HEADER ===== -->
         <div class="page-header">
-            <h1>📚 My Reading Groups</h1>
+            <h1>My Reading Groups</h1>
             <div class="header-actions">
                 <a href="create_group.php" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Create New Group
