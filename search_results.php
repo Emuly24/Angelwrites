@@ -95,17 +95,9 @@ if ($q === '') {
 foreach ($search_configs as $config) {
     $where_data = buildSearchWhere($config['columns'], $like_terms);
     
-    // Count total for this config
-    $count_sql = "SELECT COUNT(*) FROM " . $config['table'] . " WHERE " . $where_data['where'];
-    if ($config['type'] === 'blog') {
-        $count_sql = "SELECT COUNT(*) FROM " . $config['table'] . " WHERE status = 'published' AND " . $where_data['where'];
-    }
-    $stmt = $db->prepare($count_sql);
-    $stmt->execute($where_data['params']);
-    $count = $stmt->fetchColumn();
-    $total_results += $count;
-
-    if ($count > 0) {
+    // Q18: a separate COUNT(*) ran the same LIKE scan again for each type (10 full scans per search);
+    // the total is taken from the fetched rows below, so only the fetch runs now (5 scans).
+    {
         // Fetch results for this config
         $fetch_sql = $config['select'] . " WHERE " . $where_data['where'];
         if ($config['type'] === 'blog') {
@@ -154,6 +146,36 @@ $results = array_slice($results, $offset, $limit);
 $total_pages = ceil($total_results / $limit);
 $current_page = $page;
 $query_params = http_build_query(['q' => $q, 'type' => $type, 'sort' => $sort]);
+
+// Q18: snippet = plain text (tags stripped, entities decoded) around the first matching term, up to
+// ~200 characters, instead of the first 200 bytes of raw HTML; matched terms are wrapped in <mark>.
+function aw_search_snippet($text, array $terms, $len = 200) {
+    $plain = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags((string)$text), ENT_QUOTES, 'UTF-8')));
+    if (mb_strlen($plain) <= $len) return $plain;
+    $pos = false;
+    foreach ($terms as $t) {
+        if ($t === '') continue;
+        $p = mb_stripos($plain, $t);
+        if ($p !== false && ($pos === false || $p < $pos)) $pos = $p;
+    }
+    $start = ($pos === false) ? 0 : max(0, $pos - 60);
+    $snip = mb_substr($plain, $start, $len);
+    return ($start > 0 ? '…' : '') . $snip . ($start + $len < mb_strlen($plain) ? '…' : '');
+}
+function aw_search_highlight($text, array $terms) {
+    $quoted = [];
+    foreach ($terms as $t) {
+        if (mb_strlen($t) >= 2) $quoted[] = preg_quote($t, '/');
+    }
+    if (!$quoted) return htmlspecialchars((string)$text);
+    // Split the raw text on matches, then escape each piece (so a match never lands inside an entity).
+    $parts = preg_split('/(' . implode('|', $quoted) . ')/iu', (string)$text, -1, PREG_SPLIT_DELIM_CAPTURE);
+    $out = '';
+    foreach ($parts as $i => $part) {
+        $out .= ($i % 2) ? '<mark>' . htmlspecialchars($part) . '</mark>' : htmlspecialchars($part);
+    }
+    return $out;
+}
 
 // Reading time calculation
 function readingTime($content) {
@@ -239,8 +261,8 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                     $link = '';
                     $image = $item['image'] ? SITE_URL . '/' . $item['image'] : '';
                     $title = htmlspecialchars($item['title']);
-                    $description = htmlspecialchars(substr($item['description'] ?? $item['content'] ?? $item['excerpt'] ?? '', 0, 200));
-                    if (strlen($description) >= 200) $description .= '...';
+                    $title_marked = aw_search_highlight($item['title'], $search_terms); // Q18
+                    $description = aw_search_highlight(aw_search_snippet(($item['description'] ?? '') !== '' ? $item['description'] : (($item['excerpt'] ?? '') !== '' ? $item['excerpt'] : ($item['content'] ?? '')), $search_terms), $search_terms); // Q18
                     $read_time = isset($item['content']) ? readingTime($item['content']) : '';
 
                     switch ($item['type']) {
@@ -285,7 +307,7 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                                 <?php endif; ?>
                                 <span class="result-date"><?php echo date('M j, Y', strtotime($item['created_at'])); ?></span>
                             </div>
-                            <h3><a href="<?php echo $link; ?>"><?php echo $title; ?></a></h3>
+                            <h3><a href="<?php echo $link; ?>"><?php echo $title_marked; ?></a></h3>
                             <p class="result-description"><?php echo $description; ?></p>
                             <div class="result-footer">
                                 <div class="result-reactions">
@@ -522,6 +544,14 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     .results-grid { grid-template-columns: 1fr; }
     .filter-form { flex-direction: column; align-items: stretch; }
     .filter-group { min-width: auto; }
+}
+
+/* Q18: matches highlighted; tap targets at least 44 px on phones */
+.search-results-page mark { background:#f5e0a8; color:inherit; padding:0 2px; border-radius:3px; }
+@media (max-width:768px) {
+    .search-results-page .reaction-btn,
+    .search-results-page .page-link,
+    .search-results-page .btn-sm { min-height:44px; min-width:44px; display:inline-flex; align-items:center; justify-content:center; }
 }
 </style>
 

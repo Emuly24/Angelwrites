@@ -33,7 +33,7 @@ try { $stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORD
 $pageTitle = 'Admin Dashboard';
 ?>
 <?php require_once '../includes/header.php'; ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
 
 <style>
 :root {
@@ -292,7 +292,15 @@ function refreshStats() {
             document.getElementById('reading_hours').textContent = data.reading_hours ?? 0;
         }).catch(console.error);
 }
-setInterval(refreshStats, 60000);
+// Q41: polling every 60 s (stats + chart requests) cost ~3 requests a minute (~4,300 a day) per open tab,
+// even in a background tab. Now every 5 minutes, only while the tab is visible, and once on return.
+const AW_POLL_MS = 300000;
+let awLastPoll = Date.now();
+function awPoll() { awLastPoll = Date.now(); refreshStats(); if (window.activeChart) updateCharts(); }
+setInterval(function () { if (!document.hidden) awPoll(); }, AW_POLL_MS);
+document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && Date.now() - awLastPoll > 60000) awPoll();
+});
 
 // ============================================================
 // 2. SMART & SMOOTH CHART ENGINE
@@ -397,7 +405,7 @@ function initCharts() {
 
     // Fetch initial data
     updateCharts();
-    setInterval(updateCharts, 60000);
+    // Q41: chart refreshes now ride on awPoll() above (visible tab only, every 5 minutes).
 }
 
 // ============================================================

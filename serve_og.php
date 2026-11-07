@@ -31,7 +31,7 @@ if ($poem && !empty($poem['image_path'])) {
 }
 
 // Ultimate fallback: Logo
-header('Content-Type: image/png');
-// F200: angelwrites-logo.png does not exist; logo.png is the site logo.
-readfile(__DIR__ . '/assets/images/logo.png');
+// Q43: logo.png is now a small header-sized image; share previews use a 1200x800 JPEG of the logo.
+header('Content-Type: image/jpeg');
+readfile(__DIR__ . '/assets/images/og-logo.jpg');
 exit;

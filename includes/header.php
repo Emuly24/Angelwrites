@@ -55,6 +55,7 @@ if ($isLoggedIn) {
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
     <meta name="theme-color" content="#DBA1A2">
     <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
+    <link rel="apple-touch-icon" href="<?php echo SITE_URL; ?>/assets/images/apple-touch-icon.png"><!-- Q44 -->
 
    <!-- ===== OPEN GRAPH META TAGS (Social Sharing) ===== -->
 <?php
@@ -62,7 +63,7 @@ if ($isLoggedIn) {
     $og_title       = isset($og_title)       ? htmlspecialchars($og_title)       : (isset($pageTitle) ? htmlspecialchars($pageTitle) : htmlspecialchars(aw_site_name())); // F191
     $og_description = isset($og_description) ? htmlspecialchars($og_description) : 'AngelWrites — Christian writing and community platform.';
     $og_url         = isset($og_url)         ? htmlspecialchars($og_url)         : SITE_URL . $_SERVER['REQUEST_URI'];
-    $og_image       = isset($og_image)       ? htmlspecialchars($og_image)       : SITE_URL . '/assets/images/angelwrites-logo.png';
+    $og_image       = isset($og_image)       ? htmlspecialchars($og_image)       : SITE_URL . '/assets/images/og-logo.jpg'; // Q43: angelwrites-logo.png never existed
 ?>
 <meta property="og:type" content="article" />
 <meta property="og:title" content="<?php echo $og_title; ?>" />

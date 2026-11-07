@@ -337,6 +337,12 @@ try {
         }
     }
 
+    // Q50: daily clean-up of tables that only grow (see includes/housekeeping.php).
+    if (mt_rand(1, 100) === 1) {
+        require_once __DIR__ . '/housekeeping.php';
+        aw_housekeeping($db);
+    }
+
 } catch (PDOException $e) {
     // Log error and show user-friendly message
     error_log('Database Error: ' . $e->getMessage());
