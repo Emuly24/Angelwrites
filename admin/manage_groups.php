@@ -11,20 +11,24 @@ require_once '../includes/reading_groups.php';
 
 redirectIfNotAdmin();
 
-$pageTitle = 'Manage Reading Groups';
-require_once '../includes/header.php';
-
+// F47: the POST actions below answer the page's fetch() calls with JSON; they used to run after
+// header.php had already printed the page, so the JSON was appended to ~21 KB of HTML and the
+// page's JavaScript failed (although the change had been made). They now run first.
 // ===== HANDLE POST ACTIONS =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
 
     if ($action === 'delete_group') {
         $group_id = (int)$_POST['group_id'];
-        $db->exec("DELETE FROM reading_groups WHERE id = $group_id");
-        $db->exec("DELETE FROM group_members WHERE group_id = $group_id");
-        $db->exec("DELETE FROM group_notes WHERE group_id = $group_id");
-        $db->exec("DELETE FROM group_discussions WHERE group_id = $group_id");
-        $db->exec("DELETE FROM group_schedules WHERE group_id = $group_id");
+        // F214: prepared statements instead of SQL built by string concatenation (the value was
+        // int-cast, so not exploitable, but fragile); child rows first, in one transaction.
+        $db->beginTransaction();
+        foreach (['group_members', 'group_notes', 'group_discussions', 'group_schedules'] as $child) {
+            $db->prepare("DELETE FROM $child WHERE group_id = ?")->execute([$group_id]);
+        }
+        $db->prepare("DELETE FROM reading_groups WHERE id = ?")->execute([$group_id]);
+        $db->commit();
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -34,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $user_id = (int)$_POST['user_id'];
         $stmt = $db->prepare("DELETE FROM group_members WHERE group_id = ? AND user_id = ?");
         $stmt->execute([$group_id, $user_id]);
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -44,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $role = $_POST['role'];
         $stmt = $db->prepare("UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?");
         $stmt->execute([$role, $group_id, $user_id]);
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
@@ -54,10 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $description = trim($_POST['description']);
         $stmt = $db->prepare("UPDATE reading_groups SET name = ?, description = ? WHERE id = ?");
         $stmt->execute([$name, $description, $group_id]);
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true]);
         exit;
     }
 }
+
+$pageTitle = 'Manage Reading Groups';
+require_once '../includes/header.php';
 
 // ===== FETCH ALL GROUPS WITH CONTENT AND STATS =====
 $groups = [];
@@ -68,7 +78,7 @@ try {
         SELECT g.*,
                b.title as book_title, b.author as book_author,
                p.title as poem_title, p.author as poem_author,
-               n.title as newsletter_title, n.author as newsletter_author,
+               n.subject as newsletter_title, NULL as newsletter_author,
                (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
                (SELECT COUNT(*) FROM group_notes WHERE group_id = g.id) as note_count,
                (SELECT COUNT(*) FROM group_discussions WHERE group_id = g.id) as discussion_count,
@@ -76,7 +86,7 @@ try {
         FROM reading_groups g
         LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
         LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
-        LEFT JOIN newsletters n ON g.content_type = 'newsletter' AND g.content_id = n.id
+        LEFT JOIN newsletter_archive n ON g.content_type = 'newsletter' AND g.content_id = n.id -- F48: sent newsletters live here; 'newsletters' is an empty, unused table
         LEFT JOIN users u ON g.creator_id = u.id
         ORDER BY g.created_at DESC
     ");

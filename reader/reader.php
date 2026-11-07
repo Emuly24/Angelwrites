@@ -47,7 +47,7 @@ if (isLoggedIn()) {
     $streak_days = (int)$stmt->fetchColumn();
 
     // Group
-    $stmt = $db->prepare("SELECT g.id FROM reading_groups g JOIN group_members m ON g.id = m.group_id WHERE g.book_id = ? AND m.user_id = ? LIMIT 1");
+    $stmt = $db->prepare("SELECT g.id FROM reading_groups g JOIN group_members m ON g.id = m.group_id WHERE g.content_type = 'book' AND g.content_id = ? AND m.user_id = ? LIMIT 1"); // F17: groups store the book as content_type/content_id (book_id is unset)
     $stmt->execute([$book_id, $user_id]);
     $group_id = $stmt->fetchColumn();
 

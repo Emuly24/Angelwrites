@@ -184,12 +184,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
         exit;
     }
     $answer_id = (int)$_POST['answer_id'];
+    // F148: upvotes were not tracked per member, so anyone could upvote any answer (their own
+    // included) without limit. One upvote per member per answer, recorded in the generic
+    // reactions table (UNIQUE user/target/reaction); no upvoting your own answer.
+    $stmt = $db->prepare("SELECT user_id FROM answers WHERE id = ?");
+    $stmt->execute([$answer_id]);
+    $author_id = $stmt->fetchColumn();
+    $stmt->closeCursor();
+    if (!$author_id) {
+        echo json_encode(['success' => false, 'error' => 'Answer not found.']);
+        exit;
+    }
+    if ((int)$author_id === (int)$user_id) {
+        echo json_encode(['success' => false, 'error' => 'You cannot upvote your own answer.']);
+        exit;
+    }
+    $vote = $db->prepare("INSERT OR IGNORE INTO reactions (user_id, target_type, target_id, reaction_type) VALUES (?, 'answer', ?, 'upvote')");
+    $vote->execute([$user_id, $answer_id]);
+    if ($vote->rowCount() === 0) {
+        echo json_encode(['success' => false, 'error' => 'You have already upvoted this answer.']);
+        exit;
+    }
     $stmt = $db->prepare("UPDATE answers SET upvotes = upvotes + 1 WHERE id = ?");
     if ($stmt->execute([$answer_id])) {
         // Award reputation to answer author for upvotes
-        $stmt = $db->prepare("SELECT user_id FROM answers WHERE id = ?");
-        $stmt->execute([$answer_id]);
-        $author_id = $stmt->fetchColumn();
         if ($author_id) {
             awardReputation($author_id, 1, 'Received an upvote');
         }
@@ -325,6 +343,12 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                         <span class="answers-count"><i class="fas fa-comments"></i> <?php echo number_format($single_question['answers_count'] ?? 0); ?></span>
                     </div>
                     <div class="question-body"><?php echo nl2br(htmlspecialchars($single_question['body'])); ?></div>
+                    <?php if ($user_id && (int)$single_question['user_id'] === (int)$user_id): // F149: the edit/delete pages existed but nothing linked to them ?>
+                        <div class="question-owner-actions" style="margin-top:12px;display:flex;gap:8px;">
+                            <a href="<?php echo SITE_URL; ?>/community_edit.php?id=<?php echo (int)$single_question['id']; ?>" class="btn btn-sm btn-outline">✏️ Edit question</a>
+                            <a href="<?php echo SITE_URL; ?>/community_delete.php?id=<?php echo (int)$single_question['id']; ?>" class="btn btn-sm btn-danger">🗑️ Delete</a>
+                        </div>
+                    <?php endif; ?>
                     <?php
                     $stmt = $db->prepare("
                         SELECT t.name FROM tags t

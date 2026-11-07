@@ -42,33 +42,47 @@ if (isLoggedIn()) {
  * ALTER TABLE videos ADD COLUMN likes INT DEFAULT 0, ADD COLUMN dislikes INT DEFAULT 0;
 */
 
-$currentUserLiked = false;
-$currentUserDisliked = false;
-$likeCount = $video['likes'] ?? rand(100, 500); // Fallback if column missing
-$dislikeCount = $video['dislikes'] ?? rand(10, 50); // Fallback if column missing
-
+// F62: real counts from video_reactions (they used to be rand() numbers).
+// F66: one reaction vocabulary for videos, like / love / pray, as on videos.php and in the
+// table's CHECK constraint (this page used like / dislike). Decision D-G2.
+function aw_video_reaction_counts($db, $video_id) {
+    $counts = ['like' => 0, 'love' => 0, 'pray' => 0];
+    $rc = $db->prepare("SELECT reaction_type, COUNT(*) FROM video_reactions WHERE video_id = ? GROUP BY reaction_type");
+    $rc->execute([$video_id]);
+    foreach ($rc->fetchAll(PDO::FETCH_KEY_PAIR) as $t => $n) {
+        if (isset($counts[$t])) $counts[$t] = (int)$n;
+    }
+    return $counts;
+}
+$reactionCounts = aw_video_reaction_counts($db, $id);
+$myReaction = null;
 if (isLoggedIn()) {
     $stmt = $db->prepare("SELECT reaction_type FROM video_reactions WHERE video_id = ? AND user_id = ?");
     $stmt->execute([$id, $_SESSION['user_id']]);
-    $reaction = $stmt->fetchColumn();
-    if ($reaction === 'like') $currentUserLiked = true;
-    elseif ($reaction === 'dislike') $currentUserDisliked = true;
+    $myReaction = $stmt->fetchColumn() ?: null;
+    $stmt->closeCursor();
 }
 
 // ===== HANDLE AJAX LIKES =====
 if (isset($_POST['action']) && $_POST['action'] === 'react' && isLoggedIn()) {
-    $type = $_POST['type']; // 'like' or 'dislike'
-    // Just a simplified endpoint for demo. Actual Logic should handle upserts.
-    $stmt = $db->prepare("DELETE FROM video_reactions WHERE video_id = ? AND user_id = ?");
+    $type = (string)($_POST['type'] ?? '');
+    // F61: the INSERT used MySQL's ON DUPLICATE KEY UPDATE, a syntax error on SQLite, so every
+    // reaction fatalled. One reaction per member and video (UNIQUE in the table): replace it, or
+    // remove it when the same button is pressed again. The table only accepts like/love/pray.
+    if (!in_array($type, ['like', 'love', 'pray'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Unknown reaction.']);
+        exit;
+    }
+    $stmt = $db->prepare("SELECT reaction_type FROM video_reactions WHERE video_id = ? AND user_id = ?");
     $stmt->execute([$id, $_SESSION['user_id']]);
+    $prev = $stmt->fetchColumn();
+    $stmt->closeCursor();
+    $db->prepare("DELETE FROM video_reactions WHERE video_id = ? AND user_id = ?")->execute([$id, $_SESSION['user_id']]);
+    if ($prev !== $type) {
+        $db->prepare("INSERT INTO video_reactions (video_id, user_id, reaction_type) VALUES (?, ?, ?)")->execute([$id, $_SESSION['user_id'], $type]);
+    }
     
-    $stmt = $db->prepare("INSERT INTO video_reactions (video_id, user_id, reaction_type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE reaction_type = VALUES(reaction_type)");
-    $stmt->execute([$id, $_SESSION['user_id'], $type]);
-    
-    $stmt = $db->prepare("SELECT COUNT(CASE WHEN reaction_type='like' THEN 1 END) as likes, COUNT(CASE WHEN reaction_type='dislike' THEN 1 END) as dislikes FROM video_reactions WHERE video_id = ?");
-    $stmt->execute([$id]);
-    $counts = $stmt->fetch(PDO::FETCH_ASSOC);
-    echo json_encode(['success' => true, 'likes' => $counts['likes'], 'dislikes' => $counts['dislikes']]);
+    echo json_encode(['success' => true, 'counts' => aw_video_reaction_counts($db, $id), 'mine' => ($prev !== $type) ? $type : null]); // F66
     exit;
 }
 
@@ -155,12 +169,11 @@ $pageTitle = htmlspecialchars($video['title']);
                         </div>
                         <div class="meta-right">
                             <div class="like-dislike-wrapper">
-                                <button class="btn-icon like-btn <?php echo $currentUserLiked ? 'active' : ''; ?>" data-type="like">
-                                    <i class="fas fa-thumbs-up"></i> <span id="likeCount"><?php echo $likeCount; ?></span>
-                                </button>
-                                <button class="btn-icon dislike-btn <?php echo $currentUserDisliked ? 'active' : ''; ?>" data-type="dislike">
-                                    <i class="fas fa-thumbs-down"></i> <span id="dislikeCount"><?php echo $dislikeCount; ?></span>
-                                </button>
+                                <?php foreach (['like' => '👍', 'love' => '❤️', 'pray' => '🙏'] as $rt => $emoji): // F66 ?>
+                                    <button class="btn-icon reaction-btn <?php echo $myReaction === $rt ? 'active' : ''; ?>" data-type="<?php echo $rt; ?>" aria-label="<?php echo ucfirst($rt); ?>">
+                                        <?php echo $emoji; ?> <span id="count-<?php echo $rt; ?>"><?php echo $reactionCounts[$rt]; ?></span>
+                                    </button>
+                                <?php endforeach; ?>
                                 <button class="btn-icon share-btn" onclick="copyLink()">
                                     <i class="fas fa-share-alt"></i> Share
                                 </button>
@@ -278,40 +291,29 @@ document.addEventListener('DOMContentLoaded', function() {
         settings: ['speed', 'quality']
     });
 
-    // ===== LIKE / DISLIKE AJAX =====
-    const likeBtn = document.querySelector('.like-btn');
-    const dislikeBtn = document.querySelector('.dislike-btn');
-    const likeCountEl = document.getElementById('likeCount');
-    const dislikeCountEl = document.getElementById('dislikeCount');
-
-    function handleReaction(type, btnElement) {
-        if (!<?php echo isLoggedIn() ? 'true' : 'false'; ?>) {
-            alert('Please login to react to this video.');
-            return;
-        }
-        fetch('', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=react&type=' + type
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.success) {
-                likeCountEl.textContent = data.likes;
-                dislikeCountEl.textContent = data.dislikes;
-                if(type === 'like') {
-                    likeBtn.classList.toggle('active');
-                    if(dislikeBtn.classList.contains('active')) dislikeBtn.classList.remove('active');
-                } else {
-                    dislikeBtn.classList.toggle('active');
-                    if(likeBtn.classList.contains('active')) likeBtn.classList.remove('active');
-                }
+    // ===== REACTIONS (F66: like / love / pray) =====
+    document.querySelectorAll('.reaction-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!<?php echo isLoggedIn() ? 'true' : 'false'; ?>) {
+                alert('Please login to react to this video.');
+                return;
             }
+            fetch('', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=react&type=' + encodeURIComponent(btn.dataset.type)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) return;
+                document.querySelectorAll('.reaction-btn').forEach(function (b) {
+                    const t = b.dataset.type;
+                    document.getElementById('count-' + t).textContent = data.counts[t];
+                    b.classList.toggle('active', data.mine === t);
+                });
+            });
         });
-    }
-
-    likeBtn.addEventListener('click', function() { handleReaction('like', this); });
-    dislikeBtn.addEventListener('click', function() { handleReaction('dislike', this); });
+    });
 
     // ===== SHARE BUTTON =====
     window.copyLink = function() {

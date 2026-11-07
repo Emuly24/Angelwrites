@@ -71,14 +71,14 @@ try {
                    (SELECT COUNT(*) FROM review_reactions WHERE review_id = r.id AND reaction_type = 'pray') as prays
             FROM reviews r
             JOIN users u ON r.user_id = u.id
-            WHERE r.target_type = 'book' AND r.target_id = ?
+            WHERE r.target_type = 'book' AND r.target_id = ? AND r.deleted_at IS NULL -- F157: reviews deleted by the admin
             ORDER BY r.created_at DESC
         ");
         $stmt->execute([$book_id]);
         $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Average rating
-        $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'book' AND target_id = ?");
+        $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'book' AND target_id = ? AND deleted_at IS NULL"); // F157
         $stmt->execute([$book_id]);
         $rating_data = $stmt->fetch(PDO::FETCH_ASSOC);
         $avg_rating = round($rating_data['avg_rating'] ?? 0, 1);
@@ -95,11 +95,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     
     if ($rating >= 1 && $rating <= 5 && !empty($comment)) {
         try {
-            $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute(['book', $book_id, $_SESSION['user_id'], $rating, $comment]);
+            // F93: one review per member and book. A member could post any number of reviews of
+            // the same book (each counted in the average); a second submission now updates theirs.
+            $ex = $db->prepare("SELECT id FROM reviews WHERE target_type = 'book' AND target_id = ? AND user_id = ?
+                                AND parent_id IS NULL AND deleted_at IS NULL ORDER BY id LIMIT 1");
+            $ex->execute([$book_id, $_SESSION['user_id']]);
+            $existing_review = $ex->fetchColumn();
+            $ex->closeCursor();
+            if ($existing_review) {
+                $db->prepare("UPDATE reviews SET rating = ?, comment = ? WHERE id = ?")->execute([$rating, $comment, $existing_review]);
+            } else {
+                $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute(['book', $book_id, $_SESSION['user_id'], $rating, $comment]);
+            }
             
-            // Award reputation points (if function exists)
-            if (function_exists('awardReputation')) {
+            // Award reputation points (if function exists) – first review only (F93)
+            if (!$existing_review && function_exists('awardReputation')) {
                 awardReputation($_SESSION['user_id'], 3, 'Reviewed a book');
             }
             
@@ -252,6 +263,7 @@ $pageTitle = htmlspecialchars($book['title']);
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
+                    <p style="text-align:center;margin-top:8px;"><a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>">👥 Reading groups for this book</a></p><!-- F51 -->
                     <?php if (isLoggedIn()):
                         // F111: add this book to the member's library from its own page (the catalogue
                         // and book page had no way to do so). Posts to library.php's existing handler.

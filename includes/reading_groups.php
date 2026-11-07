@@ -64,14 +64,14 @@ function getUserGroups($user_id) {
         SELECT g.*,
                b.title as book_title, b.author as book_author,
                p.title as poem_title, p.author as poem_author,
-               n.title as newsletter_title, n.author as newsletter_author,
+               n.subject as newsletter_title, NULL as newsletter_author,
                (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
                (SELECT COUNT(*) FROM group_notes WHERE group_id = g.id) as note_count,
                (SELECT COUNT(*) FROM group_discussions WHERE group_id = g.id) as discussion_count
         FROM reading_groups g
         LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
         LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
-        LEFT JOIN newsletters n ON g.content_type = 'newsletter' AND g.content_id = n.id
+        LEFT JOIN newsletter_archive n ON g.content_type = 'newsletter' AND g.content_id = n.id -- F48: sent newsletters live here; 'newsletters' is an empty, unused table
         JOIN group_members m ON g.id = m.group_id
         WHERE m.user_id = ?
         ORDER BY g.created_at DESC
@@ -87,13 +87,13 @@ function getGroupDetails($group_id, $user_id) {
         SELECT g.*,
                b.title as book_title, b.author as book_author,
                p.title as poem_title, p.author as poem_author,
-               n.title as newsletter_title, n.author as newsletter_author,
+               n.subject as newsletter_title, NULL as newsletter_author,
                (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count,
                (SELECT role FROM group_members WHERE group_id = g.id AND user_id = ?) as user_role
         FROM reading_groups g
         LEFT JOIN books b ON g.content_type = 'book' AND g.content_id = b.id
         LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
-        LEFT JOIN newsletters n ON g.content_type = 'newsletter' AND g.content_id = n.id
+        LEFT JOIN newsletter_archive n ON g.content_type = 'newsletter' AND g.content_id = n.id -- F48: sent newsletters live here; 'newsletters' is an empty, unused table
         WHERE g.id = ?
     ");
     $stmt->execute([$user_id, $group_id]);
