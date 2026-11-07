@@ -44,7 +44,7 @@ if ($provider) {
     try {
         $adapter = $hybridauth->authenticate($provider);
         $userProfile = $adapter->getUserProfile();
-        $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE");
         $stmt->execute([$userProfile->email]);
         $user = $stmt->fetch();
         if ($user) {

@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $first_name = trim($_POST['first_name']);
     $last_name = trim($_POST['last_name']);
     $username = trim($_POST['username']);
-    $email = trim($_POST['email']);
+    $email = strtolower(trim($_POST['email'])); // VF1: stored in lower case; every lookup ignores case
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     $gender = $_POST['gender'] ?? '';
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         $error = 'Passwords do not match.';
     } else {
         // Check if email already exists
-        $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE");
         $stmt->execute([$email]);
         if ($stmt->fetch()) {
             $error = 'This email is already registered. You already have an account. Please <a href="login.php">go to login</a>.';
@@ -342,17 +342,17 @@ $pageTitle = 'Sign Up';
                             Please check your inbox, enter the code on the verification page to activate your account.
                             <?php else: ?>
                             <strong>Your account is created, but we couldn't send the verification email just now.</strong>
-                            Please use <a href="<?php echo SITE_URL; ?>/resend_verification.php">Request a new code</a> in a few minutes.
+                            Please use <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>">Request a new code</a> in a few minutes.
                             <?php endif; ?>
                         </p>
                         <div class="success-actions">
-                            <a href="<?php echo SITE_URL; ?>/verify.php" class="btn btn-primary btn-block">
+                            <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>" class="btn btn-primary btn-block">
                                 <i class="fas fa-sign-in-alt"></i>
                                 Go to Verification
                             </a>
                             <p class="small-note">
                                 📧 Didn't receive the email? Check your spam folder or 
-                                <a href="<?php echo SITE_URL; ?>/verify.php">Request a new code</a>.
+                                <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>">Request a new code</a>.
                             </p>
                         </div>
                     </div>
@@ -365,6 +365,9 @@ $pageTitle = 'Sign Up';
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // VF2: the "Account Created" screen has no form; the form scripts below must not run there
+    if (!document.getElementById('password')) return;
+
     // ===== GENERATE STRONG PASSWORD =====
     const genBtn = document.getElementById('generatePassword');
     const passwordInput = document.getElementById('password');

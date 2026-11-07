@@ -41,20 +41,25 @@ if ($attempts >= 5) {
     $error = 'Too many verification attempts. Please wait 15 minutes and try again.';
 }
 
+// VF2: answers for the page's own scripts are JSON, so the visitor sees the real result
+$aw_ajax = ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['ajax']));
+$aw_notice = '';
+
 // ===== HANDLE VERIFICATION (AJAX or POST) =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
+// VF2: "Resend Code" posts no code, so it used to fail here with "Please fill in all fields" first
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error && !isset($_POST['resend_code'])) {
     $email = trim($_POST['email'] ?? '');
     $code = trim($_POST['code'] ?? '');
 
     if (empty($email) || empty($code)) {
         $error = 'Please fill in all fields.';
     } else {
-        $stmt = $db->prepare("SELECT id, verification_code, verification_code_expiry, is_verified, name FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, verification_code, verification_code_expiry, is_verified, name FROM users WHERE email = ? COLLATE NOCASE ORDER BY is_verified ASC, id DESC LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            $error = 'No account found with that email address.';
+            $error = 'We could not find an account for that email address. Please check the spelling, or create an account first.';
         } elseif ($user['is_verified'] == 1) {
             $success = true;
         } elseif ($user['verification_code'] === null || $user['verification_code'] === '') {
@@ -106,14 +111,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Invalid email address.';
     } else {
-        $stmt = $db->prepare("SELECT id, first_name, is_verified FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, first_name, is_verified, verification_code_expiry FROM users WHERE email = ? COLLATE NOCASE ORDER BY is_verified ASC, id DESC LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            $error = 'No account found with that email address.';
+            $error = 'We could not find an account for that email address. Please check the spelling, or create an account first.';
         } elseif ($user['is_verified'] == 1) {
             $success = true;
+            $aw_notice = 'This account is already verified. You can log in.';
+        } elseif (!empty($user['verification_code_expiry']) && strtotime($user['verification_code_expiry']) > strtotime('+24 hours') - 60) {
+            // VF2: one new code per minute per account (the 60-second wait was only in the browser)
+            $error = 'A code was sent less than a minute ago. Please check your inbox (and spam folder) or try again in a minute.';
         } else {
             // Generate new 6-digit code
             $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -138,10 +147,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
             if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
                 $resend_success = true;
             } else {
-                $error = "Failed to send verification code. Please try again later.";
+                // VF2: say plainly that the email did not go, and what to do instead
+                $error = "We could not send the email just now. Please try again in a few minutes, or contact us and we will verify your account for you.";
             }
         }
     }
+}
+
+if ($aw_ajax) {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($success) {
+        echo json_encode(['ok' => true, 'verified' => true, 'message' => $aw_notice ?: 'Your account has been verified.']);
+    } elseif ($resend_success) {
+        echo json_encode(['ok' => true, 'verified' => false, 'message' => 'A new verification code has been sent to ' . $email . '. Please check your inbox and spam folder.']);
+    } else {
+        echo json_encode(['ok' => false, 'verified' => false, 'message' => $error ?: 'Something went wrong. Please try again.']);
+    }
+    exit;
 }
 
 $pageTitle = 'Verify Account';
@@ -170,6 +192,7 @@ $pageTitle = 'Verify Account';
                 <?php endif; ?>
 
                 <?php if (!$success): ?>
+                    <div id="verifyMsg" role="status" aria-live="polite" hidden></div><!-- VF2 -->
                     <form method="POST" action="" class="auth-form" id="verifyForm">
                         <div class="form-group">
                             <label for="email">Email Address</label>
@@ -200,9 +223,15 @@ $pageTitle = 'Verify Account';
                         <h2>Account Verified! 🎉</h2>
                         <p class="success-message">Your account has been successfully verified. You can now log in and start exploring AngelWrites.</p>
                         <div class="success-actions">
+                            <?php if (isLoggedIn()): /* VF2: verifying signs the member in */ ?>
+                            <a href="<?php echo SITE_URL; ?>/library.php" class="btn btn-primary btn-block">
+                                <i class="fas fa-book-open"></i> Start exploring
+                            </a>
+                            <?php else: ?>
                             <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-primary btn-block">
                                 <i class="fas fa-sign-in-alt"></i> Log In Now
                             </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -234,58 +263,74 @@ document.addEventListener('DOMContentLoaded', function() {
         const scrollTop = window.scrollY;
         const docHeight = document.documentElement.scrollHeight - window.innerHeight;
         const scrollPercent = (scrollTop / docHeight) * 100;
-        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
+        const pb = document.getElementById('readingProgressBar'); if (pb) pb.style.width = scrollPercent + '%';
     });
 
     // ===== AJAX VERIFICATION =====
+    // VF2: the page used to reload after a failed attempt, which wiped the error message, and
+    // "Resend Code" always said "sent" whatever happened. Both now show the server's real answer.
     const verifyForm = document.getElementById('verifyForm');
     const verifyBtn = document.getElementById('verifyBtn');
     const codeInput = document.getElementById('code');
     const codeStatus = document.getElementById('codeStatus');
+    const msgBox = document.getElementById('verifyMsg');
+    const verifyBtnHtml = verifyBtn ? verifyBtn.innerHTML : '';
 
-    verifyForm.addEventListener('submit', function(e) {
+    function showMsg(text, ok) {
+        if (!msgBox) { alert(text); return; }
+        msgBox.className = 'alert ' + (ok ? 'alert-success' : 'alert-error');
+        msgBox.textContent = text;
+        msgBox.hidden = false;
+        msgBox.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function post(fields) {
+        const fd = new FormData();
+        Object.keys(fields).forEach(k => fd.append(k, fields[k]));
+        fd.append('ajax', '1');
+        return fetch('<?php echo SITE_URL; ?>/verify.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(r => r.json());
+    }
+
+    function showVerified() {
+        const card = document.querySelector('.auth-card');
+        if (!card) { location.href = '<?php echo SITE_URL; ?>/library.php'; return; }
+        card.innerHTML = '<div class="success-popup"><div class="success-icon"><i class="fas fa-check-circle"></i></div>' +
+            '<h2>Account Verified! 🎉</h2><p class="success-message">Welcome to AngelWrites. You are now signed in.</p>' +
+            '<div class="success-actions"><a href="<?php echo SITE_URL; ?>/library.php" class="btn btn-primary btn-block">' +
+            '<i class="fas fa-book-open"></i> Start exploring</a></div></div>';
+    }
+
+    if (verifyForm) verifyForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const email = document.getElementById('email').value.trim();
         const code = codeInput.value.trim();
 
         if (email.length === 0 || code.length === 0) {
-            alert('Please fill in all fields.');
+            showMsg('Please enter your email address and the 6-digit code.', false);
             return;
         }
 
         verifyBtn.disabled = true;
         verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
-        codeStatus.textContent = '';
+        if (codeStatus) codeStatus.textContent = '';
 
-        const formData = new FormData();
-        formData.append('email', email);
-        formData.append('code', code);
-
-        fetch('<?php echo SITE_URL; ?>/verify.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(r => r.text())
-        .then(html => {
-            // Check if the response contains the success popup
-            if (html.includes('success-popup')) {
-                document.querySelector('.auth-card').innerHTML = new DOMParser()
-                    .parseFromString(html, 'text/html')
-                    .querySelector('.auth-card').innerHTML;
-            } else {
-                // Reload the page to show error
-                location.reload();
-            }
-        })
-        .catch(() => {
-            verifyBtn.disabled = false;
-            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Account';
-            alert('Verification failed. Please try again.');
-        });
+        post({ email: email, code: code })
+            .then(res => {
+                if (res.verified) { showVerified(); return; }
+                showMsg(res.message, false);
+                verifyBtn.disabled = false;
+                verifyBtn.innerHTML = verifyBtnHtml;
+            })
+            .catch(() => {
+                verifyBtn.disabled = false;
+                verifyBtn.innerHTML = verifyBtnHtml;
+                showMsg('We could not reach the server. Please check your connection and try again.', false);
+            });
     });
 
     // ===== CODE INPUT VALIDATION =====
-    codeInput.addEventListener('input', function() {
+    if (codeInput) codeInput.addEventListener('input', function() {
         const code = this.value.trim();
         if (code.length === 6 && /^\d{6}$/.test(code)) {
             codeStatus.textContent = '✅ Valid format';
@@ -305,18 +350,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let countdown = 0;
     let timerInterval = null;
 
-    resendBtn.addEventListener('click', function() {
-        const email = document.getElementById('email').value.trim();
-        if (email.length === 0 || !email.includes('@')) {
-            alert('Please enter a valid email address.');
-            return;
-        }
-
-        // Start countdown timer
+    function startCountdown() {
         countdown = 60;
         resendBtn.disabled = true;
         updateTimer();
-
+        clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             countdown--;
             updateTimer();
@@ -326,22 +364,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 resendTimer.textContent = 'You can now request a new code.';
             }
         }, 1000);
+    }
 
-        // Submit resend
-        const formData = new FormData();
-        formData.append('email', email);
-        formData.append('resend_code', '1');
-
-        fetch('<?php echo SITE_URL; ?>/verify.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(() => {
-            alert('A new verification code has been sent to your email address.');
-        })
-        .catch(() => {
-            alert('Failed to resend code. Please try again.');
-        });
+    if (resendBtn) resendBtn.addEventListener('click', function() {
+        const email = document.getElementById('email').value.trim();
+        if (email.length === 0 || !email.includes('@')) {
+            showMsg('Please enter the email address you registered with, then press Resend Code.', false);
+            document.getElementById('email').focus();
+            return;
+        }
+        resendBtn.disabled = true;
+        resendTimer.textContent = 'Sending…';
+        post({ email: email, resend_code: '1' })
+            .then(res => {
+                if (res.verified) { showMsg(res.message, true); resendTimer.textContent = ''; resendBtn.disabled = false; return; }
+                showMsg(res.message, res.ok);
+                if (res.ok) { startCountdown(); } else { resendBtn.disabled = false; resendTimer.textContent = ''; }
+            })
+            .catch(() => {
+                resendBtn.disabled = false;
+                resendTimer.textContent = '';
+                showMsg('We could not reach the server. Please check your connection and try again.', false);
+            });
     });
 
     function updateTimer() {

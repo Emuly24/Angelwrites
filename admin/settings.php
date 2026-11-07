@@ -3,6 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
+require_once '../includes/csrf.php'; // VF3
 
 redirectIfNotAdmin();
 
@@ -85,6 +86,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     }
 }
 
+// ===== VF3: EMAIL DELIVERY CHECK =====
+// Members reported verification codes not arriving. This sends a real test email and shows the
+// exact reason when it fails, plus the last failures the site recorded.
+$aw_mail_test = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test_email'])) {
+    $aw_to = trim($_POST['test_to'] ?? '');
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $aw_mail_test = ['ok' => false, 'msg' => 'Your session expired. Please reload the page and try again.'];
+    } elseif (!filter_var($aw_to, FILTER_VALIDATE_EMAIL)) {
+        $aw_mail_test = ['ok' => false, 'msg' => 'Please enter a valid email address to send the test to.'];
+    } else {
+        $sent = sendEmail($aw_to, 'AngelWrites test email',
+            "Hello,\n\nThis is a test from AngelWrites (Admin > Settings > Email). If you can read this, verification codes and other emails can be delivered.\n\n— AngelWrites",
+            'angelwrites@zohomail.com', 'AngelWrites');
+        $aw_mail_test = $sent
+            ? ['ok' => true, 'msg' => 'Test email sent to ' . $aw_to . '. If it does not arrive within a few minutes, check the spam folder.']
+            : ['ok' => false, 'msg' => 'The test email could not be sent. Reason: ' . ($GLOBALS['aw_mail_last_error'] ?? 'unknown')];
+    }
+}
+$aw_smtp_user = (string)getenv('GMAIL_USERNAME');
+$aw_smtp_ready = $aw_smtp_user !== '' && (string)getenv('GMAIL_APP_PASSWORD') !== '';
+$aw_smtp_shown = $aw_smtp_user !== '' ? preg_replace('/^(.).*(@.*)$/', '$1•••$2', $aw_smtp_user) : '';
+$aw_mail_failures = aw_mail_recent_failures(10);
+
 $pageTitle = 'Site Settings';
 ?>
 <?php require_once '../includes/header.php'; ?>
@@ -116,6 +141,7 @@ $pageTitle = 'Site Settings';
         <div class="settings-tabs">
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
+            <button class="tab-btn<?php echo $aw_mail_test ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
         </div>
 
         <!-- ===== GENERAL TAB ===== -->
@@ -210,6 +236,60 @@ $pageTitle = 'Site Settings';
                 </div>
             </div>
         </div>
+
+        <!-- ===== VF3: EMAIL TAB ===== -->
+        <div class="tab-content" id="tab-email">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-envelope-circle-check"></i> Email delivery</h2>
+                </div>
+                <div class="card-body">
+                    <?php if ($aw_smtp_ready): ?>
+                        <div class="alert alert-success">Email is set up. Messages are sent through Gmail as <strong><?php echo htmlspecialchars($aw_smtp_shown); ?></strong>.</div>
+                    <?php else: ?>
+                        <div class="alert alert-error">Email is not set up on the server: <code>GMAIL_USERNAME</code> and/or <code>GMAIL_APP_PASSWORD</code> are missing from the <code>.env</code> file in the site folder. Until they are added, no verification codes or other emails can be sent.</div>
+                    <?php endif; ?>
+
+                    <?php if ($aw_mail_test): ?>
+                        <div class="alert <?php echo $aw_mail_test['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_mail_test['msg']); ?></div>
+                    <?php endif; ?>
+
+                    <form method="POST" class="admin-form" style="margin-top:12px;">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <div class="form-group">
+                            <label for="test_to">Send a test email to</label>
+                            <input type="email" id="test_to" name="test_to" value="<?php echo htmlspecialchars($_POST['test_to'] ?? $admin_email); ?>" required>
+                            <small class="field-hint">If it fails, the reason is shown here, word for word.</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" name="send_test_email" value="1" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send test email</button>
+                        </div>
+                    </form>
+
+                    <h3 style="margin:28px 0 10px;">Recent failed emails</h3>
+                    <?php if (!$aw_mail_failures): ?>
+                        <p class="no-items">No failed emails recorded.</p>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="admin-table">
+                                <thead><tr><th>When</th><th>To</th><th>Subject</th><th>Reason</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($aw_mail_failures as $f): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($f['at'] ?? ''); ?></td>
+                                        <td><?php echo htmlspecialchars($f['to'] ?? ''); ?></td>
+                                        <td><?php echo htmlspecialchars($f['subject'] ?? ''); ?></td>
+                                        <td style="white-space:normal;max-width:420px;"><?php echo htmlspecialchars($f['error'] ?? ''); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                    <p class="field-hint" style="margin-top:14px;">Members who cannot get a code can be verified by hand in <a href="<?php echo SITE_URL; ?>/admin/manage_users.php?filter=unverified">Manage Users › Unverified</a>.</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -219,6 +299,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===== TABS =====
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
+    // VF3: after a test email, show the Email tab with its result
+    const awEmailTab = document.querySelector('.tab-btn.aw-open-email');
+    if (awEmailTab) setTimeout(() => awEmailTab.click(), 0);
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', function() {
