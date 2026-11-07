@@ -463,11 +463,10 @@ html,body { height:100%; width:100%; overflow:hidden; }
 
     <!-- Reaction Picker -->
     <div id="reaction-picker" style="position:fixed;bottom:80px;right:20px;z-index:100002;display:none;background:var(--card-bg);border-radius:16px;padding:8px 12px;box-shadow:0 8px 30px rgba(0,0,0,0.15);border:1px solid var(--rose-light);gap:6px;align-items:center;pointer-events:auto;">
-        <button onclick="reactNote(currentNoteId, '❤️')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">❤️</button>
-        <button onclick="reactNote(currentNoteId, '🙏')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">🙏</button>
-        <button onclick="reactNote(currentNoteId, '🔥')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">🔥</button>
-        <button onclick="reactNote(currentNoteId, '📖')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">📖</button>
-        <button onclick="reactNote(currentNoteId, '💔')" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">💔</button>
+        <!-- Q36: the same three reactions as the rest of the site (like / love / pray) -->
+        <button onclick="reactNote(currentNoteId, '👍')" aria-label="Like" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">👍</button>
+        <button onclick="reactNote(currentNoteId, '❤️')" aria-label="Love" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">❤️</button>
+        <button onclick="reactNote(currentNoteId, '🙏')" aria-label="Pray" style="font-size:1.4rem;background:transparent;border:none;cursor:pointer;">🙏</button>
         <button onclick="document.getElementById('reaction-picker').style.display='none'" style="font-size:0.9rem;background:transparent;border:none;cursor:pointer;color:var(--text-light);">✕</button>
     </div>
 

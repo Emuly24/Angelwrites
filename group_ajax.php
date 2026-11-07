@@ -210,9 +210,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($action === 'add_reaction') {
-        $target_type = $_POST['target_type'];
-        $target_id = (int)$_POST['target_id'];
-        $reaction_type = $_POST['reaction_type'];
+        $target_type = (string)($_POST['target_type'] ?? '');
+        $target_id = (int)($_POST['target_id'] ?? 0);
+        $reaction_type = (string)($_POST['reaction_type'] ?? '');
+        // F238: any text was stored as the reaction and group.php printed it unescaped, so a member
+        // could plant HTML/script that ran for everyone viewing the group. Only the site's reactions
+        // (like / love / pray, Q36) and the group's real target types are accepted now.
+        $aw_names = ['like' => '👍', 'love' => '❤️', 'pray' => '🙏'];
+        if (isset($aw_names[$reaction_type])) $reaction_type = $aw_names[$reaction_type];
+        if (!in_array($target_type, ['discussion', 'note', 'reply'], true) || $target_id <= 0 || !in_array($reaction_type, $aw_names, true)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid reaction.']);
+            exit;
+        }
         addReaction($target_type, $target_id, $user_id, $reaction_type);
         echo json_encode(['success' => true]);
         exit;

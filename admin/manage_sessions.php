@@ -20,7 +20,7 @@ function aw_notify_session_member($db, $session_id, $status) {
     if (!in_array($status, ['confirmed', 'cancelled'], true)) return;
     require_once __DIR__ . '/../includes/mail_helper.php';
     require_once __DIR__ . '/../includes/notifications.php';
-    $st = $db->prepare("SELECT s.date, s.time, s.timezone, u.id AS uid, u.email, u.name, u.first_name, u.last_name, u.username
+    $st = $db->prepare("SELECT s.date, s.time, s.timezone, s.meeting_details, u.id AS uid, u.email, u.name, u.first_name, u.last_name, u.username
                         FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?");
     $st->execute([(int)$session_id]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -29,7 +29,7 @@ function aw_notify_session_member($db, $session_id, $status) {
     $when = $row['date'] . ' at ' . $row['time'] . (!empty($row['timezone']) ? ' (' . $row['timezone'] . ')' : '');
     $title = $status === 'confirmed' ? 'Your session is confirmed' : 'Your session was cancelled';
     $text = $status === 'confirmed'
-        ? "Angella has confirmed your session on $when."
+        ? "Angella has confirmed your session on $when." . (!empty($row['meeting_details']) ? ' Where / how: ' . $row['meeting_details'] : '') // Q40
         : "Your session on $when has been cancelled. You are welcome to book another time.";
     awNotify($db, $row['uid'], 'session_' . $status, $title, $text, SITE_URL . '/book_session.php');
     if (!empty($row['email'])) {
@@ -47,6 +47,15 @@ if (isset($_POST['update_status'])) {
     if (in_array($status, $valid_statuses)) {
         $stmt = $db->prepare("UPDATE sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         $stmt->execute([$status, $session_id]);
+        // Q40: where / how the session takes place (link or place), asked when confirming.
+        if ($status === 'confirmed' && isset($_POST['meeting_details'])) {
+            $md = mb_substr(trim((string)$_POST['meeting_details']), 0, 500);
+            try {
+                $db->prepare("UPDATE sessions SET meeting_details = ? WHERE id = ?")->execute([$md !== '' ? $md : null, $session_id]);
+            } catch (PDOException $e) {
+                error_log('meeting_details: ' . $e->getMessage()); // column added by schema version 6
+            }
+        }
         aw_notify_session_member($db, $session_id, $status); // F188
         $success = 'Session status updated successfully.';
     } else {
@@ -254,7 +263,8 @@ $pageTitle = 'Manage Sessions';
                                             <td>
                                                 <form method="POST" class="status-form">
                                                     <input type="hidden" name="session_id" value="<?php echo $session['id']; ?>">
-                                                    <select name="status" onchange="this.form.submit()" class="status-select <?php echo $session['status']; ?>">
+                                                    <input type="hidden" name="meeting_details" value="<?php echo htmlspecialchars((string)($session['meeting_details'] ?? '')); ?>">
+                                                    <select name="status" onchange="awSessionStatus(this)" class="status-select <?php echo $session['status']; ?>">
                                                         <option value="pending" <?php echo $session['status'] === 'pending' ? 'selected' : ''; ?>>Pending</option>
                                                         <option value="confirmed" <?php echo $session['status'] === 'confirmed' ? 'selected' : ''; ?>>Confirmed</option>
                                                         <option value="completed" <?php echo $session['status'] === 'completed' ? 'selected' : ''; ?>>Completed</option>
@@ -426,4 +436,17 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
+<script>
+// Q40: when confirming, ask where / how the session takes place; it is sent to the member.
+function awSessionStatus(sel) {
+    const f = sel.form;
+    if (sel.value === 'confirmed') {
+        const cur = f.elements['meeting_details'].value;
+        const v = prompt('Where or how will this session take place? (meeting link, phone number or place; optional, sent to the member)', cur);
+        if (v === null) { sel.value = sel.querySelector('option[selected]') ? sel.querySelector('option[selected]').value : 'pending'; return; }
+        f.elements['meeting_details'].value = v;
+    }
+    f.submit();
+}
+</script>
 <?php require_once '../includes/footer.php'; ?>

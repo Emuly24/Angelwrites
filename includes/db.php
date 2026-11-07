@@ -337,6 +337,18 @@ try {
         }
     }
 
+    // Q40: confirmed sessions had nowhere to record where or how they take place. Schema version 6
+    // adds sessions.meeting_details (a link or a place), recorded once version 5 has been.
+    if ($aw_schema_version < 6 && (int)$db->query('PRAGMA user_version')->fetchColumn() >= 5) {
+        $aw_cols = $db->query("PRAGMA table_info(sessions)")->fetchAll(PDO::FETCH_COLUMN, 1);
+        if ($aw_cols && !in_array('meeting_details', $aw_cols, true)) {
+            $db->exec('ALTER TABLE sessions ADD COLUMN meeting_details TEXT');
+        }
+        if ($aw_cols) {
+            $db->exec('PRAGMA user_version = 6');
+        }
+    }
+
     // Q50: daily clean-up of tables that only grow (see includes/housekeeping.php).
     if (mt_rand(1, 100) === 1) {
         require_once __DIR__ . '/housekeeping.php';

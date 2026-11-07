@@ -10,7 +10,7 @@ $message = '';
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'forgot_password_attempts_' . $ip;
-$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$attempts_file = aw_ratelimit_file($limit_key) /* Q49 */;
 if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
     $error = 'Please wait 5 minutes before requesting another reset code.';
 }
@@ -73,7 +73,7 @@ $pageTitle = 'Forgot Password';
                 <?php if ($message): ?>
                     <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
                     <div class="success-actions" style="text-align: center; margin-top: 16px;">
-                        <a href="<?php echo SITE_URL; ?>/reset_password.php" class="btn btn-primary">Go to Reset Password</a>
+                        <a href="<?php echo SITE_URL; ?>/reset_password.php<?php echo !empty($email) ? '?email=' . urlencode($email) : ''; ?>" class="btn btn-primary">Enter the code</a><!-- Q25 -->
                     </div>
                 <?php endif; ?>
 

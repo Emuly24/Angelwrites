@@ -42,7 +42,7 @@ $login_value = isset($_POST['login']) ? trim($_POST['login']) : '';
 // ===== RATE LIMITING (FILE-BASED) =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'login_attempts_' . $ip;
-$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$attempts_file = aw_ratelimit_file($limit_key) /* Q49 */;
 $attempts = 0;
 $last_attempt = 0;
 

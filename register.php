@@ -20,7 +20,7 @@ $success = false;
 // ===== RATE LIMITING =====
 $ip = $_SERVER['REMOTE_ADDR'];
 $limit_key = 'register_attempts_' . $ip;
-$attempts_file = sys_get_temp_dir() . '/' . $limit_key . '.tmp';
+$attempts_file = aw_ratelimit_file($limit_key) /* Q49 */;
 if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
     $error = 'Please wait 5 minutes before trying to register again.';
 }
@@ -102,8 +102,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     }
 
     // Validation
-    if (empty($first_name) || empty($last_name) || empty($username) || empty($email) || empty($password) || empty($confirm_password) || empty($gender) || empty($country) || empty($contact) || empty($dob) || empty($referral_source)) {
-        $error = 'Please fill in all fields.';
+    // Q24 (decision D-Q2): only name, username, email and password are required to join. Gender, date
+    // of birth, country, phone and referral source used to be required too (13 fields before reading
+    // anything); they are optional now and can be added later on the profile. Empty ones are stored as NULL.
+    foreach (['gender', 'country', 'contact', 'dob', 'referral_source'] as $aw_opt) {
+        if ($$aw_opt === '') $$aw_opt = null;
+    }
+    if (empty($first_name) || empty($last_name) || empty($username) || empty($email) || empty($password) || empty($confirm_password)) {
+        $error = 'Please fill in your first and last name, username, email and password.';
+    } elseif ($dob !== null && (!($aw_d = DateTime::createFromFormat('Y-m-d', $dob)) || $aw_d->format('Y-m-d') !== $dob || $dob > date('Y-m-d'))) {
+        $error = 'Please enter a valid date of birth, or leave it empty.';
     } elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
         $error = 'Username must be 3-20 characters (letters, numbers, underscore only).';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -239,9 +247,12 @@ $pageTitle = 'Sign Up';
                             <div id="passwordMatchStatus" class="field-status"></div>
                         </div>
 
+                        <!-- Q24: optional details, folded away so joining takes five fields -->
+                        <details class="optional-details" style="margin:12px 0;">
+                            <summary style="cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center;">More about you (optional; you can add these later on your profile)</summary>
                         <div class="form-group">
-                            <label for="gender">Gender</label>
-                            <select id="gender" name="gender" required>
+                            <label for="gender">Gender <small>(optional)</small></label>
+                            <select id="gender" name="gender">
                                 <option value="">Select your gender</option>
                                 <option value="male">Male</option>
                                 <option value="female">Female</option>
@@ -251,13 +262,13 @@ $pageTitle = 'Sign Up';
                         </div>
 
                         <div class="form-group">
-                            <label for="dob">Date of Birth</label>
-                            <input type="date" id="dob" name="dob" required>
+                            <label for="dob">Date of Birth <small>(optional)</small></label>
+                            <input type="date" id="dob" name="dob" max="<?php echo date('Y-m-d'); ?>">
                         </div>
 
                         <div class="form-group">
-                            <label for="country">Country</label>
-                            <select id="country" name="country" required>
+                            <label for="country">Country <small>(optional)</small></label>
+                            <select id="country" name="country">
                                 <option value="">Select your country</option>
                                 <?php foreach ($countries as $name => $code): ?>
                                     <option value="<?php echo htmlspecialchars($name); ?>" data-code="<?php echo htmlspecialchars($code); ?>">
@@ -268,16 +279,16 @@ $pageTitle = 'Sign Up';
                         </div>
 
                         <div class="form-group">
-                            <label for="contact">Contact Number</label>
+                            <label for="contact">Contact Number <small>(optional)</small></label>
                             <div class="contact-wrapper">
                                 <span id="countryCodeDisplay" class="country-code-display">+265</span>
-                                <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456" required>
+                                <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456">
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="referral_source">How did you hear about AngelWrites?</label>
-                            <select id="referral_source" name="referral_source" required>
+                            <label for="referral_source">How did you hear about AngelWrites? <small>(optional)</small></label>
+                            <select id="referral_source" name="referral_source">
                                 <option value="">Select a source</option>
                                 <?php foreach ($referral_sources as $source): ?>
                                     <option value="<?php echo htmlspecialchars($source); ?>"><?php echo htmlspecialchars($source); ?></option>
@@ -288,6 +299,8 @@ $pageTitle = 'Sign Up';
                                 <input type="text" id="other_referral" name="other_referral" placeholder="Where did you hear about us?">
                             </div>
                         </div>
+
+                        </details>
 
                         <div class="checkbox-group">
                             <input type="checkbox" name="terms" id="terms" required>
@@ -339,7 +352,7 @@ $pageTitle = 'Sign Up';
                             </a>
                             <p class="small-note">
                                 📧 Didn't receive the email? Check your spam folder or 
-                                <a href="<?php echo SITE_URL; ?>/resend_verification.php">Request a new code</a>.
+                                <a href="<?php echo SITE_URL; ?>/verify.php">Request a new code</a>.
                             </p>
                         </div>
                     </div>

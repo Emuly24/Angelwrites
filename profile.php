@@ -90,12 +90,19 @@ $rep_level = $rep['level'] ?? 1;
 
 // ===== UPDATE PROFILE =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
-    $name = trim($_POST['name']);
+    // Q31: sign-up asks for first and last name but this form edited a single "name", so the two
+    // could disagree (and first_name/last_name were never updated). It now edits first and last name
+    // and keeps "name" as the two together.
+    $first_name = trim((string)($_POST['first_name'] ?? ''));
+    $last_name = trim((string)($_POST['last_name'] ?? ''));
+    $name = trim($first_name . ' ' . $last_name);
     $email = trim($_POST['email']);
     $username = trim($_POST['username']);
     $gender = $_POST['gender'] ?? '';
     $country = trim($_POST['country']);
     $contact_number = trim($_POST['contact_number']);
+    // Q24: sign-up now leaves date of birth optional and says it can be added on the profile.
+    $date_of_birth = trim((string)($_POST['date_of_birth'] ?? ''));
     $bio = trim($_POST['bio']);
     $profile_pic = $user['profile_pic'] ?? '';
 
@@ -144,8 +151,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         }
     }
 
-    if (empty($name) || empty($email) || empty($username)) {
-        $error = 'Name, email, and username are required.';
+    if ($first_name === '' || $last_name === '' || empty($email) || empty($username)) {
+        $error = 'First name, last name, email and username are required.';
+    } elseif ($date_of_birth !== '' && (!($aw_d = DateTime::createFromFormat('Y-m-d', $date_of_birth)) || $aw_d->format('Y-m-d') !== $date_of_birth || $date_of_birth > date('Y-m-d'))) {
+        $error = 'Please enter a valid date of birth, or leave it empty.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
@@ -163,17 +172,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             } else {
                 $stmt = $db->prepare("
                     UPDATE users SET 
-                        name = ?, email = ?, username = ?, gender = ?, country = ?, contact_number = ?, bio = ?, profile_pic = ?, updated_at = CURRENT_TIMESTAMP
+                        name = ?, first_name = ?, last_name = ?, email = ?, username = ?, gender = ?, country = ?, contact_number = ?, date_of_birth = ?, bio = ?, profile_pic = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ");
                 // S5 (F115): the email column keeps the current address; a new address only
                 // takes effect after the code sent to it is confirmed (handler above).
-                $stmt->execute([$name, $user['email'], $username, $gender, $country, $contact_number, $bio, $profile_pic, $user_id]);
+                $stmt->execute([$name, $first_name, $last_name, $user['email'], $username, $gender, $country, $contact_number, $date_of_birth !== '' ? $date_of_birth : null, $bio, $profile_pic, $user_id]);
                 $_SESSION['name'] = $name;
                 $success = 'Profile updated successfully!';
+                // Show what was just saved (the form used to redisplay the values loaded before saving).
+                $old_user_row = $user;
+                $reload = $db->prepare("SELECT * FROM users WHERE id = ?");
+                $reload->execute([$user_id]);
+                $user = $reload->fetch(PDO::FETCH_ASSOC) ?: $user;
+                $reload->closeCursor();
 
                 // F119: old avatars were never deleted; remove the previous file once replaced.
-                $old_pic = (string)($user['profile_pic'] ?? '');
+                $old_pic = (string)($old_user_row['profile_pic'] ?? ''); // the row loaded before saving
                 if ($old_pic !== '' && $old_pic !== $profile_pic
                     && preg_match('#^assets/uploads/profiles/user_' . (int)$user_id . '[._][A-Za-z0-9_]*\.?(jpe?g|png|webp|gif)$#', $old_pic)
                     && is_file(__DIR__ . '/' . $old_pic)) {
@@ -312,9 +327,20 @@ $pageTitle = 'My Profile';
                     <input type="hidden" name="update_profile" value="1">
                     <input type="hidden" id="croppedImageData" name="cropped_image_data" value="">
                     
+                    <?php
+                    // Q31: older accounts may only have "name"; split it once to prefill the two fields.
+                    $aw_fn = (string)($user['first_name'] ?? ''); $aw_ln = (string)($user['last_name'] ?? '');
+                    if ($aw_fn === '' && $aw_ln === '' && trim((string)($user['name'] ?? '')) !== '') {
+                        $aw_parts = preg_split('/\s+/', trim($user['name']), 2); $aw_fn = $aw_parts[0]; $aw_ln = $aw_parts[1] ?? '';
+                    }
+                    ?>
                     <div class="form-group">
-                        <label for="name">Full Name</label>
-                        <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($user['name']); ?>" required>
+                        <label for="first_name">First Name</label>
+                        <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($aw_fn); ?>" autocomplete="given-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name</label>
+                        <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($aw_ln); ?>" autocomplete="family-name" required>
                     </div>
                     
                     <div class="form-group">
@@ -350,6 +376,11 @@ $pageTitle = 'My Profile';
                         <input type="text" id="contact_number" name="contact_number" value="<?php echo htmlspecialchars($user['contact_number'] ?? ''); ?>" placeholder="e.g. +265 999 123 456">
                     </div>
                     
+                    <div class="form-group">
+                        <label for="date_of_birth">Date of Birth <small>(optional)</small></label>
+                        <input type="date" id="date_of_birth" name="date_of_birth" value="<?php echo htmlspecialchars((string)($user['date_of_birth'] ?? '')); ?>" max="<?php echo date('Y-m-d'); ?>">
+                    </div>
+
                     <div class="form-group">
                         <label for="bio">Bio</label>
                         <textarea id="bio" name="bio" rows="3"><?php echo htmlspecialchars($user['bio'] ?? ''); ?></textarea>

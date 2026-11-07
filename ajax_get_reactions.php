@@ -8,7 +8,7 @@ if (!function_exists('rate_limit')) {
     function rate_limit($key, $limit = 10, $window = 60) {
         $ip = $_SERVER['REMOTE_ADDR'];
         $cache_key = 'rate_limit_' . md5($ip . '_' . $key);
-        $file = sys_get_temp_dir() . '/' . $cache_key . '.txt';
+        $file = aw_ratelimit_file($cache_key) /* Q49 */;
         $current = time();
         if (file_exists($file)) {
             $data = file_get_contents($file);
@@ -37,7 +37,9 @@ $target_type = $_GET['target_type'] ?? '';
 $target_id = (int)$_GET['target_id'] ?? 0;
 if (!$target_type || !$target_id) { exit('[]'); }
 
-$reactions = ['like','love','laugh','wow','sad','angry'];
+// Q33: poems used six reactions (like/love/laugh/wow/sad/angry) while videos, blog comments and posts
+// use like / love / pray. Poems now use the same three (only like and love had ever been used).
+$reactions = ['like','love','pray'];
 $result = [];
 
 foreach ($reactions as $r) {

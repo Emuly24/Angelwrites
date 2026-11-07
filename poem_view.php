@@ -46,7 +46,7 @@ if (!function_exists('rate_limit')) {
     function rate_limit($key, $limit = 10, $window = 60) {
         $ip = $_SERVER['REMOTE_ADDR'];
         $cache_key = 'rate_limit_' . md5($ip . '_' . $key);
-        $file = sys_get_temp_dir() . '/' . $cache_key . '.txt';
+        $file = aw_ratelimit_file($cache_key) /* Q49 */;
         $current = time();
         if (file_exists($file)) {
             $data = file_get_contents($file);
@@ -269,10 +269,7 @@ function render_comment($comment, $level = 0) {
         <div class="reaction-buttons" data-target-type="comment" data-target-id="<?php echo $comment['id']; ?>">
             <button class="reaction-btn" data-reaction="like">👍 <span class="count"><?php echo $comment['likes']; ?></span></button>
             <button class="reaction-btn" data-reaction="love">❤️ <span class="count">0</span></button>
-            <button class="reaction-btn" data-reaction="laugh">😂 <span class="count">0</span></button>
-            <button class="reaction-btn" data-reaction="wow">😮 <span class="count">0</span></button>
-            <button class="reaction-btn" data-reaction="sad">😢 <span class="count">0</span></button>
-            <button class="reaction-btn" data-reaction="angry">😡 <span class="count">0</span></button>
+            <button class="reaction-btn" data-reaction="pray">🙏 <span class="count">0</span></button><!-- Q33: like / love / pray, as on videos and blog comments -->
         </div>
         <div class="reply-link" data-comment-id="<?php echo $comment['id']; ?>">Reply</div>
         <div class="comment-reply-form" style="display:none;">
@@ -650,10 +647,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             <div class="reaction-buttons" data-target-type="poem" data-target-id="<?php echo $id; ?>">
                 <button class="reaction-btn" data-reaction="like">👍 <span class="count">0</span></button>
                 <button class="reaction-btn" data-reaction="love">❤️ <span class="count">0</span></button>
-                <button class="reaction-btn" data-reaction="laugh">😂 <span class="count">0</span></button>
-                <button class="reaction-btn" data-reaction="wow">😮 <span class="count">0</span></button>
-                <button class="reaction-btn" data-reaction="sad">😢 <span class="count">0</span></button>
-                <button class="reaction-btn" data-reaction="angry">😡 <span class="count">0</span></button>
+                <button class="reaction-btn" data-reaction="pray">🙏 <span class="count">0</span></button><!-- Q33: like / love / pray, as on videos and blog comments -->
             </div>
         </div>
 

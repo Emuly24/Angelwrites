@@ -45,4 +45,17 @@ function aw_logo_path() {
     $logo = (string)aw_setting('logo_path', '');
     return ($logo !== '' && strpos($logo, '..') === false) ? $logo : 'assets/images/logo.png';
 }
-?>
+
+// Q49: rate-limit counters (login, registration, contact, password reset) were kept in the system temp
+// folder, which on shared hosting can be shared with other sites or emptied at any time, silently
+// resetting the limits. They now live in data/ratelimit/ (not web-readable, not deployed), falling
+// back to the temp folder only if that cannot be created.
+function aw_ratelimit_file($key) {
+    $dir = __DIR__ . '/../data/ratelimit';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    $base = (is_dir($dir) && is_writable($dir)) ? $dir : sys_get_temp_dir();
+    return $base . '/' . preg_replace('/[^a-zA-Z0-9_.-]/', '_', (string)$key) . '.tmp';
+}
+

@@ -3,13 +3,8 @@
  * Authentication & Authorization Functions
  */
 
-// ===== FIX: Set custom session save path =====
-$session_path = __DIR__ . '/../tmp/sessions';
-if (!is_dir($session_path)) {
-    mkdir($session_path, 0755, true);
-}
-//session_save_path($session_path);
-// =============================================
+// Q48: a block here checked for (and created) tmp/sessions/ on every request, although the line that
+// would have used it (session_save_path) was commented out. Removed; PHP's own session path is used.
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {

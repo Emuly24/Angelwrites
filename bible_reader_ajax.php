@@ -113,7 +113,14 @@ if ($action === 'delete_note' && $user_id > 0) {
 // ===== ADD REACTION =====
 if ($action === 'add_reaction' && $user_id > 0) {
     $note_id = (int)($_POST['note_id'] ?? 0);
-    $reaction_type = sanitize($_POST['reaction_type'] ?? '');
+    // Q36: only the site's three reactions (like / love / pray), as emoji; names are accepted too.
+    // Free text used to be stored and was later placed inside an onclick attribute (unsafe).
+    $reaction_type = (string)($_POST['reaction_type'] ?? '');
+    $reaction_type = ['like' => '👍', 'love' => '❤️', 'pray' => '🙏'][$reaction_type] ?? $reaction_type;
+    if (!in_array($reaction_type, ['👍', '❤️', '🙏'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid reaction.']);
+        exit;
+    }
     
     // Check if user already reacted with this type
     $stmt = $db->prepare("SELECT id FROM bible_reactions WHERE note_id = ? AND user_id = ? AND reaction_type = ?");
@@ -133,7 +140,14 @@ if ($action === 'add_reaction' && $user_id > 0) {
 // ===== TOGGLE REACTION =====
 if ($action === 'toggle_reaction' && $user_id > 0) {
     $note_id = (int)($_POST['note_id'] ?? 0);
-    $reaction_type = sanitize($_POST['reaction_type'] ?? '');
+    // Q36: only the site's three reactions (like / love / pray), as emoji; names are accepted too.
+    // Free text used to be stored and was later placed inside an onclick attribute (unsafe).
+    $reaction_type = (string)($_POST['reaction_type'] ?? '');
+    $reaction_type = ['like' => '👍', 'love' => '❤️', 'pray' => '🙏'][$reaction_type] ?? $reaction_type;
+    if (!in_array($reaction_type, ['👍', '❤️', '🙏'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid reaction.']);
+        exit;
+    }
     
     $stmt = $db->prepare("SELECT id FROM bible_reactions WHERE note_id = ? AND user_id = ? AND reaction_type = ?");
     $stmt->execute([$note_id, $user_id, $reaction_type]);
