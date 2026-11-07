@@ -104,6 +104,7 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title><?php echo htmlspecialchars($book['title']); ?></title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" /><!-- R13: easy-to-read font -->
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
@@ -115,7 +116,14 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 .theme-paper { --bg: #EFD8D6; --card-bg: #fffdf9; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
 .theme-light { --bg: #F7F3ED; --card-bg: #ffffff; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
 .theme-dark { --bg: #1a1212; --card-bg: #2c1e1e; --text: #e8dddd; --border: #4a3a3a; --input-bg: #2c1e1e; }
+/* R13: high contrast – black on white, strong borders and darker accents (WCAG AAA text contrast) */
+.theme-contrast { --bg: #ffffff; --card-bg: #ffffff; --text: #000000; --text-light: #1a1a1a; --dark: #000000; --border: #000000; --input-bg: #ffffff; --rose: #7a1f22; --rose-dark: #5c1215; --vanilla: #f2f2f2; }
+.theme-contrast .page-content-inner, .theme-contrast .flip-page-custom { color:#000!important; background:#fff!important; }
+.theme-contrast a { text-decoration:underline; }
 .theme-sepia { --bg: #fbf3e9; --card-bg: #fdf5ec; --text: #4a3d36; --border: #d9c9b8; --input-bg: #fdf5ec; }
+/* R12: announcements for screen readers only; a clear focus ring for keyboard users */
+.aw-sr-only { position:absolute!important; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+#reader-app :focus-visible { outline:3px solid var(--rose-dark); outline-offset:2px; }
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; width:100%; overflow:hidden; }
 #reader-app { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; transition:background var(--transition), color var(--transition); }
@@ -234,6 +242,18 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .toc-list li { padding:2px 0; }
 .toc-list a { color:var(--text); text-decoration:none; display:block; padding:6px 8px; border-radius:6px; transition:all var(--transition); }
 .toc-list a:hover { background:rgba(219,161,162,0.1); color:var(--rose); }
+/* R7: contents show page numbers, where you are and what you have read */
+.toc-list a { display:flex!important; align-items:baseline; gap:8px; }
+.toc-title { flex:1; }
+.toc-page { font-size:0.8rem; color:var(--text-light); white-space:nowrap; }
+.toc-mark { width:1.1em; flex:none; color:var(--rose); }
+.toc-list a.toc-done .toc-mark::before { content:'✓'; }
+.toc-list a.toc-current { background:rgba(219,161,162,0.15); font-weight:600; }
+.toc-list a.toc-current .toc-mark::before { content:'▸'; }
+.toc-group { border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin:0 0 12px; font-size:0.9rem; background:rgba(219,161,162,0.06); }
+.toc-group a { color:var(--rose); }
+.toc-due { font-size:0.75rem; color:var(--rose); white-space:nowrap; }
+.toc-summary { font-size:0.85rem; color:var(--text-light); margin:0 0 10px; }
 .toc-empty { text-align:center; color:var(--text-light); padding:40px 0; }
 #challenge-widget { display:none; margin:8px 16px; padding:12px 16px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); z-index:100001!important; }
 #challenge-widget h4 { margin:0 0 4px; font-size:1rem; }
@@ -321,6 +341,26 @@ html,body { height:100%; width:100%; overflow:hidden; }
 </head>
 <body>
 <div id="reader-app">
+    <div id="awPageAnnounce" class="aw-sr-only" aria-live="polite" aria-atomic="true"></div><!-- R12 -->
+<?php if (!empty($preview_version)): ?>
+    <!-- R5: draft preview banner (admin only) -->
+    <div id="previewBanner" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff3cd;color:#5c4400;border-top:2px solid #e0b100;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;">
+        <strong>Preview of draft version <?php echo (int)$preview_version; ?></strong>
+        <span><?php echo $live_version ? 'Members currently read version ' . (int)$live_version . '.' : 'Members cannot read this book yet.'; ?> Nothing is saved while previewing.</span>
+        <span style="flex:1"></span>
+        <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo (int)$book_id; ?>" style="color:#5c4400;min-height:40px;display:inline-flex;align-items:center;">Back to processing</a>
+        <button type="button" id="previewPublish" style="background:#2e7d32;color:#fff;border:0;border-radius:8px;padding:8px 14px;min-height:40px;cursor:pointer;">Publish this version</button>
+    </div>
+    <script>
+    document.getElementById('previewPublish').addEventListener('click', function () {
+        if (!confirm('Publish version <?php echo (int)$preview_version; ?>? Members will read it from now on.')) return;
+        const fd = new FormData(); fd.append('action', 'publish_version'); fd.append('version', '<?php echo (int)$preview_version; ?>');
+        fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo (int)$book_id; ?>', { method: 'POST', body: fd })
+            .then(r => r.json()).then(d => { alert(d.success ? d.message : (d.error || 'Could not publish.')); if (d.success) location.href = '<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$book_id; ?>'; })
+            .catch(() => alert('Could not publish. Please try again from the processing page.'));
+    });
+    </script>
+<?php endif; ?>
     <div id="toolbar">
         <div class="toolbar-left">
             <a id="backBtn" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book_id; ?>" aria-label="Back to the book page"><i class="fas fa-arrow-left" aria-hidden="true"></i></a><!-- Q3: a real link (was a JS button) -->
@@ -402,7 +442,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll" class="active">Scroll</button><button data-mode="flip">Page Flip</button></div></div>
             <div class="settings-group"><label>Theme</label><div class="btn-group" id="themeGroup"><button data-theme="paper">Paper</button><button data-theme="light" class="active">Light</button><button data-theme="dark">Dark</button><button data-theme="sepia">Sepia</button></div></div>
             <div class="settings-group"><label>Font Size</label><div class="slider-group"><button onclick="adjustFontSize(-5)">A-</button><input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5"><button onclick="adjustFontSize(5)">A+</button><span id="fontSizeLabel">100%</span></div></div>
-            <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option></select></div></div>
+            <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option><option value="'Atkinson Hyperlegible', Verdana, sans-serif">Atkinson Hyperlegible (easy to read)</option></select></div></div>
             <div class="settings-group"><label>Line Height</label><div class="slider-group"><button onclick="adjustLineHeight(-10)">-</button><input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10"><button onclick="adjustLineHeight(10)">+</button><span id="lineHeightLabel">1.8</span></div></div>
             <div class="settings-group"><label>Reading Speed</label><div class="slider-group"><input type="range" id="readingSpeedSlider" min="100" max="500" value="<?php echo $reading_speed_wpm; ?>" step="10"><span id="readingSpeedLabel"><?php echo $reading_speed_wpm; ?> wpm</span></div></div>
         </div>
@@ -416,9 +456,12 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
         <div class="toc-body" id="tocBody">
             <?php if (count($tocEntries) > 0): ?>
+            <p class="toc-summary" id="tocSummary"></p>
+            <div class="toc-group" id="tocGroup" hidden></div>
+            <p><button type="button" class="btn btn-sm btn-outline" id="tocPrint">🖨 Print or save this chapter</button></p><!-- R14 -->
             <ul class="toc-list">
                 <?php foreach ($tocEntries as $entry): ?>
-                <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><?php echo htmlspecialchars($entry['title']); ?></a></li>
+                <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><span class="toc-mark" aria-hidden="true"></span><span class="toc-title"><?php echo htmlspecialchars($entry['title']); ?></span><span class="toc-page">p. <?php echo (int)($entry['page'] ?? 1); ?></span></a></li>
                 <?php endforeach; ?>
             </ul>
             <?php else: ?>
@@ -555,7 +598,8 @@ if (function_exists('renderAchievementToastJS')) {
     const pages = <?php echo json_encode($pages); ?>;
     const totalPages = pages.length;
     const bookId = <?php echo $book_id; ?>;
-    const userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
+    // R5: while the admin previews a draft, nothing is saved (position, session, bookmarks...).
+    const userId = <?php echo (isLoggedIn() && empty($preview_version)) ? $_SESSION['user_id'] : 0; ?>;
     // Q7: guest-only actions showed a bare alert; offer to log in and come back to this book.
     function awNeedLogin(what) {
         if (confirm('Please log in to ' + what.replace(/\.$/, '') + '.\n\nGo to the login page now? You will come back to this book.')) {
@@ -563,8 +607,65 @@ if (function_exists('renderAchievementToastJS')) {
         }
     }
     const groupId = <?php echo $group_id ? (int)$group_id : 0; ?>;
+    // R11: the member's reading group schedule for this book (chapter + due date), shown in the contents.
+    const groupPlan = <?php
+        $aw_plan = null;
+        if ($group_id) {
+            try {
+                $gs = $db->prepare("SELECT name FROM reading_groups WHERE id = ?");
+                $gs->execute([$group_id]);
+                $aw_plan = ['group' => (string)$gs->fetchColumn(), 'url' => SITE_URL . '/group.php?id=' . (int)$group_id, 'items' => []];
+                $gs = $db->prepare("SELECT chapter_index, due_date FROM group_schedules WHERE group_id = ? ORDER BY due_date, chapter_index");
+                $gs->execute([$group_id]);
+                foreach ($gs->fetchAll(PDO::FETCH_ASSOC) as $it) {
+                    $ch = (int)$it['chapter_index'] + 1; // stored from 0, shown from 1 (as in group.php)
+                    $aw_plan['items'][] = ['chapter' => $ch, 'title' => $chapterTitles[$ch] ?? ('Chapter ' . $ch), 'page' => $chapterMap[$ch][0] ?? null, 'due' => $it['due_date']];
+                }
+            } catch (PDOException $e) { $aw_plan = null; }
+        }
+        echo json_encode($aw_plan, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
+    // R9: settings saved with the account are applied before the reader reads its settings, so they
+    // follow the member to every device; later changes are saved back (only when they differ).
+    const awServerPrefs = <?php
+        $aw_prefs = null;
+        if (isLoggedIn() && empty($preview_version)) {
+            try {
+                $ps = $db->prepare("SELECT prefs FROM reader_preferences WHERE user_id = ?");
+                $ps->execute([$_SESSION['user_id']]);
+                $aw_prefs = json_decode((string)$ps->fetchColumn(), true);
+            } catch (PDOException $e) { $aw_prefs = null; }
+        }
+        echo json_encode(is_array($aw_prefs) ? $aw_prefs : null, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    ?>;
+    // R10: keep this book readable offline (see /sw.js) and say when the reader is offline.
+    if ('serviceWorker' in navigator && userId) { navigator.serviceWorker.register('/sw.js').catch(() => {}); }
+    function awOfflineNotice() {
+        let n = document.getElementById('awOffline');
+        if (!navigator.onLine) {
+            if (!n) { n = document.createElement('div'); n.id = 'awOffline'; n.setAttribute('role', 'status'); n.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:100002;background:#333;color:#fff;padding:6px 14px;border-radius:16px;font-size:0.85rem;'; document.body.appendChild(n); }
+            n.textContent = 'You are offline. Reading the saved copy; your place will be saved when you reconnect.';
+        } else if (n) { n.remove(); savePosition && savePosition(); }
+    }
+    window.addEventListener('online', awOfflineNotice); window.addEventListener('offline', awOfflineNotice);
+    document.addEventListener('DOMContentLoaded', awOfflineNotice);
+    const awPrefKeys = ['reader_theme', 'reader_mode', 'reader_font_size', 'reader_line_height', 'reader_font_family', 'reader_font_readable'];
+    function awPrefsSnapshot() { const o = {}; awPrefKeys.forEach(k => { try { const v = localStorage.getItem(k); if (v !== null) o[k] = v; } catch (e) {} }); return o; }
+    if (awServerPrefs) { try { Object.keys(awServerPrefs).forEach(k => { if (awPrefKeys.includes(k)) localStorage.setItem(k, awServerPrefs[k]); }); } catch (e) {} }
+    let awPrefsSent = JSON.stringify(awServerPrefs ? awPrefsSnapshot() : null);
+    let awPrefsTimer = null;
+    function awPrefsChanged() {
+        if (!userId) return;
+        clearTimeout(awPrefsTimer);
+        awPrefsTimer = setTimeout(() => {
+            const now = JSON.stringify(awPrefsSnapshot());
+            if (now === awPrefsSent) return;
+            const fd = new FormData(); fd.append('action', 'save_prefs'); fd.append('prefs', now);
+            fetch('reader_ajax.php', { method: 'POST', body: fd }).then(r => r.json()).then(d => { if (d && d.success) awPrefsSent = now; }).catch(() => {});
+        }, 800);
+    }
     const cover_path = <?php echo json_encode($cover_path); ?>;
     const chapterMap = <?php echo json_encode($chapterMap); ?>;
     const pageToChapter = <?php echo json_encode($pageToChapter); ?>;
@@ -656,9 +757,9 @@ if (function_exists('renderAchievementToastJS')) {
     // ----- Theme -----
     function applyTheme(theme) {
         const app = document.getElementById('reader-app');
-        app.classList.remove('theme-paper','theme-light','theme-dark','theme-sepia');
+        app.classList.remove('theme-paper','theme-light','theme-dark','theme-sepia','theme-contrast');
         app.classList.add('theme-'+theme);
-        localStorage.setItem('reader_theme',theme);
+        localStorage.setItem('reader_theme',theme); awPrefsChanged();
     }
 
     // ----- Highlight application -----
@@ -768,6 +869,82 @@ if (function_exists('renderAchievementToastJS')) {
         const ch = getChapterForPage(page);
         chapterInfoEl.textContent = `📖 ${getChapterTitle(ch)}`;
         remainingInfoEl.textContent = `⏳ ${getRemainingPagesInChapter(page)} pages remaining • ${estimateTimeRemaining(page)} min left`;
+        markToc(page);
+        // R12: tell screen-reader users where they are after a page turn (not on start-up).
+        const ann = document.getElementById('awPageAnnounce');
+        if (ann && awAnnounceReady && page !== awAnnounced) { awAnnounced = page; ann.textContent = `Page ${page} of ${totalPages}. ${getChapterTitle(ch)}.`; }
+    }
+    var awAnnounceReady = false, awAnnounced = 0; // announce a page once, when it changes
+    window.addEventListener('load', () => setTimeout(() => { awAnnounceReady = true; }, 1000));
+
+    // R11: "Reading together" – the group's next chapter, its due date and a link to discuss it.
+    function awFmtDate(d) { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? d : x.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+    function renderGroupPlan() {
+        const box = document.getElementById('tocGroup');
+        if (!box || !groupPlan) return;
+        const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const today = new Date().toISOString().slice(0, 10);
+        const next = groupPlan.items.find(i => i.due >= today);
+        let html = '<strong>👥 ' + esc(groupPlan.group) + '</strong><br>';
+        if (next) {
+            html += 'Read ' + (next.page ? '<a href="#" data-goto="' + next.page + '">' + esc(next.title) + '</a>' : esc(next.title)) + ' by <strong>' + esc(awFmtDate(next.due)) + '</strong>';
+        } else if (groupPlan.items.length) {
+            html += 'All scheduled chapters are past their dates.';
+        } else {
+            html += 'Your group has no reading schedule yet.';
+        }
+        html += '<br><a href="' + esc(groupPlan.url) + '#tab-discussions">💬 Discuss this chapter with your group</a> · <a href="' + esc(groupPlan.url) + '#tab-schedule">📅 Schedule</a>';
+        box.innerHTML = html; box.hidden = false;
+        box.querySelectorAll('[data-goto]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); goToPage(parseInt(a.dataset.goto)); tocDrawer.classList.remove('open'); overlay.classList.remove('active'); }));
+        groupPlan.items.forEach(i => {
+            if (!i.page) return;
+            const link = Array.from(document.querySelectorAll('.toc-link[data-chapter="' + i.page + '"]')).pop();
+            if (link && !link.querySelector('.toc-due')) { const d = document.createElement('span'); d.className = 'toc-due'; d.textContent = 'due ' + awFmtDate(i.due); link.insertBefore(d, link.querySelector('.toc-page')); }
+        });
+    }
+    document.addEventListener('DOMContentLoaded', renderGroupPlan);
+
+    // R14: print (or "Save as PDF") the chapter being read, as clean pages without the reader controls.
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('tocPrint');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const ch = getChapterForPage(currentPage || 1);
+            const nums = (chapterMap[ch] && chapterMap[ch].length) ? chapterMap[ch] : [currentPage || 1];
+            const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const body = nums.map(n => { const el = document.querySelector('.page-content-inner[data-page="' + n + '"]'); return el ? '<section>' + el.innerHTML + '</section>' : ''; }).join('');
+            const w = window.open('', '_blank');
+            if (!w) { alert('Please allow pop-ups for this site to print the chapter.'); return; }
+            const bookTitle = <?php echo json_encode((string)$book['title'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            w.document.write('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(bookTitle + ' – ' + getChapterTitle(ch)) + '</title>'
+                + '<style>body{font-family:Georgia,"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#000;max-width:42em;margin:2em auto;padding:0 1em}'
+                + 'header{border-bottom:1px solid #999;margin-bottom:1.5em;font-size:10pt;color:#444}section{margin-bottom:1em}'
+                + 'img{max-width:100%}[class^="highlight-"],mark{background:none!important;text-decoration:underline}'
+                + '@media print{body{margin:0}a{color:#000;text-decoration:none}}</style></head><body>'
+                + '<header>' + esc(bookTitle) + ' · ' + esc(getChapterTitle(ch)) + ' · pages ' + nums[0] + '–' + nums[nums.length - 1] + '</header>'
+                + body + '</body></html>');
+            w.document.close();
+            w.focus();
+            setTimeout(() => w.print(), 300);
+        });
+    });
+
+    // R7: mark the current chapter and the chapters already read in the contents.
+    var furthestPage = 0; // var: markToc can run before this line during start-up
+    function markToc(page) {
+        furthestPage = Math.max(furthestPage || 0, parseInt(lastPage) || 0, page);
+        const links = Array.from(document.querySelectorAll('.toc-link'));
+        let current = null;
+        links.forEach(l => { if (parseInt(l.dataset.chapter) <= page) current = l; });
+        links.forEach((l, i) => {
+            const start = parseInt(l.dataset.chapter);
+            const next = links[i + 1] ? parseInt(links[i + 1].dataset.chapter) : totalPages + 1;
+            l.classList.toggle('toc-current', l === current);
+            l.classList.toggle('toc-done', l !== current && next - 1 <= furthestPage);
+            if (l === current) l.setAttribute('aria-current', 'true'); else l.removeAttribute('aria-current');
+        });
+        const sum = document.getElementById('tocSummary');
+        if (sum) sum.textContent = `Page ${page} of ${totalPages} · ${Math.round(page / totalPages * 100)}% read`;
     }
 
     function goToPage(pageNum) {
@@ -812,7 +989,7 @@ if (function_exists('renderAchievementToastJS')) {
 
     function switchMode(mode) {
         readingMode = mode;
-        localStorage.setItem('reader_mode',mode);
+        localStorage.setItem('reader_mode',mode); awPrefsChanged();
         if (mode === 'flip') {
             scrollContainer.style.display = 'none';
             flipContainer.style.display = 'flex';
@@ -928,6 +1105,8 @@ if (function_exists('renderAchievementToastJS')) {
         });
     });
 
+    // R13: high-contrast theme (added here so the theme buttons line stays as it is)
+    document.getElementById('themeGroup').insertAdjacentHTML('beforeend', '<button data-theme="contrast" title="High contrast: black on white">Contrast</button>');
     document.querySelectorAll('#themeGroup button').forEach(btn => {
         btn.addEventListener('click',function() {
             const theme = this.dataset.theme;
@@ -946,7 +1125,7 @@ if (function_exists('renderAchievementToastJS')) {
         const val = parseInt(this.value);
         document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontSize = val+'%');
         document.getElementById('fontSizeLabel').textContent = val+'%';
-        localStorage.setItem('reader_font_size',val);
+        localStorage.setItem('reader_font_size',val); awPrefsChanged();
     });
     window.adjustFontSize = function(amount) {
         const slider = document.getElementById('fontSizeSlider');
@@ -965,7 +1144,7 @@ if (function_exists('renderAchievementToastJS')) {
         const val = parseInt(this.value);
         document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.lineHeight = (val/100).toFixed(1));
         document.getElementById('lineHeightLabel').textContent = (val/100).toFixed(1);
-        localStorage.setItem('reader_line_height',val);
+        localStorage.setItem('reader_line_height',val); awPrefsChanged();
     });
     window.adjustLineHeight = function(amount) {
         const slider = document.getElementById('lineHeightSlider');
@@ -983,7 +1162,7 @@ if (function_exists('renderAchievementToastJS')) {
     const fontTypeSelect = document.getElementById('fontTypeSelect');
     const savedFont = localStorage.getItem('reader_font_family') || 'Inter,sans-serif';
     if (savedFont) { fontTypeSelect.value = savedFont; applyFontType(savedFont); }
-    fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); });
+    fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); awPrefsChanged(); });
     function applyFontType(font) { document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontFamily = font); }
 
     // ----- Reading speed -----
@@ -1024,7 +1203,7 @@ if (function_exists('renderAchievementToastJS')) {
         if (awPhone.matches && e.target.closest('.sidebar-btn')) sidebar.classList.remove('open');
     });
     settingsBtn.addEventListener('click',function() { settingsPanel.classList.toggle('open'); overlay.classList.toggle('active',settingsPanel.classList.contains('open')); });
-    tocBtn.addEventListener('click', function() { tocDrawer.classList.toggle('open'); overlay.classList.toggle('active', tocDrawer.classList.contains('open')); });
+    tocBtn.addEventListener('click', function() { markToc(currentPage || 1); const cur = document.querySelector('.toc-link.toc-current'); tocDrawer.classList.toggle('open'); if (cur) cur.scrollIntoView({ block: 'center' }); overlay.classList.toggle('active', tocDrawer.classList.contains('open')); });
     tocClose.addEventListener('click', function() { tocDrawer.classList.remove('open'); overlay.classList.remove('active'); });
     shareBtn.addEventListener('click', function() {
         const preview = document.getElementById('shareQuotePreview');

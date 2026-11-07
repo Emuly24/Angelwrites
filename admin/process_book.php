@@ -219,54 +219,68 @@ function extractPDF($file_path) {
     return '⚠️ PDF extraction failed. This PDF appears to be encrypted or uses an unsupported encoding.';
 }
 
+// R2: turn (X)HTML/Word XML into plain text with one blank line between paragraphs. The old DOCX
+// code stripped every tag except text runs, so paragraph breaks vanished and the whole book became
+// one run-on line (no chapters found, one "page"); the old EPUB code returned the raw XHTML (head,
+// tags and all) in manifest order, which the reader then showed as literal markup.
+function aw_markup_to_text($markup) {
+    $markup = preg_replace('#<(script|style|head)\b[^>]*>.*?</\1>#is', '', $markup);
+    $markup = preg_replace('#<w:tab\s*/>#i', "\t", $markup);
+    $markup = preg_replace('#<(w:br|br)\b[^>]*/?>#i', "\n", $markup);
+    $markup = preg_replace('#</(w:p|p|div|h[1-6]|li|blockquote|section|tr)>#i', "\n\n", $markup);
+    $text = html_entity_decode(strip_tags($markup), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace("/[ \t]+/u", ' ', $text);
+    $text = preg_replace("/ *\n */", "\n", $text);
+    $text = preg_replace("/\n{3,}/", "\n\n", $text);
+    return trim($text);
+}
+
 function extractDOCX($file_path) {
-    $zip = zip_open($file_path);
-    if (!$zip || is_numeric($zip)) return false;
-    $content = '';
-    while ($zip_entry = zip_read($zip)) {
-        if (zip_entry_name($zip_entry) == 'word/document.xml') {
-            if (zip_entry_open($zip, $zip_entry, "r")) {
-                $xml = zip_entry_read($zip_entry, zip_entry_filesize($zip_entry));
-                $xml = strip_tags($xml, '<w:t>');
-                $xml = str_replace(['<w:t>', '</w:t>'], '', $xml);
-                $content .= html_entity_decode($xml);
-                zip_entry_close($zip_entry);
-                break;
-            }
-        }
-    }
-    zip_close($zip);
-    return fixEncoding($content);
+    $zip = new ZipArchive();
+    if ($zip->open($file_path) !== true) return false;
+    $xml = $zip->getFromName('word/document.xml');
+    $zip->close();
+    if ($xml === false) return false;
+    return fixEncoding(aw_markup_to_text($xml));
 }
 
 function extractEPUB($file_path) {
     $zip = new ZipArchive();
-    if ($zip->open($file_path) !== TRUE) return false;
-    $html_content = '';
+    if ($zip->open($file_path) !== true) return false;
     $opf_path = null;
-    for ($i = 0; $i < $zip->numFiles; $i++) {
-        if (strpos($zip->getNameIndex($i), '.opf') !== false) {
-            $opf_path = $zip->getNameIndex($i);
-            break;
-        }
+    $container = $zip->getFromName('META-INF/container.xml');
+    if ($container && preg_match('/full-path="([^"]+)"/', $container, $m)) {
+        $opf_path = $m[1];
     }
-    if (!$opf_path) { $zip->close(); return false; }
-    $opf_xml = $zip->getFromName($opf_path);
-    $opf = simplexml_load_string($opf_xml);
-    $ns = $opf->getNamespaces(true);
-    $opf->registerXPathNamespace('opf', $ns[''] ?? 'http://www.idpf.org/2007/opf');
-    $items = $opf->xpath('//opf:manifest/opf:item[@media-type="application/xhtml+xml"]');
-    $base_dir = dirname($opf_path) . '/';
-    foreach ($items as $item) {
-        $href = (string)$item['href'];
-        $full_path = $base_dir . $href;
-        $content = $zip->getFromName($full_path);
-        if ($content) {
-            $html_content .= fixEncoding($content);
-        }
+    for ($i = 0; !$opf_path && $i < $zip->numFiles; $i++) {
+        if (substr($zip->getNameIndex($i), -4) === '.opf') $opf_path = $zip->getNameIndex($i);
+    }
+    $opf_xml = $opf_path ? $zip->getFromName($opf_path) : false;
+    if (!$opf_xml) { $zip->close(); return false; }
+    $opf = @simplexml_load_string($opf_xml);
+    if (!$opf) { $zip->close(); return false; }
+    $opf->registerXPathNamespace('opf', 'http://www.idpf.org/2007/opf');
+    $base_dir = (dirname($opf_path) === '.') ? '' : dirname($opf_path) . '/';
+    $manifest = [];
+    foreach ($opf->xpath('//opf:manifest/opf:item') ?: [] as $item) {
+        $manifest[(string)$item['id']] = ['href' => (string)$item['href'], 'type' => (string)$item['media-type']];
+    }
+    // Reading order is the spine; fall back to the manifest's XHTML items.
+    $order = [];
+    foreach ($opf->xpath('//opf:spine/opf:itemref') ?: [] as $ref) {
+        $id = (string)$ref['idref'];
+        if (isset($manifest[$id])) $order[] = $manifest[$id]['href'];
+    }
+    if (!$order) {
+        foreach ($manifest as $it) if ($it['type'] === 'application/xhtml+xml') $order[] = $it['href'];
+    }
+    $parts = [];
+    foreach ($order as $href) {
+        $content = $zip->getFromName($base_dir . rawurldecode($href));
+        if ($content !== false && trim($text = aw_markup_to_text($content)) !== '') $parts[] = $text;
     }
     $zip->close();
-    return $html_content;
+    return $parts ? fixEncoding(implode("\n\n", $parts)) : false;
 }
 
 function splitPagesByNumbers($text) {
@@ -520,14 +534,100 @@ function renderVersionSideBySide($old_html, $new_html, $label_old, $label_new) {
     </div>';
 }
 
+// R6: highlights, bookmarks, reading positions and group notes store a page number. Re-processing
+// (another page length, an edited text) changes the pages, so publishing a new version left them
+// pointing at the wrong text. On publish they are moved to the page of the new version that holds the
+// same text: highlights by their own text, everything else via an old-page -> new-page map built from
+// the opening words of each old page (falling back to the same relative position in the book).
+function aw_pages_text($html) {
+    $out = [];
+    if (preg_match_all('#<div class="page-content" data-page="(\d+)">(.*?)(?=<div class="page-break"|<div class="page-content" data-page=|$)#s', (string)$html, $m)) {
+        foreach ($m[2] as $i => $chunk) {
+            $t = mb_strtolower(html_entity_decode(strip_tags($chunk), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $out[(int)$m[1][$i]] = trim(preg_replace('/\s+/u', ' ', $t));
+        }
+    }
+    return $out;
+}
+
+function aw_remap_positions($book_id, $old_html, $new_html) {
+    global $db;
+    $old = aw_pages_text($old_html);
+    $new = aw_pages_text($new_html);
+    $counts = ['highlights' => 0, 'bookmarks' => 0, 'positions' => 0, 'notes' => 0];
+    if (!$old || !$new) return $counts;
+    $new_count = count($new);
+    $old_count = count($old);
+    // One long string of the new text, remembering where each new page starts.
+    $full = ''; $starts = [];
+    foreach ($new as $pg => $t) { $starts[$pg] = mb_strlen($full); $full .= $t . ' '; }
+    $page_at = function ($pos) use ($starts) {
+        $found = array_key_first($starts);
+        foreach ($starts as $pg => $st) { if ($st <= $pos) $found = $pg; else break; }
+        return $found;
+    };
+    $map = [];
+    foreach ($old as $pg => $t) {
+        $anchor = mb_substr($t, 0, 80);
+        $pos = $anchor !== '' ? mb_strpos($full, $anchor) : false;
+        $map[$pg] = $pos !== false ? $page_at($pos) : max(1, min($new_count, (int)round($pg * $new_count / max(1, $old_count))));
+    }
+    $move = function ($pg) use ($map, $new_count, $old_count) {
+        $pg = (int)$pg;
+        if ($pg <= 0) return $pg;
+        return $map[$pg] ?? max(1, min($new_count, (int)round($pg * $new_count / max(1, $old_count))));
+    };
+    // Highlights: find their own text; otherwise use the page map.
+    $hs = $db->prepare("SELECT id, chapter_index, text FROM highlights WHERE book_id = ?");
+    $hs->execute([$book_id]);
+    $upd = $db->prepare("UPDATE highlights SET chapter_index = ? WHERE id = ?");
+    foreach ($hs->fetchAll(PDO::FETCH_ASSOC) as $h) {
+        $needle = trim(preg_replace('/\s+/u', ' ', mb_strtolower((string)$h['text'])));
+        $pos = $needle !== '' ? mb_strpos($full, $needle) : false;
+        $np = $pos !== false ? $page_at($pos) : $move($h['chapter_index']);
+        if ($np != $h['chapter_index']) { $upd->execute([$np, $h['id']]); $counts['highlights']++; }
+    }
+    foreach ([
+        ['bookmarks', 'SELECT id, chapter_index AS pg FROM bookmarks WHERE book_id = ?', 'UPDATE bookmarks SET chapter_index = ?, section = CAST(? AS TEXT) WHERE id = ?', 'bookmarks', 2],
+        ['reading_progress', 'SELECT id, position_section AS pg FROM reading_progress WHERE book_id = ?', 'UPDATE reading_progress SET position_section = ?, position_offset = 0, progress_percent = ? WHERE id = ?', 'positions', 3],
+        ['group_notes', 'SELECT id, chapter_index AS pg FROM group_notes WHERE book_id = ?', 'UPDATE group_notes SET chapter_index = ?, page_number = ? WHERE id = ?', 'notes', 2],
+    ] as [$table, $sel, $updsql, $key, $nargs]) {
+        try {
+            $st = $db->prepare($sel);
+            $st->execute([$book_id]);
+            $up = $db->prepare($updsql);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $np = $move($r['pg']);
+                if ($np == $r['pg']) continue;
+                if ($key === 'positions') $up->execute([$np, (int)round($np / $new_count * 100), $r['id']]);
+                elseif ($key === 'bookmarks') { try { $up->execute([$np, $np, $r['id']]); } catch (PDOException $e) { $db->prepare("DELETE FROM bookmarks WHERE id = ?")->execute([$r['id']]); } } // two old pages on one new page
+                else $up->execute([$np, $np, $r['id']]);
+                $counts[$key]++;
+            }
+        } catch (PDOException $e) {
+            error_log("aw_remap_positions $table: " . $e->getMessage());
+        }
+    }
+    return $counts;
+}
+
 function publishVersion($book_id, $version) {
     global $db;
     $stmt = $db->prepare("SELECT content_html, toc_json, metadata_json FROM book_content_history WHERE book_id = ? AND version = ?");
     $stmt->execute([$book_id, $version]);
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$data) return false;
-    $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, metadata_json = ?, published_version = ?, version = ?, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
+    // R6: move members' highlights, bookmarks, positions and notes to the matching new pages.
+    $cur = $db->prepare("SELECT content_html FROM book_content WHERE book_id = ? AND is_processed = 1");
+    $cur->execute([$book_id]);
+    $old_html = (string)$cur->fetchColumn();
+    $cur->closeCursor();
+    $db->beginTransaction();
+    $GLOBALS['aw_remap_counts'] = $old_html !== '' ? aw_remap_positions($book_id, $old_html, $data['content_html']) : null;
+    // R1: publishing is what makes a version readable (also the first time).
+    $stmt = $db->prepare("UPDATE book_content SET content_html = ?, toc_json = ?, metadata_json = ?, published_version = ?, version = ?, is_processed = 1, processing_status = 'complete', updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
     $stmt->execute([$data['content_html'], $data['toc_json'], $data['metadata_json'], $version, $version, $book_id]);
+    $db->commit();
     return true;
 }
 
@@ -540,6 +640,67 @@ function deleteVersion($book_id, $version) {
     $stmt = $db->prepare("DELETE FROM book_content_history WHERE book_id = ? AND version = ?");
     $stmt->execute([$book_id, $version]);
     return true;
+}
+
+// R3: pages used to exist only where the text had printed page numbers (lines holding just a
+// number, as in PDFs). DOCX and EPUB books have none, so they became one huge page. Page length is now
+// a per-book choice: 'auto' keeps printed page numbers when they give real pages and otherwise cuts
+// about 350 words per page; '250' / '350' / '500' always cut by words. Pages end at paragraph
+// boundaries and every chapter (or Preface, Introduction...) starts on a new page.
+function aw_is_section_start($line) {
+    $t = trim($line);
+    if (preg_match('/^(Chapter|CHAPTER|CHAP\.?)\s+(\d+|[IVXLCDM]+)\b/i', $t)) return true;
+    foreach (['ACKNOWLEDGEMENT', "AUTHOR'S NOTE", 'ABOUT THE AUTHOR', 'Preface', 'Foreword', 'Introduction', 'DEDICATION', 'Prologue', 'Epilogue'] as $k) {
+        if (stripos($t, $k) === 0 && mb_strlen($t) < 80) return true;
+    }
+    return false;
+}
+
+function aw_split_pages_by_words($text, $words_per_page) {
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $paras = preg_split('/\n\s*\n/', $text);
+    if (count($paras) < 3) $paras = preg_split('/\n/', $text); // text without blank lines
+    $pages = [];
+    $cur = [];
+    $count = 0;
+    foreach ($paras as $para) {
+        $para = trim($para);
+        if ($para === '' || preg_match('/^\d+$/', $para)) continue; // drop stray printed page numbers
+        $w = str_word_count($para);
+        if ($cur && (aw_is_section_start($para) || $count + $w > $words_per_page * 1.15)) {
+            $pages[] = implode("\n\n", $cur);
+            $cur = [];
+            $count = 0;
+        }
+        $cur[] = $para;
+        $count += $w;
+    }
+    if ($cur) $pages[] = implode("\n\n", $cur);
+    return $pages;
+}
+
+function aw_split_pages($text, $mode = 'auto') {
+    if ($mode === 'auto') {
+        $pages = array_values(splitPagesByNumbers($text));
+        $biggest = 0;
+        foreach ($pages as $pg) $biggest = max($biggest, str_word_count($pg));
+        if (count($pages) >= 3 && $biggest <= 1200) return $pages;
+        $mode = '350';
+    }
+    return aw_split_pages_by_words($text, max(150, (int)$mode));
+}
+
+function aw_page_length_setting($book_id, $new = null) {
+    global $db;
+    $key = 'book_page_length_' . (int)$book_id;
+    if ($new !== null && in_array($new, ['auto', '250', '350', '500'], true)) {
+        $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")->execute([$key, $new]);
+        return $new;
+    }
+    $st = $db->prepare("SELECT value FROM settings WHERE key = ?");
+    $st->execute([$key]);
+    $v = (string)$st->fetchColumn();
+    return in_array($v, ['auto', '250', '350', '500'], true) ? $v : 'auto';
 }
 
 function parseBook($raw_text) {
@@ -1026,10 +1187,12 @@ if (isset($_POST['extract'])) {
         echo json_encode(['success' => false, 'error' => 'Book file not found.']);
         exit;
     }
+    $aw_t0 = microtime(true); // R4
     $raw_text = extractRawText($file_path);
     if ($raw_text && strpos($raw_text, '⚠️') !== 0) {
         $raw_text = fixEncoding($raw_text);
-        $pages = splitPagesByNumbers($raw_text);
+        $page_mode = aw_page_length_setting($book_id, isset($_POST['page_length']) ? (string)$_POST['page_length'] : null); // R3
+        $pages = aw_split_pages($raw_text, $page_mode);
         $toc = generateTOC($pages);
         $toc_json = json_encode($toc);
         
@@ -1053,9 +1216,9 @@ if (isset($_POST['extract'])) {
         $metadata = ['keywords' => extractKeywords($raw_text)];
         $metadata_json = json_encode($metadata);
         
-        $stmt = $db->prepare("SELECT published_version FROM book_content WHERE book_id = ?");
+        $stmt = $db->prepare("SELECT published_version FROM book_content WHERE book_id = ? AND is_processed = 1");
         $stmt->execute([$book_id]);
-        $published_version = $stmt->fetchColumn() ?? 1;
+        $published_version = $stmt->fetchColumn() ?: null; // R1: null = nothing published yet
         
         $stmt = $db->prepare("SELECT MAX(version) FROM book_content_history WHERE book_id = ?");
         $stmt->execute([$book_id]);
@@ -1064,22 +1227,49 @@ if (isset($_POST['extract'])) {
         $stmt = $db->prepare("INSERT INTO book_content_history (book_id, content_html, toc_json, metadata_json, version, note) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$book_id, $html_content, $toc_json, $metadata_json, $next_version, 'Extracted version ' . $next_version]);
         
+        // R1: extracting used to overwrite the live text members read (for a book already processed),
+        // although the message said the published version was unchanged, so a bad extraction went
+        // straight to readers. Extraction now only creates a draft version; members see it only after
+        // "Publish". A book processed for the first time gets a book_content row that stays
+        // unpublished (is_processed = 0, so the reader says "not ready yet") until then.
         $stmt = $db->prepare("SELECT COUNT(*) FROM book_content WHERE book_id = ?");
         $stmt->execute([$book_id]);
         if ($stmt->fetchColumn() == 0) {
-            $stmt = $db->prepare("INSERT INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status, published_version) VALUES (?, ?, ?, ?, ?, 1, 'complete', ?)");
-            $stmt->execute([$book_id, $book['title'], $html_content, $toc_json, $metadata_json, $next_version]);
-        } else {
-            $stmt = $db->prepare("UPDATE book_content SET content_html = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE book_id = ?");
-            $stmt->execute([$html_content, $book_id]);
+            $stmt = $db->prepare("INSERT INTO book_content (book_id, title, content_html, toc_json, metadata_json, is_processed, processing_status, published_version) VALUES (?, ?, '', '[]', ?, 0, 'draft', NULL)");
+            $stmt->execute([$book_id, $book['title'], $metadata_json]);
+            $published_version = null;
         }
         
         // F89: a processed book leaves the queue
         $db->prepare("UPDATE book_processing_queue SET status = 'complete', progress = 100, updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]);
-        echo json_encode(['success' => true, 'message' => "✅ Extracted version $next_version created. Published version remains v$published_version."]);
+        // R4: say what was produced and flag likely problems, instead of a bare "done".
+        $aw_words = str_word_count(strip_tags($html_content));
+        $aw_chapters = substr_count($html_content, 'class="chapter-heading"');
+        $aw_biggest = 0;
+        foreach ($pages as $aw_pg) $aw_biggest = max($aw_biggest, str_word_count($aw_pg));
+        $aw_warn = [];
+        $aw_size_mb = filesize($file_path) / 1048576;
+        if ($aw_words < 300 || ($aw_size_mb > 1 && $aw_words / $aw_size_mb < 200)) {
+            $aw_warn[] = "Very little text was found ($aw_words words). If this is a scanned PDF (pictures of pages), it has no text to extract; upload a PDF with selectable text, a DOCX or an EPUB.";
+        }
+        if (count($pages) <= 1) $aw_warn[] = 'Everything is on one page. Choose a page length other than Automatic and extract again.';
+        if ($aw_biggest > 1500) $aw_warn[] = "One page has $aw_biggest words; members will scroll a long way. Try a shorter page length.";
+        if ($aw_chapters === 0) $aw_warn[] = 'No chapter headings were found (lines starting "Chapter 1", "Chapter II"...). The contents list will only show sections such as Preface or Introduction.';
+        $aw_summary = ['pages' => count($pages), 'words' => $aw_words, 'chapters' => $aw_chapters, 'seconds' => round(microtime(true) - $aw_t0, 1), 'page_length' => $page_mode];
+        echo json_encode(['success' => true, 'version' => $next_version, 'summary' => $aw_summary, 'warnings' => $aw_warn, 'message' => "✅ Draft version $next_version created. " . ($published_version ? "Members still read v$published_version until you publish." : 'Nothing is shown to members until you publish.')]);
     } else {
         $db->prepare("UPDATE book_processing_queue SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'pending'")->execute([$book_id]); // F89
-        $error_msg = $raw_text ?: 'Failed to extract content from the file.';
+        // R4: say why, in terms the admin can act on.
+        $aw_ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+        if ($raw_text) {
+            $error_msg = $raw_text;
+        } elseif ($aw_ext === 'doc') {
+            $error_msg = 'Old Word .doc files cannot be read. Open the file in Word or LibreOffice, save it as .docx, upload it again and extract.';
+        } elseif (!in_array($aw_ext, ['pdf', 'docx', 'epub'], true)) {
+            $error_msg = 'Only PDF, DOCX and EPUB files can be turned into reader pages. This file is .' . $aw_ext . '.';
+        } else {
+            $error_msg = 'The ' . strtoupper($aw_ext) . ' file could not be read (it may be damaged or password-protected). Try saving it again from the original program and re-uploading it.';
+        }
         echo json_encode(['success' => false, 'error' => $error_msg]);
     }
     exit;
@@ -1581,6 +1771,7 @@ if (isset($_POST['action'])) {
             $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' . htmlspecialchars($version['note'] ?? '—') . '</td>';
             $html .= '<td style="padding:8px 12px;border-bottom:1px solid #eee;">';
             $html .= '<button class="btn btn-sm btn-info" onclick="previewVersion(' . $version['version'] . ')">👁️ Preview</button> ';
+            $html .= '<a class="btn btn-sm btn-info" target="_blank" href="' . SITE_URL . '/reader/reader.php?id=' . (int)$book_id . '&preview=' . (int)$version['version'] . '">📖 Open in reader</a> '; // R5
             if (!$is_published) {
                 $html .= '<button class="btn btn-sm btn-success" onclick="publishVersion(' . $version['version'] . ')">📢 Publish</button> ';
                 $html .= '<button class="btn btn-sm btn-danger" onclick="deleteVersion(' . $version['version'] . ')">🗑 Delete</button>';
@@ -1598,7 +1789,9 @@ if (isset($_POST['action'])) {
     if ($action === 'publish_version') {
         $version = (int)$_POST['version'];
         if (publishVersion($book_id, $version)) {
-            echo json_encode(['success' => true, 'message' => "✅ Version $version published successfully."]);
+            $rc = $GLOBALS['aw_remap_counts'] ?? null; // R6
+            $moved = $rc ? sprintf(' Moved to the matching pages: %d highlights, %d bookmarks, %d reading positions, %d group notes.', $rc['highlights'], $rc['bookmarks'], $rc['positions'], $rc['notes']) : '';
+            echo json_encode(['success' => true, 'message' => "✅ Version $version published successfully." . $moved]);
         } else {
             echo json_encode(['success' => false, 'error' => 'Failed to publish version.']);
         }
@@ -1943,6 +2136,15 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
         <div class="card">
             <div class="card-header"><h2>📥 Stage 1: Extract & Parse</h2></div>
             <div class="card-body">
+                <?php $aw_mode = aw_page_length_setting($book_id); /* R3 */ ?>
+                <label for="pageLength" style="display:block;margin-bottom:8px;">Page length
+                    <select id="pageLength" style="margin-left:8px;">
+                        <option value="auto" <?php echo $aw_mode === 'auto' ? 'selected' : ''; ?>>Automatic (printed page numbers if the file has them, otherwise ~350 words)</option>
+                        <option value="250" <?php echo $aw_mode === '250' ? 'selected' : ''; ?>>Short pages (~250 words, best on phones)</option>
+                        <option value="350" <?php echo $aw_mode === '350' ? 'selected' : ''; ?>>Medium pages (~350 words)</option>
+                        <option value="500" <?php echo $aw_mode === '500' ? 'selected' : ''; ?>>Long pages (~500 words)</option>
+                    </select>
+                </label>
                 <button onclick="extractAndParse()" class="btn btn-primary btn-large">
                     <i class="fas fa-magic"></i> Extract & Parse Content
                 </button>
@@ -2202,22 +2404,35 @@ tinymce.init({
 function extractAndParse() {
     const statusDiv = document.getElementById('extract-status');
     statusDiv.style.display = 'block';
-    statusDiv.innerHTML = '⏳ Extracting and parsing content...';
+    statusDiv.innerHTML = '⏳ Extracting and parsing content… <span id="awElapsed">0</span> s (large books can take a minute; keep this page open)';
+    const awStart = Date.now();
+    window.awTimer = setInterval(() => { const e = document.getElementById('awElapsed'); if (e) e.textContent = Math.round((Date.now() - awStart) / 1000); }, 1000); // R4
     statusDiv.style.background = '#e9ecef';
     statusDiv.style.color = '#333';
     const formData = new FormData();
     formData.append('extract', '1');
+    const pl = document.getElementById('pageLength'); if (pl) formData.append('page_length', pl.value); // R3
     fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book_id; ?>', {
         method: 'POST',
         body: formData
     })
     .then(response => response.json())
     .then(data => {
+        clearInterval(window.awTimer); // R4
         if (data.success) {
-            statusDiv.innerHTML = '✅ ' + data.message;
-            statusDiv.style.background = '#d4edda';
+            // R4: show what was produced, any warnings, and the next steps (the page no longer reloads by itself).
+            const sm = data.summary || {};
+            const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+            let html = '<strong>' + esc(data.message) + '</strong><br>'
+                + esc((sm.pages ?? '?') + ' pages · ' + (sm.words ?? '?').toLocaleString() + ' words · ' + (sm.chapters ?? '?') + ' chapters · ' + (sm.seconds ?? '?') + ' s');
+            (data.warnings || []).forEach(w => { html += '<div style="margin-top:6px;color:#856404;">⚠️ ' + esc(w) + '</div>'; });
+            html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
+                + '<a class="btn btn-sm btn-info" target="_blank" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$book_id; ?>&preview=' + data.version + '">👁️ Preview in the reader</a>'
+                + '<button class="btn btn-sm btn-success" onclick="publishVersion(' + data.version + ')">📢 Publish this version</button>'
+                + '<button class="btn btn-sm btn-outline" onclick="location.reload()">Refresh page</button></div>';
+            statusDiv.innerHTML = html;
+            statusDiv.style.background = (data.warnings || []).length ? '#fff3cd' : '#d4edda';
             statusDiv.style.color = '#155724';
-            setTimeout(() => location.reload(), 2000);
         } else {
             statusDiv.innerHTML = '❌ ' + (data.error || 'Unknown error');
             statusDiv.style.background = '#f8d7da';
@@ -2225,7 +2440,8 @@ function extractAndParse() {
         }
     })
     .catch(error => {
-        statusDiv.innerHTML = '❌ Network or JSON error: ' + error.message;
+        clearInterval(window.awTimer);
+        statusDiv.innerHTML = '❌ The server did not answer properly (it may have run out of time on a very large file). Try a smaller file or try again. (' + error.message + ')';
         statusDiv.style.background = '#f8d7da';
         statusDiv.style.color = '#721c24';
         console.error('Fetch error:', error);
