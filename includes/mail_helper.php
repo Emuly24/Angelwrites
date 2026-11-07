@@ -14,7 +14,12 @@ require_once __DIR__ . '/load_env.php';
  */
 function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.gt.tc', $fromName = 'AngelWrites', $isHTML = true) {
     $mail = new PHPMailer(true);
+    $GLOBALS['aw_mail_last_error'] = '';
     try {
+        // VF3: say exactly what is missing instead of a vague SMTP authentication error
+        if (!getenv('GMAIL_USERNAME') || !getenv('GMAIL_APP_PASSWORD')) {
+            throw new \RuntimeException('Email is not set up on the server: GMAIL_USERNAME and/or GMAIL_APP_PASSWORD are missing from the .env file.');
+        }
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
@@ -58,6 +63,37 @@ function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.g
         return true;
     } catch (\Throwable $e) {
         error_log('sendEmail failed (to: ' . $to . ', subject: ' . $subject . '): ' . $e->getMessage());
+        // VF3: keep the reason so the admin can see it (Settings > Email) without server logs
+        $why = $e->getMessage();
+        if (!empty($mail->ErrorInfo) && strpos($why, $mail->ErrorInfo) === false) $why .= ' — ' . $mail->ErrorInfo;
+        $GLOBALS['aw_mail_last_error'] = $why;
+        aw_mail_log_failure($to, $subject, $why);
         return false;
     }
+}
+
+/**
+ * VF3: remember the last 50 failed emails in data/mail_errors.log (data/ is not reachable from the web),
+ * so Admin > Settings > Email can show why verification codes are not arriving.
+ */
+function aw_mail_log_failure($to, $subject, $why) {
+    $file = __DIR__ . '/../data/mail_errors.log';
+    $line = json_encode(['at' => date('Y-m-d H:i:s'), 'to' => (string)$to, 'subject' => (string)$subject,
+                         'error' => mb_substr((string)$why, 0, 400)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $lines = is_file($file) ? (array)@file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
+    $lines[] = $line;
+    @file_put_contents($file, implode("\n", array_slice($lines, -50)) . "\n", LOCK_EX);
+}
+
+/** VF3: the failures recorded above, newest first. */
+function aw_mail_recent_failures($limit = 10) {
+    $file = __DIR__ . '/../data/mail_errors.log';
+    if (!is_file($file)) return [];
+    $out = [];
+    foreach (array_reverse((array)@file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)) as $l) {
+        $r = json_decode($l, true);
+        if (is_array($r)) $out[] = $r;
+        if (count($out) >= $limit) break;
+    }
+    return $out;
 }

@@ -3,6 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
+require_once '../includes/csrf.php'; // VF3
 
 redirectIfNotAdmin();
 
@@ -10,6 +11,7 @@ $error = '';
 $success = '';
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$aw_filter = (($_GET['filter'] ?? '') === 'unverified') ? 'unverified' : ''; // VF3
 $limit = 10;
 $offset = ($page - 1) * $limit;
 
@@ -36,6 +38,36 @@ if (isset($_GET['delete'])) {
         
         header('Location: ' . SITE_URL . '/admin/manage_users.php');
         exit;
+    }
+}
+
+// ===== VF3: VERIFY BY HAND, OR SEND A NEW CODE =====
+// For members whose verification email did not arrive.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aw_user_action'])) {
+    [$aw_act, $aw_uid] = array_pad(explode(':', (string)$_POST['aw_user_action'], 2), 2, '');
+    $aw_uid = (int)$aw_uid;
+    $stmt = $db->prepare("SELECT id, email, first_name, name, is_verified FROM users WHERE id = ?");
+    $stmt->execute([$aw_uid]);
+    $aw_u = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $error = 'Your session expired. Please reload the page and try again.';
+    } elseif (!$aw_u) {
+        $error = 'That account no longer exists.';
+    } elseif ($aw_act === 'verify') {
+        $db->prepare("UPDATE users SET is_verified = 1, verification_code = NULL, verification_code_expiry = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$aw_uid]);
+        $success = $aw_u['email'] . ' is now verified and can log in.';
+    } elseif ($aw_act === 'code' && (int)$aw_u['is_verified'] === 0) {
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?")
+           ->execute([$code, date('Y-m-d H:i:s', strtotime('+24 hours')), $aw_uid]);
+        $greet = trim((string)($aw_u['first_name'] ?: $aw_u['name'] ?: 'there'));
+        $body = "Hello $greet,\n\nYour AngelWrites verification code is: $code\n\nEnter it at " . SITE_URL . "/verify.php?email=" . rawurlencode($aw_u['email']) . "\n\nThis code will expire in 24 hours.\n\n— AngelWrites Team";
+        if (sendEmail($aw_u['email'], 'Your AngelWrites verification code', $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
+            $success = 'A new verification code was sent to ' . $aw_u['email'] . '.';
+        } else {
+            $error = 'The code could not be emailed to ' . $aw_u['email'] . '. Reason: ' . ($GLOBALS['aw_mail_last_error'] ?? 'unknown')
+                   . ' You can verify this member by hand instead.';
+        }
     }
 }
 
@@ -104,8 +136,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
 // ===== FETCH TOTAL USERS =====
 $count_sql = "SELECT COUNT(*) FROM users";
 $count_params = [];
+$aw_where = $aw_filter ? " WHERE is_verified = 0" : ""; // VF3
+$count_sql .= $aw_where;
 if ($search) {
-    $count_sql .= " WHERE name LIKE ? OR email LIKE ? OR username LIKE ?";
+    $count_sql .= ($aw_where ? " AND (" : " WHERE (") . "name LIKE ? OR email LIKE ? OR username LIKE ?)";
     $count_params[] = "%$search%";
     $count_params[] = "%$search%";
     $count_params[] = "%$search%";
@@ -116,10 +150,10 @@ $total_users = $stmt->fetchColumn();
 $total_pages = ceil($total_users / $limit);
 
 // ===== FETCH USERS =====
-$sql = "SELECT * FROM users";
+$sql = "SELECT * FROM users" . $aw_where;
 $params = [];
 if ($search) {
-    $sql .= " WHERE name LIKE ? OR email LIKE ? OR username LIKE ?";
+    $sql .= ($aw_where ? " AND (" : " WHERE (") . "name LIKE ? OR email LIKE ? OR username LIKE ?)";
     $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";
@@ -163,12 +197,23 @@ $pageTitle = 'Manage Users';
         <div class="search-bar">
             <form method="GET" class="search-form">
                 <input type="text" name="search" placeholder="Search users by name, email, or username..." value="<?php echo htmlspecialchars($search); ?>">
+                <?php if ($aw_filter): ?><input type="hidden" name="filter" value="unverified"><?php endif; ?>
                 <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
                 <?php if (!empty($search)): ?>
                     <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
                 <?php endif; ?>
             </form>
         </div>
+
+        <!-- VF3: who still needs to verify -->
+        <?php $aw_unv = (int)$db->query("SELECT COUNT(*) FROM users WHERE is_verified = 0")->fetchColumn(); ?>
+        <div class="aw-user-filter" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px;">
+            <a class="btn btn-sm <?php echo $aw_filter ? 'btn-outline' : 'btn-primary'; ?>" href="<?php echo SITE_URL; ?>/admin/manage_users.php">All users</a>
+            <a class="btn btn-sm <?php echo $aw_filter ? 'btn-primary' : 'btn-outline'; ?>" href="<?php echo SITE_URL; ?>/admin/manage_users.php?filter=unverified"><i class="fas fa-user-clock"></i> Unverified (<?php echo $aw_unv; ?>)</a>
+        </div>
+        <form method="POST" id="awUserAction" action="<?php echo SITE_URL; ?>/admin/manage_users.php<?php echo $aw_filter ? '?filter=unverified' : ''; ?>">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+        </form>
 
         <!-- ===== USERS TABLE ===== -->
         <div class="card">
@@ -198,6 +243,7 @@ $pageTitle = 'Manage Users';
                                         <th>Name</th>
                                         <th>Username</th>
                                         <th>Email</th>
+                                        <th>Verified</th>
                                         <th>Role</th>
                                         <th>Joined</th>
                                         <th class="actions-col">Actions</th>
@@ -219,6 +265,15 @@ $pageTitle = 'Manage Users';
                                             <td><?php echo htmlspecialchars($user['username']); ?></td>
                                             <td><?php echo htmlspecialchars($user['email']); ?></td>
                                             <td>
+                                                <?php if ((int)($user['is_verified'] ?? 0) === 1): ?>
+                                                    <span class="aw-verified yes"><i class="fas fa-circle-check"></i> Yes</span>
+                                                <?php elseif (($user['role'] ?? '') === 'admin'): ?>
+                                                    <span class="aw-verified admin" title="Admins do not need to verify">Not needed</span>
+                                                <?php else: ?>
+                                                    <span class="aw-verified no"><i class="fas fa-clock"></i> Waiting</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
                                                 <?php if ($user['id'] === $_SESSION['user_id']): ?>
                                                     <span class="role-badge admin">Admin</span>
                                                 <?php else: ?>
@@ -234,6 +289,10 @@ $pageTitle = 'Manage Users';
                                             </td>
                                             <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
                                             <td class="actions-cell">
+                                                <?php if ((int)($user['is_verified'] ?? 0) !== 1 && ($user['role'] ?? '') !== 'admin'): ?>
+                                                    <button type="submit" form="awUserAction" name="aw_user_action" value="verify:<?php echo (int)$user['id']; ?>" class="btn btn-sm btn-success action-btn" title="Mark as verified" aria-label="Mark as verified" onclick="return confirm('Mark <?php echo htmlspecialchars(addslashes($user['email']), ENT_QUOTES); ?> as verified?');"><i class="fas fa-user-check"></i></button>
+                                                    <button type="submit" form="awUserAction" name="aw_user_action" value="code:<?php echo (int)$user['id']; ?>" class="btn btn-sm btn-outline action-btn" title="Email a new verification code" aria-label="Email a new verification code"><i class="fas fa-paper-plane"></i></button>
+                                                <?php endif; ?>
                                                 <?php if ($user['id'] !== $_SESSION['user_id']): ?>
                                                     <a href="<?php echo SITE_URL; ?>/admin/manage_users.php?delete=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this user?');" title="Delete">
                                                         <i class="fas fa-trash"></i>
@@ -251,17 +310,17 @@ $pageTitle = 'Manage Users';
                     <?php if ($total_pages > 1): ?>
                         <div class="pagination">
                             <?php if ($page > 1): ?>
-                                <a href="?page=<?php echo $page - 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?>" class="page-link">
+                                <a href="?page=<?php echo $page - 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $aw_filter ? '&filter=unverified' : ''; ?>" class="page-link">
                                     <i class="fas fa-chevron-left"></i>
                                 </a>
                             <?php endif; ?>
                             <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                                <a href="?page=<?php echo $i; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?>" class="page-link <?php echo $i === $page ? 'active' : ''; ?>">
+                                <a href="?page=<?php echo $i; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $aw_filter ? '&filter=unverified' : ''; ?>" class="page-link <?php echo $i === $page ? 'active' : ''; ?>">
                                     <?php echo $i; ?>
                                 </a>
                             <?php endfor; ?>
                             <?php if ($page < $total_pages): ?>
-                                <a href="?page=<?php echo $page + 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?>" class="page-link">
+                                <a href="?page=<?php echo $page + 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $aw_filter ? '&filter=unverified' : ''; ?>" class="page-link">
                                     <i class="fas fa-chevron-right"></i>
                                 </a>
                             <?php endif; ?>
@@ -411,6 +470,10 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .badge-you { background:var(--rose); color:white; padding:2px 10px; border-radius:20px; font-size:0.7rem; font-weight:600; }
 
 /* ===== ROLE ===== */
+.aw-verified { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:0.78rem; font-weight:600; white-space:nowrap; }
+.aw-verified.yes { background:#e3efe6; color:#2d5039; }
+.aw-verified.no { background:#f7ecdc; color:#6f4e22; }
+.aw-verified.admin { background:var(--vanilla); color:var(--text-light); }
 .role-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
 .role-badge.admin { background:var(--rose); color:white; }
 .role-badge.reader { background:var(--vanilla); color:var(--text); }
