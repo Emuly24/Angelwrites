@@ -158,6 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                     // the email can't be sent; the success screen then points to "Request a new code".
                     $mail_sent = sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
                     $success = true;
+                    if (!$mail_sent) {
+                        // VF4: nothing was emailed, so "Resend Code" must work straight away
+                        $db->prepare("UPDATE users SET verification_code_expiry = ? WHERE id = ?")
+                           ->execute([date('Y-m-d H:i:s', strtotime('+24 hours') - 120), $user_id]);
+                    }
                     if ($mail_sent) {
                         
                         // ===== SEND ADMIN NOTIFICATION =====

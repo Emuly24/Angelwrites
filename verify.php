@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
             $aw_notice = 'This account is already verified. You can log in.';
         } elseif (!empty($user['verification_code_expiry']) && strtotime($user['verification_code_expiry']) > strtotime('+24 hours') - 60) {
             // VF2: one new code per minute per account (the 60-second wait was only in the browser)
-            $error = 'A code was sent less than a minute ago. Please check your inbox (and spam folder) or try again in a minute.';
+            $error = 'A new code was emailed less than a minute ago. Please check your inbox (and spam folder), or try again in a minute.';
         } else {
             // Generate new 6-digit code
             $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -147,6 +147,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
             if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
                 $resend_success = true;
             } else {
+                // VF4: the email did not go, so the one-a-minute limit must not start: move the code's
+                // timestamp back two minutes (the code itself stays valid for almost 24 hours)
+                $db->prepare("UPDATE users SET verification_code_expiry = ? WHERE id = ?")
+                   ->execute([date('Y-m-d H:i:s', strtotime('+24 hours') - 120), $user['id']]);
                 // VF2: say plainly that the email did not go, and what to do instead
                 $error = "We could not send the email just now. Please try again in a few minutes, or contact us and we will verify your account for you.";
             }
