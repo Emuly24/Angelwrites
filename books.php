@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/commerce.php';
 
 // ===== SEARCH & FILTER =====
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -21,7 +22,7 @@ if ($search) {
 if ($filter === 'free') {
     $sql .= " AND is_free = 1";
 } elseif ($filter === 'sale') {
-    $sql .= " AND is_sale = 1";
+    $sql .= " AND is_sale = 1 AND sale_price > 0 AND sale_price < price"; // F79
 }
 
 $sql .= " ORDER BY created_at DESC";
@@ -29,12 +30,38 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// F86: only books with processed reader content can be read online; the others showed a Read
+// button that opened an empty reader ("1 / 0").
+$readable = [];
+try {
+    foreach ($db->query("SELECT book_id FROM book_content WHERE is_processed = 1")->fetchAll(PDO::FETCH_COLUMN) as $rid) {
+        $readable[(int)$rid] = true;
+    }
+} catch (PDOException $e) {
+    $readable = [];
+}
+
+// F34: books this member has bought download directly instead of opening the order form.
+$owned = [];
+if (isLoggedIn()) {
+    foreach ($books as $b) {
+        if (empty($b['is_free']) && aw_has_purchased($db, $_SESSION['user_id'], $b['id'])) {
+            $owned[(int)$b['id']] = true;
+        }
+    }
+}
+
 $pageTitle = 'Books';
 ?>
 <?php require_once 'includes/header.php'; ?>
 
 <div class="books-page">
     <div class="container">
+        <?php if (($_GET['error'] ?? '') === 'not_purchased'): // F37 ?>
+            <div class="books-notice" role="alert" style="border:1px solid var(--rose, #DBA1A2);border-radius:10px;padding:12px 16px;margin:16px 0;">
+                🔒 That book has to be bought before it can be downloaded. Press <strong>Download</strong> on it below to order it; it unlocks once your payment is confirmed. Already ordered? See <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a>.
+            </div>
+        <?php endif; ?>
         <!-- ===== PAGE HEADER ===== -->
         <div class="books-header">
             <div class="books-header-content">
@@ -78,7 +105,7 @@ $pageTitle = 'Books';
         <?php if (count($books) > 0): ?>
             <div class="books-grid">
                 <?php foreach ($books as $book): ?>
-                    <div class="book-card">
+                    <div class="book-card" id="book-<?php echo (int)$book['id']; ?>">
                         <!-- Cover Wrapper -->
                         <div class="book-cover-wrapper">
                             <?php if ($book['cover_path']): ?>
@@ -93,7 +120,7 @@ $pageTitle = 'Books';
                             <div class="book-badges">
                                 <?php if ($book['is_free']): ?>
                                     <span class="badge free">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
+                                <?php elseif (aw_book_on_sale($book)): // F79 ?>
                                     <span class="badge sale">Sale</span>
                                 <?php endif; ?>
                             </div>
@@ -119,18 +146,26 @@ $pageTitle = 'Books';
                                 <div class="book-price">
                                     <?php if ($book['is_free']): ?>
                                         <span class="free-text">Free</span>
-                                    <?php elseif ($book['is_sale']): ?>
-                                        <span class="sale-text">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                    <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
+                                        <span>Not yet on sale</span>
+                                    <?php elseif (aw_book_on_sale($book)): ?>
+                                        <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
                                     <?php else: ?>
                                         <span>MWK <?php echo number_format($book['price'], 2); ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <div class="book-actions">
+                                    <?php if (isset($readable[(int)$book['id']])): // F86 ?>
                                     <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
                                         <i class="fas fa-book-open"></i> Read
                                     </a>
-                                    <?php if (isLoggedIn()): ?>
-                                        <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo $book['is_free'] ? '1' : '0'; ?>" data-price="<?php echo $book['price']; ?>">
+                                    <?php else: ?>
+                                    <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book['id']; ?>" class="btn btn-outline">
+                                        <i class="fas fa-info-circle"></i> Details
+                                    </a>
+                                    <?php endif; ?>
+                                    <?php if (isLoggedIn() && ($book['is_free'] || isset($owned[(int)$book['id']]) || (float)$book['price'] > 0)): // F80, F34 ?>
+                                        <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo ($book['is_free'] || isset($owned[(int)$book['id']])) ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
                                             <i class="fas fa-download"></i> Download
                                         </button>
                                     <?php endif; ?>
@@ -161,8 +196,8 @@ $pageTitle = 'Books';
         <span class="modal-close" onclick="closePaymentModal()">&times;</span>
         <div class="modal-header">
             <i class="fas fa-lock modal-lock-icon"></i>
-            <h3>Complete Your Purchase</h3>
-            <p class="modal-sub">You are about to download <strong id="modalBookTitle"></strong>. Choose your payment method below.</p>
+            <h3>Order this book</h3>
+            <p class="modal-sub">Order <strong id="modalBookTitle"></strong>. Choose how you will pay; you will then be shown where to send the money. The book unlocks once we confirm your payment.</p>
         </div>
         
         <div class="payment-options">
@@ -189,10 +224,15 @@ $pageTitle = 'Books';
                 <label for="paymentAmount">Amount (MWK)</label>
                 <input type="text" id="paymentAmount" readonly>
             </div>
+            <div class="form-group">
+                <label for="paymentReference">Transaction ID (optional, if you have already paid)</label>
+                <input type="text" id="paymentReference" maxlength="60" placeholder="From your payment SMS">
+            </div>
             <div id="paymentStatus" class="payment-status"></div>
+            <div id="paymentInstructions" style="display:none;white-space:pre-line;border:1px solid var(--border);border-radius:8px;padding:12px;margin:10px 0;text-align:left;"></div>
             <div class="modal-actions">
                 <button class="btn btn-primary" id="payNowBtn" onclick="processPayment()">
-                    <i class="fas fa-credit-card"></i> Pay Now
+                    <i class="fas fa-paper-plane"></i> Place order
                 </button>
                 <button class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
             </div>
@@ -250,6 +290,8 @@ function openPaymentModal(bookId, title, price) {
     document.getElementById('paymentForm').style.display = 'none';
     document.getElementById('paymentStatus').innerHTML = '';
     document.getElementById('paymentStatus').className = 'payment-status';
+    document.getElementById('paymentInstructions').style.display = 'none';
+    document.getElementById('payNowBtn').style.display = '';
     document.querySelectorAll('.payment-option').forEach(btn => btn.classList.remove('selected'));
     document.getElementById('paymentModal').style.display = 'flex';
 }
@@ -278,13 +320,14 @@ function processPayment() {
     }
 
     const statusDiv = document.getElementById('paymentStatus');
-    statusDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Processing payment...</div>';
+    statusDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Placing your order...</div>';
     statusDiv.className = 'payment-status';
 
     const formData = new FormData();
     formData.append('book_id', currentBookId);
     formData.append('payment_method', selectedMethod);
     formData.append('phone_number', phone);
+    formData.append('payer_reference', document.getElementById('paymentReference').value.trim());
     formData.append('amount', document.getElementById('paymentAmount').value.replace('MWK ', ''));
 
     fetch('<?php echo SITE_URL; ?>/process_payment.php', {
@@ -294,20 +337,26 @@ function processPayment() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            statusDiv.innerHTML = '<span class="success"><i class="fas fa-check-circle"></i> Payment successful! Preparing your download...</span>';
+            // F75: an order is not a payment. Show where to pay and the reference to use; the book
+            // unlocks when the admin confirms the money has arrived.
+            statusDiv.innerHTML = '';
+            const msg = document.createElement('span');
+            msg.className = 'success';
+            msg.textContent = data.message + ' Order reference: ' + data.reference + '.';
+            statusDiv.appendChild(msg);
             statusDiv.className = 'payment-status success';
-
-            setTimeout(() => {
-                window.location.href = '<?php echo SITE_URL; ?>/download.php?book_id=' + currentBookId;
-                closePaymentModal();
-            }, 1000);
+            const box = document.getElementById('paymentInstructions');
+            box.textContent = 'Send MWK ' + Number(data.amount).toFixed(2) + ' and use the reference ' + data.reference + ':\n\n' + data.instructions;
+            box.textContent += '\n\nYour orders and receipts are in My purchases (' + <?php echo json_encode(SITE_URL . '/my_purchases.php'); ?> + ').';
+            box.style.display = 'block';
+            document.getElementById('payNowBtn').style.display = 'none';
         } else {
             statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> ' + data.error + '</span>';
             statusDiv.className = 'payment-status error';
         }
     })
     .catch(error => {
-        statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> Payment failed. Please try again.</span>';
+        statusDiv.innerHTML = '<span class="error"><i class="fas fa-times-circle"></i> The order could not be placed. Please try again.</span>';
         statusDiv.className = 'payment-status error';
     });
 }

@@ -278,7 +278,7 @@ return array (
             view_count INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        , file_size TEXT, file_author TEXT, release_date TEXT, is_angella_book INTEGER DEFAULT 0, published_version INTEGER DEFAULT 0, author_id INTEGER DEFAULT NULL)',
+        , file_size TEXT, file_author TEXT, release_date TEXT, is_angella_book INTEGER DEFAULT 0, published_version INTEGER DEFAULT 0, author_id INTEGER DEFAULT NULL, sale_price REAL)',
   28 => 'CREATE TABLE IF NOT EXISTS comment_reactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     comment_id INTEGER NOT NULL,
@@ -556,7 +556,7 @@ return array (
     transaction_id TEXT,
     status TEXT DEFAULT \'pending\',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME,
+    completed_at DATETIME, phone_number TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 )',
