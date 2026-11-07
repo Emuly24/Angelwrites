@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // F44: group creator/admin actions. group.php sends these here, but they were only handled
     // in admin/manage_groups_ajax.php, so this endpoint answered "Invalid action".
-    if (in_array($action, ['update_group', 'change_member_role', 'remove_member'], true)) {
+    if (in_array($action, ['update_group', 'change_member_role', 'remove_member', 'regenerate_invite'], true)) {
         $group_id = (int)($_POST['group_id'] ?? 0);
         $stmt = $db->prepare("SELECT g.creator_id, m.role FROM reading_groups g
                               LEFT JOIN group_members m ON m.group_id = g.id AND m.user_id = ? WHERE g.id = ?");
@@ -171,6 +171,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $db->prepare("UPDATE reading_groups SET name = ?, description = ? WHERE id = ?")
                ->execute([$name, trim($_POST['description'] ?? ''), $group_id]);
             echo json_encode(['success' => true]);
+            exit;
+        }
+        // Q16: a leaked invite code could not be replaced. Creators/admins can now issue a new one;
+        // the old code stops working, members already in the group stay.
+        if ($action === 'regenerate_invite') {
+            $check = $db->prepare("SELECT 1 FROM reading_groups WHERE invite_code = ?");
+            do {
+                $code = generateInviteCode();
+                $check->execute([$code]);
+                $taken = (bool)$check->fetchColumn();
+                $check->closeCursor();
+            } while ($taken);
+            $db->prepare("UPDATE reading_groups SET invite_code = ? WHERE id = ?")->execute([$code, $group_id]);
+            echo json_encode(['success' => true, 'invite_code' => $code]);
             exit;
         }
         $target = (int)($_POST['user_id'] ?? 0);

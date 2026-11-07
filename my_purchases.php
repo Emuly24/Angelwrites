@@ -48,7 +48,7 @@ require_once __DIR__ . '/includes/header.php';
             </div>
             <div style="font-size:0.95rem;margin:6px 0;line-height:1.6;">
                 Order reference: <strong>AW-<?php echo (int)$o['id']; ?></strong><br>
-                Amount: MWK <?php echo number_format((float)$o['amount'], 2); ?>
+                Amount: <?php echo aw_mwk((float)$o['amount']); ?>
                 · <?php echo htmlspecialchars($methods[$o['payment_method']] ?? (string)$o['payment_method']); ?>
                 <?php if (!empty($o['phone_number'])): ?>· from <?php echo htmlspecialchars($o['phone_number']); ?><?php endif; ?><br>
                 <?php if (!empty($o['transaction_id'])): ?>Your transaction ID: <?php echo htmlspecialchars($o['transaction_id']); ?><br><?php endif; ?>
@@ -56,7 +56,7 @@ require_once __DIR__ . '/includes/header.php';
                 <?php if ($owned && $o['completed_at']): ?> · Paid <?php echo date('M j, Y', strtotime($o['completed_at'])); ?><?php endif; ?>
             </div>
             <?php if ($o['status'] === 'pending' && $instructions !== ''): ?>
-                <div style="white-space:pre-line;font-size:0.9rem;border-top:1px solid var(--border);padding-top:8px;">Send MWK <?php echo number_format((float)$o['amount'], 2); ?> with the reference AW-<?php echo (int)$o['id']; ?> to:
+                <div style="white-space:pre-line;font-size:0.9rem;border-top:1px solid var(--border);padding-top:8px;">Send <?php echo aw_mwk((float)$o['amount']); ?> with the reference AW-<?php echo (int)$o['id']; ?> to:
 <?php echo htmlspecialchars($instructions); ?></div>
             <?php elseif ($o['status'] === 'rejected'): ?>
                 <p style="font-size:0.9rem;">We could not match a payment to this order. If you did pay, please <a href="<?php echo SITE_URL; ?>/contact.php">contact us</a> with the reference AW-<?php echo (int)$o['id']; ?>.</p>

@@ -119,16 +119,23 @@ if ($action === 'add_bookmark') {
     $offset = isset($_POST['offset']) ? (int)$_POST['offset'] : 0;
     $note = isset($_POST['note']) ? trim($_POST['note']) : '';
 
-    $stmt = $db->prepare("INSERT INTO bookmarks (user_id, book_id, chapter_index, offset, note) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$user_id, $book_id, $chapter, $offset, $note]);
+    // F235: bookmarks.section is NOT NULL and UNIQUE per member and book, but was never set, so every
+    // bookmark failed to save. The page number is stored as the section; the same page twice is ignored.
+    $stmt = $db->prepare("INSERT OR IGNORE INTO bookmarks (user_id, book_id, section, chapter_index, offset, note) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$user_id, $book_id, (string)$chapter, $chapter, $offset, $note]);
     echo json_encode(['success' => true, 'bookmark_id' => $db->lastInsertId()]);
     exit;
 }
 
 if ($action === 'remove_bookmark') {
-    $bookmark_id = (int)$_POST['bookmark_id'];
-    $stmt = $db->prepare("DELETE FROM bookmarks WHERE id = ? AND user_id = ?");
-    $stmt->execute([$bookmark_id, $user_id]);
+    // F235: the reader sends the book and page, not a bookmark id, so nothing was ever removed.
+    if (!empty($_POST['bookmark_id'])) {
+        $stmt = $db->prepare("DELETE FROM bookmarks WHERE id = ? AND user_id = ?");
+        $stmt->execute([(int)$_POST['bookmark_id'], $user_id]);
+    } else {
+        $stmt = $db->prepare("DELETE FROM bookmarks WHERE user_id = ? AND book_id = ? AND chapter_index = ?");
+        $stmt->execute([$user_id, (int)($_POST['book_id'] ?? 0), (int)($_POST['chapter'] ?? 0)]);
+    }
     echo json_encode(['success' => true]);
     exit;
 }

@@ -802,9 +802,9 @@ if ('serviceWorker' in navigator) {
                                 <?php if ($book['is_free']): ?>
                                     <span class="free-text">Free</span>
                                 <?php elseif (aw_book_on_sale($book)): ?>
-                                    <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
+                                    <span class="sale-text"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
                                 <?php else: ?>
-                                    <span>MWK <?php echo number_format($book['price'], 2); ?></span>
+                                    <span><?php echo aw_mwk($book['price']); ?></span>
                                 <?php endif; ?>
                             </div>
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">
@@ -855,9 +855,9 @@ if ('serviceWorker' in navigator) {
                                 <?php if ($book['is_free']): ?>
                                     <span class="free-text">Free</span>
                                 <?php elseif (aw_book_on_sale($book)): ?>
-                                    <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
+                                    <span class="sale-text"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
                                 <?php else: ?>
-                                    <span>MWK <?php echo number_format($book['price'], 2); ?></span>
+                                    <span><?php echo aw_mwk($book['price']); ?></span>
                                 <?php endif; ?>
                             </div>
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">

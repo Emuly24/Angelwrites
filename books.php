@@ -118,7 +118,9 @@ $pageTitle = 'Books';
                             
                             <!-- Badges -->
                             <div class="book-badges">
-                                <?php if ($book['is_free']): ?>
+                                <?php if (isset($owned[(int)$book['id']])): // Q14 ?>
+                                    <span class="badge free">Owned</span>
+                                <?php elseif ($book['is_free']): ?>
                                     <span class="badge free">Free</span>
                                 <?php elseif (aw_book_on_sale($book)): // F79 ?>
                                     <span class="badge sale">Sale</span>
@@ -149,9 +151,9 @@ $pageTitle = 'Books';
                                     <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
                                         <span>Not yet on sale</span>
                                     <?php elseif (aw_book_on_sale($book)): ?>
-                                        <span class="sale-text"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span><!-- F79 -->
+                                        <span class="sale-text"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
                                     <?php else: ?>
-                                        <span>MWK <?php echo number_format($book['price'], 2); ?></span>
+                                        <span><?php echo aw_mwk($book['price']); ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <div class="book-actions">
@@ -168,6 +170,10 @@ $pageTitle = 'Books';
                                         <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo ($book['is_free'] || isset($owned[(int)$book['id']])) ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
                                             <i class="fas fa-download"></i> Download
                                         </button>
+                                    <?php elseif (!isLoggedIn() && ($book['is_free'] || (float)$book['price'] > 0)): // Q14: guests were not told ?>
+                                        <a class="btn btn-secondary" href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode('/books.php#book-' . (int)$book['id']); ?>">
+                                            <i class="fas fa-sign-in-alt"></i> Log in to <?php echo $book['is_free'] ? 'download' : 'buy'; ?>
+                                        </a>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -204,14 +210,17 @@ $pageTitle = 'Books';
             <button class="payment-option" data-method="airtel" onclick="selectPayment('airtel')">
                 <i class="fas fa-mobile-alt"></i>
                 <span>Airtel Money</span>
+                <small class="payment-hint">From an Airtel line</small><!-- Q21 -->
             </button>
             <button class="payment-option" data-method="mpamba" onclick="selectPayment('mpamba')">
                 <i class="fas fa-mobile-alt"></i>
-                <span>Mpamba</span>
+                <span>TNM Mpamba</span>
+                <small class="payment-hint">From a TNM line</small>
             </button>
             <button class="payment-option" data-method="nbm" onclick="selectPayment('nbm')">
                 <i class="fas fa-university"></i>
                 <span>NBM Mo626</span>
+                <small class="payment-hint">National Bank mobile banking</small>
             </button>
         </div>
 
@@ -279,6 +288,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Q14: book.php's "Buy this book" links here with ?buy=<id>; open that book's order form.
+document.addEventListener('DOMContentLoaded', function () {
+    const m = location.search.match(/[?&]buy=(\d+)/);
+    if (!m) return;
+    const btn = document.querySelector('.download-btn[data-id="' + m[1] + '"]');
+    if (btn) btn.click();
+});
+
+// Q21: same format as aw_mwk(): no tambala unless there are any.
+function awMwk(n) { n = Math.round(Number(n) * 100) / 100; return 'MWK ' + n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }); }
+
 // ===== PAYMENT MODAL FUNCTIONS =====
 let currentBookId = null;
 let selectedMethod = null;
@@ -286,7 +306,7 @@ let selectedMethod = null;
 function openPaymentModal(bookId, title, price) {
     currentBookId = bookId;
     document.getElementById('modalBookTitle').textContent = title;
-    document.getElementById('paymentAmount').value = 'MWK ' + price.toFixed(2);
+    document.getElementById('paymentAmount').value = awMwk(price); // Q21
     document.getElementById('paymentForm').style.display = 'none';
     document.getElementById('paymentStatus').innerHTML = '';
     document.getElementById('paymentStatus').className = 'payment-status';
@@ -346,7 +366,7 @@ function processPayment() {
             statusDiv.appendChild(msg);
             statusDiv.className = 'payment-status success';
             const box = document.getElementById('paymentInstructions');
-            box.textContent = 'Send MWK ' + Number(data.amount).toFixed(2) + ' and use the reference ' + data.reference + ':\n\n' + data.instructions;
+            box.textContent = 'Send ' + awMwk(data.amount) + ' and use the reference ' + data.reference + ':\n\n' + data.instructions;
             box.textContent += '\n\nYour orders and receipts are in My purchases (' + <?php echo json_encode(SITE_URL . '/my_purchases.php'); ?> + ').';
             box.style.display = 'block';
             document.getElementById('payNowBtn').style.display = 'none';
@@ -595,6 +615,9 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
     .book-details h3 { font-size: 1rem; }
     .book-actions .btn { padding: 4px 12px; font-size: 0.7rem; }
 }
+
+/* Q21 */
+.payment-option .payment-hint { display:block; font-size:0.75rem; color:var(--text-light); font-weight:400; }
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

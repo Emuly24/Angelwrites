@@ -35,7 +35,17 @@ if ($id > 0) {
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Q20: recordings are uploaded in the same request as the text. When a recording made the request
+// larger than the host's post_max_size, PHP dropped the whole request and the text was lost.
+$aw_post_limit = (function ($v) { $v = trim((string)$v); $n = (float)$v; $u = strtolower(substr($v, -1));
+    return (int)($u === 'g' ? $n * 1073741824 : ($u === 'm' ? $n * 1048576 : ($u === 'k' ? $n * 1024 : $n))); })(ini_get('post_max_size'));
+$aw_file_limit = (function ($v) { $v = trim((string)$v); $n = (float)$v; $u = strtolower(substr($v, -1));
+    return (int)($u === 'g' ? $n * 1073741824 : ($u === 'm' ? $n * 1048576 : ($u === 'k' ? $n * 1024 : $n))); })(ini_get('upload_max_filesize'));
+$aw_restore_draft = false;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    $error = 'The save was larger than this host accepts (' . round($aw_post_limit / 1048576, 1) . ' MB, usually because of a recording), so nothing arrived. Your text was kept on this device: press "Restore my text", then save without the recording or with a shorter one.';
+    $aw_restore_draft = true;
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
     $content = trim($_POST['content']);
@@ -143,8 +153,11 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
         </div>
 
         <?php if ($error): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?>
+                <?php if ($aw_restore_draft): ?> <button type="button" class="btn btn-sm btn-primary" id="awRestoreDraft">Restore my text</button><?php endif; ?>
+            </div>
         <?php endif; ?>
+        <p style="font-size:0.85rem;color:var(--text-light);">Recordings and images are sent with the text when you save: up to <?php echo round(min($aw_file_limit, $aw_post_limit) / 1048576, 1); ?> MB per file and <?php echo round($aw_post_limit / 1048576, 1); ?> MB in total on this host.</p><!-- Q20 -->
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
@@ -657,6 +670,43 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+</script>
+<script>
+// Q20: keep the text safe when a recording is too big for the host.
+(function () {
+    const form = document.getElementById('editorForm');
+    if (!form) return;
+    const KEY = 'awReflectionDraft';
+    const fileLimit = <?php echo (int)min($aw_file_limit, $aw_post_limit); ?>, postLimit = <?php echo (int)$aw_post_limit; ?>;
+    form.addEventListener('submit', function (e) {
+        let total = 0, msg = '';
+        form.querySelectorAll('input[type=file]').forEach(function (inp) {
+            const f = inp.files && inp.files[0]; if (!f) return; total += f.size;
+            if (f.size > fileLimit) msg = 'The ' + (inp.name.indexOf('video') >= 0 ? 'video recording' : inp.name.indexOf('audio') >= 0 ? 'audio recording' : 'file "' + f.name + '"') + ' is ' + (f.size / 1048576).toFixed(1) + ' MB; this host accepts ' + (fileLimit / 1048576).toFixed(1) + ' MB.';
+        });
+        if (!msg && total > postLimit * 0.95) msg = 'The files together are ' + (total / 1048576).toFixed(1) + ' MB; this host accepts about ' + (postLimit / 1048576).toFixed(1) + ' MB per save.';
+        if (msg) { e.preventDefault(); alert(msg + ' Nothing was sent; record a shorter clip or remove it.'); return; }
+        try {
+            const content = (window.tinymce && tinymce.get('editor')) ? tinymce.get('editor').getContent() : (document.getElementById('editor') || {}).value;
+            sessionStorage.setItem(KEY, JSON.stringify({ title: (document.getElementById('title') || {}).value || '', content: content || '' }));
+        } catch (err) {}
+    });
+    const restore = document.getElementById('awRestoreDraft');
+    if (restore) {
+        restore.addEventListener('click', function () {
+            try {
+                const d = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+                if (!d) { alert('No saved text was found on this device.'); return; }
+                document.getElementById('title').value = d.title;
+                if (window.tinymce && tinymce.get('editor')) tinymce.get('editor').setContent(d.content); else document.getElementById('editor').value = d.content;
+                restore.textContent = 'Text restored';
+                restore.disabled = true;
+            } catch (err) {}
+        });
+    } else {
+        try { sessionStorage.removeItem(KEY); } catch (err) {}
+    }
+})();
 </script>
 
 <style>

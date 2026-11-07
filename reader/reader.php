@@ -29,6 +29,20 @@ $tocEntries = buildTOC($pages, $chapterMap, $chapterTitles);
 // --- User progress (already extracted, but we need some variables for the UI) ---
 $last_offset = $user_progress['position_offset'] ?? 0;
 $last_chapter = $user_progress['position_section'] ?? 0;
+
+// Q6: a book whose file has not been processed for the reader opened an empty reader showing "1 / 0"
+// with no explanation. Show a normal site page that says so and leads to the book page instead.
+if (empty($pages)) {
+    $pageTitle = $book['title'];
+    require_once __DIR__ . '/../includes/header.php';
+    echo '<div class="container" style="max-width:640px;margin:40px auto;padding:0 16px;text-align:center;">'
+       . '<h1 style="font-size:1.6rem;">' . htmlspecialchars($book['title']) . '</h1>'
+       . '<p>This book is not ready to read online yet. Please check back soon.</p>'
+       . '<p><a class="btn btn-primary" href="' . SITE_URL . '/book.php?id=' . (int)$book_id . '">Go to the book page</a></p>'
+       . '</div>';
+    require_once __DIR__ . '/../includes/footer.php';
+    exit;
+}
 $progress_percent = $user_progress['progress_percent'] ?? 0;
 
 // --- Get additional user data ---
@@ -110,8 +124,8 @@ html,body { height:100%; width:100%; overflow:hidden; }
 #toolbar { flex-shrink:0; height:var(--toolbar-height); min-height:var(--toolbar-height); display:flex; justify-content:space-between; align-items:center; padding:0 20px; background:var(--card-bg); border-bottom:1px solid var(--border); box-shadow:var(--shadow); z-index:20; }
 .toolbar-left { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
 .toolbar-left .title { font-family:'Playfair Display',Georgia,serif; font-weight:700; font-size:1.15rem; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dark); }
-.toolbar-left button { background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-light); width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:color var(--transition); }
-.toolbar-left button:hover { color:var(--rose); background:rgba(219,161,162,0.1); }
+.toolbar-left button, .toolbar-left a#backBtn { text-decoration:none; background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-light); width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:color var(--transition); }
+.toolbar-left button:hover, .toolbar-left a#backBtn:hover { color:var(--rose); background:rgba(219,161,162,0.1); }
 .toolbar-center { display:flex; align-items:center; gap:16px; font-size:0.95rem; color:var(--text-light); flex-wrap:wrap; justify-content:center; }
 .progress-ring { position:relative; width:36px; height:36px; }
 .progress-ring svg { width:100%; height:100%; transform:rotate(-90deg); }
@@ -309,7 +323,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
 <div id="reader-app">
     <div id="toolbar">
         <div class="toolbar-left">
-            <button id="backBtn" aria-label="Back"><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
+            <a id="backBtn" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book_id; ?>" aria-label="Back to the book page"><i class="fas fa-arrow-left" aria-hidden="true"></i></a><!-- Q3: a real link (was a JS button) -->
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
             <?php echo renderStreakBadge($streak_days); ?>
             <?php echo renderLevelBadge($user_id ?? 0); ?>
@@ -511,6 +525,16 @@ html,body { height:100%; width:100%; overflow:hidden; }
     <!-- Selection toolbar for highlights; filled in by initSelectionTooltip() -->
     <div id="highlight-tooltip"></div>
     <div id="overlay"></div>
+    <?php if (!isLoggedIn()): $aw_back = urlencode('/reader/reader.php?id=' . (int)$book_id); ?>
+    <!-- Q7: guests could read but were never told that their place, highlights and notes are not saved -->
+    <div id="guestNotice" role="note" style="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:35;max-width:94vw;width:520px;background:var(--card-bg);border:1px solid var(--rose-light);border-radius:12px;box-shadow:var(--shadow-hover);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;color:var(--text);">
+        <span style="flex:1 1 220px;">You're reading as a guest: your place, highlights and notes won't be saved.</span>
+        <a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo $aw_back; ?>" class="note-submit" style="text-decoration:none;min-height:40px;display:inline-flex;align-items:center;">Log in</a>
+        <a href="<?php echo SITE_URL; ?>/register.php" style="color:var(--rose-dark);min-height:40px;display:inline-flex;align-items:center;">Create account</a>
+        <button type="button" aria-label="Dismiss" onclick="this.parentNode.remove();try{sessionStorage.setItem('awGuestNotice','1')}catch(e){}" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-light);min-width:40px;min-height:40px;">&times;</button>
+    </div>
+    <script>try { if (sessionStorage.getItem('awGuestNotice')) document.getElementById('guestNotice').remove(); } catch (e) {}</script>
+    <?php endif; ?>
 </div>
 
 <!-- ====== Include all enhanced modules ====== -->
@@ -533,6 +557,12 @@ if (function_exists('renderAchievementToastJS')) {
     const totalPages = pages.length;
     const bookId = <?php echo $book_id; ?>;
     const userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
+    // Q7: guest-only actions showed a bare alert; offer to log in and come back to this book.
+    function awNeedLogin(what) {
+        if (confirm('Please log in to ' + what.replace(/\.$/, '') + '.\n\nGo to the login page now? You will come back to this book.')) {
+            window.location.href = '<?php echo SITE_URL; ?>/login.php?redirect=' + encodeURIComponent('/reader/reader.php?id=<?php echo (int)$book_id; ?>');
+        }
+    }
     const groupId = <?php echo $group_id ? (int)$group_id : 0; ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
@@ -846,10 +876,10 @@ if (function_exists('renderAchievementToastJS')) {
 
     // ----- Bookmarks -----
     bookmarkBtn.addEventListener('click',function() {
-        if (userId === 0) { alert('Please log in to bookmark.'); return; }
+        if (userId === 0) { awNeedLogin('bookmark.'); return; }
         if (isBookmarked) {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
-            const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); xhr.send(fd);
+            const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); xhr.send(fd); // F235
             isBookmarked = false; bookmarkBtn.querySelector('i').className = 'far fa-bookmark'; bookmarkBtn.style.color = '#555';
         } else {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
@@ -860,18 +890,20 @@ if (function_exists('renderAchievementToastJS')) {
 
     function loadBookmarkStatus() {
         if (userId === 0) return;
-        const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',false);
-        const fd = new FormData(); fd.append('action','list_bookmarks'); fd.append('book_id',bookId); xhr.send(fd);
-        try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success) {
+        // Q4: this was a synchronous XMLHttpRequest, which froze the whole page (scrolling, taps) until
+        // the server answered. It is now asynchronous; the icon updates when the answer arrives.
+        const fd = new FormData(); fd.append('action','list_bookmarks'); fd.append('book_id',bookId);
+        fetch('/reader/reader_ajax.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
                 let exists = false;
                 data.bookmarks.forEach(b => { if (b.chapter_index == currentPage) exists = true; });
                 isBookmarked = exists;
                 bookmarkBtn.querySelector('i').className = exists ? 'fas fa-bookmark' : 'far fa-bookmark';
                 bookmarkBtn.style.color = exists ? 'var(--rose)' : '#555';
-            }
-        } catch(e) {}
+            })
+            .catch(() => {});
     }
 
     // ----- TOC -----
@@ -1006,9 +1038,9 @@ if (function_exists('renderAchievementToastJS')) {
         }
         openModal('share-modal');
     });
-    commentsBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to view comments.'); return; } loadComments(); openModal('commentsModal'); });
-    errorReportBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to report errors.'); return; } errorPageInput.value = currentPage; errorPageNumSpan.textContent = '(current: ' + currentPage + ')'; openModal('errorModal'); });
-    prayerBtn.addEventListener('click', function() { if (userId === 0) { alert('Please log in to submit prayer requests.'); return; } prayerText.value = ''; openModal('prayerModal'); });
+    commentsBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('view comments.'); return; } loadComments(); openModal('commentsModal'); });
+    errorReportBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('report errors.'); return; } errorPageInput.value = currentPage; errorPageNumSpan.textContent = '(current: ' + currentPage + ')'; openModal('errorModal'); });
+    prayerBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('submit prayer requests.'); return; } prayerText.value = ''; openModal('prayerModal'); });
     challengeBtn.addEventListener('click', loadChallenge);
 
     // ----- Analytics / notes / TTS buttons (redirect) -----
@@ -1035,7 +1067,7 @@ if (function_exists('renderAchievementToastJS')) {
 
     // ----- Reset progress -----
     resetProgressBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to reset progress.'); return; }
+        if (userId === 0) { awNeedLogin('reset progress.'); return; }
         if (confirm('Are you sure you want to reset your reading progress for this book? This cannot be undone.')) {
             const data = new FormData(); data.append('action', 'reset_progress'); data.append('book_id', bookId);
             const xhr = new XMLHttpRequest(); xhr.open('POST', '/reader/reader_ajax.php', true);
@@ -1433,7 +1465,6 @@ if (function_exists('renderAchievementToastJS')) {
         if (focusMode) { toggleFocus(); }
     }
 
-    backBtn.addEventListener('click',function() { window.location.href = '<?php echo SITE_URL; ?>/book.php?id=<?php echo $book_id; ?>'; });
 
     function submitError() {
         const page = parseInt(errorPageInput.value) || currentPage;
@@ -1475,7 +1506,7 @@ if (function_exists('renderAchievementToastJS')) {
 
     // ----- Export highlights -----
     exportHighlightsBtn.addEventListener('click', function() {
-        if (userId === 0) { alert('Please log in to export your highlights.'); return; }
+        if (userId === 0) { awNeedLogin('export your highlights.'); return; }
         const xhr = new XMLHttpRequest();
         xhr.open('GET','/reader/reader_ajax.php?action=get_highlights&book_id=' + bookId, true);
         xhr.onload = function() {

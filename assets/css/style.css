@@ -1593,3 +1593,11 @@ input:focus, textarea:focus, select:focus {
     input[type="text"], input[type="search"], input[type="email"], input[type="tel"], input[type="password"], input[type="number"] { min-height: 44px; }
 }
 
+/* Q27: the show-password control is a real button now */
+button.password-toggle { background:none; border:0; cursor:pointer; color:var(--text-light); font-size:0.8rem; min-width:44px; min-height:40px; display:inline-flex; align-items:center; gap:4px; }
+button.password-toggle:focus-visible { outline:2px solid var(--rose); outline-offset:2px; }
+
+
+/* Q37: footer subscribe has an optional name field on its own line */
+.footer-newsletter-form { flex-wrap: wrap; }
+.footer-newsletter-form input[name="name"] { flex-basis: 100%; }

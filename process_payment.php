@@ -113,7 +113,7 @@ try {
     $body .= "<p><strong>Member's transaction ID:</strong> " . htmlspecialchars($payer_reference !== '' ? $payer_reference : 'not given') . "</p>";
     $body .= "<p><strong>User ID:</strong> $user_id</p>";
     $body .= "<p><strong>Book ID:</strong> $book_id</p>";
-    $body .= "<p><strong>Amount:</strong> MWK " . number_format($amount, 2) . "</p>";
+    $body .= "<p><strong>Amount:</strong> " . aw_mwk($amount) . "</p>";
     $body .= "<p><strong>Payment Method:</strong> " . ucfirst($payment_method) . "</p>";
     $body .= "<p><strong>Phone Number:</strong> " . htmlspecialchars($phone_number) . "</p>";
     $body .= "<p>Confirm or reject it at " . SITE_URL . "/admin/manage_payments.php</p>";

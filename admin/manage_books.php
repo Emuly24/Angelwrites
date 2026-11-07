@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
 
 redirectIfNotAdmin();
@@ -50,8 +51,29 @@ if (isset($_GET['edit'])) {
     }
 }
 
+// Q15: the host's upload limit (PHP upload_max_filesize / post_max_size, 10 MB on InfinityFree)
+// was never shown or checked. Too-large files were silently dropped, and a request over
+// post_max_size arrived with no fields at all, which showed as "Book title is required."
+function aw_ini_bytes($v) {
+    $v = trim((string)$v); $n = (float)$v; $u = strtolower(substr($v, -1));
+    return (int)($u === 'g' ? $n * 1073741824 : ($u === 'm' ? $n * 1048576 : ($u === 'k' ? $n * 1024 : $n)));
+}
+$aw_upload_limit = min(aw_ini_bytes(ini_get('upload_max_filesize')), aw_ini_bytes(ini_get('post_max_size')) ?: PHP_INT_MAX);
+$aw_upload_limit_mb = round($aw_upload_limit / 1048576, 1);
+$aw_upload_error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    $aw_upload_error = 'The upload was larger than this host accepts (' . round(aw_ini_bytes(ini_get('post_max_size')) / 1048576, 1) . ' MB in total), so nothing was saved. Please use smaller files.';
+}
+foreach (['cover', 'book_file'] as $aw_f) {
+    if (!empty($_FILES[$aw_f]['name']) && in_array($_FILES[$aw_f]['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+        $aw_upload_error = 'The file "' . $_FILES[$aw_f]['name'] . '" is larger than this host accepts (' . $aw_upload_limit_mb . ' MB). Nothing was saved.';
+    }
+}
+
 // ===== HANDLE FORM SUBMISSION (ADD / UPDATE) =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($aw_upload_error !== '') {
+    $error = $aw_upload_error;
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = isset($_POST['book_id']) ? (int)$_POST['book_id'] : 0;
     $title = trim($_POST['title']);
     $author = trim($_POST['author'] ?? 'Angella Bottoman');
@@ -330,7 +352,8 @@ $pageTitle = 'Manage Books';
                         <!-- Standard Cover Upload (Fallback) -->
                         <div class="form-group">
                             <label for="cover">Or Upload Cover Image</label>
-                            <input type="file" id="cover" name="cover" accept="image/*">
+                            <input type="file" id="cover" name="cover" accept="image/*" data-max="<?php echo (int)min($aw_upload_limit, 5 * 1048576); ?>">
+                            <small>Up to <?php echo min($aw_upload_limit_mb, 5); ?> MB.</small><!-- Q15 -->
                             <?php if ($edit_book && $edit_book['cover_path']): ?>
                                 <div class="current-file">
                                     <img src="<?php echo SITE_URL . '/' . $edit_book['cover_path']; ?>" alt="Current cover" style="max-width:100px; border-radius:8px;">
@@ -342,7 +365,20 @@ $pageTitle = 'Manage Books';
                         <!-- Book File Upload -->
                         <div class="form-group">
                             <label for="book_file">Book File (PDF, EPUB, DOC, DOCX)</label>
-                            <input type="file" id="book_file" name="book_file" accept=".pdf,.epub,.doc,.docx">
+                            <input type="file" id="book_file" name="book_file" accept=".pdf,.epub,.doc,.docx" data-max="<?php echo (int)min($aw_upload_limit, 50 * 1048576); ?>">
+                            <small>Up to <?php echo min($aw_upload_limit_mb, 50); ?> MB on this host (cover and book file together must also fit).</small><!-- Q15 -->
+                            <script>
+                            // Q15: check sizes before sending, so a too-large file is caught here instead of being dropped.
+                            document.getElementById('bookForm').addEventListener('submit', function (e) {
+                                let total = 0, msg = '';
+                                this.querySelectorAll('input[type=file][data-max]').forEach(function (inp) {
+                                    const f = inp.files && inp.files[0]; if (!f) return; total += f.size;
+                                    if (f.size > +inp.dataset.max) msg = '"' + f.name + '" is ' + (f.size / 1048576).toFixed(1) + ' MB; the limit is ' + (inp.dataset.max / 1048576).toFixed(1) + ' MB.';
+                                });
+                                if (!msg && total > <?php echo (int)$aw_upload_limit; ?>) msg = 'The files together are ' + (total / 1048576).toFixed(1) + ' MB; this host accepts <?php echo $aw_upload_limit_mb; ?> MB per save.';
+                                if (msg) { e.preventDefault(); alert(msg + ' Nothing was sent.'); }
+                            });
+                            </script>
                             <?php if ($edit_book && $edit_book['file_path']): ?>
                                 <div class="current-file">
                                     <small>📁 Current file: <?php echo basename($edit_book['file_path']); ?></small>
@@ -423,9 +459,9 @@ $pageTitle = 'Manage Books';
                                                     <?php if ($book['is_free']): ?>
                                                         <span class="badge free">Free</span>
                                                     <?php elseif (!empty($book['is_sale']) && (float)($book['sale_price'] ?? 0) > 0 && (float)$book['sale_price'] < (float)$book['price']): // F79 ?>
-                                                        <span class="badge sale"><s>MWK <?php echo number_format($book['price'], 2); ?></s> MWK <?php echo number_format($book['sale_price'], 2); ?></span>
+                                                        <span class="badge sale"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span>
                                                     <?php else: ?>
-                                                        <span class="badge">MWK <?php echo number_format($book['price'], 2); ?></span>
+                                                        <span class="badge"><?php echo aw_mwk($book['price']); ?></span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td data-label="File">

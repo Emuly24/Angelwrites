@@ -15,6 +15,12 @@ function aw_book_on_sale(array $book) {
     return !empty($book['is_sale']) && $sale > 0 && $sale < (float)($book['price'] ?? 0);
 }
 
+// Q21: money as Malawians write it: "MWK 5,000" (tambala only when there are any, "MWK 2,500.50").
+function aw_mwk($amount) {
+    $a = round((float)$amount, 2);
+    return 'MWK ' . number_format($a, floor($a) == $a ? 0 : 2);
+}
+
 // F35: the price a member is charged for a book, from the database (never from the browser).
 // F79: the sale price while the book is on sale.
 function aw_book_price(array $book) {
@@ -105,8 +111,8 @@ function aw_notify_payment_member(PDO $db, $payment_id, $status) {
     $link = SITE_URL . '/my_purchases.php';
     if ($status === 'completed') {
         $title = 'Payment confirmed: ' . $book;
-        $text = "Thank you! We have received your payment of MWK " . number_format((float)$o['amount'], 2) . " for \"$book\" (order $ref). You can now read and download it.";
-        $body = "Receipt\n\nOrder: $ref\nBook: $book\nAmount paid: MWK " . number_format((float)$o['amount'], 2)
+        $text = "Thank you! We have received your payment of " . aw_mwk($o['amount']) . " for \"$book\" (order $ref). You can now read and download it.";
+        $body = "Receipt\n\nOrder: $ref\nBook: $book\nAmount paid: " . aw_mwk($o['amount'])
               . "\nConfirmed: " . date('j M Y', strtotime((string)($o['completed_at'] ?: 'now')))
               . "\n\nRead or download it from My purchases: $link\n\nBlessings,\nAngelWrites";
     } else {

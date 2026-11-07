@@ -111,6 +111,9 @@ $pageTitle = htmlspecialchars($group['name']);
                 <span class="invite-code">
                     <strong>Invite Code:</strong> <code><?php echo $group['invite_code']; ?></code>
                     <button onclick="copyInviteCode()" class="btn btn-sm btn-outline">📋 Copy</button>
+                    <?php if ($is_admin): ?>
+                        <button onclick="regenerateInviteCode()" class="btn btn-sm btn-outline" title="Make a new code; the old one stops working">🔄 New code</button><!-- Q16 -->
+                    <?php endif; ?>
                 </span>
                 <?php if ($is_admin): ?>
                     <button onclick="showEditGroup()" class="btn btn-sm btn-outline">
@@ -491,13 +494,26 @@ $pageTitle = htmlspecialchars($group['name']);
     </div>
 </div>
 
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-toast.js"></script>
 <script>
 // ===== COPY INVITE CODE =====
 function copyInviteCode() {
     const code = document.querySelector('.invite-code code').textContent;
     navigator.clipboard.writeText(code).then(() => {
-        alert('Invite code copied!');
-    });
+        awToast('Invite code copied.');
+    }).catch(() => awToast('Copy not available here; the code is ' + code, 'info'));
+}
+
+// Q16: issue a new invite code (creators/admins); the old code stops working.
+function regenerateInviteCode() {
+    if (!confirm('Make a new invite code? The current code will stop working; members already in the group stay.')) return;
+    const fd = new FormData();
+    fd.append('action', 'regenerate_invite');
+    fd.append('group_id', <?php echo (int)$group['id']; ?>);
+    fetch('group_ajax.php', { method: 'POST', body: fd }).then(r => r.json()).then(data => {
+        if (data.success) { document.querySelector('.invite-code code').textContent = data.invite_code; awToast('New invite code: ' + data.invite_code); }
+        else awToast(data.error || 'Could not make a new code.', 'error');
+    }).catch(() => awToast('Could not make a new code. Please try again.', 'error'));
 }
 
 // ===== TABS =====
@@ -531,7 +547,7 @@ function submitDiscussion(e) {
             closeCreateDiscussion();
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -544,7 +560,7 @@ function submitReply(e, discussionId) {
     formData.append('discussion_id', discussionId);
     fetch('group_ajax.php', { method: 'POST', body: formData })
         .then(r => r.json())
-        .then(data => { if (data.success) { location.reload(); } else { alert('Error: ' + data.error); } });
+        .then(data => { if (data.success) { location.reload(); } else { awToast(data.error || 'Something went wrong. Please try again.', 'error'); } });
 }
 
 // ===== NOTES =====
@@ -570,7 +586,7 @@ function submitNote(e) {
             closeAddNote();
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -586,7 +602,7 @@ function deleteNote(noteId) {
         if (data.success) {
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -604,7 +620,7 @@ function updateProgress(chapterIndex) {
         if (data.success) {
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -630,7 +646,7 @@ function submitSchedule(e) {
             closeAddSchedule();
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -646,7 +662,7 @@ function deleteSchedule(scheduleId) {
         if (data.success) {
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -673,7 +689,7 @@ function submitEditGroup(e) {
             closeEditGroup();
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -693,7 +709,7 @@ function changeMemberRole(userId, role) {
         if (data.success) {
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
@@ -710,7 +726,7 @@ function removeMember(userId) {
         if (data.success) {
             location.reload();
         } else {
-            alert('Error: ' + data.error);
+            awToast(data.error || 'Something went wrong. Please try again.', 'error');
         }
     });
 }
