@@ -73,10 +73,16 @@ try {
             FROM reviews r
             JOIN users u ON r.user_id = u.id
             WHERE r.target_type = 'book' AND r.target_id = ? AND r.deleted_at IS NULL -- F157: reviews deleted by the admin
-            ORDER BY r.created_at DESC
+            ORDER BY r.created_at DESC, r.id DESC
         ");
         $stmt->execute([$book_id]);
         $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // P14: all reviews were shown at once; 10 per page now, newest first.
+        require_once __DIR__ . '/includes/pagination.php';
+        [$rpage, $rper] = aw_page(10);
+        $reviews_total = count($reviews);
+        [$rpage, $roffset] = aw_clamp($reviews_total, $rpage, $rper);
+        $reviews = array_slice($reviews, $roffset, $rper);
         
         // Average rating
         $stmt = $db->prepare("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM reviews WHERE target_type = 'book' AND target_id = ? AND deleted_at IS NULL"); // F157
@@ -323,7 +329,7 @@ $pageTitle = htmlspecialchars($book['title']);
                 </div>
 
                 <!-- ===== REVIEWS SECTION ===== -->
-                <div class="reviews-section">
+                <div class="reviews-section" id="reviews">
                     <div class="reviews-header">
                         <h3>What Readers Say</h3>
                         <div class="rating-summary">
@@ -365,7 +371,7 @@ $pageTitle = htmlspecialchars($book['title']);
                     <?php endif; ?>
 
                     <!-- Reviews List -->
-                    <?php if (count($reviews) > 0): ?>
+                    <?php if (!empty($reviews_total)): ?>
                         <div class="reviews-list">
                             <?php foreach ($reviews as $review): ?>
                                 <div class="review-item" id="review-<?php echo $review['id']; ?>">
@@ -401,7 +407,8 @@ $pageTitle = htmlspecialchars($book['title']);
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                    <?php elseif (!$isLoggedIn || count($reviews) === 0): ?>
+                        <?php echo aw_pager($reviews_total, $rpage, $rper, 'reviews'); // P14 ?>
+                    <?php elseif (!$isLoggedIn || empty($reviews_total)): ?>
                         <div class="no-reviews">
                             <i class="fas fa-star-half-alt"></i>
                             <p>No reviews yet. Be the first to review this book!</p>

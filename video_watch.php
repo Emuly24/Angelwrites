@@ -106,8 +106,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
 
 // ===== FETCH COMMENTS =====
 $order = isset($_GET['order']) && $_GET['order'] === 'oldest' ? 'ASC' : 'DESC';
-$stmt = $db->prepare("SELECT c.*, u.username, u.display_name, u.avatar FROM video_comments c JOIN users u ON c.user_id = u.id WHERE c.video_id = ? ORDER BY c.created_at $order");
-$stmt->execute([$id]);
+// P17: all comments were loaded and shown at once; 10 per page now (the newest/oldest order is kept).
+require_once __DIR__ . '/includes/pagination.php';
+[$cpage, $cper] = aw_page(10);
+$cst = $db->prepare("SELECT COUNT(*) FROM video_comments WHERE video_id = ?");
+$cst->execute([$id]);
+$comments_total = (int)$cst->fetchColumn();
+[$cpage, $coffset] = aw_clamp($comments_total, $cpage, $cper);
+$stmt = $db->prepare("SELECT c.*, u.username, u.display_name, u.avatar FROM video_comments c JOIN users u ON c.user_id = u.id WHERE c.video_id = ? ORDER BY c.created_at $order, c.id $order LIMIT ? OFFSET ?");
+$stmt->execute([$id, $cper, $coffset]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH RELATED VIDEOS =====
@@ -189,9 +196,9 @@ $pageTitle = htmlspecialchars($video['title']);
                 </div>
 
                 <!-- Comments Section -->
-                <div class="comments-section">
+                <div class="comments-section" id="comments">
                     <div class="comments-header">
-                        <h3><?php echo count($comments); ?> Comments</h3>
+                        <h3><?php echo $comments_total; ?> Comment<?php echo $comments_total === 1 ? '' : 's'; ?></h3>
                         <div class="sort-options">
                             <label for="sortComments">Sort by:</label>
                             <select id="sortComments" onchange="window.location.href='?id=<?php echo $id; ?>&order=' + this.value">
@@ -217,7 +224,7 @@ $pageTitle = htmlspecialchars($video['title']);
                         <p class="login-prompt"><a href="<?php echo SITE_URL; ?>/login.php">Sign in</a> to post a comment.</p>
                     <?php endif; ?>
 
-                    <?php if (count($comments) > 0): ?>
+                    <?php if ($comments_total > 0): ?>
                         <div class="comments-list">
                             <?php foreach ($comments as $comment): ?>
                                 <div class="comment-item">
@@ -244,6 +251,7 @@ $pageTitle = htmlspecialchars($video['title']);
                                 </div>
                             <?php endforeach; ?>
                         </div>
+                        <?php echo aw_pager($comments_total, $cpage, $cper, 'comments'); // P17 ?>
                     <?php else: ?>
                         <p class="no-comments">No comments yet. Start the conversation!</p>
                     <?php endif; ?>

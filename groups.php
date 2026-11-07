@@ -69,8 +69,15 @@ if ($book_filter) {
     $dsql .= " AND g.content_type = 'book' AND g.content_id = ?";
     $dparams[] = $book_filter;
 }
-$dstmt = $db->prepare($dsql . " ORDER BY member_count DESC, g.created_at DESC LIMIT 30");
-$dstmt->execute($dparams);
+// P3: the directory stopped at 30 groups with no way to see more; it is paged, 12 at a time.
+require_once __DIR__ . '/includes/pagination.php';
+[$page, $per_page] = aw_page(12);
+$cstmt = $db->prepare("SELECT COUNT(*) FROM (" . $dsql . ")");
+$cstmt->execute($dparams);
+$public_total = (int)$cstmt->fetchColumn();
+[$page, $offset] = aw_clamp($public_total, $page, $per_page);
+$dstmt = $db->prepare($dsql . " ORDER BY member_count DESC, g.created_at DESC, g.id DESC LIMIT ? OFFSET ?");
+$dstmt->execute(array_merge($dparams, [$per_page, $offset]));
 $public_groups = $dstmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'My Reading Groups';
@@ -214,6 +221,7 @@ $pageTitle = 'My Reading Groups';
                     </div>
                 <?php endforeach; ?>
             </div>
+            <?php echo aw_pager($public_total, $page, $per_page, 'discover'); // P3 ?>
         <?php endif; ?>
     </div>
 </div>

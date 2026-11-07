@@ -25,9 +25,27 @@ if ($filter === 'free') {
     $sql .= " AND is_sale = 1 AND sale_price > 0 AND sale_price < price"; // F79
 }
 
-$sql .= " ORDER BY created_at DESC";
+// P1: the catalogue showed every book on one page. 12 per page with the shared pager.
+require_once __DIR__ . '/includes/pagination.php';
+[$page, $per_page, $offset] = aw_page(12);
+$cstmt = $db->prepare(preg_replace('/^SELECT \* /', 'SELECT COUNT(*) ', $sql));
+$cstmt->execute($params);
+$total_books = (int)$cstmt->fetchColumn();
+[$page, $offset] = aw_clamp($total_books, $page, $per_page);
+// Q14's ?buy=<id> must land on the page that holds that book (newest first, id breaks ties).
+if (!isset($_GET['page']) && !empty($_GET['buy'])) {
+    $bp = $db->prepare("SELECT created_at, id FROM books WHERE id = ?");
+    $bp->execute([(int)$_GET['buy']]);
+    if ($bb = $bp->fetch(PDO::FETCH_ASSOC)) {
+        $pos = $db->prepare(preg_replace('/^SELECT \* /', 'SELECT COUNT(*) ', $sql) . " AND (created_at > ? OR (created_at = ? AND id > ?))");
+        $pos->execute(array_merge($params, [$bb['created_at'], $bb['created_at'], $bb['id']]));
+        $page = intdiv((int)$pos->fetchColumn(), $per_page) + 1;
+        $offset = ($page - 1) * $per_page;
+    }
+}
+$sql .= " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?";
 $stmt = $db->prepare($sql);
-$stmt->execute($params);
+$stmt->execute(array_merge($params, [$per_page, $offset]));
 $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // F86: only books with processed reader content can be read online; the others showed a Read
@@ -71,7 +89,7 @@ $pageTitle = 'Books';
             <div class="books-header-stats">
                 <span class="stat-badge">
                     <i class="fas fa-book"></i>
-                    <strong><?php echo count($books); ?></strong> book<?php echo count($books) != 1 ? 's' : ''; ?>
+                    <strong><?php echo $total_books; ?></strong> book<?php echo $total_books != 1 ? 's' : ''; ?>
                 </span>
             </div>
         </div>
@@ -181,6 +199,7 @@ $pageTitle = 'Books';
                     </div>
                 <?php endforeach; ?>
             </div>
+            <?php echo aw_pager($total_books, $page, $per_page); // P1 ?>
         <?php else: ?>
             <div class="empty-state">
                 <div class="empty-state-icon">

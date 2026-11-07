@@ -17,9 +17,17 @@ $stmt = $db->prepare("
            b.title AS book_title
     FROM payments p LEFT JOIN books b ON b.id = p.book_id
     WHERE p.user_id = ?
-    ORDER BY p.created_at DESC
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT ? OFFSET ?
 ");
-$stmt->execute([$_SESSION['user_id']]);
+// P4: orders are paged, 10 at a time.
+require_once __DIR__ . '/includes/pagination.php';
+[$page, $per_page] = aw_page(10);
+$cst = $db->prepare("SELECT COUNT(*) FROM payments WHERE user_id = ?");
+$cst->execute([$_SESSION['user_id']]);
+$orders_total = (int)$cst->fetchColumn();
+[$page, $offset] = aw_clamp($orders_total, $page, $per_page);
+$stmt->execute([$_SESSION['user_id'], $per_page, $offset]);
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $methods = ['airtel' => 'Airtel Money', 'mpamba' => 'TNM Mpamba', 'nbm' => 'NBM Mo626'];
 $instructions = aw_payment_instructions();
@@ -69,5 +77,6 @@ require_once __DIR__ . '/includes/header.php';
             <?php endif; ?>
         </div>
     <?php endforeach; ?>
+    <?php echo aw_pager($orders_total, $page, $per_page); // P4 ?>
 </div>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

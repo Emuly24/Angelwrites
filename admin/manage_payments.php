@@ -63,6 +63,11 @@ if (!in_array($filter, ['pending', 'completed', 'rejected', 'all'], true)) {
     $filter = 'pending';
 }
 $where = $filter === 'all' ? '' : 'WHERE p.status = ' . $db->quote($filter);
+// P5: was capped at 300 orders with no way to see older ones; 20 per page now.
+require_once __DIR__ . '/../includes/pagination.php';
+[$page, $per_page] = aw_page(20);
+$orders_total = (int)$db->query("SELECT COUNT(*) FROM payments p $where")->fetchColumn();
+[$page, $offset] = aw_clamp($orders_total, $page, $per_page);
 $orders = $db->query("
     SELECT p.id, p.amount, p.payment_method, p.transaction_id, p.phone_number, p.status, p.created_at, p.completed_at,
            b.title AS book_title, p.book_id,
@@ -71,8 +76,8 @@ $orders = $db->query("
     LEFT JOIN books b ON b.id = p.book_id
     LEFT JOIN users u ON u.id = p.user_id
     $where
-    ORDER BY p.created_at DESC
-    LIMIT 300
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT $per_page OFFSET $offset
 ")->fetchAll(PDO::FETCH_ASSOC);
 $counts = $db->query("SELECT status, COUNT(*) FROM payments GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
 $methods = ['airtel' => 'Airtel Money', 'mpamba' => 'TNM Mpamba', 'nbm' => 'NBM Mo626'];
@@ -138,6 +143,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
             </div>
         <?php endforeach; ?>
+        <?php echo aw_pager($orders_total, $page, $per_page); // P5 ?>
     </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

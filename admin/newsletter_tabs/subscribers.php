@@ -53,7 +53,7 @@ foreach ($db->query("SELECT a.subscriber_id, s.name FROM subscriber_segment_assi
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($subscribers as $sub): ?>
+                            <?php foreach ($aw_nl['subscribers']['rows'] as $sub): // P18 ?>
                                 <tr>
                                     <td><input type="checkbox" class="bulk-subscriber" value="<?php echo (int)$sub['id']; ?>" aria-label="Select <?php echo htmlspecialchars($sub['email']); ?>"></td>
                                     <td><?php echo htmlspecialchars($sub['email']); ?></td>
@@ -69,6 +69,7 @@ foreach ($db->query("SELECT a.subscriber_id, s.name FROM subscriber_segment_assi
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                <?php echo aw_pager($aw_nl['subscribers']['total'], $aw_nl['subscribers']['page'], $aw_nl['subscribers']['per'], '', $aw_nl['subscribers']['param']); // P18 ?>
                 </div>
             </form>
             <script>

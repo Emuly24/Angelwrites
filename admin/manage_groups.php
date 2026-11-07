@@ -72,6 +72,12 @@ require_once '../includes/header.php';
 // ===== FETCH ALL GROUPS WITH CONTENT AND STATS =====
 $groups = [];
 $db_error = null;
+// P11: all groups were listed on one page; 20 per page now.
+require_once __DIR__ . '/../includes/pagination.php';
+[$page, $per_page] = aw_page(20);
+$groups_total = 0;
+try { $groups_total = (int)$db->query("SELECT COUNT(*) FROM reading_groups")->fetchColumn(); } catch (PDOException $e) {}
+[$page, $offset] = aw_clamp($groups_total, $page, $per_page);
 
 try {
     $stmt = $db->prepare("
@@ -88,9 +94,10 @@ try {
         LEFT JOIN poems p ON g.content_type = 'poem' AND g.content_id = p.id
         LEFT JOIN newsletter_archive n ON g.content_type = 'newsletter' AND g.content_id = n.id -- F48: sent newsletters live here; 'newsletters' is an empty, unused table
         LEFT JOIN users u ON g.creator_id = u.id
-        ORDER BY g.created_at DESC
+        ORDER BY g.created_at DESC, g.id DESC
+        LIMIT ? OFFSET ?
     ");
-    $stmt->execute();
+    $stmt->execute([$per_page, $offset]);
     $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $db_error = $e->getMessage();
@@ -107,7 +114,7 @@ try {
                 <p class="subtitle">Overview of all reading groups across books, poems, and newsletters.</p>
             </div>
             <div class="header-actions">
-                <span class="total-groups">Total: <strong><?php echo count($groups); ?></strong> groups</span>
+                <span class="total-groups">Total: <strong><?php echo $groups_total; ?></strong> groups</span>
                 <a href="dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
@@ -211,6 +218,7 @@ try {
                         </tbody>
                     </table>
                 </div>
+            <?php echo aw_pager($groups_total, $page, $per_page); // P11 ?>
             <?php endif; ?>
         </div>
 

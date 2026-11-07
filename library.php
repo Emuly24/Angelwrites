@@ -128,6 +128,14 @@ foreach ($books as $book) {
     $grouped[$status][] = $book;
 }
 
+// P2: "All Books" (every book not on one of the member's lists, i.e. most of the catalogue) was
+// shown in full. It is paged, 12 at a time; the member's own three lists stay complete.
+require_once __DIR__ . '/includes/pagination.php';
+[$page, $per_page] = aw_page(12);
+$all_books_total = count($grouped['none']);
+[$page, $offset] = aw_clamp($all_books_total, $page, $per_page);
+$grouped['none'] = array_slice($grouped['none'], $offset, $per_page);
+
 $pageTitle = 'My Library';
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -415,12 +423,12 @@ $pageTitle = 'My Library';
                     <h2 class="section-title">
                         <span class="section-icon other">📚</span>
                         All Books
-                        <span class="section-count">(<?php echo count($grouped['none']); ?>)</span>
+                        <span class="section-count">(<?php echo $all_books_total; ?>)</span>
                     </h2>
                     <p class="section-subtitle">Books you haven't added to any list yet.</p>
                 </div>
             </div>
-            <?php if (count($grouped['none']) > 0): ?>
+            <?php if ($all_books_total > 0): ?>
                 <div class="book-grid">
                     <?php foreach ($grouped['none'] as $book): ?>
                         <div class="book-card">
@@ -458,6 +466,7 @@ $pageTitle = 'My Library';
                         </div>
                     <?php endforeach; ?>
                 </div>
+                <?php echo aw_pager($all_books_total, $page, $per_page, 'all-books'); // P2 ?>
             <?php else: ?>
                 <div class="empty-state">
                     <div class="empty-state-icon"><i class="fas fa-layer-group"></i></div>

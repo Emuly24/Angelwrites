@@ -84,6 +84,17 @@ $segments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt = $db->query("SELECT * FROM newsletter_archive ORDER BY sent_at DESC");
 $archive = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// P18: the Subscribers, Queue and Archive tabs showed every row at once. Each table is paged
+// (25 per page, own parameter); the full lists are kept for counts and the Send tab's picker.
+require_once __DIR__ . '/../includes/pagination.php';
+$aw_nl = [];
+foreach (['subscribers' => 'spage', 'queue' => 'qpage', 'archive' => 'apage'] as $aw_list => $aw_param) {
+    [$aw_p, $aw_per] = aw_page(25, $aw_param);
+    $aw_t = count($$aw_list);
+    [$aw_p, $aw_o] = aw_clamp($aw_t, $aw_p, $aw_per);
+    $aw_nl[$aw_list] = ['rows' => array_slice($$aw_list, $aw_o, $aw_per), 'total' => $aw_t, 'page' => $aw_p, 'per' => $aw_per, 'param' => $aw_param];
+}
+
 $stmt = $db->query("SELECT * FROM newsletter_audit_log ORDER BY created_at DESC LIMIT 50");
 $audit_log = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

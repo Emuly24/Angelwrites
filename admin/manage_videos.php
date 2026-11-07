@@ -133,7 +133,15 @@ if (!empty($search)) {
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
-$sql .= " ORDER BY created_at DESC";
+// P9: all videos were listed on one page; 20 per page now.
+require_once __DIR__ . '/../includes/pagination.php';
+[$page, $per_page] = aw_page(20);
+$cst = $db->prepare("SELECT COUNT(*) FROM (" . $sql . ")");
+$cst->execute($params);
+$videos_total = (int)$cst->fetchColumn();
+[$page, $offset] = aw_clamp($videos_total, $page, $per_page);
+$sql .= " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?";
+$params[] = $per_page; $params[] = $offset;
 
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
@@ -267,10 +275,10 @@ $pageTitle = 'Manage Videos';
 
         <div class="card">
             <div class="card-header">
-                <h2>All Videos (<?php echo count($videos); ?>)</h2>
+                <h2>All Videos (<?php echo $videos_total; ?>)</h2>
             </div>
             <div class="card-body">
-                <?php if (count($videos) > 0): ?>
+                <?php if ($videos_total > 0): ?>
                     <div class="table-responsive">
                         <table class="admin-table">
                             <thead>
@@ -328,6 +336,7 @@ $pageTitle = 'Manage Videos';
                             </tbody>
                         </table>
                     </div>
+                <?php echo aw_pager($videos_total, $page, $per_page); // P9 ?>
                 <?php else: ?>
                     <p class="no-items">No videos yet. Click "Add New Video" to get started.</p>
                 <?php endif; ?>

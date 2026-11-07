@@ -16,7 +16,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($archive as $item): ?>
+                        <?php foreach ($aw_nl['archive']['rows'] as $item): // P18 ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($item['subject']); ?></td>
                                 <td><?php echo $item['recipient_count']; ?></td>
@@ -33,6 +33,7 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                <?php echo aw_pager($aw_nl['archive']['total'], $aw_nl['archive']['page'], $aw_nl['archive']['per'], '', $aw_nl['archive']['param']); // P18 ?>
             </div>
         <?php else: ?>
             <p class="no-items">No archived newsletters yet.</p>
