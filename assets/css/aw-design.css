@@ -599,3 +599,95 @@ html.aw-ui .sticky-cta {
     html.aw-ui .sticky-cta .btn { padding: 6px 16px; font-size: 0.8rem; }
     html.aw-ui .sticky-cta-close { position: absolute; top: 0; right: 8px; width: 32px; height: 32px; }
 }
+
+/* ===== D7: footer ===== */
+html.aw-ui .site-footer {
+    position: relative;
+    background:
+        radial-gradient(55% 90% at 8% 0%, rgba(219, 161, 162, 0.16), transparent 62%),
+        radial-gradient(45% 80% at 96% 0%, rgba(214, 168, 92, 0.1), transparent 60%),
+        var(--footer-bg);
+}
+html.aw-ui .site-footer::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--rose), var(--aw-gold), var(--rose), transparent);
+    background-size: 200% 100%;
+    animation: awShimmer 12s linear infinite;
+}
+html.aw-ui .site-footer :is(.footer-links, .footer-social) h4 { position: relative; padding-bottom: 8px; letter-spacing: 0.02em; }
+html.aw-ui .site-footer :is(.footer-links, .footer-social) h4::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 28px; height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--rose), var(--aw-gold));
+}
+html.aw-ui .footer-links ul li a { display: inline-flex; align-items: center; transition: color 0.25s ease, transform 0.35s var(--aw-ease); }
+html.aw-ui .footer-links ul li a::before {
+    content: "\203A";
+    width: 0;
+    overflow: hidden;
+    opacity: 0;
+    color: var(--rose);
+    transition: width 0.3s var(--aw-ease), opacity 0.3s ease, margin 0.3s var(--aw-ease);
+}
+html.aw-ui .footer-links ul li a:hover { color: #fff; text-decoration: none; transform: translateX(2px); }
+html.aw-ui .footer-links ul li a:hover::before { width: 0.7em; opacity: 1; }
+html.aw-ui .footer-legal a { transition: color 0.25s ease; }
+html.aw-ui .footer-legal a:hover { color: #fff; }
+
+html.aw-ui .social-icons a {
+    width: 40px; height: 40px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 1rem;
+    color: var(--footer-text);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    transition: transform 0.4s var(--aw-spring), background 0.3s ease, color 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+html.aw-ui .social-icons a:hover {
+    color: #fff;
+    text-decoration: none;
+    border-color: transparent;
+    background: var(--aw-grad);
+    transform: translateY(-4px) rotate(-8deg);
+    box-shadow: 0 10px 22px -8px rgba(219, 161, 162, 0.7);
+}
+
+html.aw-ui .footer-newsletter-form input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #f3eaea;
+    border-radius: 12px;
+}
+html.aw-ui .footer-newsletter-form input::placeholder { color: rgba(243, 234, 234, 0.55); }
+html.aw-ui .footer-newsletter-form input:focus { background: rgba(255, 255, 255, 0.1); border-color: var(--rose); box-shadow: 0 0 0 4px rgba(219, 161, 162, 0.2); }
+html.aw-ui .footer-newsletter-form button {
+    background: var(--aw-grad);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.35s var(--aw-spring), box-shadow 0.3s ease;
+}
+html.aw-ui .footer-newsletter-form button { min-width: 48px; min-height: 40px; }
+html.aw-ui .footer-newsletter-form button:hover { transform: translateY(-2px); box-shadow: 0 10px 22px -8px rgba(219, 161, 162, 0.7); }
+html.aw-ui .footer-newsletter-form button:hover i { animation: awFly 0.7s var(--aw-ease); }
+@keyframes awFly {
+    0% { transform: none; }
+    45% { transform: translate(18px, -18px) rotate(10deg); opacity: 0; }
+    46% { transform: translate(-18px, 18px); opacity: 0; }
+    100% { transform: none; opacity: 1; }
+}
+html.aw-ui .footer-heart i { display: inline-block; animation: awBeat 1.6s ease-in-out infinite; }
+@keyframes awBeat { 0%, 60%, 100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(1); } 45% { transform: scale(1.15); } }
+html.aw-ui .site-footer .logo-img { filter: drop-shadow(0 6px 18px rgba(219, 161, 162, 0.25)); }
+
+/* the floating "jump to section" button matches the buttons */
+html.aw-ui #tocFloatingBtn { background: var(--aw-grad); box-shadow: 0 10px 24px -8px rgba(168, 103, 106, 0.7); }
+html.aw-ui #tocFloatingBtn.visible:hover { transform: translateY(-3px) scale(1.06); }
+html.aw-ui #tocPanel { border-color: var(--aw-hairline); box-shadow: var(--aw-sh-3); border-radius: 18px; }
