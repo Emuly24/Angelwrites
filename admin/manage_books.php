@@ -4,6 +4,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
+require_once '../includes/upload.php'; // R5: shared upload limits
 
 redirectIfNotAdmin();
 
@@ -94,59 +95,30 @@ if ($aw_upload_error !== '') {
         $file_author = $edit_book['file_author'] ?? '';
         $release_date = $edit_book['release_date'] ?? '';
 
-        // ===== LIVE PHOTO CAPTURE =====
-        if (!empty($_FILES['live_cover']['name'])) {
-            $upload_dir = '../assets/uploads/books/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $photo_filename = 'live_cover_' . time() . '.jpg';
-            if (move_uploaded_file($_FILES['live_cover']['tmp_name'], $upload_dir . $photo_filename)) {
-                $cover_path = 'assets/uploads/books/' . $photo_filename;
-            } else {
-                $error = 'Failed to upload captured cover photo.';
-            }
-        }
-
-        // ===== STANDARD COVER UPLOAD =====
-        // S8 (F39): this folder is public, so only real images (≤ 5 MB) are accepted as covers.
-        if (empty($error) && !empty($_FILES['cover']['name'])) {
-            $cover_ext = strtolower(pathinfo($_FILES['cover']['name'], PATHINFO_EXTENSION));
-            if (!in_array($cover_ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
-                || $_FILES['cover']['size'] > 5 * 1024 * 1024
-                || @getimagesize($_FILES['cover']['tmp_name']) === false) {
-                $error = 'Cover must be a JPG, PNG, GIF or WebP image of at most 5 MB.';
-            }
-        }
-        if (empty($error) && !empty($_FILES['cover']['name'])) {
-            $upload_dir = '../assets/uploads/books/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $cover_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['cover']['name']);
-            if (move_uploaded_file($_FILES['cover']['tmp_name'], $upload_dir . $cover_filename)) {
-                $cover_path = 'assets/uploads/books/' . $cover_filename;
-            } else {
-                $error = 'Failed to upload cover image.';
-            }
+        // ===== COVER (captured with the camera, or chosen) =====
+        // R5: both go through the shared helper as an 'image' (real image by content, resized to
+        // 1600 px, re-encoded, EXIF stripped, 2 MB stored; was 5 MB, stored as sent).
+        $aw_new_files = []; // stored in this request; removed again if the save is refused
+        foreach (['live_cover', 'cover'] as $aw_f) {
+            if (!empty($error)) break;
+            $aw_up = aw_upload_store($_FILES[$aw_f] ?? null, 'image', 'assets/uploads/books', ['prefix' => 'cover_']);
+            if (!empty($aw_up['ok'])) { $cover_path = $aw_up['path']; $aw_new_files[] = $aw_up['path']; }
+            elseif (empty($aw_up['empty'])) { $error = 'Cover: ' . $aw_up['error']; }
         }
 
         // ===== BOOK FILE UPLOAD =====
-        // S8 (F39): only book formats (≤ 50 MB); anything else (e.g. .php) is refused before
-        // it reaches the public folder.
-        if (empty($error) && !empty($_FILES['book_file']['name'])) {
-            $book_ext = strtolower(pathinfo($_FILES['book_file']['name'], PATHINFO_EXTENSION));
-            if (!in_array($book_ext, ['pdf', 'epub', 'doc', 'docx'], true)) {
-                $error = 'Book file must be PDF, EPUB, DOC or DOCX.';
-            } elseif ($_FILES['book_file']['size'] > 50 * 1024 * 1024) {
-                $error = 'Book file is larger than 50 MB.';
-            }
+        // R5: PDF, EPUB or DOCX only, decided by the file's content (old .doc is refused: the book
+        // processor cannot read it), 25 MB at most (was 50 MB) and never more than the host accepts.
+        $aw_up = empty($error) ? aw_upload_store($_FILES['book_file'] ?? null, 'book', 'assets/uploads/books', ['prefix' => 'book_']) : ['ok' => false, 'empty' => true];
+        if (empty($aw_up['ok']) && empty($aw_up['empty'])) {
+            $error = 'Book file: ' . $aw_up['error'];
         }
-        if (empty($error) && !empty($_FILES['book_file']['name'])) {
-            $upload_dir = '../assets/uploads/books/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $file_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['book_file']['name']);
-            $file_path = 'assets/uploads/books/' . $file_filename;
-            if (!move_uploaded_file($_FILES['book_file']['tmp_name'], '../' . $file_path)) {
-                $error = 'Failed to upload book file.';
-            } else {
-                $file_size = $_FILES['book_file']['size'];
+        if (!empty($aw_up['ok'])) {
+            {
+                $file_path = $aw_up['path'];
+                $aw_new_files[] = $aw_up['path'];
+                $file_filename = basename($file_path);
+                $file_size = $aw_up['bytes'];
                 $ext = strtolower(pathinfo($file_filename, PATHINFO_EXTENSION));
                 $file_type = in_array($ext, ['pdf', 'epub', 'doc', 'docx']) ? $ext : 'unknown';
 
@@ -165,6 +137,11 @@ if ($aw_upload_error !== '') {
                 if (empty($file_author)) $file_author = $edit_book['author'] ?? '';
                 if (empty($release_date)) $release_date = date('Y-m-d');
             }
+        }
+
+        // R5: a refused save leaves none of this request's files behind
+        if (!empty($error)) {
+            foreach ($aw_new_files as $aw_p) { @unlink(__DIR__ . '/../' . $aw_p); }
         }
 
         if (empty($error)) {
@@ -352,8 +329,8 @@ $pageTitle = 'Manage Books';
                         <!-- Standard Cover Upload (Fallback) -->
                         <div class="form-group">
                             <label for="cover">Or Upload Cover Image</label>
-                            <input type="file" id="cover" name="cover" accept="image/*" data-max="<?php echo (int)min($aw_upload_limit, 5 * 1048576); ?>">
-                            <small>Up to <?php echo min($aw_upload_limit_mb, 5); ?> MB.</small><!-- Q15 -->
+                            <input type="file" id="cover" name="cover"<?php echo aw_upload_attrs('image'); ?> data-max="<?php echo (int)aw_upload_effective('image')['accept_bytes']; ?>">
+                            <small><?php echo htmlspecialchars(aw_upload_hint('image')); ?>.</small><!-- R5 -->
                             <?php if ($edit_book && $edit_book['cover_path']): ?>
                                 <div class="current-file">
                                     <img src="<?php echo SITE_URL . '/' . $edit_book['cover_path']; ?>" alt="Current cover" style="max-width:100px; border-radius:8px;">
@@ -364,9 +341,9 @@ $pageTitle = 'Manage Books';
 
                         <!-- Book File Upload -->
                         <div class="form-group">
-                            <label for="book_file">Book File (PDF, EPUB, DOC, DOCX)</label>
-                            <input type="file" id="book_file" name="book_file" accept=".pdf,.epub,.doc,.docx" data-max="<?php echo (int)min($aw_upload_limit, 50 * 1048576); ?>">
-                            <small>Up to <?php echo min($aw_upload_limit_mb, 50); ?> MB on this host (cover and book file together must also fit).</small><!-- Q15 -->
+                            <label for="book_file">Book File (PDF, EPUB or DOCX)</label>
+                            <input type="file" id="book_file" name="book_file"<?php echo aw_upload_attrs('book'); ?> data-max="<?php echo (int)aw_upload_effective('book')['accept_bytes']; ?>">
+                            <small><?php echo htmlspecialchars(aw_upload_hint('book')); ?> (cover and book file together must also fit in <?php echo $aw_upload_limit_mb; ?> MB per save).</small><!-- R5 -->
                             <script>
                             // Q15: check sizes before sending, so a too-large file is caught here instead of being dropped.
                             document.getElementById('bookForm').addEventListener('submit', function (e) {
@@ -937,4 +914,5 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 
+<?php aw_upload_script(); /* R5 */ ?>
 <?php require_once '../includes/footer.php'; ?>
