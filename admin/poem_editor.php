@@ -3,6 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
+require_once '../includes/upload.php'; // R7: shared upload limits
 
 redirectIfNotAdmin();
 
@@ -41,55 +42,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $uploaded_image_path = $image_path;
     $uploaded_audio_path = $audio_path;
 
-    // ===== LIVE PHOTO CAPTURE =====
-    if (!empty($_FILES['live_photo']['name'])) {
-        $upload_dir = '../assets/uploads/poems/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $photo_filename = 'live_poem_' . time() . '.jpg';
-        if (move_uploaded_file($_FILES['live_photo']['tmp_name'], $upload_dir . $photo_filename)) {
-            $uploaded_image_path = 'assets/uploads/poems/' . $photo_filename;
-        } else {
-            $error = 'Failed to upload captured photo.';
+    // ===== COVER IMAGE (camera capture or chosen file) and AUDIO (chosen file or recording) =====
+    // R7: every file goes through the shared helper. Images: real image by content, resized to
+    // 1600 px, re-encoded, EXIF stripped, 2 MB stored. Audio: audio formats only (by content), 5 MB,
+    // 3 minutes when the length is readable. None of these four fields was checked at all before:
+    // any file type of any size was stored under the name it was uploaded with.
+    $aw_new_files = [];
+    foreach ([['live_photo', 'image', 'assets/uploads/poems', 'poem_', 'Photo'],
+              ['image', 'image', 'assets/uploads/poems', 'poem_', 'Image'],
+              ['audio', 'audio', 'assets/uploads/audio', 'poem_', 'Audio'],
+              ['audio_recording', 'audio', 'assets/uploads/audio', 'rec_', 'Recording']] as [$aw_f, $aw_kind, $aw_dir, $aw_prefix, $aw_name]) {
+        if (!empty($error)) break;
+        $aw_up = aw_upload_store($_FILES[$aw_f] ?? null, $aw_kind, $aw_dir, ['prefix' => $aw_prefix]);
+        if (!empty($aw_up['ok'])) {
+            if ($aw_kind === 'image') $uploaded_image_path = $aw_up['path']; else $uploaded_audio_path = $aw_up['path'];
+            $aw_new_files[] = $aw_up['path'];
+        } elseif (empty($aw_up['empty'])) {
+            $error = $aw_name . ': ' . $aw_up['error'];
         }
     }
+    if (($aw_overflow = aw_upload_post_overflow()) !== '') $error = $aw_overflow;
 
-    // ===== STANDARD IMAGE UPLOAD =====
-    if (empty($error) && !empty($_FILES['image']['name'])) {
-        $upload_dir = '../assets/uploads/poems/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $image_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['image']['name']);
-        if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $image_filename)) {
-            $uploaded_image_path = 'assets/uploads/poems/' . $image_filename;
-        } else {
-            $error = 'Failed to upload image.';
-        }
-    }
-
-    // ===== STANDARD AUDIO UPLOAD =====
-    if (!empty($_FILES['audio']['name'])) {
-        $upload_dir = '../assets/uploads/audio/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $audio_filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['audio']['name']);
-        if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $audio_filename)) {
-            $uploaded_audio_path = 'assets/uploads/audio/' . $audio_filename;
-        } else {
-            $error = 'Failed to upload audio.';
-        }
-    }
-
-    // ===== LIVE AUDIO RECORDING =====
-    if (isset($_FILES['audio_recording']) && $_FILES['audio_recording']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/uploads/audio/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $rec_filename = 'rec_' . time() . '.webm';
-        if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
-            $uploaded_audio_path = 'assets/uploads/audio/' . $rec_filename;
-        } else {
-            $error = 'Failed to upload recorded audio.';
-        }
-    }
-
-    if (empty($title) || empty($content)) {
+    if (!empty($error)) {
+        // R7: a refused file stops the save (the poem used to be saved without it, hiding the problem),
+        // and nothing stored in this request is left behind. The text stays in the form.
+        foreach ($aw_new_files as $aw_p) { @unlink(__DIR__ . '/../' . $aw_p); }
+        $uploaded_image_path = $image_path; $uploaded_audio_path = $audio_path;
+    } elseif (empty($title) || empty($content)) {
         $error = 'Title and content are required.';
     } else {
         if ($id > 0) {
@@ -212,8 +191,8 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
                         <label>Or Upload Image (Drag & Drop)</label>
                         <div id="dropZone" class="upload-zone">
                             <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Drag & drop your image here, or <strong>click to browse</strong></p>
-                            <input type="file" id="fileInput" name="image" accept="image/*" style="display:none;">
+                            <p>Drag & drop your image here, or <strong>click to browse</strong><br><small><?php echo htmlspecialchars(aw_upload_hint('image')); ?></small></p><!-- R7 -->
+                            <input type="file" id="fileInput" name="image"<?php echo aw_upload_attrs('image'); ?> style="display:none;">
                             <div id="previewContainer" style="display:none; margin-top:12px;">
                                 <img id="previewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
                             </div>
@@ -235,8 +214,8 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
                         <label>Upload Audio File (MP3, WAV)</label>
                         <div id="audioDropZone" class="upload-zone">
                             <i class="fas fa-music"></i>
-                            <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
-                            <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
+                            <p>Drag & drop an audio file, or <strong>click to browse</strong><br><small><?php echo htmlspecialchars(aw_upload_hint('audio')); ?></small></p><!-- R7 -->
+                            <input type="file" id="audioInput" name="audio"<?php echo aw_upload_attrs('audio'); ?> style="display:none;">
                             <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
                                 <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
                             </div>
@@ -256,7 +235,7 @@ $pageTitle = $id > 0 ? 'Edit Poem' : 'Add New Poem';
                             <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
                             <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                             <div id="recordingForm" style="display:none;"><!-- M3: was a nested <form>, which ended the page form early -->
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                                <input type="file" name="audio_recording" id="recordingInput"<?php echo aw_upload_attrs('audio'); ?>>
                             </div>
                             <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
                                 <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
@@ -677,4 +656,5 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
+<?php aw_upload_script(); /* R7 */ ?>
 <?php require_once '../includes/footer.php'; ?>
