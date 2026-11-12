@@ -3,6 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
+require_once '../includes/upload.php'; // R9: shared upload limits
 
 redirectIfNotAdmin();
 require_once __DIR__ . '/../includes/newsletter.php'; // RF3: CSRF helpers and "send to subscribers"
@@ -21,17 +22,7 @@ function aw_refl_slug(PDO $db, $title, $except_id = 0) {
         $slug = $base . '-' . $n++;
     }
 }
-// RF3: only real images (checked by content, saved with the matching extension); any file used to be
-// saved with its own extension (e.g. .php) under assets/uploads/blog/.
-function aw_refl_save_image($tmp, $prefix) {
-    $info = @getimagesize($tmp);
-    $ext = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'][$info[2] ?? 0] ?? null;
-    if (!$ext) return null;
-    $dir = __DIR__ . '/../assets/uploads/blog/';
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
-    $name = $prefix . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-    return move_uploaded_file($tmp, $dir . $name) ? 'assets/uploads/blog/' . $name : null;
-}
+// R9: images are saved by the shared upload helper (includes/upload.php); the page's own saver is gone.
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $error = '';
@@ -87,61 +78,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
 
     $uploaded_featured_image = $featured_image;
 
-    // ===== LIVE PHOTO CAPTURE =====
-    if (!empty($_FILES['live_photo']['name'])) {
-        $upload_dir = '../assets/uploads/blog/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        if ($saved = aw_refl_save_image($_FILES['live_photo']['tmp_name'], 'live_')) {
-            $uploaded_featured_image = $saved;
-        } else {
-            $error = 'The captured photo could not be saved as an image.';
+    // ===== FEATURED IMAGE (camera capture or chosen file), AUDIO and VIDEO RECORDINGS =====
+    // R9: every file goes through the shared helper. Images: resized to 1600 px, re-encoded, EXIF
+    // stripped, 2 MB stored (they were stored at full size). Audio recording: 5 MB / 3 minutes.
+    // Video recording: 20 MB / 2 minutes. Recordings were never checked and were always named .webm.
+    $aw_new_files = [];
+    $aw_media_html = '';
+    foreach ([['live_photo', 'image', 'assets/uploads/blog', 'live_', 'Photo'],
+              ['featured_image', 'image', 'assets/uploads/blog', 'feat_', 'Featured image'],
+              ['audio_recording', 'audio', 'assets/uploads/audio', 'rec_', 'Audio recording'],
+              ['video_recording', 'video_recording', 'assets/uploads/videos', 'vid_', 'Video recording']] as [$aw_f, $aw_kind, $aw_dir, $aw_prefix, $aw_name]) {
+        if (!empty($error)) break;
+        $aw_up = aw_upload_store($_FILES[$aw_f] ?? null, $aw_kind, $aw_dir, ['prefix' => $aw_prefix]);
+        if (!empty($aw_up['ok'])) {
+            $aw_new_files[] = $aw_up['path'];
+            if ($aw_kind === 'image') {
+                $uploaded_featured_image = $aw_up['path'];
+            } elseif ($aw_kind === 'audio') {
+                // CAM2: show the recording in the post
+                $aw_media_html .= "\n" . '<figure class="aw-post-media"><audio controls preload="metadata" src="' . SITE_URL . '/' . $aw_up['path'] . '"></audio></figure>';
+            } else {
+                $aw_media_html .= "\n" . '<figure class="aw-post-media"><video controls preload="metadata" playsinline style="max-width:100%;" src="' . SITE_URL . '/' . $aw_up['path'] . '"></video></figure>';
+            }
+        } elseif (empty($aw_up['empty'])) {
+            $error = $aw_name . ': ' . $aw_up['error'];
         }
     }
-
-    // ===== STANDARD IMAGE UPLOAD =====
-    if (empty($error) && !empty($_FILES['featured_image']['name'])) {
-        $upload_dir = '../assets/uploads/blog/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        if ($saved = aw_refl_save_image($_FILES['featured_image']['tmp_name'], 'feat_')) {
-            $uploaded_featured_image = $saved;
-        } else {
-            $error = 'The featured image must be a JPG, PNG, GIF or WebP picture.';
-        }
-    }
-
-    // ===== AUDIO RECORDING =====
-    if (isset($_FILES['audio_recording']) && $_FILES['audio_recording']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/uploads/audio/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $rec_filename = 'rec_' . time() . '.webm';
-        if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $rec_filename)) {
-            // CAM2: show the recording in the post (it was saved to disk and never attached)
-            $content .= "\n" . '<figure class="aw-post-media"><audio controls preload="metadata" src="' . SITE_URL . '/assets/uploads/audio/' . $rec_filename . '"></audio></figure>';
-        } else {
-            $error = 'Failed to upload recorded audio.';
-        }
-    }
-
-    // ===== VIDEO RECORDING =====
-    if (isset($_FILES['video_recording']) && $_FILES['video_recording']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/uploads/videos/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $video_filename = 'vid_' . time() . '.webm';
-        if (move_uploaded_file($_FILES['video_recording']['tmp_name'], $upload_dir . $video_filename)) {
-            // CAM2: show the video in the post (it was saved to disk and never attached)
-            $content .= "\n" . '<figure class="aw-post-media"><video controls preload="metadata" playsinline style="max-width:100%;" src="' . SITE_URL . '/assets/uploads/videos/' . $video_filename . '"></video></figure>';
-        } else {
-            $error = 'Failed to upload recorded video.';
-        }
+    if (!empty($error)) {
+        // nothing stored in a refused request is left behind
+        foreach ($aw_new_files as $aw_p) { @unlink(__DIR__ . '/../' . $aw_p); }
+        $aw_new_files = [];
+        $uploaded_featured_image = $featured_image;
     }
 
     // Tags: trimmed, no duplicates, comma-separated.
     $tags = implode(', ', array_values(array_unique(array_filter(array_map(function ($t) { return mb_substr(trim($t), 0, 40); }, explode(',', $tags))))));
     if (!empty($error)) {
         // keep the form as typed and show the error
-    } elseif (empty($title) || empty($content)) {
+    } elseif (empty($title) || (empty($content) && $aw_media_html === '')) {
         $error = 'Title and content are required.';
+        foreach ($aw_new_files as $aw_p) { @unlink(__DIR__ . '/../' . $aw_p); }
     } else {
+        $content .= $aw_media_html; // R9: recordings join the post only when everything was accepted
         if ($id > 0) {
             // The address stays the same after the first save (links already shared keep working);
             // a reflection saved before RF3 with an empty or duplicate slug gets a proper one.
@@ -295,8 +273,8 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                         <label for="featured_image">Or Upload Featured Image</label>
                         <div id="featDropZone" class="upload-zone">
                             <i class="fas fa-image"></i>
-                            <p>Click to upload a featured image</p>
-                            <input type="file" id="featFileInput" name="featured_image" accept="image/*" style="display:none;">
+                            <p>Click to upload a featured image<br><small><?php echo htmlspecialchars(aw_upload_hint('image')); ?></small></p><!-- R9 -->
+                            <input type="file" id="featFileInput" name="featured_image"<?php echo aw_upload_attrs('image'); ?> style="display:none;">
                             <div id="featPreviewContainer" style="display:none; margin-top:12px;">
                                 <img id="featPreviewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
                             </div>
@@ -322,13 +300,13 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                             <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
                             <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                             <div id="recordingForm" style="display:none;"><!-- M3: was a nested <form>, which ended the page form early -->
-                                <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                                <input type="file" name="audio_recording" id="recordingInput"<?php echo aw_upload_attrs('audio'); ?>>
                             </div>
                             <div id="audioPreviewRecorderContainer" style="display:none; margin-top:10px;">
                                 <audio controls id="audioPreviewRecorder" style="width:100%;"><source src="" type="audio/webm"></audio>
                             </div>
                         </div>
-                        <p class="field-hint">Record your audio directly in the browser. The recording will be saved when you submit the form.</p>
+                        <p class="field-hint">Record your audio directly in the browser. The recording will be saved when you submit the form. Limit: <?php echo htmlspecialchars(aw_upload_hint('audio')); ?>.</p>
                     </div>
 
                     <!-- ===== VIDEO RECORDER ===== -->
@@ -338,13 +316,13 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
                             <button type="button" id="videoRecordBtn" class="btn btn-secondary btn-sm">🎥 Start Recording</button>
                             <span id="videoRecordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                             <div id="videoRecordingForm" style="display:none;"><!-- M4: was a nested <form>, which ended the page form early -->
-                                <input type="file" name="video_recording" id="videoRecordingInput" accept="video/webm">
+                                <input type="file" name="video_recording" id="videoRecordingInput"<?php echo aw_upload_attrs('video_recording'); ?>>
                             </div>
                             <div id="videoPreviewContainer" style="display:none; margin-top:10px;">
                                 <video controls width="100%"><source src="" type="video/webm"></video>
                             </div>
                         </div>
-                        <p class="field-hint">Record a video directly in your browser. The recording will be saved when you submit the form.</p>
+                        <p class="field-hint">Record a video directly in your browser. The recording will be saved when you submit the form. Limit: <?php echo htmlspecialchars(aw_upload_hint('video_recording')); ?>.</p>
                     </div>
 
                     <!-- Form Actions -->
@@ -768,4 +746,5 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 
+<?php aw_upload_script(); /* R9 */ ?>
 <?php require_once '../includes/footer.php'; ?>
