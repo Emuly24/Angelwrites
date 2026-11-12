@@ -3,6 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
+require_once '../includes/upload.php'; // R6: shared upload limits
 
 redirectIfNotAdmin();
 
@@ -36,6 +37,12 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
+// R6: a request over the server's post limit arrives with no fields; it used to do nothing at all
+if (($aw_overflow = aw_upload_post_overflow()) !== '') {
+    aw_upload_log_reject($_SESSION['user_id'] ?? null, 'request', (int)($_SERVER['CONTENT_LENGTH'] ?? 0), 'over post_max_size');
+    $error = $aw_overflow . ' For a video, please compress it first or paste a YouTube link instead.';
+}
+
 // ===== HANDLE ADD/EDIT VIDEO =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_video'])) {
     $id = isset($_POST['video_id']) ? (int)$_POST['video_id'] : 0;
@@ -50,57 +57,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_video'])) {
         $thumbnail = null;
         $video_file = null;
 
-        // ===== LIVE PHOTO CAPTURE FOR THUMBNAIL =====
-        if (!empty($_FILES['live_thumbnail']['name'])) {
-            $upload_dir = '../assets/uploads/videos/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $thumb_filename = 'thumb_' . time() . '.jpg';
-            if (move_uploaded_file($_FILES['live_thumbnail']['tmp_name'], $upload_dir . $thumb_filename)) {
-                $thumbnail = 'assets/uploads/videos/' . $thumb_filename;
-            } else {
-                $error = 'Failed to upload captured thumbnail.';
-            }
+        // ===== THUMBNAIL (captured with the camera, or chosen) =====
+        // R6: through the shared helper as an 'image' (real image by content, resized, re-encoded,
+        // EXIF stripped, 2 MB stored). The captured thumbnail used to skip every check.
+        $aw_new_files = [];
+        foreach (['live_thumbnail', 'thumbnail'] as $aw_f) {
+            if (!empty($error)) break;
+            $aw_up = aw_upload_store($_FILES[$aw_f] ?? null, 'image', 'assets/uploads/videos', ['prefix' => 'thumb_']);
+            if (!empty($aw_up['ok'])) { $thumbnail = $aw_up['path']; $aw_new_files[] = $aw_up['path']; }
+            elseif (empty($aw_up['empty'])) { $error = 'Thumbnail: ' . $aw_up['error']; }
         }
 
-        // ===== STANDARD THUMBNAIL UPLOAD =====
-        // S8 (F68): public folder, so only real images (≤ 5 MB).
-        if (empty($error) && !empty($_FILES['thumbnail']['name'])) {
-            $thumb_ext = strtolower(pathinfo($_FILES['thumbnail']['name'], PATHINFO_EXTENSION));
-            if (!in_array($thumb_ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
-                || $_FILES['thumbnail']['size'] > 5 * 1024 * 1024
-                || @getimagesize($_FILES['thumbnail']['tmp_name']) === false) {
-                $error = 'Thumbnail must be a JPG, PNG, GIF or WebP image of at most 5 MB.';
-            }
+        // ===== VIDEO FILE (chosen from the device, or recorded here) =====
+        // R6: a chosen file must be MP4 (H.264), 20 MB and 2 minutes at most (was any of five formats
+        // up to 100 MB). There is no ffmpeg on this host, so nothing is converted: a file over the limit
+        // is refused with "Please compress this video first". A recording made with the camera button
+        // on this page (named recorded_video.*) may also be WebM, because that is what some browsers record.
+        if (empty($error)) {
+            $aw_kind = (strncmp((string)($_FILES['video_file']['name'] ?? ''), 'recorded_video', 14) === 0) ? 'video_recording' : 'video';
+            $aw_up = aw_upload_store($_FILES['video_file'] ?? null, $aw_kind, 'assets/uploads/videos', ['prefix' => 'video_']);
+            if (!empty($aw_up['ok'])) { $video_file = $aw_up['path']; $aw_new_files[] = $aw_up['path']; }
+            elseif (empty($aw_up['empty'])) { $error = 'Video: ' . $aw_up['error']; }
         }
-        if (empty($error) && !empty($_FILES['thumbnail']['name'])) {
-            $upload_dir = '../assets/uploads/videos/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $thumb_filename = 'thumb_' . time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['thumbnail']['name']);
-            if (move_uploaded_file($_FILES['thumbnail']['tmp_name'], $upload_dir . $thumb_filename)) {
-                $thumbnail = 'assets/uploads/videos/' . $thumb_filename;
-            } else {
-                $error = 'Failed to upload thumbnail.';
-            }
-        }
-
-        // ===== VIDEO FILE UPLOAD (Live Recording) =====
-        // S8 (F68): only video formats (≤ 100 MB); the extension was copied from the upload,
-        // so a .php file would have landed in this public folder.
-        if (empty($error) && !empty($_FILES['video_file']['name'])) {
-            $file_extension = strtolower(pathinfo($_FILES['video_file']['name'], PATHINFO_EXTENSION));
-            if (!in_array($file_extension, ['mp4', 'webm', 'mov', 'm4v', 'ogv'], true)) {
-                $error = 'Video must be MP4, WebM, MOV, M4V or OGV.';
-            } elseif ($_FILES['video_file']['size'] > 100 * 1024 * 1024) {
-                $error = 'Video is larger than 100 MB.';
-            }
-        }
-        if (empty($error) && !empty($_FILES['video_file']['name'])) {
-            $upload_dir = '../assets/uploads/videos/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $new_filename = 'video_' . time() . '.' . $file_extension;
-            if (move_uploaded_file($_FILES['video_file']['tmp_name'], $upload_dir . $new_filename)) {
-                $video_file = 'assets/uploads/videos/' . $new_filename;
-            }
+        if (!empty($error)) {
+            foreach ($aw_new_files as $aw_p) { @unlink(__DIR__ . '/../' . $aw_p); } // nothing left behind
         }
 
         if (empty($error)) {
@@ -227,7 +207,8 @@ $pageTitle = 'Manage Videos';
                         <!-- Standard Thumbnail Upload (Fallback) -->
                         <div class="form-group">
                             <label for="thumbnail">Or Upload Thumbnail Image</label>
-                            <input type="file" id="thumbnail" name="thumbnail" accept="image/*">
+                            <input type="file" id="thumbnail" name="thumbnail"<?php echo aw_upload_attrs('image'); ?>>
+                            <small><?php echo htmlspecialchars(aw_upload_hint('image')); ?>.</small><!-- R6 -->
                         </div>
 
                         <!-- ===== VIDEO SOURCE ===== -->
@@ -256,8 +237,9 @@ $pageTitle = 'Manage Videos';
                                             <label for="video_file" class="btn btn-outline btn-sm">
                                                 <i class="fas fa-upload"></i> Or Upload Video File
                                             </label>
-                                            <input type="file" id="video_file" name="video_file" accept="video/*" style="display:none;">
+                                            <input type="file" id="video_file" name="video_file"<?php echo aw_upload_attrs('video_recording'); ?> style="display:none;">
                                             <span id="fileChosen" class="file-status">No file chosen</span>
+                                            <small style="display:block;margin-top:6px;">Uploaded files: <?php echo htmlspecialchars(aw_upload_hint('video')); ?>. Longer or larger videos: compress them first, or paste a YouTube link above.</small><!-- R6 -->
                                         </div>
                                     </div>
                                 </div>
@@ -1075,4 +1057,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php aw_upload_script(); /* R6 */ ?>
 <?php require_once '../includes/footer.php'; ?>
