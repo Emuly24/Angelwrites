@@ -17,6 +17,7 @@
  */
 
 require_once __DIR__ . '/upload_limits.php';
+require_once __DIR__ . '/upload_quota.php';
 
 /* ------------------------------------------------------------------ host facts */
 
