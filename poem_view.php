@@ -315,7 +315,7 @@ function render_comment($comment, $level = 0) {
         <div class="reaction-buttons" data-target-type="comment" data-target-id="<?php echo (int)$comment['id']; ?>">
             <?php echo aw_rx_buttons('comment', $comment['id']); /* L2: rendered with the page */ ?>
         </div>
-        <div class="reply-link" data-comment-id="<?php echo $comment['id']; ?>">Reply</div>
+        <button type="button" class="reply-link" data-comment-id="<?php echo (int)$comment['id']; ?>" aria-expanded="false">Reply</button><!-- A1: was a clickable div -->
         <div class="comment-reply-form" style="display:none;">
             <form method="POST" class="reply-form">
                 <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
@@ -579,7 +579,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
    COMMENT & REPLY FORM TWEAKS
    ============================================================ */
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
-.reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
+.reply-link { background: none; border: 0; padding: 4px 0; font: inherit; cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
 .reply-link:hover { color: var(--rose-dark); }
 .private-badge { background: #ffd700; color: #3d2e2e; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: 6px; }
 .tag-suggestions { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; z-index: 99999; min-width: 150px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 4px 0; }
@@ -907,8 +907,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.reply-link').forEach(link => {
         link.addEventListener('click', function() {
             const form = this.nextElementSibling;
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
-            form.querySelector('textarea').focus();
+            const open = form.style.display === 'none';
+            form.style.display = open ? 'block' : 'none';
+            this.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) form.querySelector('textarea').focus();
         });
     });
     document.querySelectorAll('.cancel-reply').forEach(btn => {

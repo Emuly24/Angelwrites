@@ -841,9 +841,9 @@ function awGuestOnly(what) {
                         let reactionsHtml = '';
                         if (note.reactions && note.reactions.length > 0) {
                             note.reactions.forEach(reaction => {
-                                reactionsHtml += `<span class="reaction" onclick="reactBibleNote(${note.id}, '${reaction.reaction_type}')">
+                                reactionsHtml += `<button type="button" class="reaction" onclick="reactBibleNote(${note.id}, '${reaction.reaction_type}')">
                                     ${reaction.reaction_type} ${reaction.count}
-                                </span>`;
+                                </button>`;
                             });
                         }
                         const isMyNote = note.user_id == userId;
@@ -1765,7 +1765,7 @@ body.dark-mode {
 .note-text { margin:0 0 8px; font-size:0.95rem; }
 .note-footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
 .note-reactions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
-.reaction { background:var(--vanilla); padding:0 8px; border-radius:12px; font-size:0.8rem; cursor:pointer; transition:all 0.2s; }
+.reaction { border:0; font-family:inherit; color:inherit; background:var(--vanilla); padding:0 8px; border-radius:12px; font-size:0.8rem; cursor:pointer; transition:all 0.2s; }
 .reaction:hover { background:rgba(219,161,162,0.2); }
 .badge-private { background:#7a6868; color:white; padding:0 6px; border-radius:4px; font-size:0.7rem; }
 .empty-notes { color:var(--text-light); text-align:center; padding:24px 12px; }

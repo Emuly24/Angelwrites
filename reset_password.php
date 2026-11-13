@@ -140,9 +140,9 @@ $pageTitle = 'Reset Password';
                             <label for="password">New Password</label>
                             <div class="password-wrapper">
                                 <input type="password" id="password" name="password" placeholder="At least 8 characters" required>
-                                <span class="password-toggle" id="togglePassword">
-                                    <i class="fas fa-eye"></i>
-                                </span>
+                                <button type="button" class="password-toggle" id="togglePassword" aria-label="Show password" aria-pressed="false"><!-- A1: was a clickable span -->
+                                    <i class="fas fa-eye" aria-hidden="true"></i>
+                                </button>
                             </div>
                             <div class="password-strength-meter">
                                 <div class="strength-bar" id="strengthBar"></div>
@@ -194,6 +194,8 @@ document.addEventListener('DOMContentLoaded', function() {
         passwordInput.setAttribute('type', type);
         this.querySelector('i').classList.toggle('fa-eye');
         this.querySelector('i').classList.toggle('fa-eye-slash');
+        this.setAttribute('aria-pressed', type === 'text' ? 'true' : 'false');
+        this.setAttribute('aria-label', type === 'text' ? 'Hide password' : 'Show password');
     });
 
     // ===== PASSWORD STRENGTH METER =====

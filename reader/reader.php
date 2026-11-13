@@ -205,7 +205,8 @@ html,body { height:100%; width:100%; overflow:hidden; }
 #search-bar .search-header button { background:none; border:none; cursor:pointer; color:var(--text-light); font-size:0.9rem; transition:color var(--transition); }
 #search-bar .search-header button:hover { color:var(--rose); }
 #searchResults { margin-top:8px; max-height:200px; overflow-y:auto; font-size:0.85rem; }
-.search-result { padding:6px 8px; border-bottom:1px solid var(--border); cursor:pointer; transition:background var(--transition); }
+.search-result { display:block; width:100%; text-align:left; background:none; border:0; font:inherit; color:inherit; padding:6px 8px; border-bottom:1px solid var(--border); cursor:pointer; transition:background var(--transition); }
+.note-reactions .reaction { background:var(--vanilla); border:0; border-radius:12px; padding:2px 8px; margin-right:4px; font:inherit; font-size:.8rem; color:inherit; cursor:pointer; } /* A1: reactions are buttons */
 .search-result:hover { background:rgba(219,161,162,0.1); }
 .search-result strong { color:var(--rose); }
 #settings-panel { bottom:0; left:0; right:0; background:var(--card-bg); border-top:1px solid var(--border); padding:16px 20px; transform:translateY(100%); transition:transform 0.25s ease; max-height:50vh; overflow-y:auto; pointer-events:auto; z-index:100001!important; }
@@ -1407,7 +1408,7 @@ require_once __DIR__ . '/reader_share.php';
                         data.notes.forEach(n => {
                             let rh = '';
                             if (n.reactions && n.reactions.length > 0) {
-                                n.reactions.forEach(r => { rh += `<span class="reaction" onclick="reactNote(${n.id}, '${r.reaction_type}')">${r.reaction_type} ${r.count}</span>`; });
+                                n.reactions.forEach(r => { rh += `<button type="button" class="reaction" onclick="reactNote(${n.id}, '${r.reaction_type}')">${r.reaction_type} ${r.count}</button>`; });
                             }
                             const canReact = !n.is_private || n.user_id == userId;
                             const isMyNote = n.user_id == userId;
@@ -1704,7 +1705,7 @@ require_once __DIR__ . '/reader_share.php';
         if (results.length === 0) searchResults.innerHTML = '<p style="padding:8px;color:var(--text-light);">No results found.</p>';
         else {
             let html = '<div style="font-weight:600;font-size:0.8rem;padding:4px 8px;">' + results.length + ' result(s)</div>';
-            results.forEach(r => { html += `<div class="search-result" onclick="goToPage(${r.page}); closeSearch();">Page ${r.page} … ${r.snippet}</div>`; });
+            results.forEach(r => { html += `<button type="button" class="search-result" onclick="goToPage(${r.page}); closeSearch();">Page ${r.page} … ${r.snippet}</button>`; });
             searchResults.innerHTML = html;
         }
     });
