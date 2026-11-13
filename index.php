@@ -202,12 +202,17 @@ try {
 // C2: "Angella's picks" — a poem, a story and a reflection chosen by the team (admin/picks.php)
 require_once 'includes/picks.php';
 require_once 'includes/poem_card.php'; // M1
+require_once 'includes/book_card.php';
+// Free books with reader pages open straight in the reader; the others open their book page.
+$aw_readable = [];
+try { foreach ($db->query("SELECT book_id FROM book_content WHERE is_processed = 1")->fetchAll(PDO::FETCH_COLUMN) as $rid) $aw_readable[(int)$rid] = true; } catch (PDOException $e) { error_log('index readable: ' . $e->getMessage()); }
 $aw_picks = aw_picks($db);
 
 $pageTitle = 'AngelWrites — Christian Writing & Community';
 ?>
 <?php require_once 'includes/header.php'; ?>
 <?php echo aw_poem_assets(); /* M1: poem card styles */ ?>
+<?php echo aw_book_assets(); ?>
 
 <!-- PWA Manifest and Service Worker -->
 <link rel="manifest" href="/manifest.json">
@@ -762,45 +767,9 @@ if ('serviceWorker' in navigator) {
                 <h2>Recommended for <span class="rose-text">You</span></h2>
                 <p>Based on your reading journey – books we think you'll love.</p>
             </div>
-            <div class="books-grid">
+            <div class="bk-grid bk-few">
                 <?php foreach ($recommended_books as $book): ?>
-                <div class="book-card">
-                    <div class="book-cover-wrapper">
-                        <?php if ($book['cover_path']): ?>
-                            <img src="<?php echo get_image_url($book['cover_path']); ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                        <?php else: ?>
-                            <div class="placeholder-cover"><i class="fas fa-book"></i></div>
-                        <?php endif; ?>
-                        <?php if ($book['is_free']): ?><span class="badge free">Free</span><?php endif; ?>
-                        <?php if (aw_book_on_sale($book)): // F79 ?><span class="badge sale">Sale</span><?php endif; ?>
-                    </div>
-                    <div class="book-details">
-                        <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                        <p class="book-author">by Angella Bottoman</p>
-                        <div class="book-description-wrapper">
-                            <div class="book-description" id="desc-<?php echo $book['id']; ?>">
-                                <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
-                            </div>
-                            <?php if (strlen($book['description'] ?? '') > 100): ?>
-                                <button class="toggle-desc-btn" data-id="<?php echo $book['id']; ?>">Read More</button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="book-bottom">
-                            <div class="book-price">
-                                <?php if ($book['is_free']): ?>
-                                    <span class="free-text">Free</span>
-                                <?php elseif (aw_book_on_sale($book)): ?>
-                                    <span class="sale-text"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
-                                <?php else: ?>
-                                    <span><?php echo aw_mwk($book['price']); ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">
-                                <i class="fas fa-book-open"></i> Read
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                    <?php echo aw_book_card($book, ['author' => ($book['author'] ?? '') ?: 'Angella Bottoman', 'readable' => !empty($book['is_free']) && isset($aw_readable[(int)$book['id']])]); ?>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -815,45 +784,9 @@ if ('serviceWorker' in navigator) {
                 <h2>Featured <span class="rose-text">Books</span></h2>
                 <p>Explore Angella's latest writings and download free or purchase.</p>
             </div>
-            <div class="books-grid">
+            <div class="bk-grid bk-few">
                 <?php foreach ($featured_books as $book): ?>
-                <div class="book-card">
-                    <div class="book-cover-wrapper">
-                        <?php if ($book['cover_path']): ?>
-                            <img src="<?php echo get_image_url($book['cover_path']); ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                        <?php else: ?>
-                            <div class="placeholder-cover"><i class="fas fa-book"></i></div>
-                        <?php endif; ?>
-                        <?php if ($book['is_free']): ?><span class="badge free">Free</span><?php endif; ?>
-                        <?php if (aw_book_on_sale($book)): // F79 ?><span class="badge sale">Sale</span><?php endif; ?>
-                    </div>
-                    <div class="book-details">
-                        <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                        <p class="book-author">by Angella Bottoman</p>
-                        <div class="book-description-wrapper">
-                            <div class="book-description" id="desc-<?php echo $book['id']; ?>">
-                                <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
-                            </div>
-                            <?php if (strlen($book['description'] ?? '') > 100): ?>
-                                <button class="toggle-desc-btn" data-id="<?php echo $book['id']; ?>">Read More</button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="book-bottom">
-                            <div class="book-price">
-                                <?php if ($book['is_free']): ?>
-                                    <span class="free-text">Free</span>
-                                <?php elseif (aw_book_on_sale($book)): ?>
-                                    <span class="sale-text"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
-                                <?php else: ?>
-                                    <span><?php echo aw_mwk($book['price']); ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary btn-sm">
-                                <i class="fas fa-book-open"></i> Read
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                    <?php echo aw_book_card($book, ['author' => ($book['author'] ?? '') ?: 'Angella Bottoman', 'readable' => !empty($book['is_free']) && isset($aw_readable[(int)$book['id']])]); ?>
                 <?php endforeach; ?>
             </div>
             <div class="section-footer">

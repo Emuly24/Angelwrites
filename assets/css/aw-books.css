@@ -1,0 +1,64 @@
+/* AngelWrites book cards (includes/book_card.php): a bookshelf, cover first.
+   Uses the site colour tokens, so it follows the light and dark themes. */
+
+.bk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 36px 24px; align-items: start; }
+.bk-card { --bk-accent: #9c5457; --bk-on-accent: #fff; --bk-free: #2f6b45; --bk-sale: #9e3c46; --bk-soft: rgba(219, 161, 162, .2); position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.bk-cover { position: relative; display: block; aspect-ratio: 2 / 3; border-radius: 4px 10px 10px 4px; overflow: hidden; background: var(--vanilla, #efd8d6); box-shadow: 0 1px 2px rgba(44, 30, 30, .10), 0 10px 26px rgba(44, 30, 30, .16); transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s ease; text-decoration: none; }
+/* the spine: a soft fold down the left edge, as on a real cover */
+.bk-cover::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2; background: linear-gradient(90deg, rgba(0, 0, 0, .16) 0, rgba(255, 255, 255, .16) 2.5%, rgba(0, 0, 0, 0) 6%), linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, .04)); }
+.bk-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.bk-card:hover .bk-cover, .bk-card:focus-within .bk-cover { transform: translateY(-4px); box-shadow: 0 2px 4px rgba(44, 30, 30, .10), 0 18px 38px rgba(44, 30, 30, .22); }
+/* no cover yet: a typeset cover with the title */
+.bk-cover-ph { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding: 18px 16px; text-align: center; background: linear-gradient(160deg, #e9c9c9 0%, #c48f91 100%); color: #fff; }
+.bk-cover-ph span { font-family: 'Playfair Display', Georgia, serif; font-size: 1.05rem; line-height: 1.3; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.bk-cover-ph small { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; opacity: .9; }
+.bk-flag { position: absolute; z-index: 3; top: 10px; left: 12px; padding: 3px 9px; border-radius: 999px; font-size: .7rem; font-weight: 700; letter-spacing: .02em; color: #fff; background: rgba(30, 20, 20, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.bk-flag-free { background: #2f6b45; }
+.bk-flag-sale { background: #9e3c46; }
+.bk-flag-owned { background: rgba(30, 20, 20, .78); }
+
+.bk-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.bk-title { margin: 0; font-size: 1rem; line-height: 1.3; font-weight: 600; font-family: inherit; }
+.bk-title a { color: var(--text, #3d2e2e); text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bk-title a:hover { color: var(--bk-accent); }
+.bk-title a:focus-visible { outline: 3px solid var(--bk-accent); outline-offset: 2px; border-radius: 4px; }
+/* the whole card opens the book; the buttons stay on top */
+.bk-title a::before { content: ''; position: absolute; inset: 0; z-index: 1; }
+.bk-author { margin: 0; font-size: .86rem; color: var(--text-light, #6b5a5a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-blurb { margin: 6px 0 0; font-size: .85rem; line-height: 1.5; color: var(--text-light, #6b5a5a); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.bk-foot { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.bk-price { font-size: .86rem; font-weight: 600; color: var(--text, #3d2e2e); font-variant-numeric: tabular-nums; }
+.bk-price s { font-weight: 400; color: var(--text-light, #6b5a5a); margin-right: 2px; }
+.bk-price-free { color: var(--bk-free); }
+.bk-price-sale { color: var(--bk-sale); }
+.bk-price-own, .bk-price-soon { font-weight: 500; color: var(--text-light, #6b5a5a); }
+.bk-actions { position: relative; z-index: 2; display: inline-flex; gap: 6px; }
+.bk-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; min-width: 34px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--bk-soft); color: var(--bk-accent); font: inherit; font-size: .82rem; font-weight: 700; letter-spacing: .01em; text-decoration: none; cursor: pointer; transition: background .2s ease, transform .2s ease; }
+.bk-btn:hover { background: rgba(219, 161, 162, .34); color: var(--bk-accent); }
+.bk-btn:focus-visible { outline: 3px solid var(--bk-accent); outline-offset: 2px; }
+.bk-btn-primary, .bk-btn-buy { background: var(--bk-accent); color: var(--bk-on-accent); }
+.bk-btn-primary:hover, .bk-btn-buy:hover { background: var(--bk-accent); color: var(--bk-on-accent); filter: brightness(.92); }
+.bk-btn-icon { padding: 0; width: 34px; }
+
+/* a short row (the home page): centred covers of a steady size */
+.bk-grid.bk-few { grid-template-columns: repeat(auto-fit, minmax(160px, 210px)); justify-content: center; gap: 36px 32px; }
+
+/* dark theme: chosen in the site menu, or the device setting when none is chosen */
+html[data-theme="dark"] .bk-card { --bk-accent: #f0c4c5; --bk-on-accent: #2c1e1e; --bk-free: #8fd1a5; --bk-sale: #f2a7b0; --bk-soft: rgba(219, 161, 162, .16); }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) .bk-card { --bk-accent: #f0c4c5; --bk-on-accent: #2c1e1e; --bk-free: #8fd1a5; --bk-sale: #f2a7b0; --bk-soft: rgba(219, 161, 162, .16); }
+}
+html[data-theme="dark"] .bk-cover { box-shadow: 0 10px 28px rgba(0, 0, 0, .55); }
+
+/* tablets: a little tighter */
+@media (max-width: 900px) { .bk-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 30px 18px; } }
+/* phones: two covers to a row; the blurb gives way to the cover */
+@media (max-width: 520px) {
+    .bk-grid, .bk-grid.bk-few { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 14px; }
+    .bk-blurb { display: none; }
+    .bk-title { font-size: .94rem; }
+    .bk-foot { margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { .bk-cover { transition: none; } .bk-card:hover .bk-cover { transform: none; } }
