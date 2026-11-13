@@ -178,19 +178,15 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
     }
     try {
         $mail = new PHPMailer(true);
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->SMTPAuth = true;
-        $mail->Username = getenv('GMAIL_USERNAME');
-        $mail->Password = getenv('GMAIL_APP_PASSWORD');
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
-        $mail->Timeout = 10;
-        $mail->CharSet = 'UTF-8';
-        // As F217: From is the Gmail account (SPF/DKIM align), replies go to the AngelWrites mailbox.
-        $from = getenv('GMAIL_USERNAME') ?: 'angelwrites@zohomail.com';
+        // ET1: same provider and settings as every other email (Zoho or the Gmail fallback, from .env)
+        $cfg = aw_mail_config();
+        if (empty($cfg['ok'])) {
+            throw new \RuntimeException($cfg['error']);
+        }
+        aw_mail_transport($mail, $cfg);
+        $from = $cfg['from'];
         $mail->setFrom($from, (function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites') . ' Newsletter');
-        if (strcasecmp($from, 'angelwrites@zohomail.com') !== 0) $mail->addReplyTo('angelwrites@zohomail.com', 'Angella Bottoman');
+        $mail->Sender = $from;
         $mail->addAddress($to);
         $mail->Subject = $subject;
         $mail->isHTML(true);
