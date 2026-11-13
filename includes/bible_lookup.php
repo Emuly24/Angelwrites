@@ -1,16 +1,13 @@
 <?php
 function getBibleText($book, $chapter, $verse_start = 1, $verse_end = 0, $version = 'KJV') {
     $version_map = [
-        'AMP'  => 'bible_AMP.db',
         'ASV'  => 'bible_ASV.db',
-        'ESV'  => 'bible_ESV.db',
         'KJV'  => 'bible_KJV.db',
-        'NASB' => 'bible_NASB.db',
-        'NIV'  => 'bible_NIV.db',
-        'NKJV' => 'bible_NKJV.db',
         'WEB'  => 'bible_WEB.db',
     ];
     
+    // BL1: NIV, ESV, NASB, NKJV and AMP were removed: copyrighted translations the site has no licence to
+    // serve. A request for one of them gets the "not available" answer below.
     // F24: an unknown version (e.g. YLT, which has no database) used to fall back silently to
     // KJV while the page still said YLT. It is now reported instead.
     if (!isset($version_map[$version])) {

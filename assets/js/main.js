@@ -174,8 +174,9 @@
         bibleBookSelect.appendChild(option);
     });
 
-    // Populate version dropdown with all 9 versions
-    const versions = ["KJV", "NIV", "ESV", "NASB", "NKJV", "AMP", "ASV", "WEB", "YLT"];
+    // BL1: only the public-domain translations the site holds (it listed nine; five were copyrighted
+    // and one, YLT, never had any text)
+    const versions = ["KJV", "WEB", "ASV"];
     versions.forEach(version => {
         const option = document.createElement('option');
         option.value = version;
