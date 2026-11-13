@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/components.php'; // A1
 
 redirectIfNotLoggedIn();
 
@@ -183,10 +184,10 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
                     </li>
                 <?php endforeach; ?>
                 </ul>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/library.php" class="btn btn-sm btn-outline">My library</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/library.php', 'My library', 'outline', ['small' => true]); ?></div>
             <?php else: ?>
                 <p class="dash-empty">You are not reading a book right now. Open any book and it will wait for you here, with your place saved.</p>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-sm btn-primary">Browse books</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/books.php', 'Browse books', 'primary', ['small' => true]); ?></div>
             <?php endif; ?>
         </section>
 
@@ -206,7 +207,7 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
                 <?php endforeach; ?>
                 </ul>
                 <div class="dash-foot">
-                    <a href="<?php echo SITE_URL; ?>/notifications.php" class="btn btn-sm btn-outline">See all</a>
+                    <?php echo aw_link_btn(SITE_URL . '/notifications.php', 'See all', 'outline', ['small' => true]); ?>
                     <?php if ($unread_count > 0): ?>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
@@ -231,10 +232,10 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
                     </div></li>
                 <?php endforeach; ?>
                 </ul>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-sm btn-outline">Community Q&amp;A</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/community.php', 'Community Q&A', 'outline', ['small' => true]); ?></div>
             <?php else: ?>
                 <p class="dash-empty">Carrying a question about faith, healing or a passage you read? Ask it in the community; others who have walked the same road can answer.</p>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/community.php" class="btn btn-sm btn-primary">Ask a question</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/community.php', 'Ask a question', 'primary', ['small' => true]); ?></div>
             <?php endif; ?>
         </section>
 
@@ -258,7 +259,7 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
                 </ul>
             <?php else: ?>
                 <p class="dash-empty">Highlight a line in any book, or bookmark a verse in the Bible reader, and it will be kept here for you.</p>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/bible_reader.php" class="btn btn-sm btn-outline">Open the Bible</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/bible_reader.php', 'Open the Bible', 'outline', ['small' => true]); ?></div>
             <?php endif; ?>
         </section>
 
@@ -271,10 +272,10 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
                     <li><a href="<?php echo SITE_URL; ?>/group.php?id=<?php echo (int)$g['id']; ?>"><?php echo htmlspecialchars($g['name']); ?></a></li>
                 <?php endforeach; ?>
                 </ul>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/groups.php" class="btn btn-sm btn-outline">All groups</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/groups.php', 'All groups', 'outline', ['small' => true]); ?></div>
             <?php else: ?>
                 <p class="dash-empty">Reading together helps. Join a group to read a book alongside others and share what stays with you.</p>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/groups.php" class="btn btn-sm btn-primary">Find a group</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/groups.php', 'Find a group', 'primary', ['small' => true]); ?></div>
             <?php endif; ?>
         </section>
 
@@ -292,7 +293,7 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
                 </ul>
             <?php else: ?>
                 <p class="dash-empty">Would it help to talk with someone? You can book a private session with Angella.</p>
-                <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/book_session.php" class="btn btn-sm btn-outline">Book a session</a></div>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/book_session.php', 'Book a session', 'outline', ['small' => true]); ?></div>
             <?php endif; ?>
         </section>
 
@@ -305,7 +306,7 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
                 <li><a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars($p['title']); ?></a></li>
             <?php endforeach; ?>
             </ul>
-            <div class="dash-foot"><a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-sm btn-outline">More poems</a></div>
+            <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/poetry.php', 'More poems', 'outline', ['small' => true]); ?></div>
         </section>
         <?php endif; ?>
     </div>

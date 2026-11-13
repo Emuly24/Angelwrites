@@ -8,6 +8,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
 require_once '../includes/picks.php';
+require_once '../includes/components.php'; // A1
 
 redirectIfNotAdmin();
 
@@ -53,9 +54,7 @@ require_once '../includes/header.php';
             </div>
         </div>
 
-        <?php if ($error): ?>
-            <div class="alert alert-error" role="alert"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
+        <?php echo aw_alert('error', $error); ?>
         <?php if ($notice): ?>
             <div class="alert alert-success" role="status"><?php echo htmlspecialchars($notice); ?> <a href="<?php echo SITE_URL; ?>/index.php#picks">See it on the home page</a></div>
         <?php endif; ?>
@@ -94,7 +93,7 @@ require_once '../includes/header.php';
                 </div>
             </div>
             <?php endforeach; ?>
-            <button type="submit" name="save_picks" value="1" class="btn btn-primary"><i class="fas fa-check" aria-hidden="true"></i> Save picks</button>
+            <?php echo aw_btn('Save picks', 'primary', ['type' => 'submit', 'name' => 'save_picks', 'value' => '1', 'icon' => 'fa-check']); ?>
         </form>
     </div>
 </div>

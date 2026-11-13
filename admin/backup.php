@@ -17,6 +17,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
+require_once '../includes/components.php'; // A1
 
 redirectIfNotAdmin();
 
@@ -211,13 +212,9 @@ require_once '../includes/header.php';
             </div>
         </div>
 
-        <?php if ($error): ?>
-            <div class="alert alert-error" role="alert"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
+        <?php echo aw_alert('error', $error); ?>
 
-        <?php if ($notice): ?>
-            <div class="alert alert-success" role="status"><?php echo htmlspecialchars($notice); ?></div>
-        <?php endif; ?>
+        <?php echo aw_alert('success', $notice); ?>
 
         <?php if ($days === null): ?>
             <div class="alert alert-warning">No backup has been downloaded yet.</div>
