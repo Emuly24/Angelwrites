@@ -33,3 +33,5 @@ Thumbs.db
 .idea/
 *.sublime-project
 *.sublime-workspace
+# Generated caches (sanitiser, etc.)
+data/cache/

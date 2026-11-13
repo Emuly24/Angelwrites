@@ -48,7 +48,8 @@ if ($id > 0) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
-    $content = trim($_POST['content']);
+    require_once __DIR__ . '/../includes/sanitize.php';
+    $content = aw_clean_html(trim((string)($_POST['content'] ?? '')), 'rich'); // S1: cleaned before it is stored
     $category = trim($_POST['category'] ?? '');
     if ($category === '') {
         $category = ($type === 'reflection') ? 'Christian Reflections' : 'General'; // F73

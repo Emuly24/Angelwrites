@@ -259,7 +259,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 
             <!-- Post Content -->
             <div class="post-content">
-                <?php echo $post['content']; ?>
+                <?php require_once __DIR__ . '/includes/sanitize.php'; echo aw_clean_html($post['content'], 'rich'); /* S1: also cleans posts saved before the sanitiser */ ?>
             </div>
 
             <!-- Reading Progress -->
