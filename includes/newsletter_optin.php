@@ -25,6 +25,9 @@ function newsletter_request_optin($db, $email, $name = '') {
     }
 
     if ($existing) {
+        // J1: record the new request, so the subscribe control can show "check your inbox"
+        try { $db->prepare("UPDATE newsletter SET updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$existing['id']]); }
+        catch (Throwable $e) { error_log('optin updated_at: ' . $e->getMessage()); }
         $token = $existing['unsubscribe_token'];
         if (!$token) {
             $token = bin2hex(random_bytes(32));

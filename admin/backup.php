@@ -17,11 +17,52 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
+require_once '../includes/components.php'; // A1
 
 redirectIfNotAdmin();
 
 $error = '';
 $dbFile = defined('DB_PATH') ? DB_PATH : __DIR__ . '/../data/site.db';
+
+// C1: tables that held points, levels, streaks, achievements and challenges (retired in Phase 1).
+const AW_RETIRED_TABLES = ['achievements', 'user_reputations', 'reading_streaks', 'reading_challenges', 'reading_goals', 'bible_monthly_challenges'];
+
+/** The retired tables still present, with their row counts. Never throws. */
+function aw_retired_tables(PDO $db) {
+    $found = [];
+    foreach (AW_RETIRED_TABLES as $t) {
+        try {
+            $st = $db->prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?");
+            $st->execute([$t]);
+            if ($st->fetchColumn()) {
+                $found[$t] = (int)$db->query('SELECT COUNT(*) FROM "' . $t . '"')->fetchColumn();
+            }
+        } catch (Throwable $e) {
+            error_log('backup: could not inspect ' . $t . ': ' . $e->getMessage());
+        }
+    }
+    return $found;
+}
+
+/**
+ * Drop the retired tables. Returns true on success, false (and logs) on failure; never throws.
+ * Runs in one transaction, so either every table goes or none does.
+ */
+function aw_drop_retired_tables(PDO $db, array $tables) {
+    try {
+        $db->beginTransaction();
+        foreach ($tables as $t) {
+            if (!in_array($t, AW_RETIRED_TABLES, true)) continue; // only ever these names
+            $db->exec('DROP TABLE IF EXISTS "' . $t . '"');
+        }
+        $db->commit();
+        return true;
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
+        error_log('backup: dropping retired tables failed: ' . $e->getMessage());
+        return false;
+    }
+}
 
 function aw_backup_size($bytes) {
     return $bytes >= 1048576 ? number_format($bytes / 1048576, 1) . ' MB' : max(1, (int)round($bytes / 1024)) . ' KB';
@@ -110,6 +151,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_backup'])) {
     }
 }
 
+// ===== DELETE RETIRED POINTS AND STREAKS DATA (C1) =====
+$notice = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['drop_retired'])) {
+    $st = $db->prepare("SELECT password FROM users WHERE id = ? AND role = 'admin'");
+    $st->execute([(int)$_SESSION['user_id']]);
+    $hash = (string)$st->fetchColumn();
+    $st->closeCursor();
+    $lastAt = (string)aw_setting('last_backup_at', '');
+    $fresh = $lastAt !== '' && strtotime($lastAt) !== false && (time() - strtotime($lastAt)) < 86400;
+    $present = aw_retired_tables($db);
+
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $error = 'Your session expired. Please reload the page and try again.';
+    } elseif (!$fresh) {
+        $error = 'Please download a backup first. Old data can only be removed within 24 hours of a backup.';
+    } elseif (empty($_POST['confirm_drop'])) {
+        $error = 'Please tick the box to confirm.';
+    } elseif ($hash === '' || !password_verify((string)($_POST['password'] ?? ''), $hash)) {
+        $error = 'That password is not correct. Nothing was removed.';
+        error_log('retired-data removal refused: wrong password for admin #' . (int)$_SESSION['user_id']);
+    } elseif (!$present) {
+        $notice = 'There is nothing left to remove.';
+    } elseif (aw_drop_retired_tables($db, array_keys($present))) {
+        $rows = array_sum($present);
+        try {
+            $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)")
+               ->execute([(int)$_SESSION['user_id'], 'retired_data_removed', 'Removed points, streaks and achievements data (' . implode(', ', array_keys($present)) . '; ' . $rows . ' rows)']);
+        } catch (Throwable $e) { /* the audit table is optional */ }
+        $notice = 'The old points, streaks and achievements data has been removed (' . number_format($rows) . ' records).';
+    } else {
+        $error = 'The old data could not be removed. Nothing was changed. Please try again later.';
+    }
+}
+
 // ===== PAGE =====
 $last = (string)aw_setting('last_backup_at', '');
 $dbSize = is_file($dbFile) ? (int)filesize($dbFile) : 0;
@@ -119,6 +194,8 @@ foreach (['Members' => 'users', 'Books' => 'books', 'Poems' => 'poems', 'Blog po
     try { $counts[$label] = (int)$db->query("SELECT COUNT(*) FROM $table")->fetchColumn(); } catch (Throwable $e) { /* table not present */ }
 }
 $days = $last !== '' ? (int)floor((time() - strtotime($last)) / 86400) : null;
+$retired = aw_retired_tables($db);
+$backupFresh = $last !== '' && (time() - strtotime($last)) < 86400;
 
 $pageTitle = 'Database Backup';
 require_once '../includes/header.php';
@@ -135,9 +212,9 @@ require_once '../includes/header.php';
             </div>
         </div>
 
-        <?php if ($error): ?>
-            <div class="alert alert-error" role="alert"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
+        <?php echo aw_alert('error', $error); ?>
+
+        <?php echo aw_alert('success', $notice); ?>
 
         <?php if ($days === null): ?>
             <div class="alert alert-warning">No backup has been downloaded yet.</div>
@@ -175,6 +252,34 @@ require_once '../includes/header.php';
                 </ul>
             </div>
         </div>
+
+        <?php if ($retired): ?>
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-body">
+                <h2 style="font-size:1.25rem;margin:0 0 6px;">Remove old points and streaks data</h2>
+                <p style="color:var(--text-light);margin:0 0 10px;">The site no longer keeps points, levels, reading streaks, achievements or challenges.
+                    The old records are still stored (<?php echo number_format(array_sum($retired)); ?> in all). Removing them cannot be undone except by restoring a backup.</p>
+                <?php if (!$backupFresh): ?>
+                    <p class="field-hint" style="margin:0;"><strong>Download a backup above first.</strong> This option opens for 24 hours after a backup.</p>
+                <?php else: ?>
+                <form method="POST" class="admin-form" autocomplete="off">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                    <div class="form-group">
+                        <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;">
+                            <input type="checkbox" name="confirm_drop" value="1" required style="margin-top:4px;">
+                            <span>I have a backup from today and want to remove the old points, streaks and achievements data.</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="drop_password">Confirm your password</label>
+                        <input type="password" id="drop_password" name="password" required autocomplete="current-password" style="max-width:340px;">
+                    </div>
+                    <button type="submit" name="drop_retired" value="1" class="btn btn-outline"><i class="fas fa-trash-alt" aria-hidden="true"></i> Remove old data</button>
+                </form>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="card">
             <div class="card-body">

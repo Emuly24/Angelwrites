@@ -18,9 +18,6 @@ if (!isLoggedIn()) {
 
 $user_id = $_SESSION['user_id'];
 $action = isset($_POST['action']) ? $_POST['action'] : '';
-// F9: updateUserStats() (XP for highlights, notes, finished books, challenges) lives here; it
-// was never loaded, so every function_exists('updateUserStats') check below skipped it.
-require_once __DIR__ . '/reader_gamification.php';
 
 // Allow GET for certain actions
 if (empty($action) && isset($_GET['action'])) {
@@ -86,8 +83,6 @@ if ($action === 'save_position') {
         error_log('R8 reading_status: ' . $e->getMessage());
     }
 
-    // Update streak and gamification
-    updateReadingStreak($user_id);
     updateReadingSessionDuration($user_id, $book_id);
 
     // Check milestones
@@ -96,10 +91,6 @@ if ($action === 'save_position') {
     }
     if ($percent >= 100) {
         checkMilestone($user_id, $book_id, 100);
-        // Award XP for finishing the book
-        if (function_exists('updateUserStats')) {
-            updateUserStats($user_id, $book_id, 'book_finish', 1);
-        }
     }
 
     // Update circle position if member
@@ -194,10 +185,6 @@ if ($action === 'add_highlight') {
     $stmt = $db->prepare("INSERT INTO highlights (user_id, book_id, chapter_index, paragraph_index, text, color, note) VALUES (?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$user_id, $book_id, $chapter, $paragraph, $text, $color, $note]);
 
-    // Award XP for adding a highlight
-    if (function_exists('updateUserStats')) {
-        updateUserStats($user_id, $book_id, 'highlight', 1);
-    }
 
     echo json_encode(['success' => true, 'highlight_id' => $db->lastInsertId()]);
     exit;
@@ -337,41 +324,7 @@ if ($action === 'report_typo') {
     exit;
 }
 
-// ================================================================
-// 7. GOALS (legacy, may be used)
-// ================================================================
-if ($action === 'update_goal') {
-    $goal_id = (int)$_POST['goal_id'];
-    $progress = (int)$_POST['progress'];
-
-    if ($progress <= 0) {
-        echo json_encode(['success' => false, 'error' => 'Progress must be positive.']);
-        exit;
-    }
-
-    $stmt = $db->prepare("UPDATE reading_goals SET current_value = current_value + ? WHERE id = ? AND user_id = ?");
-    $stmt->execute([$progress, $goal_id, $user_id]);
-
-    $stmt = $db->prepare("SELECT target_value, completed FROM reading_goals WHERE id = ? AND user_id = ?");
-    $stmt->execute([$goal_id, $user_id]);
-    $goal = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($goal && $goal['completed'] == 0 && $goal['target_value'] > 0) {
-        $stmt = $db->prepare("SELECT current_value FROM reading_goals WHERE id = ? AND user_id = ?");
-        $stmt->execute([$goal_id, $user_id]);
-        $current = $stmt->fetchColumn();
-
-        if ($current >= $goal['target_value']) {
-            $stmt = $db->prepare("UPDATE reading_goals SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?");
-            $stmt->execute([$goal_id, $user_id]);
-            $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
-            $stmt->execute([$user_id, 'goal_completed']);
-        }
-    }
-
-    echo json_encode(['success' => true]);
-    exit;
-}
+// C1: reading goals (update_goal) are retired with the rest of the gamification (wish C).
 
 // ================================================================
 // 8. STATS
@@ -387,90 +340,19 @@ if ($action === 'get_stats') {
     $stmt->execute([$user_id, $book_id]);
     $total_pages = $stmt->fetchColumn() ?? 0;
 
-    $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $streak = $stmt->fetchColumn() ?? 0;
-
-    $stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC LIMIT 20");
-    $stmt->execute([$user_id]);
-    $achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+    // C1: streaks and achievements are retired; only the member's own reading time is reported.
     echo json_encode([
         'success' => true,
         'total_seconds' => $total_seconds,
-        'total_pages' => $total_pages,
-        'streak' => $streak,
-        'achievements' => $achievements
+        'total_pages' => $total_pages
     ]);
     exit;
 }
 
-// ================================================================
-// 9. MONTHLY CHALLENGE
-// ================================================================
-if ($action === 'get_monthly_challenge') {
-    // Support both POST and GET
-    $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : (isset($_GET['user_id']) ? (int)$_GET['user_id'] : $user_id);
-    $month = date('m');
-    $year = date('Y');
-
-    $stmt = $db->prepare("SELECT * FROM reading_challenges WHERE user_id = ? AND month = ? AND year = ?");
-    $stmt->execute([$user_id, $month, $year]);
-    $challenge = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$challenge) {
-        $stmt = $db->prepare("INSERT INTO reading_challenges (user_id, month, year, goal, target, progress) VALUES (?, ?, ?, ?, ?, 0)");
-        $stmt->execute([$user_id, $month, $year, 'Read 30 pages this month', 30, 0]);
-        $challenge = [
-            'id' => $db->lastInsertId(),
-            'user_id' => $user_id,
-            'month' => $month,
-            'year' => $year,
-            'goal' => 'Read 30 pages this month',
-            'target' => 30,
-            'progress' => 0
-        ];
-    }
-
-    echo json_encode([
-        'success' => true,
-        'goal' => $challenge['goal'],
-        'target' => (int)$challenge['target'],
-        'progress' => (int)$challenge['progress']
-    ]);
-    exit;
-}
-
-if ($action === 'update_challenge_progress') {
-    $user_id = (int)$_POST['user_id'];
-    $pages_read = (int)$_POST['pages_read'];
-
-    if ($pages_read <= 0) {
-        echo json_encode(['success' => false, 'error' => 'Pages read must be positive.']);
-        exit;
-    }
-
-    $month = date('m');
-    $year = date('Y');
-
-    $stmt = $db->prepare("UPDATE reading_challenges SET progress = progress + ? WHERE user_id = ? AND month = ? AND year = ?");
-    $stmt->execute([$pages_read, $user_id, $month, $year]);
-
-    $stmt = $db->prepare("SELECT target, progress FROM reading_challenges WHERE user_id = ? AND month = ? AND year = ?");
-    $stmt->execute([$user_id, $month, $year]);
-    $challenge = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($challenge && $challenge['progress'] >= $challenge['target']) {
-        $stmt = $db->prepare("UPDATE reading_challenges SET completed = 1 WHERE user_id = ? AND month = ? AND year = ?");
-        $stmt->execute([$user_id, $month, $year]);
-        $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
-        $stmt->execute([$user_id, 'monthly_challenge_completed']);
-        if (function_exists('updateUserStats')) {
-            updateUserStats($user_id, 0, 'challenge', 1);
-        }
-    }
-
-    echo json_encode(['success' => true]);
+// C1: monthly challenges (get_monthly_challenge, update_challenge_progress) are retired (wish C).
+if ($action === 'get_monthly_challenge' || $action === 'update_challenge_progress' || $action === 'update_goal') {
+    http_response_code(410);
+    echo json_encode(['success' => false, 'error' => 'Reading challenges and goals have been retired.']);
     exit;
 }
 
@@ -543,10 +425,6 @@ if ($action === 'add_reader_note') {
     ");
     $stmt->execute([$group_id, $user_id, $book_id, $chapter, $text, $is_private, $highlight_id]);
 
-    // Award XP for adding a note
-    if (function_exists('updateUserStats')) {
-        updateUserStats($user_id, $book_id, 'note', 1);
-    }
 
     echo json_encode(['success' => true]);
     exit;
@@ -845,47 +723,10 @@ if ($action === 'update_reading_speed') {
 // 17. HELPER FUNCTIONS
 // ================================================================
 
+// C1: reading streaks are retired (wish C). Kept as an empty function for its callers.
+// C1: reading streaks are retired; kept as a no-op so nothing older can call a missing function.
 function updateReadingStreak($user_id) {
-    global $db;
-    $today = date('Y-m-d');
-    $stmt = $db->prepare("SELECT * FROM reading_streaks WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $streak = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$streak) {
-        $stmt = $db->prepare("INSERT INTO reading_streaks (user_id, current_streak, longest_streak, last_read_date) VALUES (?, 1, 1, ?)");
-        $stmt->execute([$user_id, $today]);
-        return;
-    }
-
-    $last_read = $streak['last_read_date'];
-    $current = (int)$streak['current_streak'];
-    $longest = (int)$streak['longest_streak'];
-
-    if ($last_read === $today) return;
-    $yesterday = date('Y-m-d', strtotime('-1 day'));
-
-    if ($last_read === $yesterday) {
-        $current++;
-        if ($current > $longest) $longest = $current;
-        if ($current === 7) {
-            $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
-            $stmt->execute([$user_id, 'streak_7_days']);
-        }
-        if ($current === 30) {
-            $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
-            $stmt->execute([$user_id, 'streak_30_days']);
-        }
-        if ($current === 365) {
-            $stmt = $db->prepare("INSERT OR IGNORE INTO achievements (user_id, achievement_type) VALUES (?, ?)");
-            $stmt->execute([$user_id, 'streak_365_days']);
-        }
-    } else {
-        $current = 1;
-    }
-
-    $stmt = $db->prepare("UPDATE reading_streaks SET current_streak = ?, longest_streak = ?, last_read_date = ? WHERE user_id = ?");
-    $stmt->execute([$current, $longest, $today, $user_id]);
+    return null;
 }
 
 function updateReadingSessionDuration($user_id, $book_id) {

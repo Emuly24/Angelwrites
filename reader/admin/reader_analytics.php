@@ -95,17 +95,6 @@ $stmt = $db->prepare("
 $stmt->execute();
 $recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== FETCH ACHIEVEMENTS LEADERBOARD =====
-$stmt = $db->prepare("
-    SELECT u.name, a.achievement_type, a.unlocked_at
-    FROM achievements a
-    JOIN users u ON a.user_id = u.id
-    ORDER BY a.unlocked_at DESC
-    LIMIT 20
-");
-$stmt->execute();
-$achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 $pageTitle = 'Reader Analytics';
 ?>
 <?php require_once __DIR__ . '/../../includes/header.php'; ?>
@@ -302,38 +291,6 @@ $pageTitle = 'Reader Analytics';
             </div>
         </div>
 
-        <!-- ===== ACHIEVEMENTS LEADERBOARD ===== -->
-        <div class="card">
-            <div class="card-header">
-                <h2>🏆 Achievements Leaderboard</h2>
-            </div>
-            <div class="card-body">
-                <?php if (count($achievements) > 0): ?>
-                    <div class="table-responsive">
-                        <table class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Achievement</th>
-                                    <th>Unlocked</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($achievements as $achievement): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($achievement['name']); ?></td>
-                                        <td><?php echo ucfirst(str_replace('_', ' ', $achievement['achievement_type'])); ?></td>
-                                        <td><?php echo date('M j, Y', strtotime($achievement['unlocked_at'])); ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <p class="no-items">No achievements unlocked yet.</p>
-                <?php endif; ?>
-            </div>
-        </div>
     </div>
 </div>
 

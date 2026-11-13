@@ -266,8 +266,6 @@ p { line-height:1.7; }
 .user-reputation-box h4 { margin-bottom:8px; font-size:1.1rem; }
 .rep-stats { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:6px; }
 .rep-points, .rep-level, .rep-streak { font-weight:600; color:var(--text); font-size:0.95rem; }
-.achievement-badges { display:flex; flex-wrap:wrap; gap:4px; }
-.achievement-badge { background:var(--vanilla); padding:4px 12px; border-radius:20px; font-size:0.75rem; color:var(--text-light); border:1px solid var(--border); }
 
 /* ===== SKILLS ===== */
 .about-skills-section { margin-bottom:48px; }

@@ -362,7 +362,7 @@ $pageTitle = 'My Library';
                         Finished Books
                         <span class="section-count">(<?php echo count($grouped['finished']); ?>)</span>
                     </h2>
-                    <p class="section-subtitle">Celebrate your reading achievements.</p>
+                    <p class="section-subtitle">Books you have read to the end.</p>
                 </div>
             </div>
             <?php if (count($grouped['finished']) > 0): ?>

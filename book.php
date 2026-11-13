@@ -4,7 +4,6 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/commerce.php';
 require_once 'includes/mail_helper.php';
-require_once 'includes/reputation.php';
 
 // ===== ERROR HANDLING =====
 // S7 (F88, F211): errors are logged, never printed to visitors (they leaked server paths
@@ -116,11 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
                 $stmt->execute(['book', $book_id, $_SESSION['user_id'], $rating, $comment]);
             }
             
-            // Award reputation points (if function exists) – first review only (F93)
-            if (!$existing_review && function_exists('awardReputation')) {
-                awardReputation($_SESSION['user_id'], 3, 'Reviewed a book');
-            }
-            
             // Admin notification
             $admin_email = aw_admin_email();
             $subject = '📖 New Book Review: ' . $book['title'];
@@ -157,29 +151,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['react_to_review']) &&
     exit;
 }
 
-// ===== USER REPUTATION =====
-$user_rep = null;
-$achievements = [];
-$reading_streak = 0;
-if (isLoggedIn()) {
-    $user_id = $_SESSION['user_id'];
-    try {
-        $stmt = $db->prepare("SELECT points, level, badges FROM user_reputations WHERE user_id = ?");
-        $stmt->execute([$user_id]);
-        $user_rep = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        $stmt = $db->prepare("SELECT achievement_type, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC LIMIT 3");
-        $stmt->execute([$user_id]);
-        $achievements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
-        $stmt->execute([$user_id]);
-        $reading_streak = (int)$stmt->fetchColumn(); // F87: fetchColumn() returns false with no row; ?? 0 kept the false (blank)
-    } catch (Exception $e) {
-        // Tables might not exist – skip
-    }
-}
-
 $pageTitle = htmlspecialchars($book['title']);
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -195,23 +166,6 @@ $pageTitle = htmlspecialchars($book['title']);
                 <i class="fas fa-arrow-left"></i> Back to Books
             </a>
         </div>
-
-        <!-- ===== USER REPUTATION DISPLAY ===== -->
-        <?php if ($user_rep): ?>
-            <div class="user-reputation-bar">
-                <span class="rep-item">🏆 <strong><?php echo $user_rep['points']; ?></strong> pts · Level <?php echo $user_rep['level']; ?></span>
-                <span class="rep-item">🔥 <?php echo $reading_streak; ?> day streak</span>
-                <?php if ($achievements): ?>
-                    <span class="achievement-badges">
-                        <?php foreach ($achievements as $a): ?>
-                            <span class="achievement-badge" title="<?php echo ucfirst(str_replace('_', ' ', $a['achievement_type'])); ?>">
-                                🏆
-                            </span>
-                        <?php endforeach; ?>
-                    </span>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
 
         <!-- ===== MAIN BOOK LAYOUT ===== -->
         <div class="book-content-wrapper">
@@ -548,16 +502,6 @@ p { line-height:1.6; }
 .back-link { color:var(--text-light); font-size:0.95rem; transition:color 0.2s; }
 .back-link:hover { color:var(--rose); }
 .back-link i { margin-right:6px; }
-
-/* ===== REPUTATION BAR ===== */
-.user-reputation-bar {
-    display:flex; flex-wrap:wrap; gap:16px; align-items:center;
-    padding:12px 20px; background:var(--vanilla); border-radius:20px;
-    margin-bottom:32px; border:1px solid var(--rose-light); box-shadow:var(--shadow);
-}
-.rep-item { font-size:0.9rem; color:var(--text); display:flex; align-items:center; gap:4px; }
-.achievement-badges { display:flex; gap:4px; }
-.achievement-badge { background:var(--rose); color:white; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem; }
 
 /* ===== BOOK CONTENT WRAPPER ===== */
 .book-content-wrapper {

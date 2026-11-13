@@ -73,27 +73,12 @@ class ProgressTracker {
             $stmt->execute([$this->user_id, $this->book_id, $offset, $chapter, $percent]);
         }
 
-        // --- 1. Update reading streak ---
-        $this->updateStreak();
-
-        // --- 2. Award XP for pages read ---
-        if (function_exists('updateUserStats') && $pages_read > 0) {
-            // Only award XP if progress increased
-            if ($percent > $old_percent) {
-                // Calculate pages read since last save
-                $pages_advanced = max(1, $percent - $old_percent);
-                // Award XP for each page (10 XP per page)
-                updateUserStats($this->user_id, $this->book_id, 'page_read', $pages_advanced);
-            }
-        }
+        // C1: streaks and XP are retired (PROGRAM_PLAN.md, wish C).
 
         // --- 3. Update reading circle position (if user is in a circle) ---
         $this->updateCirclePosition($chapter);
 
-        // --- 4. Update monthly challenge progress ---
-        $this->updateChallengeProgress($pages_read);
-
-        // --- 5. Check milestones and achievements ---
+        // C1: monthly challenges and achievements are retired; reading milestones still notify the admin.
         $this->checkMilestones($percent, $old_percent);
 
         // --- 6. Check for book completion ---
@@ -102,58 +87,6 @@ class ProgressTracker {
         }
 
         return true;
-    }
-
-    /**
-     * Update reading streak.
-     */
-    private function updateStreak() {
-        $today = date('Y-m-d');
-
-        $stmt = $this->db->prepare("SELECT * FROM reading_streaks WHERE user_id = ?");
-        $stmt->execute([$this->user_id]);
-        $streak = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$streak) {
-            $stmt = $this->db->prepare("
-                INSERT INTO reading_streaks (user_id, current_streak, longest_streak, last_read_date)
-                VALUES (?, 1, 1, ?)
-            ");
-            $stmt->execute([$this->user_id, $today]);
-            return;
-        }
-
-        $last_read = $streak['last_read_date'];
-        $current = (int)$streak['current_streak'];
-        $longest = (int)$streak['longest_streak'];
-
-        if ($last_read === $today) return;
-
-        $yesterday = date('Y-m-d', strtotime('-1 day'));
-        if ($last_read === $yesterday) {
-            $current++;
-            if ($current > $longest) $longest = $current;
-
-            // Check streak achievements (7, 30, 365 days)
-            if ($current === 7) {
-                $this->unlockAchievement('streak_7_days');
-            }
-            if ($current === 30) {
-                $this->unlockAchievement('streak_30_days');
-            }
-            if ($current === 365) {
-                $this->unlockAchievement('streak_365_days');
-            }
-        } else {
-            $current = 1;
-        }
-
-        $stmt = $this->db->prepare("
-            UPDATE reading_streaks
-            SET current_streak = ?, longest_streak = ?, last_read_date = ?
-            WHERE user_id = ?
-        ");
-        $stmt->execute([$current, $longest, $today, $this->user_id]);
     }
 
     /**
@@ -180,57 +113,7 @@ class ProgressTracker {
     }
 
     /**
-     * Update monthly challenge progress.
-     */
-    private function updateChallengeProgress($pages_read) {
-        if (!$pages_read || $pages_read <= 0) return;
-
-        $month = date('m');
-        $year = date('Y');
-
-        // Try to get existing challenge
-        $stmt = $this->db->prepare("
-            SELECT id, progress, target, completed
-            FROM reading_challenges
-            WHERE user_id = ? AND month = ? AND year = ?
-        ");
-        $stmt->execute([$this->user_id, $month, $year]);
-        $challenge = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$challenge) {
-            // Create default challenge if none exists
-            $default_target = 30;
-            $default_goal = "Read $default_target pages this month";
-            $stmt = $this->db->prepare("
-                INSERT INTO reading_challenges (user_id, month, year, goal, target, progress)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([$this->user_id, $month, $year, $default_goal, $default_target, $pages_read]);
-            return;
-        }
-
-        $new_progress = $challenge['progress'] + $pages_read;
-        $stmt = $this->db->prepare("
-            UPDATE reading_challenges
-            SET progress = ?
-            WHERE id = ?
-        ");
-        $stmt->execute([$new_progress, $challenge['id']]);
-
-        // Check if challenge completed
-        if ($new_progress >= $challenge['target'] && !$challenge['completed']) {
-            $stmt = $this->db->prepare("UPDATE reading_challenges SET completed = 1 WHERE id = ?");
-            $stmt->execute([$challenge['id']]);
-            $this->unlockAchievement('monthly_challenge_completed');
-            // Award extra XP for completing challenge
-            if (function_exists('updateUserStats')) {
-                updateUserStats($this->user_id, $this->book_id, 'challenge', 1);
-            }
-        }
-    }
-
-    /**
-     * Check milestones and unlock achievements.
+     * Tell the admin when a reader passes 50% and 75%.
      */
     private function checkMilestones($percent, $old_percent) {
         // Milestone 50%
@@ -245,43 +128,12 @@ class ProgressTracker {
     }
 
     /**
-     * Handle book completion (achievements, notifications).
+     * Handle book completion (admin notification).
      */
     private function handleBookCompletion() {
-        // Unlock achievement
-        $this->unlockAchievement('first_book_completed');
-
-        // Check for multiple books completed
-        $stmt = $this->db->prepare("
-            SELECT COUNT(*) FROM reading_progress
-            WHERE user_id = ? AND progress_percent >= 100
-        ");
-        $stmt->execute([$this->user_id]);
-        $completed_books = $stmt->fetchColumn();
-
-        if ($completed_books >= 5) {
-            $this->unlockAchievement('five_books_completed');
-        }
-        if ($completed_books >= 10) {
-            $this->unlockAchievement('ten_books_completed');
-        }
-        if ($completed_books >= 25) {
-            $this->unlockAchievement('twenty_five_books_completed');
-        }
-
+        // C1: achievements are retired; finishing a book still notifies the admin.
         // Send admin notification for completion
         $this->sendAdminNotification(100);
-    }
-
-    /**
-     * Unlock an achievement for the user.
-     */
-    private function unlockAchievement($type) {
-        $stmt = $this->db->prepare("
-            INSERT OR IGNORE INTO achievements (user_id, achievement_type)
-            VALUES (?, ?)
-        ");
-        $stmt->execute([$this->user_id, $type]);
     }
 
     /**

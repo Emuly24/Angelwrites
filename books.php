@@ -218,7 +218,7 @@ $pageTitle = 'Books';
 <!-- ===== PAYMENT MODAL ===== -->
 <div id="paymentModal" class="modal" style="display:none;">
     <div class="modal-content">
-        <span class="modal-close" onclick="closePaymentModal()">&times;</span>
+        <button type="button" class="modal-close" onclick="closePaymentModal()" aria-label="Close">&times;</button><!-- A1: was a clickable span -->
         <div class="modal-header">
             <i class="fas fa-lock modal-lock-icon"></i>
             <h3>Order this book</h3>

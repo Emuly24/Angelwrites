@@ -5,30 +5,45 @@ require_once '../includes/auth.php';
 
 redirectIfNotAdmin();
 
-// ============================================================
-// 1. FETCH STATISTICS (all wrapped in try-catch)
-// ============================================================
-$stats = [];
-try { $stmt = $db->query("SELECT COUNT(*) FROM users"); $stats['total_users'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats users: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(*) FROM books"); $stats['total_books'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats books: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(*) FROM poems"); $stats['total_poems'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats poems: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(*) FROM sessions"); $stats['total_sessions'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats sessions: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(*) FROM blog_posts"); $stats['total_posts'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats blog_posts: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(*) FROM videos"); $stats['total_videos'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats videos: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT SUM(view_count) FROM poems"); $stats['poem_views'] = $stmt->fetchColumn() ?? 0; } catch (Exception $e) { error_log("Stats poem views: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT SUM(view_count) FROM books"); $stats['book_views'] = $stmt->fetchColumn() ?? 0; } catch (Exception $e) { error_log("Stats book views: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions"); $stats['total_reading_hours'] = floor(($stmt->fetchColumn() ?? 0) / 3600); } catch (Exception $e) { error_log("Stats reading hours: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-1 day')"); $stats['active_today'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats active today: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-7 days')"); $stats['active_week'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats active week: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-30 days')"); $stats['active_month'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats active month: " . $e->getMessage()); }
-try { $stmt = $db->query("SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time > date('now', '-365 days')"); $stats['active_year'] = $stmt->fetchColumn(); } catch (Exception $e) { error_log("Stats active year: " . $e->getMessage()); }
-$stats['total_views'] = ($stats['poem_views'] ?? 0) + ($stats['book_views'] ?? 0);
+// E2 (PROGRAM_PLAN.md Phase 1): the admin dashboard shows what needs doing and what happened
+// recently, read once on the server. No charts, no "Live" polling: the page makes no request after
+// it loads until the admin acts. Every query fails soft (logged, empty).
+function aw_adm_rows(PDO $db, $sql, array $params = []) {
+    try { $st = $db->prepare($sql); $st->execute($params); return $st->fetchAll(PDO::FETCH_ASSOC); }
+    catch (Throwable $e) { error_log('admin dashboard: ' . $e->getMessage()); return []; }
+}
+function aw_adm_count(PDO $db, $sql) {
+    try { return (int)$db->query($sql)->fetchColumn(); }
+    catch (Throwable $e) { error_log('admin dashboard: ' . $e->getMessage()); return 0; }
+}
+function aw_adm_short($text, $len) {
+    $t = trim(preg_replace('/\s+/u', ' ', strip_tags((string)$text)));
+    if (function_exists('mb_strlen')) return mb_strlen($t) > $len ? rtrim(mb_substr($t, 0, $len)) . '…' : $t;
+    return strlen($t) > $len ? rtrim(substr($t, 0, $len)) . '…' : $t;
+}
 
-// ============================================================
-// 2. FETCH RECENT ITEMS (simplified for brevity)
-// ============================================================
-try { $stmt = $db->prepare("SELECT s.*, u.name AS user_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date ASC LIMIT 5"); $stmt->execute(); $recent_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT * FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5"); $stmt->execute(); $recent_messages = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+$week = [
+    'New members'    => aw_adm_count($db, "SELECT COUNT(*) FROM users WHERE created_at >= datetime('now', '-7 days')"),
+    'Readers'        => aw_adm_count($db, "SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time >= datetime('now', '-7 days')"),
+    'Comments'       => aw_adm_count($db, "SELECT COUNT(*) FROM reviews WHERE deleted_at IS NULL AND created_at >= datetime('now', '-7 days')"),
+    'Questions'      => aw_adm_count($db, "SELECT COUNT(*) FROM questions WHERE created_at >= datetime('now', '-7 days')"),
+];
+$totals = [
+    'Members' => aw_adm_count($db, "SELECT COUNT(*) FROM users"),
+    'Books'   => aw_adm_count($db, "SELECT COUNT(*) FROM books"),
+    'Poems'   => aw_adm_count($db, "SELECT COUNT(*) FROM poems"),
+    'Posts'   => aw_adm_count($db, "SELECT COUNT(*) FROM blog_posts"),
+    'Videos'  => aw_adm_count($db, "SELECT COUNT(*) FROM videos"),
+];
+
+$recent_sessions = aw_adm_rows($db, "SELECT s.id, s.date, s.time, u.name, u.first_name, u.last_name, u.username FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date ASC, s.time ASC LIMIT 5");
+$recent_messages = aw_adm_rows($db, "SELECT id, name, message, created_at FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5");
+$aw_me = aw_adm_rows($db, "SELECT name, first_name, last_name, username FROM users WHERE id = ?", [(int)($_SESSION['user_id'] ?? 0)]);
+$aw_me_name = $aw_me ? awDisplayName($aw_me[0]) : 'Admin';
+$recent_members  = aw_adm_rows($db, "SELECT id, name, first_name, last_name, username, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 5");
+$recent_comments = aw_adm_rows($db, "SELECT r.id, r.target_type, r.target_id, r.comment, r.created_at, u.name, u.first_name, u.last_name, u.username
+    FROM reviews r JOIN users u ON u.id = r.user_id WHERE r.deleted_at IS NULL ORDER BY r.created_at DESC LIMIT 5");
+$open_questions  = aw_adm_rows($db, "SELECT q.id, q.title, q.created_at FROM questions q WHERE q.answers_count = 0 ORDER BY q.created_at DESC LIMIT 5");
 
 // Q42: the real to-do items were buried among totals and zero-filled charts. Count what is waiting
 // for the admin; each query is optional (a table may not exist before the DB repair).
@@ -58,29 +73,29 @@ if ($aw_backup_days === null || $aw_backup_days >= 7) {
 $pageTitle = 'Admin Dashboard';
 ?>
 <?php require_once '../includes/header.php'; ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
 
 <style>
-:root {
-    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9;
-    --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
-    --shadow: 0 4px 20px rgba(0,0,0,0.04);
-}
-body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #3d2e2e; }
-body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
-body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
-
 /* Hero */
-.admin-hero { background: linear-gradient(135deg, #fff, var(--rose-light)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--rose-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.admin-hero { background: linear-gradient(135deg, var(--card-bg), var(--vanilla)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .admin-hero h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; margin:0; letter-spacing: -0.5px; }
-.admin-hero .sub { color: #6b5a5a; margin-top: 4px; font-size: 0.95rem; }
+.admin-hero .sub { color: var(--text-light); margin-top: 4px; font-size: 0.95rem; }
 
-/* Core Stats */
-.admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.admin-stat-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); text-align: center; transition: 0.2s; }
-.admin-stat-card:hover { transform: translateY(-4px); border-color: var(--rose); }
-.admin-stat-card .num { font-size: 2.2rem; font-weight: 700; color: var(--rose); display: block; }
-.admin-stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #6b5a5a; margin-top: 6px; }
+/* E2 */
+.adm-h2 { font-family: 'Playfair Display', serif; font-size: 1.15rem; margin: 0 0 12px; color: var(--text); }
+.adm-week { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); }
+.adm-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 0 0 12px; }
+.adm-figures div { background: var(--bg); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--border); }
+.adm-figures dt { font-size: 0.8rem; color: var(--text-light); }
+.adm-figures dd { margin: 2px 0 0; font-size: 1.6rem; font-weight: 700; color: var(--text); }
+.adm-totals { margin: 0; font-size: 0.9rem; color: var(--text-light); }
+.adm-linkbtn { background: none; border: 0; padding: 0; color: var(--rose-dark, #a8676a); text-decoration: underline; cursor: pointer; font: inherit; }
+.adm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 28px; }
+.adm-list { list-style: none; margin: 0; padding: 0; }
+.adm-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.adm-list li:last-child { border-bottom: 0; }
+.adm-list li span { color: var(--text-light); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.adm-list a { font-weight: 600; color: var(--text); }
+.adm-empty { margin: 0; color: var(--text-light); font-size: 0.9rem; line-height: 1.5; }
 
 /* Alerts */
 .alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
@@ -90,22 +105,6 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .alert-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .alert-item:last-child { border-bottom: none; }
 
-/* Charts */
-.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
-.chart-container { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); height: 260px; position: relative; }
-@media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } .alert-row { grid-template-columns: 1fr; } }
-
-/* Monitoring Stats */
-.monitoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-.monitor-card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
-.monitor-card .title { font-size: 0.75rem; color: #8a7878; text-transform: uppercase; }
-.monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); margin: 4px 0; }
-.monitor-card .sub { font-size: 0.75rem; color: #6b5a5a; }
-
-/* Top Content */
-.top-content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.top-content-card { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); }
-.top-content-card h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 /* Deep Dive Modal */
 #statsModal .modal-box { max-width: 850px; max-height: 90vh; display: flex; flex-direction: column; }
 #statsModal table { width:100%; border-collapse:collapse; font-size:0.85rem; }
@@ -119,7 +118,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 .admin-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .admin-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .admin-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #3d2e2e; transition: 0.2s; text-align: center; }
+.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: var(--text); transition: 0.2s; text-align: center; }
 .admin-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
 .admin-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
 .admin-module-btn span { font-size: 0.75rem; font-weight: 500; }
@@ -136,86 +135,84 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
     <!-- Hero -->
     <div class="admin-hero">
         <div>
-            <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'Admin'); ?></span></h1>
-            <div class="sub">Your command center – real-time overview of your site.</div>
+            <h1>Welcome back, <span style="color:var(--rose-dark, #a8676a);"><?php echo htmlspecialchars($aw_me_name); ?></span></h1>
+            <div class="sub"><?php echo $aw_attention ? 'A few things are waiting for you.' : 'Nothing is waiting for you right now.'; ?></div>
         </div>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-            <span style="background:#4f8a63; color:white; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; animation:pulse 2s infinite;"><i class="fas fa-circle"></i> Live</span>
-            <!-- Theme toggle removed from here as header has it -->
-            <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Quick Add</button>
+            <button type="button" onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus" aria-hidden="true"></i> Quick add</button>
         </div>
     </div>
 
-    <!-- Q42: needs attention -->
-    <div class="admin-module" style="margin-bottom:16px;">
-        <h3>🔔 Needs your attention</h3>
+    <!-- Q42 / E2: needs attention -->
+    <section class="admin-module" style="margin-bottom:20px;" aria-labelledby="admAttention">
+        <h3 id="admAttention">Needs your attention</h3>
         <?php if (!$aw_attention): ?>
-            <p style="margin:0;">Nothing is waiting for you. ✅</p>
+            <p style="margin:0;">All caught up. New orders, session requests, messages and reports will appear here.</p>
         <?php else: ?>
             <div class="admin-module-grid">
                 <?php foreach ($aw_attention as [$aw_label, $aw_n, $aw_link, $aw_icon]): ?>
-                    <a href="<?php echo $aw_link; ?>" class="admin-module-btn"><i class="fas <?php echo $aw_icon; ?>"></i><span><strong><?php echo $aw_n; ?></strong> <?php echo htmlspecialchars($aw_label); ?></span></a>
+                    <a href="<?php echo htmlspecialchars($aw_link); ?>" class="admin-module-btn"><i class="fas <?php echo $aw_icon; ?>" aria-hidden="true"></i><span><strong><?php echo htmlspecialchars((string)$aw_n); ?></strong> <?php echo htmlspecialchars($aw_label); ?></span></a>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
+    </section>
+
+    <!-- This week, at a glance (static numbers, read once) -->
+    <section class="adm-week" aria-labelledby="admWeek">
+        <h2 id="admWeek" class="adm-h2">This week</h2>
+        <dl class="adm-figures">
+            <?php foreach ($week as $label => $n): ?>
+                <div><dt><?php echo htmlspecialchars($label); ?></dt><dd><?php echo number_format($n); ?></dd></div>
+            <?php endforeach; ?>
+        </dl>
+        <p class="adm-totals"><?php $bits = []; foreach ($totals as $l => $n) { $bits[] = number_format($n) . ' ' . strtolower($l); } echo htmlspecialchars('On the site: ' . implode(' · ', $bits)); ?>.
+            <button type="button" class="adm-linkbtn" onclick="openStatsModal('views')">Who viewed what</button> ·
+            <button type="button" class="adm-linkbtn" onclick="openStatsModal('reading')">Reading sessions</button>
+        </p>
+    </section>
+
+    <div class="adm-grid">
+        <section class="alert-card" aria-labelledby="admSessions">
+            <h4 id="admSessions"><i class="fas fa-calendar-check" aria-hidden="true" style="color:var(--rose);"></i> Session requests</h4>
+            <?php if ($recent_sessions): ?><ul class="adm-list"><?php foreach ($recent_sessions as $s): ?>
+                <li><a href="manage_sessions.php?status=pending"><?php echo htmlspecialchars(awDisplayName($s)); ?></a><span><?php echo htmlspecialchars(date('M j, g:i a', strtotime($s['date'] . ' ' . $s['time']))); ?></span></li>
+            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No requests waiting. When a member books a session it appears here to confirm.</p><?php endif; ?>
+        </section>
+        <section class="alert-card" aria-labelledby="admMessages">
+            <h4 id="admMessages"><i class="fas fa-envelope" aria-hidden="true" style="color:var(--rose);"></i> Unread messages</h4>
+            <?php if ($recent_messages): ?><ul class="adm-list"><?php foreach ($recent_messages as $m): ?>
+                <li><a href="manage_messages.php"><?php echo htmlspecialchars($m['name']); ?></a><span><?php echo htmlspecialchars(aw_adm_short($m['message'], 40)); ?></span></li>
+            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No unread messages from the contact form.</p><?php endif; ?>
+        </section>
+        <section class="alert-card" aria-labelledby="admComments">
+            <h4 id="admComments"><i class="fas fa-comment-dots" aria-hidden="true" style="color:var(--rose);"></i> Latest comments</h4>
+            <?php if ($recent_comments): ?><ul class="adm-list"><?php foreach ($recent_comments as $c): ?>
+                <li><a href="comments.php"><?php echo htmlspecialchars(awDisplayName($c)); ?></a><span><?php echo htmlspecialchars(aw_adm_short($c['comment'], 48)); ?> · <?php echo htmlspecialchars(date('M j', strtotime($c['created_at']))); ?></span></li>
+            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No comments yet. Comments on poems, books and videos will show here as they arrive.</p><?php endif; ?>
+        </section>
+        <section class="alert-card" aria-labelledby="admQuestions">
+            <h4 id="admQuestions"><i class="fas fa-question-circle" aria-hidden="true" style="color:var(--rose);"></i> Questions with no answer</h4>
+            <?php if ($open_questions): ?><ul class="adm-list"><?php foreach ($open_questions as $q): ?>
+                <li><a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo (int)$q['id']; ?>"><?php echo htmlspecialchars(aw_adm_short($q['title'], 60)); ?></a><span>asked <?php echo htmlspecialchars(date('M j', strtotime($q['created_at']))); ?></span></li>
+            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">Every question has at least one answer.</p><?php endif; ?>
+        </section>
+        <section class="alert-card" aria-labelledby="admMembers">
+            <h4 id="admMembers"><i class="fas fa-user-plus" aria-hidden="true" style="color:var(--rose);"></i> Newest members</h4>
+            <?php if ($recent_members): ?><ul class="adm-list"><?php foreach ($recent_members as $u): ?>
+                <li><a href="manage_users.php"><?php echo htmlspecialchars(awDisplayName($u)); ?></a><span>joined <?php echo htmlspecialchars(date('M j', strtotime($u['created_at']))); ?></span></li>
+            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No members yet.</p><?php endif; ?>
+        </section>
     </div>
 
-    <!-- Core Stats -->
-    <div class="admin-stats-grid">
-        <div class="admin-stat-card"><span class="num" id="stat_users"><?php echo $stats['total_users'] ?? 0; ?></span><span class="label">Users</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_books"><?php echo $stats['total_books'] ?? 0; ?></span><span class="label">Books</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_poems"><?php echo $stats['total_poems'] ?? 0; ?></span><span class="label">Poems</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_sessions"><?php echo $stats['total_sessions'] ?? 0; ?></span><span class="label">Sessions</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_posts"><?php echo $stats['total_posts'] ?? 0; ?></span><span class="label">Blog</span></div>
-        <div class="admin-stat-card"><span class="num" id="stat_videos"><?php echo $stats['total_videos'] ?? 0; ?></span><span class="label">Videos</span></div>
-    </div>
-
-    <!-- Alerts -->
-    <div class="alert-row">
-        <div class="alert-card"><h4><i class="fas fa-clock" style="color:var(--rose);"></i> Pending Sessions</h4>
-            <div class="alert-list"><?php if(count($recent_sessions)>0): foreach($recent_sessions as $s): ?>
-                <div class="alert-item"><span><?php echo date('M j, g:i a', strtotime($s['date'].' '.$s['time'])); ?> – <?php echo htmlspecialchars($s['user_name']); ?></span><span class="badge badge-warning">Pending</span></div>
-            <?php endforeach; else: ?><div class="alert-item" style="color:#a08a8a;">No pending sessions.</div><?php endif; ?></div>
-        </div>
-        <div class="alert-card"><h4><i class="fas fa-envelope" style="color:var(--rose);"></i> Unread Messages</h4>
-            <div class="alert-list"><?php if(count($recent_messages)>0): foreach($recent_messages as $m): ?>
-                <div class="alert-item"><span><strong><?php echo htmlspecialchars($m['name']); ?></strong> – <?php echo htmlspecialchars(substr($m['message'],0,30)); ?>...</span><span class="badge badge-danger">Unread</span></div>
-            <?php endforeach; else: ?><div class="alert-item" style="color:#a08a8a;">No unread messages.</div><?php endif; ?></div>
-        </div>
-    </div>
-
-    <!-- Charts -->
-    <div class="chart-row">
-        <div class="chart-container"><canvas id="activeChart"></canvas></div>
-        <div class="chart-container"><canvas id="viewsChart"></canvas></div>
-    </div>
-
-    <div class="monitoring-grid">
-    <div class="monitor-card" style="cursor: pointer;" onclick="openStatsModal('views')">
-        <div class="title">Total Views</div>
-        <div class="value" id="total_views"><?php echo number_format($stats['total_views'] ?? 0); ?></div>
-        <div class="sub">Poems + Books <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
-    </div>
-        <div class="monitor-card"><div class="title">Active Today</div><div class="value" id="active_today"><?php echo $stats['active_today'] ?? 0; ?></div><div class="sub">Logged‑in users</div></div>
-        <div class="monitor-card"><div class="title">Active Week</div><div class="value" id="active_week"><?php echo $stats['active_week'] ?? 0; ?></div><div class="sub">Last 7 days</div></div>
-        <div class="monitor-card"><div class="title">Active Month</div><div class="value" id="active_month"><?php echo $stats['active_month'] ?? 0; ?></div><div class="sub">Last 30 days</div></div>
-        <div class="monitor-card"><div class="title">Active Year</div><div class="value" id="active_year"><?php echo $stats['active_year'] ?? 0; ?></div><div class="sub">Last 365 days</div></div>
-        <div class="monitor-card" style="cursor: pointer;" onclick="openStatsModal('reading')">
-        <div class="title">Reading Hours</div>
-        <div class="value" id="reading_hours"><?php echo number_format($stats['total_reading_hours'] ?? 0); ?></div>
-        <div class="sub">All users <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
-    </div>
-</div>
-    
-    <!-- Deep Dive Stats Modal -->
-<div id="statsModal" class="modal-overlay" style="z-index: 99999;">
+    <!-- Deep Dive Stats Modal (opened only when the admin asks) -->
+<div id="statsModal" class="modal-overlay" style="z-index: 99999;" role="dialog" aria-modal="true" aria-labelledby="statsModalTitle">
     <div class="modal-box">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
             <h2 id="statsModalTitle" style="font-family:'Playfair Display'; color: var(--rose-dark); margin:0;">Loading...</h2>
-            <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:#a08a8a;">&times;</button>
+            <button type="button" onclick="closeStatsModal()" aria-label="Close" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
         </div>
         <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem; padding-bottom:10px;">
-            <p style="color:#a08a8a; text-align:center;">Fetching data...</p>
+            <p style="color:var(--text-light); text-align:center;">Fetching data...</p>
         </div>
     </div>
 </div>
@@ -284,6 +281,7 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
             <div class="admin-module-grid">
                 <a href="settings.php" class="admin-module-btn"><i class="fas fa-sliders-h"></i><span>System Settings</span></a>
                 <a href="backup.php" class="admin-module-btn"><i class="fas fa-database"></i><span>Database Backup</span></a><!-- P0-1 -->
+                <a href="picks.php" class="admin-module-btn"><i class="fas fa-star"></i><span>Angella's Picks</span></a><!-- C2 -->
                 <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
             </div>
         </div>
@@ -308,8 +306,6 @@ body.dark-mode .admin-module-btn { background: #3a2a2a; color: #e0d0d0; }
 </div>
 
 <script>
-// Dark mode will be triggered by global header, we just apply the class
-if (localStorage.getItem('adminDarkMode') === '1') { document.body.classList.add('dark-mode'); }
 
 // Modal Functions
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
@@ -317,170 +313,7 @@ function closeQuickModal() { document.getElementById('quickModal').classList.rem
 document.getElementById('quickModal').addEventListener('click', function(e) { if(e.target===this) closeQuickModal(); });
 
 // ============================================================
-// 1. LIVE STATS POLLING (Unchanged)
-// ============================================================
-function refreshStats() {
-    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=stats')
-        .then(res => res.json()).then(data => {
-            ['users','books','poems','sessions','posts','videos'].forEach(k => {
-                document.getElementById('stat_'+k).textContent = data[k] ?? 0;
-            });
-            document.getElementById('total_views').textContent = data.total_views ?? 0;
-            document.getElementById('active_today').textContent = data.active_today ?? 0;
-            document.getElementById('active_week').textContent = data.active_week ?? 0;
-            document.getElementById('active_month').textContent = data.active_month ?? 0;
-            document.getElementById('active_year').textContent = data.active_year ?? 0;
-            document.getElementById('reading_hours').textContent = data.reading_hours ?? 0;
-        }).catch(console.error);
-}
-// Q41: polling every 60 s (stats + chart requests) cost ~3 requests a minute (~4,300 a day) per open tab,
-// even in a background tab. Now every 5 minutes, only while the tab is visible, and once on return.
-const AW_POLL_MS = 300000;
-let awLastPoll = Date.now();
-function awPoll() { awLastPoll = Date.now(); refreshStats(); if (window.activeChart) updateCharts(); }
-setInterval(function () { if (!document.hidden) awPoll(); }, AW_POLL_MS);
-document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && Date.now() - awLastPoll > 60000) awPoll();
-});
-
-// ============================================================
-// 2. SMART & SMOOTH CHART ENGINE
-// ============================================================
-function initCharts() {
-    const activeCtx = document.getElementById('activeChart').getContext('2d');
-    const viewsCtx = document.getElementById('viewsChart').getContext('2d');
-
-    // Dynamic gradient for active chart (adapts to background)
-    const gradientActive = activeCtx.createLinearGradient(0,0,0,250);
-    const isDark = document.body.classList.contains('dark-mode');
-    gradientActive.addColorStop(0, '#DBA1A2'); 
-    gradientActive.addColorStop(1, isDark ? '#2c1e1e' : '#f0dad9');
-
-    // ===== SMART LINE CHART =====
-    window.activeChart = new Chart(activeCtx, {
-        type: 'line', 
-        data: { 
-            labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], 
-            datasets: [{ 
-                label: 'Active Readers', 
-                data: [0,0,0,0,0,0,0], 
-                borderColor: '#DBA1A2', 
-                backgroundColor: gradientActive, 
-                fill: true, 
-                tension: 0.4, // smooth curves
-                borderWidth: 3, 
-                pointBackgroundColor: '#DBA1A2',
-                pointRadius: 4,
-                pointHoverRadius: 8, // Expands on hover
-                pointHoverBackgroundColor: '#c08a8b'
-            }] 
-        },
-        options: { 
-            responsive: true, maintainAspectRatio: false,
-            interaction: {
-                mode: 'nearest',
-                intersect: false,
-            },
-            plugins: { 
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: 'rgba(219,161,162,0.9)',
-                    titleColor: '#fff',
-                    bodyColor: '#fff',
-                    cornerRadius: 10,
-                    padding: 10,
-                    displayColors: false
-                }
-            }, 
-            scales: { 
-                y: { beginAtZero: true, grid: { drawBorder: false, color: 'rgba(0,0,0,0.05)' } },
-                x: { grid: { display: false } }
-            },
-            animation: {
-                duration: 1800,
-                easing: 'easeOutQuart' // Very smooth, decelerating animation
-            }
-        }
-    });
-
-    // ===== SMART BAR CHART =====
-    window.viewsChart = new Chart(viewsCtx, {
-        type: 'bar', 
-        data: { 
-            labels: ['Poems','Books','Blog','Videos'], 
-            datasets: [{ 
-                label: 'Views (7 days)', 
-                data: [0,0,0,0], 
-                backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], 
-                borderRadius: 8,
-                borderSkipped: false,
-                hoverBackgroundColor: '#c08a8b'
-            }] 
-        },
-        options: { 
-            responsive: true, maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
-            plugins: { 
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: 'rgba(219,161,162,0.9)',
-                    titleColor: '#fff',
-                    bodyColor: '#fff',
-                    cornerRadius: 10,
-                    padding: 10
-                }
-            }, 
-            scales: { 
-                y: { beginAtZero: true, grid: { drawBorder: false, color: 'rgba(0,0,0,0.05)' } },
-                x: { grid: { display: false } }
-            },
-            animation: {
-                duration: 1200,
-                easing: 'easeOutQuart' // Bars slide up smoothly
-            }
-        }
-    });
-
-    // Fetch initial data
-    updateCharts();
-    // Q41: chart refreshes now ride on awPoll() above (visible tab only, every 5 minutes).
-}
-
-// ============================================================
-// 3. DATA UPDATER (Triggers the animation on every refresh)
-// ============================================================
-function updateCharts() {
-    // Active Readers Data
-    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=active_chart')
-        .then(res => res.json()).then(data => {
-            if(window.activeChart) {
-                // Only animate if data actually exists, otherwise show zeros
-                const activeData = (data.data && data.data.length > 0) ? data.data : [0,0,0,0,0,0,0];
-                window.activeChart.data.labels = data.labels || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-                window.activeChart.data.datasets[0].data = activeData;
-                window.activeChart.update(); // Calling .update() triggers the smooth animation!
-            }
-        }).catch(console.error);
-        
-    // Views Data
-    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=views_chart')
-        .then(res => res.json()).then(data => {
-            if(window.viewsChart) {
-                const viewsData = (data.data && data.data.length > 0) ? data.data : [0,0,0,0];
-                window.viewsChart.data.datasets[0].data = viewsData;
-                window.viewsChart.update(); // Bars will slide up with the easeOutQuart effect
-            }
-        }).catch(console.error);
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', initCharts);
-
-// ============================================================
-// 4. DEEP DIVE MODAL FUNCTIONS (Kept intact)
+// DEEP DIVE MODAL (fetches only when the admin clicks)
 // ============================================================
 function openStatsModal(type) {
     document.getElementById('statsModal').classList.add('active');

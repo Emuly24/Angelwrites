@@ -234,6 +234,8 @@ if ($isLoggedIn) {
             padding: 4px 8px; border-radius: 8px; transition: background 0.2s; flex-shrink: 0;
         }
         .user-wrapper:hover { background: rgba(219,161,162,0.1); }
+        .user-toggle { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; min-height: 44px; }
+        .user-toggle:focus-visible { outline: 2px solid var(--rose-dark, #a8676a); outline-offset: 2px; border-radius: 6px; }
 
         /* ===== GLOBAL NOTIFICATION & BREADCRUMBS ===== */
         .global-notification {
@@ -328,7 +330,7 @@ if ($isLoggedIn) {
                     <!-- Notifications -->
                     <?php if ($isLoggedIn): ?>
                         <div class="notification-wrapper">
-                            <button class="nav-action-icon" aria-label="Notifications" onclick="document.getElementById('notificationDropdown').classList.toggle('open');">
+                            <button type="button" class="nav-action-icon" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" aria-controls="notificationDropdown" onclick="awToggleMenu(this, 'notificationDropdown')">
                                 <i class="fas fa-bell"></i>
                                 <?php if ($unreadNotifications > 0): ?>
                                     <span class="notification-badge"><?php echo $unreadNotifications; ?></span>
@@ -358,9 +360,13 @@ if ($isLoggedIn) {
 
                     <!-- User Dropdown (Logged in only) -->
                     <?php if ($isLoggedIn): ?>
-                        <div class="user-wrapper" onclick="document.getElementById('userDropdown').classList.toggle('open');">
-                            <i class="fas fa-user-circle" style="font-size: 1.2rem; color: var(--text);"></i>
-                            <span style="font-size: 0.9rem; color: var(--text);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'User'); ?></span>
+                        <div class="user-wrapper">
+                            <!-- A1: the account menu opens from a real button (keyboard and screen readers), not a clickable div -->
+                            <button type="button" class="user-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" onclick="awToggleMenu(this, 'userDropdown')">
+                                <i class="fas fa-user-circle" aria-hidden="true" style="font-size: 1.2rem; color: var(--text);"></i>
+                                <span style="font-size: 0.9rem; color: var(--text);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'User'); ?></span>
+                                <span class="sr-only">account menu</span>
+                            </button>
                             <div class="user-dropdown" id="userDropdown">
                                 <a href="<?php echo SITE_URL; ?>/dashboard.php">Dashboard</a>
                                 <a href="<?php echo SITE_URL; ?>/library.php">My Library</a>
@@ -520,17 +526,34 @@ if ($isLoggedIn) {
                 if (e.key === 'Escape') closeMobileMenu();
             });
 
+            // A1: menu buttons report their state (aria-expanded); Escape closes an open menu
+            window.awToggleMenu = function (btn, id) {
+                const dd = document.getElementById(id);
+                if (!dd) return;
+                const open = !dd.classList.contains('open');
+                dd.classList.toggle('open', open);
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            };
+            function awCloseMenu(id) {
+                const dd = document.getElementById(id);
+                if (!dd || !dd.classList.contains('open')) return false;
+                dd.classList.remove('open');
+                const b = document.querySelector('[aria-controls="' + id + '"]');
+                if (b) b.setAttribute('aria-expanded', 'false');
+                return b;
+            }
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'Escape') return;
+                ['userDropdown', 'notificationDropdown'].forEach(function (id) { const b = awCloseMenu(id); if (b) b.focus(); });
+            });
+
             // Close all dropdowns on outside click
             document.addEventListener('click', function(e) {
                 // Item 6 (F198): guests have neither dropdown; the null access threw on every click.
                 const notifDd = document.getElementById('notificationDropdown');
                 const userDd = document.getElementById('userDropdown');
-                if (notifDd && !e.target.closest('.notification-wrapper')) {
-                    notifDd.classList.remove('open');
-                }
-                if (userDd && !e.target.closest('.user-wrapper')) {
-                    userDd.classList.remove('open');
-                }
+                if (notifDd && !e.target.closest('.notification-wrapper')) awCloseMenu('notificationDropdown');
+                if (userDd && !e.target.closest('.user-wrapper')) awCloseMenu('userDropdown');
             });
         });
     </script>

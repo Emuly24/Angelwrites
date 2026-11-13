@@ -250,6 +250,43 @@ $comments_total = count($comments);
 [$cpage, $coffset] = aw_clamp($comments_total, $cpage, $cper);
 $comments = array_slice($comments, $coffset, $cper, true);
 
+// L2: reaction counts and "you reacted" were fetched with one request per comment plus one for the
+// poem (11 on a busy page; the endpoint allows 10 a minute, so some failed). They are now read in
+// one query for the poem and the comments on this page, and rendered with the page.
+$aw_rx = [];
+try {
+    $aw_cids = [];
+    foreach ($comments as $c) {
+        if (!empty($c['id'])) $aw_cids[] = (int)$c['id'];
+        foreach (($c['children'] ?? []) as $ch) $aw_cids[] = (int)$ch['id'];
+    }
+    $aw_sql = "SELECT target_type, target_id, reaction_type, COUNT(*) AS n, MAX(user_id = ?) AS mine
+               FROM reactions WHERE reaction_type IN ('like','love','pray') AND ((target_type = 'poem' AND target_id = ?)";
+    $aw_params = [(int)($user_id ?? 0), (int)$id];
+    if ($aw_cids) {
+        $aw_sql .= " OR (target_type = 'comment' AND target_id IN (" . implode(',', array_fill(0, count($aw_cids), '?')) . "))";
+        $aw_params = array_merge($aw_params, $aw_cids);
+    }
+    $aw_sql .= ") GROUP BY target_type, target_id, reaction_type";
+    $aw_st = $db->prepare($aw_sql);
+    $aw_st->execute($aw_params);
+    foreach ($aw_st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $aw_rx[$r['target_type'] . ':' . (int)$r['target_id']][$r['reaction_type']] = ['n' => (int)$r['n'], 'mine' => (int)$r['mine'] === 1];
+    }
+} catch (Throwable $e) {
+    error_log('poem_view reactions: ' . $e->getMessage());
+}
+function aw_rx_buttons($type, $tid) {
+    $set = $GLOBALS['aw_rx'][$type . ':' . (int)$tid] ?? [];
+    $html = '';
+    foreach (['like' => ['👍', 'Like'], 'love' => ['❤️', 'Love'], 'pray' => ['🙏', 'Praying']] as $r => [$emoji, $label]) {
+        $n = $set[$r]['n'] ?? 0; $mine = !empty($set[$r]['mine']);
+        $html .= '<button type="button" class="reaction-btn' . ($mine ? ' active' : '') . '" data-reaction="' . $r . '" aria-pressed="' . ($mine ? 'true' : 'false') . '" aria-label="' . $label . '">'
+               . $emoji . ' <span class="count">' . $n . '</span></button>';
+    }
+    return $html;
+}
+
 function render_comment($comment, $level = 0) {
     $id = $GLOBALS['id'];
     ?>
@@ -275,12 +312,10 @@ function render_comment($comment, $level = 0) {
             </div>
         <?php endif; ?>
         <div class="review-comment"><?php echo nl2br(htmlspecialchars($comment['comment'])); ?></div>
-        <div class="reaction-buttons" data-target-type="comment" data-target-id="<?php echo $comment['id']; ?>">
-            <button class="reaction-btn" data-reaction="like">👍 <span class="count"><?php echo $comment['likes']; ?></span></button>
-            <button class="reaction-btn" data-reaction="love">❤️ <span class="count">0</span></button>
-            <button class="reaction-btn" data-reaction="pray">🙏 <span class="count">0</span></button><!-- Q33: like / love / pray, as on videos and blog comments -->
+        <div class="reaction-buttons" data-target-type="comment" data-target-id="<?php echo (int)$comment['id']; ?>">
+            <?php echo aw_rx_buttons('comment', $comment['id']); /* L2: rendered with the page */ ?>
         </div>
-        <div class="reply-link" data-comment-id="<?php echo $comment['id']; ?>">Reply</div>
+        <button type="button" class="reply-link" data-comment-id="<?php echo (int)$comment['id']; ?>" aria-expanded="false">Reply</button><!-- A1: was a clickable div -->
         <div class="comment-reply-form" style="display:none;">
             <form method="POST" class="reply-form">
                 <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
@@ -544,7 +579,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
    COMMENT & REPLY FORM TWEAKS
    ============================================================ */
 .comment-reply-form { margin-left: 20px; margin-top: 8px; }
-.reply-link { cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
+.reply-link { background: none; border: 0; padding: 4px 0; font: inherit; cursor: pointer; color: var(--rose); font-size: 0.8rem; margin-left: 8px; text-decoration: underline; }
 .reply-link:hover { color: var(--rose-dark); }
 .private-badge { background: #ffd700; color: #3d2e2e; font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: 6px; }
 .tag-suggestions { position: fixed; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; z-index: 99999; min-width: 150px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 4px 0; }
@@ -609,10 +644,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
         <!-- Styled Reaction Section -->
         <div class="reaction-section aw-hide-focus">
             <span>React to this poem:</span>
-            <div class="reaction-buttons" data-target-type="poem" data-target-id="<?php echo $id; ?>">
-                <button class="reaction-btn" data-reaction="like">👍 <span class="count">0</span></button>
-                <button class="reaction-btn" data-reaction="love">❤️ <span class="count">0</span></button>
-                <button class="reaction-btn" data-reaction="pray">🙏 <span class="count">0</span></button><!-- Q33: like / love / pray, as on videos and blog comments -->
+            <div class="reaction-buttons" data-target-type="poem" data-target-id="<?php echo (int)$id; ?>">
+                <?php echo aw_rx_buttons('poem', $id); /* L2: rendered with the page */ ?>
             </div>
         </div>
 
@@ -767,19 +800,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const targetId = container.dataset.targetId;
         const buttons = container.querySelectorAll('.reaction-btn');
 
-        fetch(`ajax_get_reactions.php?target_type=${targetType}&target_id=${targetId}`)
-            .then(res => res.json())
-            .then(data => {
-                buttons.forEach(btn => {
-                    const reaction = btn.dataset.reaction;
-                    const countSpan = btn.querySelector('.count');
-                    if (data[reaction]) {
-                        countSpan.textContent = data[reaction].count;
-                        if (data[reaction].active) btn.classList.add('active');
-                    }
-                });
-            })
-            .catch(err => console.error('Error loading reactions:', err));
+        // L2: counts and state arrive with the page; nothing is fetched on load.
 
         buttons.forEach(btn => {
             btn.addEventListener('click', function() {
@@ -802,8 +823,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     const countSpan = this.querySelector('.count');
                     countSpan.textContent = data.count;
-                    if (data.active) this.classList.add('active');
-                    else this.classList.remove('active');
+                    this.classList.toggle('active', !!data.active);
+                    this.setAttribute('aria-pressed', data.active ? 'true' : 'false');
                 })
                 .catch(err => console.error('Error toggling reaction:', err));
             });
@@ -816,10 +837,17 @@ document.addEventListener('DOMContentLoaded', function() {
     let usersList = [];
     let tagTimer = null;
 
-    fetch('ajax_get_users.php')
-        .then(res => res.json())
-        .then(data => usersList = data)
-        .catch(err => console.error('Failed to load users for tagging:', err));
+    // L2: the member list for @-tagging is fetched only when someone first types "@",
+    // not on every page view.
+    let usersLoaded = false;
+    function loadUsersOnce() {
+        if (usersLoaded) return;
+        usersLoaded = true;
+        fetch('ajax_get_users.php')
+            .then(res => res.json())
+            .then(data => usersList = Array.isArray(data) ? data : [])
+            .catch(err => { usersLoaded = false; console.error('Failed to load users for tagging:', err); });
+    }
 
     if(commentText) {
         commentText.addEventListener('input', function() {
@@ -827,6 +855,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const text = this.value;
             const atPos = text.lastIndexOf('@');
             
+            if (atPos !== -1) loadUsersOnce();
             if (atPos !== -1 && text.length > atPos + 1) {
                 const query = text.substring(atPos + 1);
                 tagTimer = setTimeout(() => {
@@ -878,8 +907,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.reply-link').forEach(link => {
         link.addEventListener('click', function() {
             const form = this.nextElementSibling;
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
-            form.querySelector('textarea').focus();
+            const open = form.style.display === 'none';
+            form.style.display = open ? 'block' : 'none';
+            this.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) form.querySelector('textarea').focus();
         });
     });
     document.querySelectorAll('.cancel-reply').forEach(btn => {

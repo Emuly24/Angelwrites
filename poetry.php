@@ -24,6 +24,7 @@ if (!function_exists('get_image_url')) {
 // V5: the catalogue – search, "with a recording" filter, sort, a featured newest poem and cards that
 // show each poem's opening lines. Built on includes/poem_reader.php; paged with the shared pager.
 require_once __DIR__ . '/includes/poem_reader.php';
+require_once __DIR__ . '/includes/poem_card.php'; // M1: the shared poem card
 require_once __DIR__ . '/includes/pagination.php';
 $search = isset($_GET['search']) ? trim((string)$_GET['search']) : '';
 $sort = in_array($_GET['sort'] ?? '', ['newest', 'popular', 'az'], true) ? $_GET['sort'] : 'newest';
@@ -121,28 +122,8 @@ $og_description = "Poems by Angella Bottoman – words of faith, healing and hop
 
         <?php if ($poems): ?>
             <div class="aw-cat-grid">
-                <?php foreach ($poems as $poem):
-                    $st = aw_poem_stats($poem); $img = aw_cat_img($poem); ?>
-                    <a class="aw-card" href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$poem['id']; ?>">
-                        <div class="aw-card-img">
-                            <?php if ($img): ?>
-                                <img src="<?php echo htmlspecialchars($img); ?>" alt="" loading="lazy" onerror="this.remove()">
-                            <?php endif; ?>
-                            <span class="aw-ph" aria-hidden="true"><i class="fas fa-heart"></i></span>
-                            <?php if (aw_poem_audio_url($poem) !== ''): ?><span class="aw-badge">🎧 Listen</span><?php endif; ?>
-                        </div>
-                        <div class="aw-card-body">
-                            <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                            <?php $open = aw_poem_opening($poem, 3); if ($open): ?>
-                                <p class="aw-opening"><?php foreach ($open as $l): ?><span><?php echo htmlspecialchars($l); ?></span><?php endforeach; ?></p>
-                            <?php endif; ?>
-                            <div class="aw-card-foot">
-                                <span><i class="far fa-calendar" aria-hidden="true"></i><?php echo date('M j, Y', strtotime($poem['created_at'])); ?></span>
-                                <span><i class="far fa-clock" aria-hidden="true"></i><?php echo $st['minutes']; ?> min</span>
-                                <span><i class="far fa-eye" aria-hidden="true"></i><?php echo number_format((int)($poem['view_count'] ?? 0)); ?></span>
-                            </div>
-                        </div>
-                    </a>
+                <?php foreach ($poems as $poem): ?>
+                    <?php echo aw_poem_card($poem); ?>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>

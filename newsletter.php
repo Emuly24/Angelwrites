@@ -60,9 +60,18 @@ $error = '';
 $success = '';
 
 // ===== HANDLE SUBSCRIPTION =====
+require_once 'includes/subscribe_control.php'; // J1: member email and subscription state
+$aw_wants_json = stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim((string)($_POST['email'] ?? ''));
-    $name = mb_substr(trim(strip_tags((string)($_POST['name'] ?? ''))), 0, 100);
+    $name = trim(strip_tags((string)($_POST['name'] ?? '')));
+    $name = function_exists('mb_substr') ? mb_substr($name, 0, 100) : substr($name, 0, 100);
+    // J1: a signed-in member subscribes with their account email (one click); a posted address
+    // is ignored then, so nobody can sign up someone else from a member's session.
+    if (!empty($_POST['use_account']) && isLoggedIn()) {
+        $email = aw_member_email($db);
+        if ($name === '') $name = (string)($_SESSION['name'] ?? '');
+    }
 
     if (empty($email)) {
         $error = 'Please enter your email address.';
@@ -83,17 +92,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== J1: ANSWER IN PLACE WHEN ASKED (the subscribe control's inline submit) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $aw_wants_json) {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    // the real state only for a member's own account address; a guest always gets the neutral
+    // answer, so the form never reveals whether an address is on the list (N6)
+    $aw_own = !empty($_POST['use_account']) && isLoggedIn();
+    $aw_state = ($error === '' && $aw_own && filter_var($email, FILTER_VALIDATE_EMAIL)) ? aw_subscription_state($db, $email) : 'pending';
+    if ($error === '' && $aw_state === 'active' && !empty($_POST['use_account'])) {
+        $success = 'You are already subscribed. Thank you!';
+    }
+    echo json_encode(['ok' => $error === '', 'message' => $error !== '' ? $error : $success,
+                      'state' => $error === '' ? ($aw_state === 'none' ? 'pending' : $aw_state) : 'none']);
+    exit;
+}
+
 // ===== DETERMINE WHERE TO REDIRECT =====
 $redirect = isset($_POST['redirect']) ? $_POST['redirect'] : '/index.php';
 // S10: only same-site paths. SITE_URL . $redirect must not let the value change the host
 // (e.g. "@evil.example/" turns SITE_URL into userinfo). Require a leading "/" and no
 // backslash, CR/LF or other control characters.
-if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || preg_match('/[\\\x00-\x1f\x7f]/', $redirect)) {
+if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || preg_match('/[\\\\\x00-\x1f\x7f]/', $redirect) /* the earlier pattern did not compile, so this check never ran */) {
     $redirect = '/index.php';
 }
 
 // Store message in session to display after redirect
-session_start();
+if (session_status() !== PHP_SESSION_ACTIVE) session_start(); // auth.php has usually started it already
 if ($error) {
     $_SESSION['newsletter_error'] = $error;
 } elseif ($success) {

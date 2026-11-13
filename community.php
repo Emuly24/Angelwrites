@@ -3,7 +3,6 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
-require_once 'includes/reputation.php';
 
 $error = '';
 $success = '';
@@ -51,13 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accept_answer'])) {
     
     $stmt = $db->prepare("UPDATE answers SET is_accepted = 1 WHERE id = ?");
     $stmt->execute([$answer_id]);
-    
-    $stmt = $db->prepare("SELECT user_id FROM answers WHERE id = ?");
-    $stmt->execute([$answer_id]);
-    $answer_author = $stmt->fetchColumn();
-    if ($answer_author) {
-        awardReputation($answer_author, 15, 'Answer accepted');
-    }
     
     echo json_encode(['success' => true]);
     exit;
@@ -133,9 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                 $stmt = $db->prepare("UPDATE questions SET answers_count = answers_count + 1 WHERE id = ?");
                 $stmt->execute([$question_id]);
                 $success = 'Your answer has been posted!';
-                
-                // Award reputation to answer author
-                awardReputation($user_id, 5, 'Answered a question');
 
                 // F114: tell the person who asked
                 require_once __DIR__ . '/includes/notifications.php';
@@ -180,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
 // ================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
     if (!$user_id) {
-        echo json_encode(['success' => false, 'error' => 'Please login to upvote.']);
+        echo json_encode(['success' => false, 'error' => 'Please sign in first.']);
         exit;
     }
     $answer_id = (int)$_POST['answer_id'];
@@ -196,24 +185,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
         exit;
     }
     if ((int)$author_id === (int)$user_id) {
-        echo json_encode(['success' => false, 'error' => 'You cannot upvote your own answer.']);
+        echo json_encode(['success' => false, 'error' => 'This is your own answer.']);
         exit;
     }
     $vote = $db->prepare("INSERT OR IGNORE INTO reactions (user_id, target_type, target_id, reaction_type) VALUES (?, 'answer', ?, 'upvote')");
     $vote->execute([$user_id, $answer_id]);
     if ($vote->rowCount() === 0) {
-        echo json_encode(['success' => false, 'error' => 'You have already upvoted this answer.']);
+        echo json_encode(['success' => false, 'error' => 'You have already marked this answer as helpful.']);
         exit;
     }
     $stmt = $db->prepare("UPDATE answers SET upvotes = upvotes + 1 WHERE id = ?");
     if ($stmt->execute([$answer_id])) {
-        // Award reputation to answer author for upvotes
-        if ($author_id) {
-            awardReputation($author_id, 1, 'Received an upvote');
-        }
         echo json_encode(['success' => true]);
     } else {
-        echo json_encode(['success' => false, 'error' => 'Failed to upvote.']);
+        echo json_encode(['success' => false, 'error' => 'That did not work. Please try again.']);
     }
     exit;
 }
@@ -308,6 +293,19 @@ if (isset($_GET['id'])) {
         ");
         $stmt->execute([$qid]);
         $answers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // C3: which answers this member has already marked helpful (one mark each, F148)
+        $my_helpful = [];
+        if ($user_id && $answers) {
+            try {
+                $ids = array_map('intval', array_column($answers, 'id'));
+                $st = $db->prepare("SELECT target_id FROM reactions WHERE user_id = ? AND target_type = 'answer' AND reaction_type = 'upvote' AND target_id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")");
+                $st->execute(array_merge([(int)$user_id], $ids));
+                $my_helpful = array_flip(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
+            } catch (Throwable $e) {
+                error_log('community: helpful marks: ' . $e->getMessage());
+            }
+        }
     }
 }
 
@@ -389,9 +387,14 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                                     </div>
                                     <div class="answer-body"><?php echo nl2br(htmlspecialchars($answer['body'])); ?></div>
                                     <div class="answer-footer">
-                                        <button class="upvote-btn" onclick="upvoteAnswer(<?php echo $answer['id']; ?>)">
-                                            <i class="fas fa-thumbs-up"></i> <span id="upvotes-<?php echo $answer['id']; ?>"><?php echo number_format($answer['upvotes'] ?? 0); ?></span>
+                                        <?php // C3: "found this helpful", not a score; no totals or ranks
+                                            $aw_h = (int)($answer['upvotes'] ?? 0); $aw_mine = isset($my_helpful[(int)$answer['id']]); $aw_own = $answer['user_id'] == $user_id; ?>
+                                        <?php if ($user_id && !$aw_own): ?>
+                                        <button type="button" class="upvote-btn<?php echo $aw_mine ? ' active' : ''; ?>" aria-pressed="<?php echo $aw_mine ? 'true' : 'false'; ?>"<?php echo $aw_mine ? ' disabled' : ''; ?> onclick="upvoteAnswer(<?php echo (int)$answer['id']; ?>, this)">
+                                            <i class="fas fa-hands-helping" aria-hidden="true"></i> <span class="upvote-label"><?php echo $aw_mine ? 'You found this helpful' : 'This helped me'; ?></span>
                                         </button>
+                                        <?php endif; ?>
+                                        <span class="helpful-note" id="upvotes-<?php echo (int)$answer['id']; ?>" data-count="<?php echo $aw_h; ?>"><?php echo $aw_h > 0 ? ($aw_h === 1 ? '1 person found this helpful' : number_format($aw_h) . ' people found this helpful') : ''; ?></span>
                                         <div class="answer-reactions">
                                             <button onclick="reactAnswer(<?php echo $answer['id']; ?>, 'like')">👍</button>
                                             <button onclick="reactAnswer(<?php echo $answer['id']; ?>, 'love')">❤️</button>
@@ -548,46 +551,16 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                     <?php endif; ?>
                 </div>
 
-                <!-- Sidebar: User Reputation & Newsletter -->
+                <!-- Sidebar -->
                 <div class="community-sidebar">
-                    <?php if ($user_id): ?>
-                        <?php
-                        $stmt = $db->prepare("SELECT points, level, badges FROM user_reputations WHERE user_id = ?");
-                        $stmt->execute([$user_id]);
-                        $rep = $stmt->fetch(PDO::FETCH_ASSOC);
-                        if ($rep):
-                            $badges = json_decode($rep['badges'] ?? '[]', true);
-                        ?>
-                            <div class="card">
-                                <div class="card-header"><h4>🏆 Your Reputation</h4></div>
-                                <div class="card-body" style="text-align:center;">
-                                    <div style="font-size:2rem; font-weight:700; color:var(--rose);"><?php echo $rep['points'] ?? 0; ?></div>
-                                    <p>Level <?php echo $rep['level'] ?? 1; ?></p>
-                                    <?php if ($badges): ?>
-                                        <div class="badge-container">
-                                            <?php foreach ($badges as $badge): ?>
-                                                <span class="badge"><?php echo $badge; ?></span>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
+                    <?php // J1: this form posted to community.php, which never handled it; it is now the shared control
+                        require_once 'includes/subscribe_control.php'; $aw_sub_html = aw_subscribe_control($db, 'sidebar'); ?>
+                    <?php if ($aw_sub_html !== ''): ?>
                     <div class="card">
-                        <div class="card-header"><h4><i class="fas fa-envelope" style="color: var(--rose);"></i> Stay Updated</h4></div>
-                        <div class="card-body">
-                            <p>Subscribe to receive free email updates when new questions are answered.</p>
-                            <form method="POST" class="sidebar-newsletter-form">
-                                <div class="form-group">
-                                    <input type="email" name="email" placeholder="Your email address" required>
-                                </div>
-                                <button type="submit" name="subscribe_newsletter" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Subscribe Free</button>
-                            </form>
-                            <small>No spam. Unsubscribe anytime.</small>
-                        </div>
+                        <div class="card-header"><h4><i class="fas fa-envelope" style="color: var(--rose);" aria-hidden="true"></i> Stay Updated</h4></div>
+                        <div class="card-body"><?php echo aw_subscribe_assets(); echo $aw_sub_html; ?></div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php endif; ?>
@@ -649,7 +622,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ===== Upvote Answer =====
-    window.upvoteAnswer = function(answerId) {
+    window.upvoteAnswer = function(answerId, btn) {
         fetch('<?php echo SITE_URL; ?>/community.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -659,13 +632,15 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 const span = document.getElementById('upvotes-' + answerId);
-                let count = parseInt(span.textContent) || 0;
-                span.textContent = count + 1;
+                const n = (parseInt(span.dataset.count, 10) || 0) + 1;
+                span.dataset.count = n;
+                span.textContent = n === 1 ? '1 person found this helpful' : n + ' people found this helpful';
+                if (btn) { btn.classList.add('active'); btn.setAttribute('aria-pressed', 'true'); btn.disabled = true; const l = btn.querySelector('.upvote-label'); if (l) l.textContent = 'You found this helpful'; }
             } else {
-                alert(data.error || 'Failed to upvote.');
+                alert(data.error || 'That did not work. Please try again.');
             }
         })
-        .catch(() => alert('Failed to upvote.'));
+        .catch(() => alert('That did not work. Please try again.'));
     };
 
     // ===== Accept Answer =====
@@ -819,6 +794,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .answer-footer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .upvote-btn { background: transparent; border: 1px solid var(--border); border-radius: 20px; padding: 4px 14px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; color: var(--text); }
 .upvote-btn:hover { background: var(--rose); border-color: var(--rose); color: white; }
+.upvote-btn.active, .upvote-btn:disabled { background: var(--vanilla, #EFD8D6); border-color: var(--rose); color: var(--text); cursor: default; }
+.helpful-note { font-size: 0.85rem; color: var(--text-light); }
 .answer-reactions { display: flex; gap: 4px; }
 .answer-reactions button { background: none; border: none; font-size: 1.2rem; cursor: pointer; transition: transform 0.2s; }
 .answer-reactions button:hover { transform: scale(1.2); }
@@ -860,10 +837,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .community-sidebar .card-body { padding: 20px; }
 .badge-container { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
 .badge-container .badge { background: var(--rose); color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; }
-.sidebar-newsletter-form input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: var(--input-bg); color: var(--text); }
-.sidebar-newsletter-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.sidebar-newsletter-form .btn-block { width: 100%; }
-.sidebar-newsletter-form small { display: block; text-align: center; margin-top: 8px; color: var(--text-light); font-size: 0.8rem; }
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
 .empty-state h3 { font-size: 1.3rem; margin-bottom: 6px; }
 

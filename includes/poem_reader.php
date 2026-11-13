@@ -233,7 +233,7 @@ function aw_poem_neighbours(PDO $db, array $poem) {
 function aw_poem_assets() {
     return '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         . '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">'
-        . '<link rel="stylesheet" href="' . SITE_URL . '/assets/css/aw-poem.css?v=1">';
+        . '<link rel="stylesheet" href="' . SITE_URL . '/assets/css/aw-poem.css?v=2">';
 }
 
 function aw_poem_toolbar() {

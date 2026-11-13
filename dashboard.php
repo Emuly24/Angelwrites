@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/components.php'; // A1
 
 redirectIfNotLoggedIn();
 
@@ -53,426 +54,272 @@ $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // ============================================================
-// 3. FETCH STATISTICS (All tied to current user)
+// 3. WHAT IS WAITING FOR THIS MEMBER (E1)
 // ============================================================
-// Books reading & finished
-try { $stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'currently reading'"); $stmt->execute([$user_id]); $stats['books_reading'] = $stmt->fetchColumn(); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'finished'"); $stmt->execute([$user_id]); $stats['books_finished'] = $stmt->fetchColumn(); } catch (Exception $e) {}
-// Poems & Videos
-try { $stmt = $db->prepare("SELECT COUNT(*) FROM poem_reads WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['poems_read'] = $stmt->fetchColumn(); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['videos_watched'] = $stmt->fetchColumn(); } catch (Exception $e) {}
-// Questions & Sessions
-try { $stmt = $db->prepare("SELECT COUNT(*) FROM questions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['questions_asked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['sessions_booked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
-// Streak & Rep
-try { $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['current_streak'] = (int)$stmt->fetchColumn(); /* F118: false (no row) printed as blank */ } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT points, level FROM user_reputations WHERE user_id = ?"); $stmt->execute([$user_id]); $rep = $stmt->fetch(PDO::FETCH_ASSOC); $stats['points'] = $rep['points'] ?? 0; $stats['level'] = $rep['level'] ?? 1; } catch (Exception $e) {}
+// E1 (PROGRAM_PLAN.md Phase 1): the dashboard shows real things the member can act on, read
+// once on the server. There are no charts, counters or timers, and the page makes no request
+// after it loads until the member does something. Each query fails soft (logged, empty list).
+function aw_dash_rows(PDO $db, $sql, array $params) {
+    try {
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('dashboard: ' . $e->getMessage());
+        return [];
+    }
+}
+function aw_dash_link($link) {
+    // only same-site links from notifications are followed
+    $link = trim((string)$link);
+    if ($link === '') return SITE_URL . '/notifications.php';
+    if (strpos($link, SITE_URL . '/') === 0) return $link;
+    if ($link[0] === '/' && (strlen($link) < 2 || $link[1] !== '/')) return rtrim(SITE_URL, '/') . $link;
+    return SITE_URL . '/notifications.php';
+}
+function aw_dash_short($text, $len) {
+    $t = trim(preg_replace('/\s+/u', ' ', strip_tags((string)$text)));
+    if (function_exists('mb_strlen')) return mb_strlen($t) > $len ? rtrim(mb_substr($t, 0, $len)) . '…' : $t;
+    return strlen($t) > $len ? rtrim(substr($t, 0, $len)) . '…' : $t;
+}
 
-// My total view counts
-$stats['my_views'] = 0;
-try { 
-    $stmt = $db->prepare("SELECT SUM(view_count) FROM poems WHERE id IN (SELECT poem_id FROM poem_reads WHERE user_id = ?)"); 
-    $stmt->execute([$user_id]); $stats['my_poem_views'] = $stmt->fetchColumn() ?? 0;
-    $stmt = $db->prepare("SELECT SUM(view_count) FROM books WHERE id IN (SELECT book_id FROM reading_status WHERE user_id = ?)"); 
-    $stmt->execute([$user_id]); $stats['my_book_views'] = $stmt->fetchColumn() ?? 0;
-    $stats['my_views'] = $stats['my_poem_views'] + $stats['my_book_views'];
-} catch (Exception $e) {}
-
-// My personal reading times
-try { 
-    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ?"); 
-    $stmt->execute([$user_id]); $stats['my_reading_hours'] = floor(($stmt->fetchColumn() ?? 0) / 3600);
-    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-1 day')"); 
-    $stmt->execute([$user_id]); $stats['my_minutes_today'] = floor(($stmt->fetchColumn() ?? 0) / 60);
-    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-7 days')"); 
-    $stmt->execute([$user_id]); $stats['my_minutes_week'] = floor(($stmt->fetchColumn() ?? 0) / 60);
-    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-30 days')"); 
-    $stmt->execute([$user_id]); $stats['my_minutes_month'] = floor(($stmt->fetchColumn() ?? 0) / 60);
-    $stmt = $db->prepare("SELECT SUM(duration_seconds) FROM reading_sessions WHERE user_id = ? AND start_time > date('now', '-365 days')"); 
-    $stmt->execute([$user_id]); $stats['my_minutes_year'] = floor(($stmt->fetchColumn() ?? 0) / 60);
-} catch (Exception $e) {}
-
-// ============================================================
-// 4. FETCH RECENT CONTENT (Books, Poems, Blog, Videos)
-// ============================================================
-try { $stmt = $db->prepare("SELECT b.*, COALESCE(rp.progress_percent, rs.progress, 0) AS progress, CAST(rp.position_section AS INTEGER) AS last_page FROM books b JOIN reading_status rs ON b.id = rs.book_id LEFT JOIN reading_progress rp ON rp.book_id = b.id AND rp.user_id = rs.user_id WHERE rs.user_id = ? AND rs.status = 'currently reading' ORDER BY COALESCE(rp.last_accessed_at, rs.updated_at) DESC LIMIT 2"); /* R8: real progress, most recently read first */ $stmt->execute([$user_id]); $reading_books = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT p.* FROM poems p JOIN poem_reads pr ON p.id = pr.poem_id WHERE pr.user_id = ? ORDER BY pr.read_at DESC LIMIT 3"); $stmt->execute([$user_id]); $recent_poems = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT v.* FROM videos v JOIN video_watches vw ON v.id = vw.video_id WHERE vw.user_id = ? ORDER BY vw.watched_at DESC LIMIT 3"); $stmt->execute([$user_id]); $recent_videos = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT bp.* FROM blog_posts bp JOIN blog_reads br ON bp.id = br.blog_post_id WHERE br.user_id = ? ORDER BY br.read_at DESC LIMIT 3"); $stmt->execute([$user_id]); $recent_blog = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+$reading_books = aw_dash_rows($db, "SELECT b.id, b.title, b.cover_path, COALESCE(rp.progress_percent, rs.progress, 0) AS progress, COALESCE(rp.last_accessed_at, rs.updated_at) AS last_read
+    FROM books b JOIN reading_status rs ON b.id = rs.book_id
+    LEFT JOIN reading_progress rp ON rp.book_id = b.id AND rp.user_id = rs.user_id
+    WHERE rs.user_id = ? AND rs.status = 'currently reading'
+    ORDER BY COALESCE(rp.last_accessed_at, rs.updated_at) DESC LIMIT 3", [$user_id]);
+$notifications = aw_dash_rows($db, "SELECT id, title, message, link, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY is_read ASC, created_at DESC LIMIT 5", [$user_id]);
+$unread_count = (int)(aw_dash_rows($db, "SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND is_read = 0", [$user_id])[0]['n'] ?? 0);
+$my_questions = aw_dash_rows($db, "SELECT q.id, q.title, q.answers_count, q.created_at,
+        EXISTS(SELECT 1 FROM answers a WHERE a.question_id = q.id AND a.is_accepted = 1) AS has_accepted
+    FROM questions q WHERE q.user_id = ? ORDER BY q.updated_at DESC, q.created_at DESC LIMIT 4", [$user_id]);
+$highlights = aw_dash_rows($db, "SELECT h.text, h.book_id, h.created_at, b.title AS book_title FROM highlights h JOIN books b ON b.id = h.book_id WHERE h.user_id = ? ORDER BY h.created_at DESC LIMIT 3", [$user_id]);
+$bible_marks = aw_dash_rows($db, "SELECT book, chapter, verse FROM bible_bookmarks WHERE user_id = ? ORDER BY created_at DESC LIMIT 3", [$user_id]);
+$my_groups = aw_dash_rows($db, "SELECT g.id, g.name FROM reading_groups g JOIN group_members m ON m.group_id = g.id WHERE m.user_id = ? ORDER BY m.joined_at DESC LIMIT 4", [$user_id]);
+$upcoming_sessions = aw_dash_rows($db, "SELECT id, date, time, status, message FROM sessions WHERE user_id = ? AND date >= date('now') AND status IN ('pending','confirmed') ORDER BY date ASC, time ASC LIMIT 3", [$user_id]);
+$recent_poems = aw_dash_rows($db, "SELECT p.id, p.title, MAX(pr.read_at) AS read_at FROM poems p JOIN poem_reads pr ON p.id = pr.poem_id WHERE pr.user_id = ? GROUP BY p.id ORDER BY read_at DESC LIMIT 3", [$user_id]);
 
 // ============================================================
-// 5. FETCH NOTIFICATIONS & UPCOMING SESSIONS
-// ============================================================
-try { $stmt = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5"); $stmt->execute([$user_id]); $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $stmt->execute([$user_id]); $unread_count = $stmt->fetchColumn(); } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT * FROM sessions WHERE user_id = ? AND date >= date('now') ORDER BY date ASC, time ASC LIMIT 5"); $stmt->execute([$user_id]); $upcoming_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
-
-// ============================================================
-// 6. HANDLE MARK ALL NOTIFICATIONS AS READ
+// 4. HANDLE MARK ALL NOTIFICATIONS AS READ
 // ============================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
-    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) { die('Invalid CSRF token.'); }
-    $stmt = $db->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?");
-    $stmt->execute([$user_id]);
+    if (validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        try {
+            $db->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?")->execute([$user_id]);
+        } catch (Throwable $e) {
+            error_log('dashboard: mark all read: ' . $e->getMessage());
+        }
+    }
     header('Location: ' . SITE_URL . '/dashboard.php');
     exit;
 }
 
 $pageTitle = 'My Dashboard';
+$aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
 ?>
 <?php require_once 'includes/header.php'; ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
 
 <style>
-:root {
-    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #f0dad9;
-    --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5;
-    --shadow: 0 4px 20px rgba(0,0,0,0.04);
-}
-body { background: var(--bg); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; color: #3d2e2e; }
-body.dark-mode { --bg: #1a1212; --card-bg: #2c1e1e; --border: #4a3a3a; color: #e0d0d0; }
-body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
-
-/* User Hero */
-.user-hero { background: linear-gradient(135deg, #fff, var(--rose-light)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--rose-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
-.user-hero h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; margin:0; letter-spacing: -0.5px; }
-.user-hero .sub { color: #6b5a5a; margin-top: 4px; font-size: 0.95rem; }
-
-/* Core Stats */
-.user-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.user-stat-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); text-align: center; transition: 0.2s; }
-.user-stat-card:hover { transform: translateY(-4px); border-color: var(--rose); }
-.user-stat-card .num { font-size: 2.2rem; font-weight: 700; color: var(--rose); display: block; }
-.user-stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #6b5a5a; margin-top: 6px; }
-
-/* Alerts Row */
-.user-alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
-.user-alert-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
-.user-alert-card h4 { font-size: 1rem; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; }
-.user-alert-list { display: flex; flex-direction: column; gap: 10px; }
-.user-alert-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-.user-alert-item:last-child { border-bottom: none; }
-
-/* Charts */
-.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
-.chart-container { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); height: 260px; position: relative; }
-@media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } .user-alert-row { grid-template-columns: 1fr; } }
-
-/* User Monitoring Stats */
-.user-monitoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-.user-monitor-card { background: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
-.user-monitor-card .title { font-size: 0.75rem; color: #8a7878; text-transform: uppercase; }
-.user-monitor-card .value { font-size: 1.6rem; font-weight: 700; color: var(--rose); margin: 4px 0; }
-.user-monitor-card .sub { font-size: 0.75rem; color: #6b5a5a; }
-
-/* Recent Content */
-.user-content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.user-content-card { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); }
-.user-content-card h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-
-/* User Quick Actions */
-.user-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
-.user-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
-.user-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-.user-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.user-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: #3d2e2e; transition: 0.2s; text-align: center; }
-.user-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
-.user-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
-.user-module-btn span { font-size: 0.75rem; font-weight: 500; }
-
-/* Modal */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 9999; display: none; justify-content: center; align-items: center; }
-.modal-overlay.active { display: flex; }
-.modal-box { background: var(--card-bg); border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); border: 1px solid var(--rose-light); }
-.modal-box h2 { font-family: 'Playfair Display', serif; margin-top: 0; color: var(--rose-dark); }
-.modal-box .btn { width: 100%; justify-content: center; margin-bottom: 10px; }
-
-/* Stats Modal Override */
-#statsModal .modal-box { max-width: 800px; }
-#statsModal table { width:100%; border-collapse:collapse; font-size:0.9rem; }
-#statsModal table th { background: var(--vanilla); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border); }
-#statsModal table td { padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; }
+.dash { max-width: 1200px; margin: 0 auto; padding: 24px 20px 48px; }
+.dash-hero { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px; padding:28px 32px; border-radius:20px; background:linear-gradient(135deg, var(--card-bg), var(--vanilla)); border:1px solid var(--border); }
+.dash-hero h1 { font-family:'Playfair Display', Georgia, serif; font-size:clamp(1.6rem, 4vw, 2.2rem); margin:0; color:var(--text); }
+.dash-hero p { margin:6px 0 0; color:var(--text-light); }
+.dash-hero-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.dash-badge { display:inline-block; min-width:1.5em; padding:0 6px; margin-left:4px; border-radius:999px; background:var(--rose-dark, #a8676a); color:#fff; font-size:.75rem; font-weight:700; line-height:1.5; text-align:center; }
+.dash-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:28px; }
+.dash-card { background:var(--card-bg); border:1px solid var(--border); border-radius:18px; padding:20px 22px; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+.dash-card h2 { font-family:'Playfair Display', Georgia, serif; font-size:1.15rem; margin:0 0 14px; color:var(--text); display:flex; align-items:center; gap:10px; }
+.dash-card h2 i { color:var(--rose); }
+.dash-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.dash-list li { padding:10px 0; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center; justify-content:space-between; }
+.dash-list li:last-child { border-bottom:0; }
+.dash-list a { color:var(--text); font-weight:600; text-decoration:none; }
+.dash-list a:hover, .dash-list a:focus-visible { color:var(--rose-dark, #a8676a); text-decoration:underline; }
+.dash-meta { display:block; font-size:.82rem; color:var(--text-light); font-weight:400; margin-top:2px; }
+.dash-unread { width:8px; height:8px; border-radius:50%; background:var(--rose-dark, #a8676a); flex:none; }
+.dash-progress { height:6px; border-radius:6px; background:var(--border); overflow:hidden; margin-top:6px; }
+.dash-progress span { display:block; height:100%; background:var(--rose); }
+.dash-book { display:flex; gap:12px; align-items:center; flex:1; min-width:0; }
+.dash-book img { width:40px; height:56px; object-fit:cover; border-radius:6px; flex:none; background:var(--vanilla); }
+.dash-book > div { flex:1; min-width:0; }
+.dash-quote { font-style:italic; color:var(--text); display:block; }
+.dash-empty { color:var(--text-light); margin:0 0 14px; line-height:1.55; }
+.dash-foot { margin-top:auto; padding-top:14px; display:flex; gap:10px; flex-wrap:wrap; }
+.dash-explore { display:flex; flex-wrap:wrap; gap:10px; }
+.dash-explore a { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:999px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); text-decoration:none; font-weight:500; }
+.dash-explore a:hover, .dash-explore a:focus-visible { border-color:var(--rose); color:var(--rose-dark, #a8676a); }
+.dash-explore i { color:var(--rose); }
+.dash h2.dash-section { font-family:'Playfair Display', Georgia, serif; font-size:1.2rem; margin:0 0 12px; color:var(--text); }
+@media (max-width: 420px) { .dash-hero { padding:22px 20px; } .dash-grid { grid-template-columns:1fr; } }
 </style>
 
-<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 20px;">
-    <!-- User Hero -->
-    <div class="user-hero">
+<div class="dash">
+    <div class="dash-hero">
         <div>
-            <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars(awDisplayName($user)); /* F100 */ ?></span></h1>
-            <div class="sub">Your personal dashboard – track your reading journey.</div>
-            <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <?php
-                // Q30: the streak and level badges sat at the top of every dashboard, but nothing fills
-                // user_reputations.points (the reader adds to xp), so everyone saw "Level 1 (0 pts)" and
-                // usually "0 Day Streak". Each badge now only shows when it has something real to say.
-                $aw_level = (int)($stats['level'] ?? 1); $aw_points = (int)($stats['points'] ?? 0);
-                ?>
-                <?php if ((int)$stats['current_streak'] > 0): ?>
-                <span style="background: #c9965a; color: #3d2e2e; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo (int)$stats['current_streak']; ?> Day Streak</span>
-                <?php endif; ?>
-                <?php if ($aw_level > 1 || $aw_points > 0): ?>
-                <span style="background: var(--bg); color: #3d2e2e; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🏆 Level <?php echo $aw_level; ?><?php echo $aw_points > 0 ? ' (' . $aw_points . ' pts)' : ''; ?></span>
-                <?php endif; ?>
-            </div>
+            <h1>Welcome back<?php echo $aw_first !== '' ? ', <span style="color:var(--rose-dark, #a8676a);">' . htmlspecialchars($aw_first) . '</span>' : ''; ?></h1>
+            <p><?php echo $unread_count > 0 ? 'You have ' . $unread_count . ' new notification' . ($unread_count === 1 ? '' : 's') . '.' : 'Here is what is waiting for you.'; ?></p>
         </div>
-        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-            <a href="notifications.php" class="btn btn-outline btn-sm" style="position:relative; border-radius:30px; text-decoration:none;">
-                <i class="fas fa-bell"></i> Alerts
-                <?php if ($unread_count > 0): ?>
-                    <span style="position:absolute; top:-8px; right:-8px; background:#b4505a; color:white; border-radius:50%; padding:2px 8px; font-size:0.65rem; font-weight:700;"><?php echo $unread_count; ?></span>
-                <?php endif; ?>
-            </a>
-            <button onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-bolt"></i> Quick Actions</button>
+        <div class="dash-hero-actions">
+            <a href="<?php echo SITE_URL; ?>/notifications.php" class="btn btn-outline btn-sm"><i class="fas fa-bell" aria-hidden="true"></i> Notifications<?php if ($unread_count > 0): ?><span class="dash-badge"><?php echo $unread_count; ?><span class="sr-only"> unread</span></span><?php endif; ?></a>
+            <a href="<?php echo SITE_URL; ?>/profile.php" class="btn btn-outline btn-sm"><i class="fas fa-user" aria-hidden="true"></i> My profile</a>
         </div>
     </div>
 
-    <!-- Core Stats -->
-    <div class="user-stats-grid">
-        <div class="user-stat-card"><span class="num"><?php echo $stats['books_reading'] ?? 0; ?></span><span class="label">Currently Reading</span></div>
-        <div class="user-stat-card"><span class="num"><?php echo $stats['books_finished'] ?? 0; ?></span><span class="label">Books Finished</span></div>
-        <div class="user-stat-card"><span class="num"><?php echo $stats['poems_read'] ?? 0; ?></span><span class="label">Poems Read</span></div>
-        <div class="user-stat-card"><span class="num"><?php echo $stats['videos_watched'] ?? 0; ?></span><span class="label">Videos Watched</span></div>
-        <div class="user-stat-card"><span class="num"><?php echo $stats['questions_asked'] ?? 0; ?></span><span class="label">Questions Asked</span></div>
-        <div class="user-stat-card"><span class="num"><?php echo $stats['sessions_booked'] ?? 0; ?></span><span class="label">Sessions Booked</span></div>
-    </div>
+    <div class="dash-grid">
+        <!-- Continue reading -->
+        <section class="dash-card" aria-labelledby="dContinue">
+            <h2 id="dContinue"><i class="fas fa-book-open" aria-hidden="true"></i> Continue reading</h2>
+            <?php if ($reading_books): ?>
+                <ul class="dash-list">
+                <?php foreach ($reading_books as $b): $pc = max(0, min(100, (int)$b['progress'])); ?>
+                    <li>
+                        <div class="dash-book">
+                            <?php if (!empty($b['cover_path'])): ?><img src="<?php echo htmlspecialchars(get_image_url($b['cover_path'])); ?>" alt="" loading="lazy" onerror="this.remove()"><?php endif; ?>
+                            <div>
+                                <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['title']); ?></a>
+                                <span class="dash-meta"><?php echo $pc; ?>% read</span>
+                                <div class="dash-progress" role="progressbar" aria-label="<?php echo htmlspecialchars($b['title']); ?> progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo $pc; ?>"><span style="width:<?php echo $pc; ?>%"></span></div>
+                            </div>
+                        </div>
+                    </li>
+                <?php endforeach; ?>
+                </ul>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/library.php', 'My library', 'outline', ['small' => true]); ?></div>
+            <?php else: ?>
+                <p class="dash-empty">You are not reading a book right now. Open any book and it will wait for you here, with your place saved.</p>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/books.php', 'Browse books', 'primary', ['small' => true]); ?></div>
+            <?php endif; ?>
+        </section>
 
-    <!-- Alerts Row (Custom for user) -->
-    <div class="user-alert-row">
-        <div class="user-alert-card"><h4><i class="fas fa-bell" style="color:var(--rose);"></i> Recent Notifications</h4>
-            <div class="user-alert-list"><?php if(count($notifications)>0): foreach($notifications as $n): ?>
-                <div class="user-alert-item" style="<?php echo $n['is_read'] ? '' : 'background:rgba(219,161,162,0.05); border-left:3px solid var(--rose); padding-left:8px;'; ?>">
-                    <span><strong><?php echo htmlspecialchars($n['title']); ?></strong> – <?php echo htmlspecialchars(substr($n['message'],0,30)); ?>...</span>
-                    <span style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($n['created_at'])); ?></span>
+        <!-- Notifications -->
+        <section class="dash-card" aria-labelledby="dNotes">
+            <h2 id="dNotes"><i class="fas fa-bell" aria-hidden="true"></i> For you</h2>
+            <?php if ($notifications): ?>
+                <ul class="dash-list">
+                <?php foreach ($notifications as $n): ?>
+                    <li>
+                        <div style="min-width:0;">
+                            <a href="<?php echo htmlspecialchars(aw_dash_link($n['link'] ?? '')); ?>"><?php echo htmlspecialchars($n['title']); ?></a>
+                            <span class="dash-meta"><?php echo htmlspecialchars(aw_dash_short($n['message'], 70)); ?> · <?php echo date('M j', strtotime($n['created_at'])); ?></span>
+                        </div>
+                        <?php if (!(int)$n['is_read']): ?><span class="dash-unread" title="New"><span class="sr-only">New</span></span><?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+                </ul>
+                <div class="dash-foot">
+                    <?php echo aw_link_btn(SITE_URL . '/notifications.php', 'See all', 'outline', ['small' => true]); ?>
+                    <?php if ($unread_count > 0): ?>
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <button type="submit" name="mark_all_read" value="1" class="btn btn-sm btn-outline">Mark all as read</button>
+                    </form>
+                    <?php endif; ?>
                 </div>
-            <?php endforeach; else: ?><div class="user-alert-item" style="color:#a08a8a;">All caught up!</div><?php endif; ?></div>
-            <div style="display:flex; gap:8px; margin-top:8px;">
-                <a href="notifications.php" class="btn btn-sm btn-outline">View All</a>
-                <form method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-                    <button type="submit" name="mark_all_read" class="btn btn-sm btn-secondary">Mark All Read</button>
-                </form>
-            </div>
-        </div>
-        <div class="user-alert-card"><h4><i class="fas fa-calendar-check" style="color:var(--rose);"></i> Upcoming Sessions</h4>
-            <div class="user-alert-list"><?php if(count($upcoming_sessions)>0): foreach($upcoming_sessions as $s): ?>
-                <div class="user-alert-item"><span><?php echo date('M j, g:i a', strtotime($s['date'].' '.$s['time'])); ?> – <?php echo htmlspecialchars($s['message'] ?: 'Booked Session'); ?></span><span class="badge badge-info"><?php echo ucfirst($s['status']); ?></span></div>
-            <?php endforeach; else: ?><div class="user-alert-item" style="color:#a08a8a;">No upcoming sessions.</div><?php endif; ?></div>
-            <a href="book_session.php" class="btn btn-sm btn-primary" style="margin-top:8px;">Book a Session</a>
-        </div>
+            <?php else: ?>
+                <p class="dash-empty">Nothing new. When someone answers your question, replies in your group or your session is confirmed, you will see it here.</p>
+            <?php endif; ?>
+        </section>
+
+        <!-- Questions -->
+        <section class="dash-card" aria-labelledby="dQuestions">
+            <h2 id="dQuestions"><i class="fas fa-comments" aria-hidden="true"></i> Your questions</h2>
+            <?php if ($my_questions): ?>
+                <ul class="dash-list">
+                <?php foreach ($my_questions as $q): $na = (int)$q['answers_count']; ?>
+                    <li><div style="min-width:0;">
+                        <a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo (int)$q['id']; ?>"><?php echo htmlspecialchars($q['title']); ?></a>
+                        <span class="dash-meta"><?php echo (int)$q['has_accepted'] ? 'Answered' : ($na === 0 ? 'No answers yet' : ($na === 1 ? '1 answer' : $na . ' answers')); ?> · asked <?php echo date('M j', strtotime($q['created_at'])); ?></span>
+                    </div></li>
+                <?php endforeach; ?>
+                </ul>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/community.php', 'Community Q&A', 'outline', ['small' => true]); ?></div>
+            <?php else: ?>
+                <p class="dash-empty">Carrying a question about faith, healing or a passage you read? Ask it in the community; others who have walked the same road can answer.</p>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/community.php', 'Ask a question', 'primary', ['small' => true]); ?></div>
+            <?php endif; ?>
+        </section>
+
+        <!-- Saved -->
+        <section class="dash-card" aria-labelledby="dSaved">
+            <h2 id="dSaved"><i class="fas fa-bookmark" aria-hidden="true"></i> Saved for later</h2>
+            <?php if ($highlights || $bible_marks): ?>
+                <ul class="dash-list">
+                <?php foreach ($highlights as $h): ?>
+                    <li><div style="min-width:0;">
+                        <span class="dash-quote">“<?php echo htmlspecialchars(aw_dash_short($h['text'], 90)); ?>”</span>
+                        <span class="dash-meta">from <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$h['book_id']; ?>"><?php echo htmlspecialchars($h['book_title']); ?></a></span>
+                    </div></li>
+                <?php endforeach; ?>
+                <?php foreach ($bible_marks as $m): $ref = $m['book'] . ' ' . (int)$m['chapter'] . ((int)$m['verse'] > 0 ? ':' . (int)$m['verse'] : ''); ?>
+                    <li><div>
+                        <a href="<?php echo SITE_URL; ?>/bible_reader.php?book=<?php echo urlencode($m['book']); ?>&amp;chapter=<?php echo (int)$m['chapter']; ?><?php echo (int)$m['verse'] > 0 ? '&amp;verse=' . (int)$m['verse'] : ''; ?>"><?php echo htmlspecialchars($ref); ?></a>
+                        <span class="dash-meta">Bible bookmark</span>
+                    </div></li>
+                <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <p class="dash-empty">Highlight a line in any book, or bookmark a verse in the Bible reader, and it will be kept here for you.</p>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/bible_reader.php', 'Open the Bible', 'outline', ['small' => true]); ?></div>
+            <?php endif; ?>
+        </section>
+
+        <!-- Groups -->
+        <section class="dash-card" aria-labelledby="dGroups">
+            <h2 id="dGroups"><i class="fas fa-users" aria-hidden="true"></i> Your groups</h2>
+            <?php if ($my_groups): ?>
+                <ul class="dash-list">
+                <?php foreach ($my_groups as $g): ?>
+                    <li><a href="<?php echo SITE_URL; ?>/group.php?id=<?php echo (int)$g['id']; ?>"><?php echo htmlspecialchars($g['name']); ?></a></li>
+                <?php endforeach; ?>
+                </ul>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/groups.php', 'All groups', 'outline', ['small' => true]); ?></div>
+            <?php else: ?>
+                <p class="dash-empty">Reading together helps. Join a group to read a book alongside others and share what stays with you.</p>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/groups.php', 'Find a group', 'primary', ['small' => true]); ?></div>
+            <?php endif; ?>
+        </section>
+
+        <!-- Sessions -->
+        <section class="dash-card" aria-labelledby="dSessions">
+            <h2 id="dSessions"><i class="fas fa-calendar-check" aria-hidden="true"></i> Your sessions</h2>
+            <?php if ($upcoming_sessions): ?>
+                <ul class="dash-list">
+                <?php foreach ($upcoming_sessions as $s): ?>
+                    <li><div>
+                        <a href="<?php echo SITE_URL; ?>/book_session.php"><?php echo htmlspecialchars(date('l, M j \a\t g:i a', strtotime($s['date'] . ' ' . $s['time']))); ?></a>
+                        <span class="dash-meta"><?php echo $s['status'] === 'confirmed' ? 'Confirmed' : 'Waiting for confirmation'; ?></span>
+                    </div></li>
+                <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <p class="dash-empty">Would it help to talk with someone? You can book a private session with Angella.</p>
+                <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/book_session.php', 'Book a session', 'outline', ['small' => true]); ?></div>
+            <?php endif; ?>
+        </section>
+
+        <?php if ($recent_poems): ?>
+        <!-- Recently read poems -->
+        <section class="dash-card" aria-labelledby="dPoems">
+            <h2 id="dPoems"><i class="fas fa-feather-alt" aria-hidden="true"></i> Poems you read recently</h2>
+            <ul class="dash-list">
+            <?php foreach ($recent_poems as $p): ?>
+                <li><a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars($p['title']); ?></a></li>
+            <?php endforeach; ?>
+            </ul>
+            <div class="dash-foot"><?php echo aw_link_btn(SITE_URL . '/poetry.php', 'More poems', 'outline', ['small' => true]); ?></div>
+        </section>
+        <?php endif; ?>
     </div>
 
-    <!-- Charts -->
-    <div class="chart-row">
-        <div class="chart-container"><canvas id="activeChart"></canvas></div>
-        <div class="chart-container"><canvas id="viewsChart"></canvas></div>
-    </div>
-
-    <!-- Personal Monitoring Stats -->
-    <div class="user-monitoring-grid">
-        <div class="user-monitor-card" style="cursor: pointer;" onclick="openStatsModal('views')">
-            <div class="title">My Total Views</div>
-            <div class="value" id="my_total_views"><?php echo number_format($stats['my_views'] ?? 0); ?></div>
-            <div class="sub">My Poems + Books <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
-        </div>
-        <div class="user-monitor-card"><div class="title">Read Today</div><div class="value" id="my_today"><?php echo $stats['my_minutes_today'] ?? 0; ?>m</div><div class="sub">Last 24 hours</div></div>
-        <div class="user-monitor-card"><div class="title">Read This Week</div><div class="value" id="my_week"><?php echo $stats['my_minutes_week'] ?? 0; ?>m</div><div class="sub">Last 7 days</div></div>
-        <div class="user-monitor-card"><div class="title">Read This Month</div><div class="value" id="my_month"><?php echo $stats['my_minutes_month'] ?? 0; ?>m</div><div class="sub">Last 30 days</div></div>
-        <div class="user-monitor-card"><div class="title">Read This Year</div><div class="value" id="my_year"><?php echo $stats['my_minutes_year'] ?? 0; ?>m</div><div class="sub">Last 365 days</div></div>
-        <div class="user-monitor-card" style="cursor: pointer;" onclick="openStatsModal('reading')">
-            <div class="title">My Reading Hours</div>
-            <div class="value" id="my_hours"><?php echo number_format($stats['my_reading_hours'] ?? 0); ?></div>
-            <div class="sub">Lifetime <span style="font-size:0.7rem; color:#d4c8c8;">(Click to view)</span></div>
-        </div>
-    </div>
-
-    <!-- My Recent Content -->
-    <div style="margin-bottom: 20px;">
-        <h3 style="font-family:'Playfair Display'; margin-bottom:12px;">📚 My Recent Activity</h3>
-        <div class="user-content-grid">
-            <div class="user-content-card"><h4>Currently Reading</h4><?php foreach($reading_books as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['title']); ?></a></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo (int)($b['progress'] ?? 0); ?>% complete<?php if (!empty($b['last_page'])): ?> · page <?php echo (int)$b['last_page']; ?><?php endif; ?></div></div><a class="btn btn-sm btn-primary" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>">Continue</a></div><?php endforeach; ?><?php if (!$reading_books): ?><div style="font-size:0.8rem;color:#a08a8a;">Open a book to see it here.</div><?php endif; ?></div>
-            <div class="user-content-card"><h4>Recent Poems</h4><?php foreach($recent_poems as $p): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($p['title']); ?></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($p['created_at'])); ?></div></div></div><?php endforeach; ?></div>
-            <div class="user-content-card"><h4>Recent Videos</h4><?php foreach($recent_videos as $v): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($v['title']); ?></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($v['created_at'])); ?></div></div></div><?php endforeach; ?></div>
-            <div class="user-content-card"><h4>Recent Blog</h4><?php foreach($recent_blog as $b): ?><div style="display:flex; align-items:center; gap:8px; width:100%; border-bottom:1px solid var(--border); padding:4px 0;"><div style="flex:1; text-align:left;"><div style="font-size:0.8rem; font-weight:600;"><?php echo htmlspecialchars($b['title']); ?></div><div style="font-size:0.7rem; color:#a08a8a;"><?php echo date('M j', strtotime($b['created_at'])); ?></div></div></div><?php endforeach; ?></div>
-        </div>
-    </div>
-
-    <!-- Quick Actions Modules (UPDATED TO INCLUDE READER FILES) -->
-    <div class="user-actions-grid">
-        <div class="user-module"><h3>📖 My Library</h3><div class="user-module-grid">
-            <a href="books.php" class="user-module-btn"><i class="fas fa-book"></i><span>Browse Books</span></a>
-            <!-- F10: "Open Reader" opened the reader with no book (redirect) and "Export Data" needed a book id
-                 (raw JSON error). The library lists the member's books; each book opens in the reader. -->
-            <a href="library.php" class="user-module-btn"><i class="fas fa-book-open"></i><span>Continue Reading</span></a>
-        </div></div>
-        
-        <div class="user-module"><h3>✍️ Poetry & Blogs</h3><div class="user-module-grid">
-            <a href="poetry.php" class="user-module-btn"><i class="fas fa-feather-alt"></i><span>Read Poems</span></a>
-            <a href="blog.php" class="user-module-btn"><i class="fas fa-blog"></i><span>Read Blog</span></a>
-            <a href="reflections.php" class="user-module-btn"><i class="fas fa-pray"></i><span>Reflections</span></a>
-        </div></div>
-        
-        <div class="user-module"><h3>👥 Community</h3><div class="user-module-grid">
-            <a href="groups.php" class="user-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
-            <a href="community.php" class="user-module-btn"><i class="fas fa-comments"></i><span>Community Q&A</span></a>
-        </div></div>
-        
-        <div class="user-module"><h3>🎥 Videos</h3><div class="user-module-grid">
-            <a href="videos.php" class="user-module-btn"><i class="fas fa-video"></i><span>Watch Videos</span></a>
-        </div></div>
-
-        <!-- F10: the "Reader Tools" tiles linked raw partials and endpoints (reader_challenges, reader_notes,
-             reader_tts, reader_gamification: unstyled fragments; reader_analytics: admin-only). These tools
-             live inside the reader itself, so the tiles are removed. -->
-
-        <div class="user-module"><h3>⚙️ My Account</h3><div class="user-module-grid">
-            <a href="profile.php" class="user-module-btn"><i class="fas fa-user"></i><span>My Profile</span></a>
-            <a href="my_purchases.php" class="user-module-btn"><i class="fas fa-receipt"></i><span>My Purchases</span></a><!-- F77 -->
-        </div></div>
-    </div>
-
-    <!-- Quick Actions Modal -->
-    <div class="modal-overlay" id="quickModal">
-        <div class="modal-box">
-            <h2>Quick Actions</h2>
-            <p style="color:#6b5a5a; margin-bottom: 16px;">Select what you want to do.</p>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                <a href="books.php" class="btn btn-primary">📖 Browse Books</a>
-                <a href="poetry.php" class="btn btn-primary">✍️ Read a Poem</a>
-                <a href="groups.php" class="btn btn-primary">👥 Join a Group</a>
-                <a href="profile.php" class="btn btn-primary">⚙️ Update Profile</a>
-                <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #d4c8c8; color:#6b5a5a; margin-top: 8px;">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Deep Dive Stats Modal -->
-    <div id="statsModal" class="modal-overlay" style="z-index: 99999;">
-        <div class="modal-box">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
-                <h2 id="statsModalTitle" style="font-family:'Playfair Display'; color: var(--rose-dark); margin:0;">Loading...</h2>
-                <button onclick="closeStatsModal()" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
-            </div>
-            <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem;">
-                <p style="color:#a08a8a; text-align:center;">Loading your personal data...</p>
-            </div>
-        </div>
-    </div>
+    <h2 class="dash-section">Explore</h2>
+    <nav class="dash-explore" aria-label="Explore AngelWrites">
+        <a href="<?php echo SITE_URL; ?>/books.php"><i class="fas fa-book" aria-hidden="true"></i> Books</a>
+        <a href="<?php echo SITE_URL; ?>/poetry.php"><i class="fas fa-feather-alt" aria-hidden="true"></i> Poetry</a>
+        <a href="<?php echo SITE_URL; ?>/reflections.php"><i class="fas fa-dove" aria-hidden="true"></i> Reflections</a>
+        <a href="<?php echo SITE_URL; ?>/blog.php"><i class="fas fa-pen-nib" aria-hidden="true"></i> Blog</a>
+        <a href="<?php echo SITE_URL; ?>/videos.php"><i class="fas fa-video" aria-hidden="true"></i> Videos</a>
+        <a href="<?php echo SITE_URL; ?>/bible_reader.php"><i class="fas fa-bible" aria-hidden="true"></i> Bible</a>
+        <a href="<?php echo SITE_URL; ?>/my_purchases.php"><i class="fas fa-receipt" aria-hidden="true"></i> My purchases</a>
+    </nav>
 </div>
-
-<script>
-// Dark mode will be triggered by global header
-if (localStorage.getItem('userDarkMode') === '1') { document.body.classList.add('dark-mode'); }
-if (localStorage.getItem('adminDarkMode') === '1') { document.body.classList.add('dark-mode'); }
-
-// ===== Quick Modal Functions =====
-function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
-function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }
-document.getElementById('quickModal').addEventListener('click', function(e) { if(e.target===this) closeQuickModal(); });
-
-// ===== Live Personal Stats Polling =====
-function refreshStats() {
-    fetch('<?php echo SITE_URL; ?>/ajax_user.php?action=stats')
-        .then(res => res.json()).then(data => {
-            document.getElementById('my_total_views').textContent = data.my_total_views ?? 0;
-            document.getElementById('my_today').textContent = (data.my_minutes_today ?? 0) + 'm';
-            document.getElementById('my_week').textContent = (data.my_minutes_week ?? 0) + 'm';
-            document.getElementById('my_month').textContent = (data.my_minutes_month ?? 0) + 'm';
-            document.getElementById('my_year').textContent = (data.my_minutes_year ?? 0) + 'm';
-            document.getElementById('my_hours').textContent = data.my_reading_hours ?? 0;
-        }).catch(console.error);
-}
-// Q28: polling every 60 s (stats + 2 chart requests) cost ~4,300 requests a day per open tab,
-// even in a background tab. Now every 5 minutes, only while the tab is visible, and once on return.
-const AW_POLL_MS = 300000;
-let awLastPoll = Date.now();
-function awPoll() { awLastPoll = Date.now(); refreshStats(); if (window.activeChart) updateCharts(); }
-setInterval(function () { if (!document.hidden) awPoll(); }, AW_POLL_MS);
-document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && Date.now() - awLastPoll > 60000) awPoll();
-});
-
-// ============================================================
-// SMOOTH & SMART CHARTS
-// ============================================================
-function initCharts() {
-    const gradientActive = document.getElementById('activeChart').getContext('2d').createLinearGradient(0,0,0,250);
-    const isDark = document.body.classList.contains('dark-mode');
-    gradientActive.addColorStop(0, '#DBA1A2'); gradientActive.addColorStop(1, isDark ? '#2c1e1e' : '#f0dad9');
-
-    window.activeChart = new Chart(document.getElementById('activeChart'), {
-        type: 'line', 
-        data: { labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], datasets: [{ label: 'My Reading Sessions', data: [0,0,0,0,0,0,0], borderColor: '#DBA1A2', backgroundColor: gradientActive, fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: '#DBA1A2', pointRadius: 3 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } } }
-    });
-    window.viewsChart = new Chart(document.getElementById('viewsChart'), {
-        type: 'bar', 
-        data: { labels: ['Poems','Books','Blog','Videos'], datasets: [{ label: 'Content Read (7 days)', data: [0,0,0,0], backgroundColor: ['#DBA1A2','#c08a8b','#e8c0c0','#EFD8D6'], borderRadius: 6, borderSkipped: false }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } } }
-    });
-    updateCharts();
-    // Q28: chart refreshes now ride on awPoll() above (visible tab only, every 5 minutes).
-}
-
-function updateCharts() {
-    fetch('<?php echo SITE_URL; ?>/ajax_user.php?action=active_chart')
-        .then(res => res.json()).then(data => { window.activeChart.data.labels = data.labels; window.activeChart.data.datasets[0].data = data.data; window.activeChart.update(); }).catch(console.error);
-    fetch('<?php echo SITE_URL; ?>/ajax_user.php?action=views_chart')
-        .then(res => res.json()).then(data => { window.viewsChart.data.datasets[0].data = data.data; window.viewsChart.update(); }).catch(console.error);
-}
-document.addEventListener('DOMContentLoaded', initCharts);
-
-// ============================================================
-// DEEP DIVE MODAL FUNCTIONS (Only displays current user's data)
-// ============================================================
-function openStatsModal(type) {
-    document.getElementById('statsModal').classList.add('active');
-    const body = document.getElementById('statsModalBody');
-    const title = document.getElementById('statsModalTitle');
-    body.innerHTML = '<p style="color:#a08a8a; text-align:center;">Loading your history...</p>';
-
-    const url = '<?php echo SITE_URL; ?>/ajax_user.php?action=' + (type === 'views' ? 'get_my_view_details' : 'get_my_reading_details');
-    title.textContent = type === 'views' ? '📊 My Viewed Content' : '📖 My Reading Sessions';
-
-    fetch(url)
-        .then(res => res.json())
-        .then(data => {
-            if (!data.success || data.logs.length === 0) {
-                body.innerHTML = '<p style="color:#a08a8a; text-align:center;">You haven\'t recorded any activity yet. Start reading!</p>';
-                return;
-            }
-            let html = '<table><thead><tr><th>Content</th><th>Date & Time</th></tr></thead><tbody>';
-            data.logs.forEach(row => {
-                let titleCol = row.target_type === 'poem' ? htmlspecialchars(row.poem_title) : htmlspecialchars(row.book_title);
-                let subTitle = `<span style="color:#a08a8a;font-size:0.75rem;display:block;">${row.target_type}</span>`;
-                if(type === 'views') {
-                    html += `<tr><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#6b5a5a;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
-                } else {
-                    let dur = Math.floor(row.duration_seconds / 60);
-                    let sec = row.duration_seconds % 60;
-                    html += `<tr><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#6b5a5a;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#f0e8e8; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
-                }
-            });
-            html += '</tbody></table>';
-            body.innerHTML = html;
-        })
-        .catch(err => {
-            body.innerHTML = '<p style="color:red; text-align:center;">Error loading data.</p>';
-            console.error(err);
-        });
-}
-
-function closeStatsModal() {
-    document.getElementById('statsModal').classList.remove('active');
-}
-document.getElementById('statsModal').addEventListener('click', function(e) {
-    if (e.target === this) closeStatsModal();
-});
-
-function htmlspecialchars(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"]/g, function(m) {
-        if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; if (m === '"') return '&quot;'; return m;
-    });
-}
-</script>
 <?php require_once 'includes/footer.php'; ?>
