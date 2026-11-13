@@ -222,6 +222,10 @@ if ($carousel_poem) {
     }
 }
 
+// C2: "Angella's picks" — a poem, a story and a reflection chosen by the team (admin/picks.php)
+require_once 'includes/picks.php';
+$aw_picks = aw_picks($db);
+
 $pageTitle = 'AngelWrites — Christian Writing & Community';
 ?>
 <?php require_once 'includes/header.php'; ?>
@@ -562,6 +566,20 @@ if ('serviceWorker' in navigator) {
         .books-grid { grid-template-columns:1fr 1fr; }
         .book-cover-wrapper { height:160px; }
     }
+/* C2: Angella's picks */
+.aw-picks-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 360px)); justify-content:center; gap:24px; }
+.aw-pick { display:flex; flex-direction:column; background:var(--card-bg, #fff); border:1px solid var(--border, #e5d5d5); border-radius:20px; overflow:hidden; box-shadow:var(--shadow); color:inherit; text-decoration:none; transition:transform .25s, box-shadow .25s; }
+.aw-pick:hover, .aw-pick:focus-visible { transform:translateY(-4px); box-shadow:var(--shadow-hover); text-decoration:none; }
+.aw-pick:focus-visible { outline:3px solid var(--rose-dark, #a8676a); outline-offset:3px; }
+.aw-pick-img { position:relative; aspect-ratio:16/9; background:linear-gradient(135deg, var(--fantasy, #F7F3ED), var(--vanilla, #EFD8D6)); display:grid; place-items:center; overflow:hidden; }
+.aw-pick-img img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+.aw-pick-img i { font-size:2.2rem; color:var(--rose, #DBA1A2); }
+.aw-pick-body { padding:18px 20px 20px; display:flex; flex-direction:column; gap:8px; flex:1; }
+.aw-pick-kind { font:600 .75rem/1 'Inter', sans-serif; letter-spacing:.08em; text-transform:uppercase; color:var(--text-light); }
+.aw-pick-body h3 { margin:0; font-family:'Playfair Display', Georgia, serif; font-size:1.2rem; line-height:1.3; color:var(--text); }
+.aw-pick-excerpt { margin:0; color:var(--text-light); font-size:.95rem; line-height:1.55; }
+.aw-pick-why { margin:auto 0 0; padding-top:12px; border-top:1px solid var(--border, #e5d5d5); font-style:italic; color:var(--text); font-size:.92rem; line-height:1.5; }
+@media (prefers-reduced-motion: reduce) { .aw-pick, .aw-pick:hover { transition:none; transform:none; } }
 </style>
 
 <!-- ===== HTML CONTENT ===== -->
@@ -642,6 +660,36 @@ if ('serviceWorker' in navigator) {
         </div>
     </div>
 </section>
+
+<?php if (!empty($aw_picks)): ?>
+<!-- C2: ANGELLA'S PICKS -->
+<section class="picks-section section-padding" id="picks" aria-labelledby="picksTitle">
+    <div class="container">
+        <div class="section-header">
+            <h2 id="picksTitle">Angella's <span class="rose-text">Picks</span></h2>
+            <p>Chosen by hand, with a word on why.</p>
+        </div>
+        <div class="aw-picks-grid">
+            <?php foreach ($aw_picks as $slot => $pk): ?>
+                <a class="aw-pick" href="<?php echo htmlspecialchars($pk['url']); ?>">
+                    <div class="aw-pick-img">
+                        <i class="fas <?php echo $pk['icon']; ?>" aria-hidden="true"></i>
+                        <?php if ($pk['image'] !== ''): ?>
+                            <img src="<?php echo htmlspecialchars(get_image_url($pk['image'])); ?>" alt="" loading="lazy" onerror="this.remove()">
+                        <?php endif; ?>
+                    </div>
+                    <div class="aw-pick-body">
+                        <span class="aw-pick-kind"><?php echo htmlspecialchars($pk['label']); ?></span>
+                        <h3><?php echo htmlspecialchars($pk['title']); ?></h3>
+                        <?php if ($pk['excerpt'] !== ''): ?><p class="aw-pick-excerpt"><?php echo htmlspecialchars($pk['excerpt']); ?></p><?php endif; ?>
+                        <?php if ($pk['note'] !== ''): ?><p class="aw-pick-why"><?php echo htmlspecialchars($pk['note']); ?></p><?php endif; ?>
+                    </div>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
 
 <!-- STATS -->
 <section class="stats-section section-padding" style="background-color: var(--vanilla);">
