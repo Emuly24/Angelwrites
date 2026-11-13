@@ -1,6 +1,7 @@
 # AngelWrites program plan (wishes A to Q)
 
 Status: **plan only, no feature code.** Written 13 November 2026 against `main` at `66c58af`.
+**The owner's decisions are recorded in section 6 and take precedence over the defaults elsewhere.**
 Nothing in this document is built until the owner approves it. Wish R (upload limits) is built
 separately in PR #34. Wish S (Bible) has its own plan, `docs/BIBLE_PLAN.md`.
 
@@ -846,3 +847,74 @@ the least effort and risk:
    offline, which is what makes a community feel alive, and it is the foundation D and I need.
 5. **Bible focus mode (S, from BIBLE_PLAN.md).** A signature, distraction-free experience open
    to every visitor, on public-domain text, with no dependency on anything else in this plan.
+
+---
+
+## 6. Decisions recorded (owner's answers, 13 November 2026)
+
+These settle the open questions in section 4 and override any earlier default in this document.
+
+| # | Question | Decision | What it changes |
+|---|---|---|---|
+| 1 | Hosting | **Stay on the free plan for now**; move to a low-cost paid plan later | Everything is built inside the free host's limits. A manual backup is provided instead of scheduled ones (PR #36) |
+| 2 | Moderators | **Angella Bottoman (owner) and Blessings Emulyn** | Two people cover the queue. The service levels in 2b become targets, not promises; sensitive categories stay pre-moderated |
+| 3 | Sending mailbox | **Zoho** (Gmail did not work) | PR #35 adds Zoho SMTP behind `MAIL_PROVIDER`; `.env` must set it to `zoho` |
+| 4 | Crisis contact | **The owner's own phone number** was supplied | It is stored in site settings, not in this repository. Recommendation still stands: show Malawi's emergency and helpline numbers beside it, so one person is not the only line |
+| 5 | Minimum age | **18 and over** for community and messaging | Sign-up for those areas asks for confirmation of age; reading stays open |
+| 6 | Messaging brief | **None exists; build it** | Phase 5 is built from this plan |
+| 7 | "What they're saying" | **The comments, and anything that pops up on the home page** | Phase 1 restyles the home page's comment carousel, testimonial cards, the join bar and the cookie notice as one family |
+| 8 | Old gamification data | **Delete** | Phase 1 removes the screens, then drops the tables after a backup is taken |
+| 9 | Member storage | **100 MB per member now, with a way to raise it** on a paid plan | Done in PR #34: the default is 100 MB and Admin → Settings → Uploads changes it without code |
+| 10 | Editor | **Agreed:** Quill 2 for members; admin screens keep the current editor until Phase 6 | |
+| 11 | New dependencies | **Approved:** HTMLPurifier and Quill 2, self-hosted | |
+| 12 | Second-factor sign-in for staff | **Agreed** | Phase 2 |
+| 13 | Pseudonyms | **A new pseudonym for each post** | Replaces "one per member" in 2b. Consequences accepted: readers cannot recognise a returning voice, and one person may appear as several. The team still sees the real account on every post, and per-member posting limits apply to the account, not the pseudonym. Replies by the author on their own post keep that post's pseudonym |
+| 14 | Member books | **Agreed:** "suggest a book" only, until hosting and a takedown procedure are in place | |
+| 15 | Who sees real identities | **Owner and admins only** | Moderators without the admin role do not see who is behind a pseudonym or read team-only posts. Blessings Emulyn therefore needs the admin role to share that work with the owner. The capability table in 2d changes accordingly |
+
+### Phase 0 status
+
+| Item | State |
+|---|---|
+| Email reliable | PR #35 (Zoho SMTP, two categories of email). Needs the `.env` values and the live test |
+| Backups | PR #36 (manual backup, weekly reminder, restore steps; restore tried on a copy) |
+| Upload limits and quotas | PR #34 |
+| Unlicensed Bible texts | PR #37 |
+| Existing waiting members verified | PR #33 |
+| Measured requests per page | Below |
+| Open questions | Answered above |
+
+### Measured requests and weight (Phase 0, 13 November 2026)
+
+Measured on a copy of `main` with sample content, phone width, first visit, scrolled to the bottom.
+"Requests" are same-origin only (what the host counts); fonts, icons and the editor come from CDNs.
+
+| Page | Requests | Transferred | HTML alone |
+|---|---|---|---|
+| Home | 7 | 367 KB | 90 KB |
+| Books | 6 | 206 KB | 90 KB |
+| Poetry | 7 | 194 KB | 57 KB |
+| **A poem** | **23** | 303 KB | 94 KB |
+| Blog | 6 | 195 KB | 78 KB |
+| A blog post | 7 | 249 KB | 77 KB |
+| Reflections | 6 | 203 KB | 87 KB |
+| Bible reader | 7 | 259 KB | 145 KB |
+| Login | 6 | 164 KB | 46 KB |
+| Member dashboard | 6 | 179 KB | 61 KB |
+| Library | 6 | 195 KB | 80 KB |
+| Community | 6 | 185 KB | 69 KB |
+| **Book reader** | 7 | 685 KB | **634 KB** |
+| Admin dashboard | 5 | 158 KB | 51 KB |
+
+What the numbers say:
+
+- **Requests are already inside the budget** (12 on a first visit) on every page but one. The
+  earlier worry about hits is mostly answered; the polling timers remain the thing to remove.
+- **The poem page makes 23 requests**: one call to `ajax_get_reactions.php` for each of its 11
+  reviews. Returning the reactions with the page, or in one call, brings it to 8. This is the
+  single cheapest saving on the site and belongs in Phase 1.
+- **HTML is heavier than the 60 KB budget almost everywhere** (46 to 145 KB), because each page
+  carries its own large `<style>` block and inline script. Moving those into the shared files,
+  which Phase 1 does page by page, is what brings the weight down.
+- **The book reader sends the whole book in one 634 KB page.** Reader v1 (Phase 4) should load a
+  chapter at a time.
