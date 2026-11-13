@@ -173,7 +173,7 @@ function aw_upload_post_overflow(): string
 function aw_upload_log_reject($userId, string $kind, int $size, string $reason, string $name = ''): void
 {
     $row = ['at' => date('Y-m-d H:i:s'), 'member' => $userId === null ? null : (int)$userId, 'type' => $kind,
-            'size' => $size, 'reason' => $reason, 'name' => mb_substr($name, 0, 80)];
+            'size' => $size, 'reason' => $reason, 'name' => substr($name, 0, 80)];
     error_log('upload refused: ' . json_encode($row));
     $file = __DIR__ . '/../data/upload_rejections.log';
     $lines = is_file($file) ? (array)@file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
