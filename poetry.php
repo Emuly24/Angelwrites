@@ -111,7 +111,8 @@ $og_description = "Poems by Angella Bottoman – words of faith, healing and hop
                     <h2><?php echo htmlspecialchars($featured['title']); ?></h2>
                     <p class="aw-opening"><?php foreach (aw_poem_opening($featured, 4) as $l): ?><span><?php echo htmlspecialchars($l); ?></span><?php endforeach; ?></p>
                     <div class="aw-card-foot" style="border:0;padding:0;">
-                        <span><i class="far fa-calendar" aria-hidden="true"></i><?php echo date('M j, Y', strtotime($featured['created_at'])); ?></span>
+                        <?php $aw_w = trim((string)($featured['written_on'] ?? '')); /* P-ED: the date written, when set */ ?>
+                        <span><i class="far fa-calendar" aria-hidden="true"></i><?php echo $aw_w !== '' && strtotime($aw_w) ? '<span class="sr-only">Written </span>' . date('M j, Y', strtotime($aw_w)) : date('M j, Y', strtotime($featured['created_at'])); ?></span>
                         <span><i class="far fa-clock" aria-hidden="true"></i><?php echo $fs['minutes']; ?> min read</span>
                         <span><i class="fas fa-align-center" aria-hidden="true"></i><?php echo $fs['stanzas']; ?> stanzas</span>
                     </div>
