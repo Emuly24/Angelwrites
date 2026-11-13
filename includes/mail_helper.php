@@ -75,59 +75,168 @@ function aw_mail_transport(PHPMailer $mail, array $cfg): void
 }
 
 /**
- * Send an email via SMTP.
+ * ET2: the address replies are pointed at, so an accidental "Reply" never reaches a monitored inbox.
  *
- * Returns true on success and false on failure. It never stops the page:
- * callers have usually already saved the user's action, so a mail failure
- * is logged and the request carries on.
+ * Normally noreply@<the domain of the From address>. One exception: when From is a mailbox at a
+ * shared provider (zohomail.com, gmail.com, ...), "noreply@" at that domain is not ours and could
+ * belong to a stranger, who would then receive members' replies. In that case the site's own host
+ * name is used instead (noreply@angelwrites.gt.tc), which has no mailbox, so the reply bounces.
+ * MAIL_NOREPLY_ADDRESS in .env overrides both.
  */
-function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.gt.tc', $fromName = 'AngelWrites', $isHTML = true) {
+function aw_mail_noreply_address(string $from): string
+{
+    $override = trim((string)getenv('MAIL_NOREPLY_ADDRESS'));
+    if ($override !== '' && filter_var($override, FILTER_VALIDATE_EMAIL)) return $override;
+    $domain = strtolower((string)substr((string)strrchr($from, '@'), 1));
+    $shared = ['zohomail.com', 'zohomail.eu', 'zohomail.in', 'zoho.com', 'zoho.eu', 'zoho.in', 'gmail.com', 'googlemail.com',
+               'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com', 'icloud.com', 'me.com', 'aol.com', 'proton.me', 'protonmail.com'];
+    if ($domain === '' || in_array($domain, $shared, true)) {
+        $host = strtolower((string)parse_url(defined('SITE_URL') ? SITE_URL : '', PHP_URL_HOST));
+        if ($host !== '') $domain = preg_replace('/^www\./', '', $host);
+    }
+    return 'noreply@' . ($domain !== '' ? $domain : 'invalid.invalid');
+}
+
+/** ET2: the sentence that ends every automated (transactional) email. */
+function aw_mail_automated_note(): string
+{
+    return 'This is an automated message from ' . (function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites') . '. Please do not reply to this email.';
+}
+
+/**
+ * ET2: builds a ready-to-send PHPMailer object. One place for sender, Reply-To, layout and footer,
+ * shared by sendEmail(), sendConversationalEmail() and sendEmailWithAttachment().
+ *
+ * $m: to, subject, message, is_html, from_name,
+ *     kind  'transactional' (default): From "<name> (no reply)", automated-message footer
+ *           'conversational': From "<name>", a button to $m['reply_url'] and a "not monitored" note
+ *     reply_url, reply_label, attachment ['path' =>, 'name' =>], opts (passed to the template)
+ * Throws on a configuration problem; callers catch.
+ */
+function aw_mail_prepare(array $m): PHPMailer
+{
+    require_once __DIR__ . '/email_template.php';
+    $cfg = aw_mail_config();
+    if (empty($cfg['ok'])) {
+        throw new \RuntimeException($cfg['error']);
+    }
+    $kind = ($m['kind'] ?? 'transactional') === 'conversational' ? 'conversational' : 'transactional';
+    $fromName = trim((string)($m['from_name'] ?? '')) ?: 'AngelWrites';
+    if ($fromName === 'AngelWrites' && $cfg['from_name'] !== '') $fromName = $cfg['from_name'];
+    $fromName = trim(str_replace(["\r", "\n"], ' ', $fromName));
+
     $mail = new PHPMailer(true);
+    aw_mail_transport($mail, $cfg);
+    // From is always the mailbox we sign in as (SPF/DKIM align). Transactional mail says so in the name.
+    $mail->setFrom($cfg['from'], $kind === 'transactional' ? $fromName . ' (no reply)' : $fromName);
+    $mail->Sender = $cfg['from'];
+    $mail->addReplyTo(aw_mail_noreply_address($cfg['from']), $kind === 'transactional' ? $fromName . ' (no reply)' : $fromName . ' (replies not monitored)');
+    $mail->addAddress((string)$m['to']);
+    $mail->Subject = (string)$m['subject'];
+
+    $opts = array_merge(['to' => (string)$m['to']], (array)($m['opts'] ?? []));
+    if ($kind === 'conversational') {
+        $url = (string)($m['reply_url'] ?? '');
+        if (!preg_match('#^https?://#i', $url)) $url = rtrim(defined('SITE_URL') ? SITE_URL : '', '/') . '/'; // never a broken or script link
+        $label = trim((string)($m['reply_label'] ?? '')) ?: 'Reply in the app';
+        $note = 'Replies to this email are not monitored. Use the button above to reach us.';
+        // Inline styles only: email clients strip modern CSS. Deep rose from the design tokens (--aw-rose-deep).
+        $opts['append_html'] =
+              '<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:28px auto 12px;"><tr>'
+            . '<td align="center" bgcolor="#a8676a" style="background:#a8676a;border-radius:30px;">'
+            . '<a href="' . aw_email_e($url) . '" style="display:inline-block;padding:14px 36px;font:600 16px \'Inter\',Arial,Helvetica,sans-serif;color:#ffffff;text-decoration:none;border-radius:30px;">'
+            . aw_email_e($label) . '</a></td></tr></table>'
+            . '<p style="margin:0 0 6px;font:13px/1.6 \'Inter\',Arial,Helvetica,sans-serif;color:#6b5a5a;text-align:center;">' . aw_email_e($note) . '</p>';
+        $opts['append_text'] = $label . ': ' . $url . "\n\n" . str_replace('button above', 'link above', $note);
+        $opts['footer_note'] = $note;
+    } else {
+        $opts['footer_note'] = aw_mail_automated_note();
+    }
+
+    [$html, $text] = aw_email_brand((string)$m['subject'], (string)$m['message'], !empty($m['is_html']), $opts);
+    $mail->isHTML(true);
+    $mail->Body    = $html;
+    $mail->AltBody = $text;
+
+    if (!empty($m['attachment'])) {
+        $path = (string)($m['attachment']['path'] ?? '');
+        if ($path === '' || !is_file($path) || !is_readable($path)) {
+            throw new \RuntimeException('The file to attach could not be read (' . basename($path) . '). Nothing was sent.');
+        }
+        $mail->addAttachment($path, (string)($m['attachment']['name'] ?? '') ?: basename($path));
+    }
+    return $mail;
+}
+
+/** ET2: prepare, send, and on any failure log it and return false. Nothing escapes; nothing dies. */
+function aw_mail_deliver(array $m, string $fn): bool
+{
     $GLOBALS['aw_mail_last_error'] = '';
+    $mail = null;
     try {
-        // ET1: the provider and its settings come from .env; a missing setting is named plainly and
-        // nothing is sent (this also covers VF3's "say exactly what is missing").
-        $cfg = aw_mail_config();
-        if (empty($cfg['ok'])) {
-            throw new \RuntimeException($cfg['error']);
+        if (function_exists('aw_mail_test_sink')) { // test harness only (never defined on the site)
+            $mail = aw_mail_prepare($m);
+            $mail->preSend();
+            return (bool)aw_mail_test_sink(['fn' => $fn, 'to' => $m['to'], 'subject' => $m['subject'], 'mime' => $mail->getSentMIMEMessage(), 'host' => $mail->Host, 'port' => $mail->Port, 'user' => $mail->Username]);
         }
-        aw_mail_transport($mail, $cfg);
-        // ET1: From is always the mailbox we sign in as (ZOHO_FROM_ADDRESS, or the Gmail account on the
-        // fallback path), so SPF/DKIM align. The $fromEmail argument is kept for existing callers but no
-        // longer chooses the sender. This replaces F217's "From = Gmail, Reply-To = Zoho".
-        $mail->setFrom($cfg['from'], ($fromName === 'AngelWrites' && $cfg['from_name'] !== '') ? $cfg['from_name'] : $fromName);
-        $mail->Sender = $cfg['from'];
-        $mail->addAddress($to);
-        $mail->Subject = $subject;
-        $mail->Body    = $message;
-        $mail->isHTML($isHTML);
-        // F91: optional attachment as 7th/8th argument (path, file name). admin/process_book.php
-        // passed one, but the arguments were ignored, so the file was silently dropped. (Read with
-        // func_get_args() so the signature line stays unchanged.)
-        $aw_extra = func_get_args();
-        if (!empty($aw_extra[6]) && is_file($aw_extra[6])) {
-            $mail->addAttachment($aw_extra[6], !empty($aw_extra[7]) ? $aw_extra[7] : basename($aw_extra[6]));
-        }
-        // E1: every email uses the AngelWrites layout (logo, fonts, colours, Angella's signature) with a
-        // plain-text part, in UTF-8 (the default was Latin-1, which garbled ’ é …). A 9th argument
-        // ['signature' => false] leaves the signature out; mail to the admin gets a website footer.
-        require_once __DIR__ . '/email_template.php';
-        [$aw_html, $aw_text] = aw_email_brand($subject, $message, $isHTML, array_merge(['to' => $to], (array)($aw_extra[8] ?? [])));
-        $mail->CharSet = 'UTF-8';
-        $mail->isHTML(true);
-        $mail->Body    = $aw_html;
-        $mail->AltBody = $aw_text;
+        $mail = aw_mail_prepare($m);
         $mail->send();
         return true;
     } catch (\Throwable $e) {
-        error_log('sendEmail failed (to: ' . $to . ', subject: ' . $subject . '): ' . $e->getMessage());
+        error_log($fn . ' failed (to: ' . ($m['to'] ?? '') . ', subject: ' . ($m['subject'] ?? '') . '): ' . $e->getMessage());
         // VF3: keep the reason so the admin can see it (Settings > Email) without server logs
         $why = $e->getMessage();
-        if (!empty($mail->ErrorInfo) && strpos($why, $mail->ErrorInfo) === false) $why .= ' — ' . $mail->ErrorInfo;
+        if ($mail && !empty($mail->ErrorInfo) && strpos($why, $mail->ErrorInfo) === false) $why .= ' — ' . $mail->ErrorInfo;
         $GLOBALS['aw_mail_last_error'] = $why;
-        aw_mail_log_failure($to, $subject, $why);
+        aw_mail_log_failure((string)($m['to'] ?? ''), (string)($m['subject'] ?? ''), $why);
         return false;
     }
+}
+
+/**
+ * Send a TRANSACTIONAL email (the default): codes, receipts, alerts, confirmations. Nobody is
+ * expected to answer it.
+ *
+ *   From      the site's mailbox, shown as "<fromName> (no reply)"
+ *   Reply-To  a no-reply address (see aw_mail_noreply_address())
+ *   Footer    "This is an automated message from AngelWrites. Please do not reply to this email."
+ *
+ * Returns true on success and false on failure. It never stops the page: callers have usually
+ * already saved the user's action, so a mail failure is logged and the request carries on.
+ * The signature is unchanged. $fromEmail is accepted for existing callers but no longer chooses
+ * the sender (ET1). An optional 9th argument, ['signature' => false], leaves Angella's signature out.
+ */
+function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.gt.tc', $fromName = 'AngelWrites', $isHTML = true) {
+    $aw_extra = func_get_args();
+    return aw_mail_deliver([
+        'kind' => 'transactional', 'to' => $to, 'subject' => $subject, 'message' => $message,
+        'is_html' => $isHTML, 'from_name' => $fromName,
+        // F91's 7th/8th arguments (attachment path and name) still work here until the one caller
+        // moves to sendEmailWithAttachment() in the next commit.
+        'attachment' => (!empty($aw_extra[6]) && is_file($aw_extra[6])) ? ['path' => $aw_extra[6], 'name' => $aw_extra[7] ?? ''] : null,
+        'opts' => (array)($aw_extra[8] ?? []),
+    ], 'sendEmail');
+}
+
+/**
+ * ET2: send a CONVERSATIONAL email: the person is expected to answer, and the answer belongs on
+ * the site, not in an inbox.
+ *
+ *   From      the site's mailbox, shown as "<fromName>"
+ *   Reply-To  the same no-reply address, so a reply by email fails cleanly instead of sitting unread
+ *   Body      $body, then a prominent button to $replyUrl labelled $replyLabel, then
+ *             "Replies to this email are not monitored. Use the button above to reach us."
+ *
+ * $replyUrl must be a full http(s) URL (build it from SITE_URL). Returns false on failure, logs,
+ * never dies. An optional 7th argument is passed to the template, e.g. ['signature' => false].
+ */
+function sendConversationalEmail($to, $subject, $body, $replyUrl, $replyLabel = 'Reply in the app', $fromName = 'AngelWrites') {
+    $aw_extra = func_get_args();
+    return aw_mail_deliver([
+        'kind' => 'conversational', 'to' => $to, 'subject' => $subject, 'message' => $body, 'is_html' => true,
+        'from_name' => $fromName, 'reply_url' => $replyUrl, 'reply_label' => $replyLabel,
+        'opts' => (array)($aw_extra[6] ?? []),
+    ], 'sendConversationalEmail');
 }
 
 /**

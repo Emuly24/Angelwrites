@@ -157,7 +157,9 @@ function aw_nl_render(PDO $db, $subject, $content, array $sub, array $opts = [])
         'pixel' => $track ? aw_nl_open_url($db, $qid, $sub['email'] ?? '') : '',
         'footer' => 'You are receiving this because you subscribed to the ' . $e($site) . ' newsletter at <a href="' . $e($base) . '" style="color:#c08a8b;">' . $e(preg_replace('#^https?://#', '', $base)) . '</a>.<br>'
             . ($unsub ? '<a href="' . $e($unsub) . '" style="color:#c08a8b;">Unsubscribe</a> · ' : '')
-            . '<a href="mailto:angelwrites@zohomail.com" style="color:#c08a8b;">Reply to Angella</a>',
+            . '<a href="' . $e($base) . '/contact.php" style="color:#c08a8b;">Contact us</a>'
+            // ET2: a newsletter is automated mail; replies are not read (the footer used to invite them)
+            . '<br>' . $e(function_exists('aw_mail_automated_note') ? aw_mail_automated_note() : 'This is an automated message. Please do not reply to this email.'),
     ]);
     if ($sig) $text_body .= "\n\nWith love and blessings,\nAngella Bottoman\nFounder, $site";
 
@@ -185,8 +187,11 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
         }
         aw_mail_transport($mail, $cfg);
         $from = $cfg['from'];
-        $mail->setFrom($from, (function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites') . ' Newsletter');
+        // ET2: newsletters are transactional mail: "(no reply)" in the name, replies pointed at no-reply
+        $nl_name = (function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites') . ' Newsletter (no reply)';
+        $mail->setFrom($from, $nl_name);
         $mail->Sender = $from;
+        $mail->addReplyTo(aw_mail_noreply_address($from), $nl_name);
         $mail->addAddress($to);
         $mail->Subject = $subject;
         $mail->isHTML(true);
