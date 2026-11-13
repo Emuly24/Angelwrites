@@ -132,6 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                 $qstmt->execute([$question_id]);
                 $qrow = $qstmt->fetch(PDO::FETCH_ASSOC);
                 $qstmt->closeCursor();
+                // N2: mentions in the answer
+                require_once __DIR__ . '/includes/mentions.php';
+                if ($qrow) aw_mentions_save($db, $body, 'answer', (int)$answer_id, 'the question “' . mb_substr($qrow['title'], 0, 80) . '”',
+                    SITE_URL . '/community.php?id=' . $question_id, awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']));
                 if ($qrow && (int)$qrow['user_id'] !== (int)$user_id) {
                     awNotify($db, $qrow['user_id'], 'answer', 'New answer to your question',
                         'Someone answered "' . mb_substr($qrow['title'], 0, 80) . '".', SITE_URL . '/community.php?id=' . $question_id);
@@ -385,7 +389,7 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                                             </div>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="answer-body"><?php echo nl2br(htmlspecialchars($answer['body'])); ?></div>
+                                    <div class="answer-body"><?php require_once __DIR__ . '/includes/mentions.php'; echo aw_mentions_render($db, nl2br(htmlspecialchars($answer['body'])), 'answer', (int)$answer['id']); /* N2 */ ?></div>
                                     <div class="answer-footer">
                                         <?php // C3: "found this helpful", not a score; no totals or ranks
                                             $aw_h = (int)($answer['upvotes'] ?? 0); $aw_mine = isset($my_helpful[(int)$answer['id']]); $aw_own = $answer['user_id'] == $user_id; ?>

@@ -73,6 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
     if (!empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, photo_path) VALUES (?, ?, ?, ?)");
         $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment, $photo_path]);
+        // N2: mentions in the comment
+        require_once __DIR__ . '/includes/mentions.php';
+        aw_mentions_save($db, $comment, 'reflection_comment', (int)$db->lastInsertId(), '“' . mb_substr((string)($post['title'] ?? 'a reflection'), 0, 80) . '”',
+            SITE_URL . '/blog_post.php?slug=' . urlencode($slug) . '#comments', awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']));
         
         // Send email notification to admin
         $user_id = $_SESSION['user_id'];
@@ -351,7 +355,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                                         <source src="<?php echo SITE_URL . '/' . $comment['voice_path']; ?>" type="audio/webm">
                                     </audio>
                                 <?php else: ?>
-                                    <?php echo nl2br(htmlspecialchars($comment['comment'])); ?>
+                                    <?php require_once __DIR__ . '/includes/mentions.php'; echo aw_mentions_render($db, nl2br(htmlspecialchars($comment['comment'])), 'reflection_comment', (int)$comment['id']); /* N2 */ ?>
                                 <?php endif; ?>
                                 <?php if ($comment['photo_path']): ?>
                                     <div class="comment-photo">
