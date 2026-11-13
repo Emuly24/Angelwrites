@@ -32,6 +32,9 @@ function aw_report_types() {
         'review'             => ['reviews', 'user_id', 'comment', "CASE target_type WHEN 'poem' THEN 'poem_view.php?id=' || target_id WHEN 'book' THEN 'book.php?id=' || target_id ELSE 'index.php' END || '#comments'", 'soft'],
         'reflection_comment' => ['reflection_comments', 'user_id', 'comment', "'blog_post.php?slug=' || (SELECT slug FROM blog_posts b WHERE b.id = reflection_id) || '#comments'", 'archive'],
         'video_comment'      => ['video_comments', 'user_id', 'content', "'video_watch.php?id=' || video_id", 'archive'],
+        // D1: Stories & Help. 'status' mode: removal sets status = 'removed' (kept 90 days, then purged)
+        'community_post'     => ['community_posts', 'author_id', "title || ' — ' || body", "'story.php?id=' || id", 'status'],
+        'community_reply'    => ['community_replies', 'author_id', 'body', "'story.php?id=' || post_id || '#reply-' || id", 'status'],
     ];
 }
 
@@ -62,12 +65,20 @@ function aw_report_item(PDO $db, $type, $id) {
     if (!$t) return null;
     [$table, $authorCol, $textExpr, $linkExpr, $mode] = $t;
     try {
-        $extra = $mode === 'soft' ? ' AND deleted_at IS NULL' : '';
+        $extra = $mode === 'soft' ? ' AND deleted_at IS NULL' : ($mode === 'status' ? " AND status <> 'removed'" : '');
         $st = $db->prepare("SELECT $authorCol AS author_id, $textExpr AS text, $linkExpr AS link FROM $table WHERE id = ?$extra");
         $st->execute([(int)$id]);
         $r = $st->fetch(PDO::FETCH_ASSOC);
         if (!$r) return null;
         $r['link'] = SITE_URL . '/' . ltrim((string)$r['link'], '/');
+        // a team-only post (or a reply on one) is shown only to the owner and admins (decision 15)
+        if (($type === 'community_post' || $type === 'community_reply') && !(function_exists('aw_can') && aw_can('see_identities'))) {
+            $pid = $type === 'community_post' ? (int)$id : (int)$db->query("SELECT post_id FROM community_replies WHERE id = " . (int)$id)->fetchColumn();
+            if ((string)$db->query("SELECT visibility FROM community_posts WHERE id = " . $pid)->fetchColumn() === 'team') {
+                $r['text'] = 'A private post for the team. An admin will review this report.';
+                $r['link'] = SITE_URL . '/admin/moderation.php';
+            }
+        }
         return $r;
     } catch (Throwable $e) {
         error_log('report item: ' . $e->getMessage());
@@ -128,6 +139,7 @@ function aw_report_decide(PDO $db, $report_id, $decision, $note = '') {
             $db->prepare("INSERT INTO moderation_archive (target_type, target_id, row_json, removed_by, reason) VALUES (?, ?, ?, ?, ?)")
                ->execute([$type, $tid, json_encode($row->fetch(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE), $me, (string)$rep['reason']]);
             if ($mode === 'soft') $db->prepare("UPDATE $table SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$tid]);
+            elseif ($mode === 'status') $db->prepare("UPDATE $table SET status = 'removed', updated_at = CURRENT_TIMESTAMP" . ($table === 'community_posts' ? ', removed_at = CURRENT_TIMESTAMP' : '') . " WHERE id = ?")->execute([$tid]);
             else $db->prepare("DELETE FROM $table WHERE id = ?")->execute([$tid]);
             if ($type === 'answer') { try { $db->exec("UPDATE questions SET answers_count = (SELECT COUNT(*) FROM answers a WHERE a.question_id = questions.id)"); } catch (Throwable $e) {} }
         }
@@ -169,6 +181,8 @@ function aw_moderation_restore(PDO $db, $archive_id) {
         $db->beginTransaction();
         if ($mode === 'soft') {
             $db->prepare("UPDATE $table SET deleted_at = NULL WHERE id = ?")->execute([(int)$a['target_id']]);
+        } elseif ($mode === 'status') {
+            $db->prepare("UPDATE $table SET status = 'published', updated_at = CURRENT_TIMESTAMP" . ($table === 'community_posts' ? ', removed_at = NULL' : '') . " WHERE id = ?")->execute([(int)$a['target_id']]);
         } elseif (is_array($row) && $row) {
             $cols = array_keys($row);
             $db->prepare("INSERT OR IGNORE INTO $table (" . implode(',', array_map(function ($c) { return '"' . str_replace('"', '', $c) . '"'; }, $cols)) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")

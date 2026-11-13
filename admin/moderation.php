@@ -45,7 +45,7 @@ try {
 } catch (Throwable $e) {
     error_log('moderation list: ' . $e->getMessage());
 }
-$labels = ['question' => 'Question', 'answer' => 'Answer', 'review' => 'Comment', 'reflection_comment' => 'Reflection comment', 'video_comment' => 'Video comment'];
+$labels = ['question' => 'Question', 'answer' => 'Answer', 'review' => 'Comment', 'reflection_comment' => 'Reflection comment', 'video_comment' => 'Video comment', 'community_post' => 'Stories & Help post', 'community_reply' => 'Stories & Help reply'];
 $open_count = 0;
 try { $open_count = (int)$db->query("SELECT COUNT(DISTINCT target_type || ':' || target_id) FROM reports WHERE status = 'pending'")->fetchColumn(); } catch (Throwable $e) {}
 
@@ -73,7 +73,15 @@ require_once '../includes/header.php';
             <?php foreach ($rows as $a): $row = json_decode((string)$a['row_json'], true) ?: []; ?>
                 <article class="mod-card">
                     <p class="mod-kind"><?php echo htmlspecialchars($labels[$a['target_type']] ?? $a['target_type']); ?> · removed <?php echo htmlspecialchars(date('M j, Y', strtotime($a['created_at']))); ?> by <?php echo htmlspecialchars($a['removed_by'] ? awDisplayName($a) : 'staff'); ?><?php echo $a['restored_at'] ? ' · restored ' . htmlspecialchars(date('M j', strtotime($a['restored_at']))) : ''; ?></p>
-                    <blockquote class="mod-text"><?php echo nl2br(htmlspecialchars(mb_substr((string)($row['comment'] ?? $row['body'] ?? $row['content'] ?? $row['title'] ?? ''), 0, 600))); ?></blockquote>
+                    <?php
+                    $rtext = strip_tags((string)($row['comment'] ?? $row['body'] ?? $row['content'] ?? $row['title'] ?? ''));
+                    // D1: private (team-only) Stories & Help writing is for the owner and admins only
+                    if (in_array($a['target_type'], ['community_post', 'community_reply'], true) && !aw_can('see_identities')) {
+                        $pid = $a['target_type'] === 'community_post' ? (int)$a['target_id'] : (int)($row['post_id'] ?? 0);
+                        try { if ((string)$db->query("SELECT visibility FROM community_posts WHERE id = " . $pid)->fetchColumn() === 'team') $rtext = 'A private post for the team.'; } catch (Throwable $e) {}
+                    }
+                    ?>
+                    <blockquote class="mod-text"><?php echo nl2br(htmlspecialchars(mb_substr($rtext, 0, 600))); ?></blockquote>
                     <?php if (!$a['restored_at'] && aw_can('manage_content')): ?>
                     <form method="POST"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>"><button type="submit" name="restore" value="<?php echo (int)$a['id']; ?>" class="btn btn-outline btn-sm">Put it back</button></form>
                     <?php endif; ?>
