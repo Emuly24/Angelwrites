@@ -53,7 +53,7 @@ if ($isLoggedIn) {
     
     <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : 'AngelWrites — Christian writing and community platform by Angella Bottoman.'; ?>">
     <meta name="keywords" content="AngelWrites, Christian writing, faith, poetry, books, reflections, Angella Bottoman">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="<?php echo !empty($aw_noindex) ? 'noindex, nofollow' : 'index, follow'; ?>"><!-- D2: private-ish pages (Stories & Help) ask search engines to stay away -->
     <!-- Q32: og:title/description/url and twitter:card were printed here and again in the Open Graph
          block below, so pages that set their own $og_* values were shadowed by these generic ones. -->
     
@@ -309,6 +309,9 @@ if ($isLoggedIn) {
                         <li role="none"><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>" role="menuitem">Poems</a></li>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/reflections.php" class="<?php echo $currentPage === 'reflections.php' ? 'active' : ''; ?>" role="menuitem">Reflections</a></li><!-- F74 -->
                         <li role="none"><a href="<?php echo SITE_URL; ?>/community.php" class="<?php echo $currentPage === 'community.php' ? 'active' : ''; ?>" role="menuitem">Community</a></li>
+                        <?php if ((string)(function_exists('aw_setting') ? aw_setting('community_posts_enabled', '1') : '1') !== '0'): /* D2 */ ?>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/stories.php" class="<?php echo in_array($currentPage, ['stories.php', 'story.php', 'story_write.php', 'my_stories.php'], true) ? 'active' : ''; ?>" role="menuitem">Get help · Offer help</a></li>
+                        <?php endif; ?>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/book_session.php" class="<?php echo $currentPage === 'book_session.php' ? 'active' : ''; ?>" role="menuitem">Book Session</a></li>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/profile.php" class="<?php echo $currentPage === 'profile.php' ? 'active' : ''; ?>" role="menuitem">Profile</a></li>
                         <?php if (function_exists('aw_is_staff') && aw_is_staff()): /* K1: moderators */ ?>
