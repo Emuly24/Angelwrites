@@ -645,3 +645,19 @@ Host limits (community forum, not official documentation):
 
 - https://forum.infinityfree.com/t/how-much-disk-space-is-free-account/80589
 - https://forum.infinityfree.com/t/inode-limit-on-free-hosting/49331
+
+---
+
+## L. Decisions recorded (owner's answers, 13 November 2026)
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Licences for NIV, ESV, NASB, NKJV, AMP | **None held.** The files were downloaded as "open source" and committed. They are removed in PR #37; KJV, WEB and ASV remain. Replacing the incomplete ASV file is still to do |
+| 2 | Permission letter to the Bible Society of Malawi | Not answered directly ("answered above"). Default applies: a draft letter will be prepared for the owner to send, asking for Buku Lopatulika first |
+| 3 to 9 | | Not yet answered; the recommended defaults in section I apply until the owner says otherwise |
+
+Related decisions from PROGRAM_PLAN.md section 6: the site stays on free hosting for now (so the
+10 MB per-file limit and the 8-version cap stand), the editor for members will be Quill 2 with
+HTMLPurifier (so the verse picker's adapter and its sanitiser allow-list are written for those),
+and identities behind pseudonyms are visible to the owner and admins only (relevant to reports
+on public Bible notes).
