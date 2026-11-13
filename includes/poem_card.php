@@ -6,7 +6,7 @@
  * Styles live in assets/css/aw-poem.css (.aw-card*), loaded with aw_poem_assets().
  *
  * aw_poem_card($poem, $opts):
- *   $poem  a poems row; needs id, title, content; uses image_path, audio_path, created_at,
+ *   $poem  a poems row; needs id, title, content; uses image_path, audio_path, written_on, created_at,
  *          view_count when present (a missing field is simply not shown).
  *   $opts  'title_html' => already-escaped title markup (e.g. search highlighting)
  *          'heading'    => 'h3' (default) or 'h2'
@@ -47,7 +47,10 @@ function aw_poem_card(array $poem, array $opts = []) {
             $html .= '</p>';
         }
         $html .= '<div class="aw-card-foot">';
-        if (!empty($poem['created_at'])) {
+        $written = trim((string)($poem['written_on'] ?? '')); // P-ED: the date written, when the admin set one
+        if ($written !== '' && strtotime($written)) {
+            $html .= '<span><i class="far fa-calendar" aria-hidden="true"></i><span class="sr-only">Written </span>' . htmlspecialchars(date('M j, Y', strtotime($written))) . '</span>';
+        } elseif (!empty($poem['created_at'])) {
             $html .= '<span><i class="far fa-calendar" aria-hidden="true"></i>' . htmlspecialchars(date('M j, Y', strtotime($poem['created_at']))) . '</span>';
         }
         $html .= '<span><i class="far fa-clock" aria-hidden="true"></i>' . (int)$st['minutes'] . ' min</span>';

@@ -269,9 +269,13 @@ function aw_poem_reader(array $poem, $db = null, array $opts = []) {
         $h .= '<figure class="aw-cover"><img src="' . $u . '" alt="Cover image for ' . htmlspecialchars($title) . '" fetchpriority="high"'
             . ' onerror="var h=this.closest(\'.aw-hero\');h.classList.remove(\'has-cover\');h.querySelector(\'.aw-hero-wash\').remove();this.parentNode.remove()"></figure>';
     }
-    $h .= '<div class="aw-hero-text"><div class="aw-hero-kicker">A poem by Angella Bottoman</div>';
+    $author = trim((string)($poem['author'] ?? '')); // P-ED: editable author line
+    $h .= '<div class="aw-hero-text"><div class="aw-hero-kicker">A poem by ' . htmlspecialchars($author !== '' ? $author : 'Angella Bottoman') . '</div>';
     $h .= '<h1>' . htmlspecialchars($title) . '</h1><div class="aw-meta">';
-    if (!empty($poem['created_at'])) $h .= '<span><i class="far fa-calendar" aria-hidden="true"></i>' . date('F j, Y', strtotime($poem['created_at'])) . '</span>';
+    // P-ED: an older poem shows the date it was written; otherwise the day it was added
+    $written = trim((string)($poem['written_on'] ?? ''));
+    if ($written !== '' && strtotime($written)) $h .= '<span><i class="far fa-calendar" aria-hidden="true"></i>Written <time datetime="' . htmlspecialchars($written) . '">' . date('F j, Y', strtotime($written)) . '</time></span>';
+    elseif (!empty($poem['created_at'])) $h .= '<span><i class="far fa-calendar" aria-hidden="true"></i>' . date('F j, Y', strtotime($poem['created_at'])) . '</span>';
     $h .= '<span><i class="far fa-clock" aria-hidden="true"></i>' . $stats['minutes'] . ' min read</span>';
     if ($stats['stanzas']) $h .= '<span><i class="fas fa-align-center" aria-hidden="true"></i>' . $stats['stanzas'] . ' stanza' . ($stats['stanzas'] == 1 ? '' : 's') . '</span>';
     if (isset($poem['view_count'])) $h .= '<span><i class="far fa-eye" aria-hidden="true"></i>' . number_format((int)$poem['view_count']) . ' reads</span>';
