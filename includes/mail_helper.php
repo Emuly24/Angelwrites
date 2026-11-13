@@ -205,15 +205,13 @@ function aw_mail_deliver(array $m, string $fn): bool
  * already saved the user's action, so a mail failure is logged and the request carries on.
  * The signature is unchanged. $fromEmail is accepted for existing callers but no longer chooses
  * the sender (ET1). An optional 9th argument, ['signature' => false], leaves Angella's signature out.
+ * It does not take attachments: use sendEmailWithAttachment() (ET3).
  */
 function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.gt.tc', $fromName = 'AngelWrites', $isHTML = true) {
     $aw_extra = func_get_args();
     return aw_mail_deliver([
         'kind' => 'transactional', 'to' => $to, 'subject' => $subject, 'message' => $message,
         'is_html' => $isHTML, 'from_name' => $fromName,
-        // F91's 7th/8th arguments (attachment path and name) still work here until the one caller
-        // moves to sendEmailWithAttachment() in the next commit.
-        'attachment' => (!empty($aw_extra[6]) && is_file($aw_extra[6])) ? ['path' => $aw_extra[6], 'name' => $aw_extra[7] ?? ''] : null,
         'opts' => (array)($aw_extra[8] ?? []),
     ], 'sendEmail');
 }
@@ -237,6 +235,21 @@ function sendConversationalEmail($to, $subject, $body, $replyUrl, $replyLabel = 
         'from_name' => $fromName, 'reply_url' => $replyUrl, 'reply_label' => $replyLabel,
         'opts' => (array)($aw_extra[6] ?? []),
     ], 'sendConversationalEmail');
+}
+
+/**
+ * ET3 (F91): send a transactional email with one file attached.
+ *
+ * Same SMTP settings, From and Reply-To as sendEmail(). If the file cannot be read, or the send
+ * fails, NOTHING is sent and false is returned (and logged). It never falls back to sending the
+ * message without the file: a missing attachment that looks like a success is what F91 was.
+ */
+function sendEmailWithAttachment($to, $subject, $body, $filePath, $fileName, $fromName = 'AngelWrites') {
+    return aw_mail_deliver([
+        'kind' => 'transactional', 'to' => $to, 'subject' => $subject, 'message' => $body, 'is_html' => true,
+        'from_name' => $fromName,
+        'attachment' => ['path' => (string)$filePath, 'name' => (string)$fileName],
+    ], 'sendEmailWithAttachment');
 }
 
 /**
