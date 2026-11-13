@@ -55,7 +55,7 @@ $pageTitle = 'Delete Answer';
                     <strong>Posted:</strong> <?php echo date('M j, Y', strtotime($answer['created_at'])); ?>
                 </div>
                 <div class="question-detail">
-                    <strong>Upvotes:</strong> <?php echo number_format($answer['upvotes'] ?? 0); ?>
+                    <strong>Found helpful by:</strong> <?php $aw_h = (int)($answer['upvotes'] ?? 0); echo $aw_h === 1 ? '1 person' : number_format($aw_h) . ' people'; ?>
                 </div>
             </div>
             

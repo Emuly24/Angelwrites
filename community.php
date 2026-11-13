@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
 // ================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
     if (!$user_id) {
-        echo json_encode(['success' => false, 'error' => 'Please login to upvote.']);
+        echo json_encode(['success' => false, 'error' => 'Please sign in first.']);
         exit;
     }
     $answer_id = (int)$_POST['answer_id'];
@@ -185,20 +185,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
         exit;
     }
     if ((int)$author_id === (int)$user_id) {
-        echo json_encode(['success' => false, 'error' => 'You cannot upvote your own answer.']);
+        echo json_encode(['success' => false, 'error' => 'This is your own answer.']);
         exit;
     }
     $vote = $db->prepare("INSERT OR IGNORE INTO reactions (user_id, target_type, target_id, reaction_type) VALUES (?, 'answer', ?, 'upvote')");
     $vote->execute([$user_id, $answer_id]);
     if ($vote->rowCount() === 0) {
-        echo json_encode(['success' => false, 'error' => 'You have already upvoted this answer.']);
+        echo json_encode(['success' => false, 'error' => 'You have already marked this answer as helpful.']);
         exit;
     }
     $stmt = $db->prepare("UPDATE answers SET upvotes = upvotes + 1 WHERE id = ?");
     if ($stmt->execute([$answer_id])) {
         echo json_encode(['success' => true]);
     } else {
-        echo json_encode(['success' => false, 'error' => 'Failed to upvote.']);
+        echo json_encode(['success' => false, 'error' => 'That did not work. Please try again.']);
     }
     exit;
 }
@@ -293,6 +293,19 @@ if (isset($_GET['id'])) {
         ");
         $stmt->execute([$qid]);
         $answers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // C3: which answers this member has already marked helpful (one mark each, F148)
+        $my_helpful = [];
+        if ($user_id && $answers) {
+            try {
+                $ids = array_map('intval', array_column($answers, 'id'));
+                $st = $db->prepare("SELECT target_id FROM reactions WHERE user_id = ? AND target_type = 'answer' AND reaction_type = 'upvote' AND target_id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")");
+                $st->execute(array_merge([(int)$user_id], $ids));
+                $my_helpful = array_flip(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
+            } catch (Throwable $e) {
+                error_log('community: helpful marks: ' . $e->getMessage());
+            }
+        }
     }
 }
 
@@ -374,9 +387,14 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                                     </div>
                                     <div class="answer-body"><?php echo nl2br(htmlspecialchars($answer['body'])); ?></div>
                                     <div class="answer-footer">
-                                        <button class="upvote-btn" onclick="upvoteAnswer(<?php echo $answer['id']; ?>)">
-                                            <i class="fas fa-thumbs-up"></i> <span id="upvotes-<?php echo $answer['id']; ?>"><?php echo number_format($answer['upvotes'] ?? 0); ?></span>
+                                        <?php // C3: "found this helpful", not a score; no totals or ranks
+                                            $aw_h = (int)($answer['upvotes'] ?? 0); $aw_mine = isset($my_helpful[(int)$answer['id']]); $aw_own = $answer['user_id'] == $user_id; ?>
+                                        <?php if ($user_id && !$aw_own): ?>
+                                        <button type="button" class="upvote-btn<?php echo $aw_mine ? ' active' : ''; ?>" aria-pressed="<?php echo $aw_mine ? 'true' : 'false'; ?>"<?php echo $aw_mine ? ' disabled' : ''; ?> onclick="upvoteAnswer(<?php echo (int)$answer['id']; ?>, this)">
+                                            <i class="fas fa-hands-helping" aria-hidden="true"></i> <span class="upvote-label"><?php echo $aw_mine ? 'You found this helpful' : 'This helped me'; ?></span>
                                         </button>
+                                        <?php endif; ?>
+                                        <span class="helpful-note" id="upvotes-<?php echo (int)$answer['id']; ?>" data-count="<?php echo $aw_h; ?>"><?php echo $aw_h > 0 ? ($aw_h === 1 ? '1 person found this helpful' : number_format($aw_h) . ' people found this helpful') : ''; ?></span>
                                         <div class="answer-reactions">
                                             <button onclick="reactAnswer(<?php echo $answer['id']; ?>, 'like')">👍</button>
                                             <button onclick="reactAnswer(<?php echo $answer['id']; ?>, 'love')">❤️</button>
@@ -609,7 +627,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ===== Upvote Answer =====
-    window.upvoteAnswer = function(answerId) {
+    window.upvoteAnswer = function(answerId, btn) {
         fetch('<?php echo SITE_URL; ?>/community.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -619,13 +637,15 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 const span = document.getElementById('upvotes-' + answerId);
-                let count = parseInt(span.textContent) || 0;
-                span.textContent = count + 1;
+                const n = (parseInt(span.dataset.count, 10) || 0) + 1;
+                span.dataset.count = n;
+                span.textContent = n === 1 ? '1 person found this helpful' : n + ' people found this helpful';
+                if (btn) { btn.classList.add('active'); btn.setAttribute('aria-pressed', 'true'); btn.disabled = true; const l = btn.querySelector('.upvote-label'); if (l) l.textContent = 'You found this helpful'; }
             } else {
-                alert(data.error || 'Failed to upvote.');
+                alert(data.error || 'That did not work. Please try again.');
             }
         })
-        .catch(() => alert('Failed to upvote.'));
+        .catch(() => alert('That did not work. Please try again.'));
     };
 
     // ===== Accept Answer =====
@@ -779,6 +799,8 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .answer-footer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .upvote-btn { background: transparent; border: 1px solid var(--border); border-radius: 20px; padding: 4px 14px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; color: var(--text); }
 .upvote-btn:hover { background: var(--rose); border-color: var(--rose); color: white; }
+.upvote-btn.active, .upvote-btn:disabled { background: var(--vanilla, #EFD8D6); border-color: var(--rose); color: var(--text); cursor: default; }
+.helpful-note { font-size: 0.85rem; color: var(--text-light); }
 .answer-reactions { display: flex; gap: 4px; }
 .answer-reactions button { background: none; border: none; font-size: 1.2rem; cursor: pointer; transition: transform 0.2s; }
 .answer-reactions button:hover { transform: scale(1.2); }
