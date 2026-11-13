@@ -226,7 +226,7 @@ $pageTitle = 'Admin Dashboard';
                 <a href="manage_books.php" class="admin-module-btn"><i class="fas fa-book"></i><span>Manage Books</span></a>
                 <a href="process_book.php" class="admin-module-btn"><i class="fas fa-cog"></i><span>Process Book</span></a>
                 <a href="manage_poems.php" class="admin-module-btn"><i class="fas fa-feather-alt"></i><span>Manage Poems</span></a>
-                <a href="poem_editor.php" class="admin-module-btn"><i class="fas fa-edit"></i><span>Poem Editor</span></a>
+                <a href="manage_poems.php?new=1" class="admin-module-btn"><i class="fas fa-edit"></i><span>New Poem</span></a>
             </div>
         </div>
 

@@ -127,7 +127,7 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 <?php echo $aw_is_draft ? '📝 Draft (not public yet)' : '✅ Published'; ?> ·
                 <?php echo htmlspecialchars($aw_audio_note); ?></span>
             <span class="aw-actions">
-                <a class="btn btn-sm btn-primary" href="<?php echo SITE_URL; ?>/admin/poem_editor.php?id=<?php echo (int)$id; ?>"><i class="fas fa-pen"></i> Edit</a>
+                <a class="btn btn-sm btn-primary" href="<?php echo SITE_URL; ?>/admin/manage_poems.php?edit=<?php echo (int)$id; ?>"><i class="fas fa-pen"></i> Edit</a>
                 <?php if (!$aw_is_draft): ?><a class="btn btn-sm btn-outline" href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$id; ?>"><i class="fas fa-external-link-alt"></i> Public page</a><?php endif; ?>
                 <a class="btn btn-sm btn-outline" href="<?php echo SITE_URL; ?>/admin/manage_poems.php"><i class="fas fa-list"></i> All poems</a>
             </span>

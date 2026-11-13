@@ -752,7 +752,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
             <div class="share-section">
                 <span>Share:</span>
                 <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode($share_url); ?>&display=popup" target="_blank" class="share-btn facebook"><i class="fab fa-facebook-f"></i></a>
-                <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode($og_title . ' — a poem by Angella Bottoman'); ?>&url=<?php echo urlencode($share_url); ?>" target="_blank" class="share-btn twitter"><i class="fab fa-twitter"></i></a>
+                <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode($og_title . ' — a poem by ' . (trim((string)($poem['author'] ?? '')) !== '' ? trim($poem['author']) : 'Angella Bottoman')); ?>&url=<?php echo urlencode($share_url); ?>" target="_blank" class="share-btn twitter"><i class="fab fa-twitter"></i></a>
                 <a href="https://api.whatsapp.com/send?text=<?php echo urlencode($og_title . ' — read this poem on AngelWrites: ' . $share_url); ?>" target="_blank" class="share-btn whatsapp"><i class="fab fa-whatsapp"></i></a>
             </div>
             <div class="reading-actions">
