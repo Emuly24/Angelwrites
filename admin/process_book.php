@@ -1280,26 +1280,20 @@ if (isset($_POST['upload_cover'])) {
     header('Content-Type: application/json');
     ob_clean();
     if (!empty($_FILES['live_cover']['name'])) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime = finfo_file($finfo, $_FILES['live_cover']['tmp_name']);
-        finfo_close($finfo);
-        if (!in_array($mime, $allowed_types)) {
-            echo json_encode(['success' => false, 'error' => 'Invalid file type. Only JPEG, PNG, GIF, WEBP allowed.']);
+        // R12: shared upload limits: real image by content, resized to 1600 px, re-encoded, EXIF
+        // stripped, 2 MB stored. The type was checked before, but the file kept the extension it was
+        // uploaded with and its full size.
+        require_once __DIR__ . '/../includes/upload.php';
+        $aw_up = aw_upload_store($_FILES['live_cover'], 'image', 'assets/uploads/books', ['prefix' => 'cover_']);
+        if (empty($aw_up['ok'])) {
+            echo json_encode(['success' => false, 'error' => $aw_up['error'] ?: 'No image was received.']);
             exit;
         }
-        $upload_dir = '../assets/uploads/books/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $ext = pathinfo($_FILES['live_cover']['name'], PATHINFO_EXTENSION);
-        $cover_filename = 'live_cover_' . time() . '.' . $ext;
-        if (move_uploaded_file($_FILES['live_cover']['tmp_name'], $upload_dir . $cover_filename)) {
-            $cover_path = 'assets/uploads/books/' . $cover_filename;
+        {
+            $cover_path = $aw_up['path'];
             $stmt = $db->prepare("UPDATE books SET cover_path = ? WHERE id = ?");
             $stmt->execute([$cover_path, $book_id]);
             echo json_encode(['success' => true, 'path' => $cover_path]);
-            exit;
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Upload failed.']);
             exit;
         }
     }
@@ -2169,7 +2163,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
                     <?php endif; ?>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <input type="file" id="coverInput" accept="image/*" style="padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--input-bg);">
+                    <input type="file" id="coverInput"<?php require_once __DIR__ . '/../includes/upload.php'; echo aw_upload_attrs('image'); ?> title="<?php echo htmlspecialchars(aw_upload_hint('image')); ?>" style="padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--input-bg);">
                     <button class="btn btn-primary" onclick="uploadCover()">Upload Cover</button>
                 </div>
             </div>
@@ -3062,4 +3056,5 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
+<?php aw_upload_script(); /* R12 */ ?>
 <?php require_once '../includes/footer.php'; ?>

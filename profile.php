@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/upload.php'; // R4: shared upload limits
 
 redirectIfNotLoggedIn();
 
@@ -106,52 +107,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     $bio = trim($_POST['bio']);
     $profile_pic = $user['profile_pic'] ?? '';
 
-    // ===== CROPPED IMAGE UPLOAD (from Croppie) =====
-    if (!empty($_POST['cropped_image_data'])) {
-        $upload_dir = 'assets/uploads/profiles/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        
-        $data = $_POST['cropped_image_data'];
-        $data = base64_decode((string)substr($data, (int)strpos($data, ',') + 1), true);
-        // F119: the decoded data was written as .jpg without checking it was an image.
-        $img = $data !== false ? @getimagesizefromstring($data) : false;
-        $img_ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$img['mime'] ?? ''] ?? null;
-        if (!$img_ext || strlen($data) > 5 * 1024 * 1024) {
-            $error = 'The profile picture must be a JPG, PNG, WebP or GIF image of at most 5 MB.';
-        }
-        $filename = 'user_' . $user_id . '_' . time() . '.' . ($img_ext ?: 'jpg');
-        $filepath = $upload_dir . $filename;
-        
-        if (!empty($error)) {
-            // rejected above
-        } elseif (file_put_contents($filepath, $data)) {
-            $profile_pic = $upload_dir . $filename;
-        } else {
-            $error = 'Failed to save cropped image.';
-        }
-    }
-    
-    // ===== STANDARD PROFILE PICTURE UPLOAD (if no crop) =====
-    if (empty($error) && empty($_POST['cropped_image_data']) && !empty($_FILES['profile_pic']['name'])) {
-        $upload_dir = 'assets/uploads/profiles/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        // F119: the original extension was kept (user_<id>.php would be stored in a public
-        // folder); only real images of at most 5 MB are accepted, saved under a fixed extension.
-        $ext = strtolower(pathinfo($_FILES['profile_pic']['name'], PATHINFO_EXTENSION));
-        $img = @getimagesize($_FILES['profile_pic']['tmp_name']);
-        $img_ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$img['mime'] ?? ''] ?? null;
-        $filename = 'user_' . $user_id . '_' . time() . '.' . ($img_ext ?: 'jpg');
-        $target = $upload_dir . $filename;
-        if (!$img_ext || !in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) || $_FILES['profile_pic']['size'] > 5 * 1024 * 1024) {
-            $error = 'The profile picture must be a JPG, PNG, WebP or GIF image of at most 5 MB.';
-        } elseif (move_uploaded_file($_FILES['profile_pic']['tmp_name'], $target)) {
-            $profile_pic = $upload_dir . $filename;
-        } else {
-            $error = 'Failed to upload profile picture.';
-        }
+    // ===== PROFILE PICTURE =====
+    // R4: both ways a picture can arrive (the cropper's data: URI, or a plain file field) go through the
+    // shared helper as an 'avatar': real image by content, centre-cropped to 400 x 400, re-encoded,
+    // EXIF stripped, 500 KB at most, member quota.
+    $aw_avatar = !empty($_POST['cropped_image_data'])
+        ? aw_upload_store_data((string)$_POST['cropped_image_data'], 'avatar', 'assets/uploads/profiles', ['prefix' => 'user_' . (int)$user_id . '_'])
+        : aw_upload_store($_FILES['profile_pic'] ?? null, 'avatar', 'assets/uploads/profiles', ['prefix' => 'user_' . (int)$user_id . '_']);
+    $aw_new_pic = '';
+    if (!empty($aw_avatar['ok'])) {
+        $profile_pic = $aw_new_pic = $aw_avatar['path'];
+    } elseif (empty($aw_avatar['empty'])) {
+        $error = $aw_avatar['error'];
     }
 
-    if ($first_name === '' || $last_name === '' || empty($email) || empty($username)) {
+    if (!empty($error)) {
+        // R4: the picture was refused; say why and save nothing
+    } elseif ($first_name === '' || $last_name === '' || empty($email) || empty($username)) {
         $error = 'First name, last name, email and username are required.';
     } elseif ($date_of_birth !== '' && (!($aw_d = DateTime::createFromFormat('Y-m-d', $date_of_birth)) || $aw_d->format('Y-m-d') !== $date_of_birth || $date_of_birth > date('Y-m-d'))) {
         $error = 'Please enter a valid date of birth, or leave it empty.';
@@ -209,6 +181,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 }
             }
         }
+    }
+    // R4: the form was refused after the new picture had been stored: do not leave it on disk
+    if (!empty($error) && $aw_new_pic !== '' && is_file(__DIR__ . '/' . $aw_new_pic)) {
+        @unlink(__DIR__ . '/' . $aw_new_pic);
     }
 }
 
@@ -385,12 +361,12 @@ $pageTitle = 'My Profile';
 
                     <!-- ===== PROFILE PICTURE UPLOAD WITH CROPPING ===== -->
                     <div class="form-group">
-                        <label>Profile Picture</label>
+                        <label>Profile Picture <small style="font-weight:400;color:var(--text-light);">(<?php echo htmlspecialchars(aw_upload_hint('avatar')); ?>; saved as a 400 × 400 square)</small></label><!-- R4 -->
                         <div class="upload-section">
                             <div class="upload-zone" id="uploadZone">
                                 <i class="fas fa-cloud-upload-alt"></i>
                                 <p>Click or drag &amp; drop an image</p>
-                                <input type="file" id="fileInput" accept="image/*" style="display:none;">
+                                <input type="file" id="fileInput"<?php echo aw_upload_attrs('avatar'); ?> style="display:none;">
                             </div>
                             <div id="previewContainer" style="display:none; margin-top:12px;">
                                 <img id="previewImage" style="max-width:200px; max-height:200px; border-radius:8px;">
@@ -1080,4 +1056,5 @@ body.dark-mode {
 }
 </style>
 
+<?php aw_upload_script(); /* R4 */ ?>
 <?php require_once 'includes/footer.php'; ?>

@@ -4,6 +4,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
 require_once 'includes/csrf.php';
+require_once 'includes/upload.php'; // R3: shared upload limits
 
 // ===== FETCH POST =====
 $slug = isset($_GET['slug']) ? trim($_GET['slug']) : '';
@@ -33,6 +34,15 @@ if (isLoggedIn()) {
     $stmt->execute([$user_id, $post['id']]);
 }
 
+// R3: a request larger than the server's post limit arrives with no fields at all; say so instead of
+// silently doing nothing.
+if (($aw_overflow = aw_upload_post_overflow()) !== '') {
+    aw_upload_log_reject($_SESSION['user_id'] ?? null, 'request', (int)($_SERVER['CONTENT_LENGTH'] ?? 0), 'over post_max_size');
+    $_SESSION['aw_comment_flash'] = ['error' => $aw_overflow, 'comment' => ''];
+    header('Location: ' . SITE_URL . '/blog_post.php?slug=' . urlencode($slug) . '#add-comment');
+    exit;
+}
+
 // ===== S9: CSRF check for the four POST handlers below =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
     && (isset($_POST['add_comment']) || isset($_POST['submit_voice_comment']) || isset($_POST['request_prayer']) || isset($_POST['add_admin_reply']))
@@ -47,22 +57,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
     $comment = trim($_POST['comment']);
     $photo_path = null;
     
-    // ===== LIVE PHOTO CAPTURE =====
-    // S8 (F137): only a real image of at most 5 MB is stored; anything else is dropped.
-    if (!empty($_FILES['live_comment_photo']['name'])
-        && ($_FILES['live_comment_photo']['size'] > 5 * 1024 * 1024
-            || @getimagesize($_FILES['live_comment_photo']['tmp_name']) === false)) {
-        unset($_FILES['live_comment_photo']);
+    // ===== COMMENT PHOTO =====
+    // R3: the shared helper checks size and real type, resizes and strips EXIF, and applies the member's
+    // quota. A refused photo is explained to the member and the comment is kept for another try
+    // (before, a bad photo was dropped silently).
+    $aw_photo = aw_upload_store($_FILES['live_comment_photo'] ?? null, 'image', 'assets/uploads/comments', ['prefix' => 'comment_']);
+    if (!empty($aw_photo['ok'])) {
+        $photo_path = $aw_photo['path'];
+    } elseif (empty($aw_photo['empty'])) {
+        $_SESSION['aw_comment_flash'] = ['error' => $aw_photo['error'], 'comment' => $comment];
+        header('Location: ' . SITE_URL . '/blog_post.php?slug=' . urlencode($slug) . '#add-comment');
+        exit;
     }
-    if (!empty($_FILES['live_comment_photo']['name'])) {
-        $upload_dir = __DIR__ . '/assets/uploads/comments/'; // F135: was '../assets/…' (outside the web root) while 'assets/uploads/comments/…' was stored
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $photo_filename = 'comment_' . time() . '.jpg';
-        if (move_uploaded_file($_FILES['live_comment_photo']['tmp_name'], $upload_dir . $photo_filename)) {
-            $photo_path = 'assets/uploads/comments/' . $photo_filename;
-        }
-    }
-    
+
     if (!empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, photo_path) VALUES (?, ?, ?, ?)");
         $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment, $photo_path]);
@@ -96,20 +103,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
 // ===== HANDLE VOICE COMMENT SUBMISSION =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment']) && isLoggedIn()) {
     $reflection_id = (int)$_POST['reflection_id'];
-    // S8 (F137): at most 10 MB, and the file must start like an audio recording
-    // (WebM/Matroska, MP4/M4A as recorded by Safari, or Ogg).
-    $voice_ok = false;
-    if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK && $_FILES['voice_file']['size'] <= 10 * 1024 * 1024) {
-        $head = (string)@file_get_contents($_FILES['voice_file']['tmp_name'], false, null, 0, 12);
-        $voice_ok = strncmp($head, "\x1A\x45\xDF\xA3", 4) === 0 || substr($head, 4, 4) === 'ftyp' || strncmp($head, 'OggS', 4) === 0;
+    // R3: shared helper: 5 MB, 3 minutes when the length can be read, audio formats only (by content),
+    // member quota. The stored extension now matches the real format (Safari records MP4, not WebM).
+    $aw_voice = aw_upload_store($_FILES['voice_file'] ?? null, 'audio', 'assets/uploads/voice_comments', ['prefix' => 'voice_']);
+    if (empty($aw_voice['ok'])) {
+        $_SESSION['aw_comment_flash'] = ['error' => !empty($aw_voice['empty']) ? 'No recording was received. Please record again.' : $aw_voice['error'], 'comment' => ''];
+        header('Location: ' . SITE_URL . '/blog_post.php?slug=' . urlencode($slug) . '#add-comment');
+        exit;
     }
-    if ($voice_ok) {
-        $upload_dir = __DIR__ . '/assets/uploads/voice_comments/'; // F135: was '../assets/…' (outside the web root) while 'assets/uploads/voice_comments/…' was stored
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $filename = 'voice_' . time() . '.webm';
-        $target = $upload_dir . $filename;
-        if (move_uploaded_file($_FILES['voice_file']['tmp_name'], $target)) {
-            $voice_path = 'assets/uploads/voice_comments/' . $filename;
+    {
+        {
+            $voice_path = $aw_voice['path'];
             $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, voice_path) VALUES (?, ?, ?, ?)");
             $stmt->execute([$reflection_id, $_SESSION['user_id'], '🎙️ Voice comment', $voice_path]);
             
@@ -378,8 +382,12 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 
             <!-- Comment Form -->
             <?php if (isLoggedIn()): ?>
-                <div class="comment-form-container">
+                <div class="comment-form-container" id="add-comment">
                     <h4>Add a Comment</h4>
+                    <?php $aw_flash = $_SESSION['aw_comment_flash'] ?? null; unset($_SESSION['aw_comment_flash']); /* R3 */ ?>
+                    <?php if (!empty($aw_flash['error'])): ?>
+                        <div class="alert alert-error" role="alert"><?php echo htmlspecialchars($aw_flash['error']); ?> Your comment was not posted yet.</div>
+                    <?php endif; ?>
                     
                     <!-- Text Comment with Live Photo -->
                     <form method="POST" enctype="multipart/form-data" class="comment-form">
@@ -387,7 +395,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                         <input type="hidden" name="reflection_id" value="<?php echo $post['id']; ?>">
                         <div class="form-group">
-                            <textarea name="comment" rows="3" placeholder="Share your thoughts about this reflection..." required></textarea>
+                            <textarea name="comment" rows="3" placeholder="Share your thoughts about this reflection..." required><?php echo htmlspecialchars($aw_flash['comment'] ?? ''); ?></textarea>
                         </div>
                         
                         <!-- ===== LIVE PHOTO CAPTURE ===== -->
@@ -419,7 +427,9 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                                 <div class="captured-photo-container" id="capturedPhotoContainer" style="display:none;">
                                     <img id="capturedPhotoPreview" style="max-width:200px; max-height:200px; border-radius:8px;">
                                 </div>
-                                <input type="file" id="livePhotoInput" name="live_comment_photo" accept="image/*" style="display:none;">
+                                <!-- R3: a photo can also be chosen from the device; limits are shown and checked before sending -->
+                                <label for="livePhotoInput" style="display:block;margin-top:10px;font-size:0.9rem;">Or choose a photo <small style="color:var(--text-light);">(<?php echo htmlspecialchars(aw_upload_hint('image')); ?>)</small></label>
+                                <input type="file" id="livePhotoInput" name="live_comment_photo"<?php echo aw_upload_attrs('image'); ?>>
                             </div>
                         </div>
                         
@@ -434,7 +444,8 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                             <input type="hidden" name="submit_voice_comment" value="1">
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                             <input type="hidden" name="reflection_id" value="<?php echo $post['id']; ?>">
-                            <input type="file" name="voice_file" id="voiceFileInput" accept="audio/webm" required>
+                            <input type="file" name="voice_file" id="voiceFileInput"<?php echo aw_upload_attrs('audio'); ?> required>
+                            <small style="display:block;color:var(--text-light);"><?php echo htmlspecialchars(aw_upload_hint('audio')); ?></small><!-- R3 -->
                             <button type="submit" class="btn btn-success">Upload Voice</button>
                         </form>
                     </div>
@@ -643,11 +654,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     const dt = new DataTransfer();
                     dt.items.add(file);
                     voiceFileInput.files = dt.files;
+                    voiceFileInput.dispatchEvent(new Event('change', { bubbles: true })); // R3: run the size check
                     voiceForm.style.display = 'block';
                     recordBtn.textContent = '🎙️ Record Again';
                 };
 
                 mediaRecorder.start();
+                // R3: stop by itself at the length limit
+                const awVoiceMax = <?php echo (int)(aw_upload_effective('audio')['max_seconds'] ?? 180); ?>;
+                setTimeout(() => { if (mediaRecorder && mediaRecorder.state === 'recording') recordBtn.click(); }, awVoiceMax * 1000);
                 recordingStatus.style.display = 'inline';
                 recordBtn.textContent = '⏹️ Stop Recording';
             } catch (error) {
@@ -827,4 +842,5 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
+<?php aw_upload_script(); /* R3 */ ?>
 <?php require_once 'includes/footer.php'; ?>

@@ -4,6 +4,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
+require_once '../includes/upload.php'; // R10: shared upload limits
 
 redirectIfNotAdmin();
 
@@ -132,6 +133,14 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
+// R10: a request over the server's post limit arrives with no fields and used to do nothing
+if (($aw_overflow = aw_upload_post_overflow()) !== '') {
+    $_SESSION['flash_message'] = '❌ ' . $aw_overflow;
+    $_SESSION['flash_type'] = 'error';
+    header('Location: ' . SITE_URL . '/admin/manage_poems.php');
+    exit;
+}
+
 // ===== HANDLE SAVE (ADD / EDIT) =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
     $id = isset($_POST['poem_id']) ? (int)$_POST['poem_id'] : 0;
@@ -143,48 +152,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_poem'])) {
     if (empty($title)) $error = 'Please enter a title.';
     elseif (empty($content)) $error = 'Please enter the poem content.';
 
-    // Handle Image Upload
+    // Image (camera capture / chosen file) and audio (chosen file / recording)
+    // R10: all four fields go through the shared helper. Before, each file was stored under the
+    // extension it was uploaded with and nothing was checked, so a .php file would have been saved
+    // in a public folder. Images: resized to 1600 px, re-encoded, EXIF stripped, 2 MB stored.
+    // Audio: audio formats only (by content), 5 MB, 3 minutes when the length is readable.
     $image_path = null;
-    if (is_null($error)) {
-        if (!empty($_FILES['image']['name'])) {
-            $upload_dir = '../assets/uploads/poems/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
-            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_dir . $filename)) {
-                $image_path = 'assets/uploads/poems/' . $filename;
-            } else $error = 'Failed to upload image.';
-        } elseif (!empty($_FILES['image_fallback']['name'])) { // Fallback drag & drop
-            $upload_dir = '../assets/uploads/poems/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $ext = pathinfo($_FILES['image_fallback']['name'], PATHINFO_EXTENSION);
-            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
-            if (move_uploaded_file($_FILES['image_fallback']['tmp_name'], $upload_dir . $filename)) {
-                $image_path = 'assets/uploads/poems/' . $filename;
-            } else $error = 'Failed to upload image.';
+    $audio_path = null;
+    $aw_new_files = [];
+    foreach ([['image', 'image', 'Image'], ['image_fallback', 'image', 'Image'],
+              ['audio', 'audio', 'Audio'], ['audio_recording', 'audio', 'Recording']] as [$aw_f, $aw_kind, $aw_name]) {
+        if (!is_null($error)) break;
+        if ($aw_kind === 'image' ? $image_path !== null : $audio_path !== null) continue; // first one wins, as before
+        $aw_up = aw_upload_store($_FILES[$aw_f] ?? null, $aw_kind, 'assets/uploads/poems', ['prefix' => 'poem_']);
+        if (!empty($aw_up['ok'])) {
+            if ($aw_kind === 'image') $image_path = $aw_up['path']; else $audio_path = $aw_up['path'];
+            $aw_new_files[] = $aw_up['path'];
+        } elseif (empty($aw_up['empty'])) {
+            $error = $aw_name . ': ' . $aw_up['error'];
         }
     }
-
-    // Handle Audio Upload
-    $audio_path = null;
-    if (is_null($error)) {
-        if (!empty($_FILES['audio']['name'])) {
-            $upload_dir = '../assets/uploads/poems/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $ext = pathinfo($_FILES['audio']['name'], PATHINFO_EXTENSION);
-            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
-            if (move_uploaded_file($_FILES['audio']['tmp_name'], $upload_dir . $filename)) {
-                $audio_path = 'assets/uploads/poems/' . $filename;
-            } else $error = 'Failed to upload audio.';
-        } elseif (!empty($_FILES['audio_recording']['name'])) { // Recording fallback
-            $upload_dir = '../assets/uploads/poems/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $ext = pathinfo($_FILES['audio_recording']['name'], PATHINFO_EXTENSION);
-            $filename = 'poem_' . time() . '_' . uniqid() . '.' . $ext;
-            if (move_uploaded_file($_FILES['audio_recording']['tmp_name'], $upload_dir . $filename)) {
-                $audio_path = 'assets/uploads/poems/' . $filename;
-            } else $error = 'Failed to upload recording.';
-        }
+    if (!is_null($error)) {
+        foreach ($aw_new_files as $aw_p) { @unlink(__DIR__ . '/../' . $aw_p); } // nothing left behind
     }
 
     if (is_null($error)) {
@@ -448,8 +437,8 @@ $pageTitle = 'Manage Poems';
                 <label>Or Upload Image (Drag & Drop)</label>
                 <div id="dropZone" class="upload-zone">
                     <i class="fas fa-cloud-upload-alt"></i>
-                    <p>Drag & drop your image here, or <strong>click to browse</strong></p>
-                    <input type="file" id="fileInput" name="image_fallback" accept="image/*" style="display:none;">
+                    <p>Drag & drop your image here, or <strong>click to browse</strong><br><small><?php echo htmlspecialchars(aw_upload_hint('image')); ?></small></p><!-- R10 -->
+                    <input type="file" id="fileInput" name="image_fallback"<?php echo aw_upload_attrs('image'); ?> style="display:none;">
                     <div id="previewContainer" style="display:none; margin-top:12px;">
                         <img id="previewImage" style="max-width:150px; max-height:150px; border-radius:8px;">
                     </div>
@@ -461,8 +450,8 @@ $pageTitle = 'Manage Poems';
                 <label>Poem Audio (MP3 or WAV) – optional</label>
                 <div id="audioDropZone" class="upload-zone">
                     <i class="fas fa-music"></i>
-                    <p>Drag & drop an audio file (MP3, WAV), or <strong>click to browse</strong></p>
-                    <input type="file" id="audioInput" name="audio" accept="audio/*" style="display:none;">
+                    <p>Drag & drop an audio file, or <strong>click to browse</strong><br><small><?php echo htmlspecialchars(aw_upload_hint('audio')); ?></small></p><!-- R10 -->
+                    <input type="file" id="audioInput" name="audio"<?php echo aw_upload_attrs('audio'); ?> style="display:none;">
                     <div id="audioPreviewContainer" style="display:none; margin-top:12px;">
                         <audio controls id="audioPreview" style="width:100%;"><source src="" type="audio/mpeg"></audio>
                     </div>
@@ -481,7 +470,7 @@ $pageTitle = 'Manage Poems';
                     <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
                     <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                     <form id="recordingForm" style="display:none;">
-                        <input type="file" name="audio_recording" id="recordingInput" accept="audio/webm">
+                        <input type="file" name="audio_recording" id="recordingInput"<?php echo aw_upload_attrs('audio'); ?>>
                     </form>
                     <div id="recordingPreviewContainer" style="display:none; margin-top:10px;">
                         <audio controls id="recordingPreview" style="width:100%;"><source src="" type="audio/webm"></audio>
@@ -1128,4 +1117,5 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 @media (max-width:480px) { .search-form { flex-direction:column; } .search-form input { width:100%; } .camera-bottom-controls { bottom:16px; padding:0 12px; padding-bottom:16px; } .camera-shutter-btn { width:64px; height:64px; } .camera-shutter-btn .shutter-inner { width:48px; height:48px; } .camera-btn { font-size:0.75rem; padding:6px 12px; } }
 </style>
 
+<?php aw_upload_script(); /* R10 */ ?>
 <?php require_once '../includes/footer.php'; ?>

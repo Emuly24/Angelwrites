@@ -44,12 +44,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_voice_comment'
     $target_id = (int)$_POST['target_id'];
     $rating = isset($_POST['rating']) ? (int)$_POST['rating'] : 0;
     
-    if (isset($_FILES['voice_file']) && $_FILES['voice_file']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/uploads/voice_comments/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $filename = 'voice_' . time() . '.webm';
-        if (move_uploaded_file($_FILES['voice_file']['tmp_name'], $upload_dir . $filename)) {
-            $voice_path = 'assets/uploads/voice_comments/' . $filename;
+    // R11: shared upload limits: audio formats only (by content), 5 MB, 3 minutes when readable,
+    // stored with the extension of the real format. Nothing was checked here before.
+    require_once __DIR__ . '/../includes/upload.php';
+    $aw_voice = aw_upload_store($_FILES['voice_file'] ?? null, 'audio', 'assets/uploads/voice_comments', ['prefix' => 'voice_']);
+    if (empty($aw_voice['ok']) && empty($aw_voice['empty'])) {
+        $_SESSION['aw_voice_error'] = $aw_voice['error'];
+        header('Location: ' . SITE_URL . '/admin/preview_poem.php?id=' . $target_id);
+        exit;
+    }
+    if (!empty($aw_voice['ok'])) {
+        {
+            $voice_path = $aw_voice['path'];
             $stmt = $db->prepare("INSERT INTO reviews (target_type, target_id, user_id, rating, comment, voice_path) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute(['poem', $target_id, $_SESSION['user_id'], $rating, '🎙️ Voice comment', $voice_path]);
             header('Location: ' . SITE_URL . '/poem_view.php?id=' . $target_id);
@@ -174,13 +180,17 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
                 <!-- Voice Comment Form -->
                 <div class="voice-comment-section">
                     <h4>🎙️ Record a Voice Comment</h4>
+                    <?php if (!empty($_SESSION['aw_voice_error'])): /* R11 */ ?>
+                        <div class="alert alert-error" role="alert"><?php echo htmlspecialchars($_SESSION['aw_voice_error']); unset($_SESSION['aw_voice_error']); ?></div>
+                    <?php endif; ?>
+                    <p class="field-hint" style="font-size:0.85rem;color:var(--text-light);">Limit: <?php require_once __DIR__ . '/../includes/upload.php'; echo htmlspecialchars(aw_upload_hint('audio')); ?>.</p>
                     <div class="recorder-wrapper">
                         <button type="button" id="recordBtn" class="btn btn-secondary btn-sm">🎙️ Start Recording</button>
                         <span id="recordingStatus" style="display:none; font-weight:600; color:#b4505a;">🔴 Recording...</span>
                         <form method="POST" enctype="multipart/form-data" id="voiceForm" style="display:none; margin-top:10px;">
                             <input type="hidden" name="submit_voice_comment" value="1">
                             <input type="hidden" name="target_id" value="<?php echo $id; ?>">
-                            <input type="file" name="voice_file" id="voiceFileInput" accept="audio/webm" required>
+                            <input type="file" name="voice_file" id="voiceFileInput"<?php echo aw_upload_attrs('audio'); ?> required>
                             <button type="submit" class="btn btn-success btn-sm">Upload Voice Comment</button>
                         </form>
                         <div id="voicePreviewContainer" style="display:none; margin-top:10px;">
@@ -495,4 +505,5 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
+<?php aw_upload_script(); /* R11 */ ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
