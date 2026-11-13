@@ -89,10 +89,31 @@ $stmt = $db->prepare("SELECT * FROM blog_posts WHERE status = 'published' ORDER 
 $stmt->execute();
 $latest_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ===== FETCH TESTIMONIALS (real, approved) =====
-$stmt = $db->prepare("SELECT * FROM testimonials WHERE approved = 1 ORDER BY created_at DESC LIMIT 8");
-$stmt->execute();
-$testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// ===== FETCH TESTIMONIALS (real, approved, public) =====
+// L1: three approved stories chosen at random on each page load (no timer, no flip cards), joined to
+// the author in one query. A story the member did not mark "featured publicly" is never shown.
+function aw_voice_name(array $row) {
+    // first name only on the public home page
+    $n = trim(awDisplayName($row));
+    $first = preg_split('/\s+/u', $n)[0] ?? '';
+    return $first !== '' ? $first : 'A member';
+}
+function aw_voice_short($text, $len) {
+    $t = trim(preg_replace('/\s+/u', ' ', strip_tags((string)$text)));
+    if (function_exists('mb_strlen')) return mb_strlen($t) > $len ? rtrim(mb_substr($t, 0, $len)) . '…' : $t;
+    return strlen($t) > $len ? rtrim(substr($t, 0, $len)) . '…' : $t;
+}
+$testimonials = [];
+$testimonial_total = 0;
+try {
+    $testimonials = $db->query("SELECT t.testimony, t.created_at, u.name, u.first_name, u.last_name, u.username
+        FROM testimonials t LEFT JOIN users u ON u.id = t.user_id
+        WHERE t.approved = 1 AND COALESCE(t.is_public, 1) = 1
+        ORDER BY RANDOM() LIMIT 3")->fetchAll(PDO::FETCH_ASSOC);
+    $testimonial_total = (int)$db->query("SELECT COUNT(*) FROM testimonials WHERE approved = 1 AND COALESCE(is_public, 1) = 1")->fetchColumn();
+} catch (Throwable $e) {
+    error_log('home testimonials: ' . $e->getMessage());
+}
 
 // ===== FETCH LIVE STATS =====
 $stmt = $db->prepare("SELECT COUNT(*) FROM users");
@@ -176,50 +197,24 @@ if ($isLoggedIn && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit
     }
 }
 
-// ===== FETCH POEM WITH MOST COMMENTS FOR CAROUSEL =====
-$carousel_poem = null;
-$carousel_comments = [];
-$stmt = $db->prepare("
-    SELECT p.*, COUNT(r.id) as comment_count
-    FROM poems p
-    JOIN reviews r ON r.target_type = 'poem' AND r.target_id = p.id
-    WHERE r.deleted_at IS NULL AND r.is_private = 0
-      AND p.id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft') -- F122
-    GROUP BY p.id
-    ORDER BY comment_count DESC
-    LIMIT 1
-");
-$stmt->execute();
-$carousel_poem = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if ($carousel_poem) {
-    $stmt = $db->prepare("
-        SELECT r.*, u.name AS author_name
-        FROM reviews r
-        JOIN users u ON r.user_id = u.id
-        WHERE r.target_type = 'poem' AND r.target_id = ? AND r.deleted_at IS NULL AND r.is_private = 0
-        ORDER BY r.created_at DESC
-        LIMIT 10
-    ");
-    $stmt->execute([$carousel_poem['id']]);
-    $carousel_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    if (empty($carousel_comments)) {
-        $stmt = $db->prepare("SELECT * FROM poems WHERE id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft') ORDER BY created_at DESC LIMIT 1"); // F122
-        $stmt->execute();
-        $carousel_poem = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($carousel_poem) {
-            $stmt = $db->prepare("
-                SELECT r.*, u.name AS author_name
-                FROM reviews r
-                JOIN users u ON r.user_id = u.id
-                WHERE r.target_type = 'poem' AND r.target_id = ? AND r.deleted_at IS NULL AND r.is_private = 0
-                ORDER BY r.created_at DESC
-                LIMIT 10
-            ");
-            $stmt->execute([$carousel_poem['id']]);
-            $carousel_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-    }
+// ===== COMMUNITY VOICES (L1) =====
+// Three public comments on poems, picked at random from the 30 most recent on each page load,
+// each linking to the poem it is about. Replaces the 5-second auto-playing carousel.
+$community_voices = [];
+try {
+    $community_voices = $db->query("SELECT * FROM (
+            SELECT r.comment, r.created_at, p.id AS poem_id, p.title AS poem_title,
+                   u.name, u.first_name, u.last_name, u.username
+            FROM reviews r
+            JOIN users u ON u.id = r.user_id
+            JOIN poems p ON p.id = r.target_id
+            WHERE r.target_type = 'poem' AND r.deleted_at IS NULL AND r.is_private = 0
+              AND TRIM(COALESCE(r.comment, '')) != ''
+              AND p.id NOT IN (SELECT poem_id FROM poem_status WHERE status = 'draft')
+            ORDER BY r.created_at DESC LIMIT 30
+        ) ORDER BY RANDOM() LIMIT 3")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    error_log('home community voices: ' . $e->getMessage());
 }
 
 // C2: "Angella's picks" — a poem, a story and a reflection chosen by the team (admin/picks.php)
@@ -465,17 +460,17 @@ if ('serviceWorker' in navigator) {
     .stat-number { font-size:2.6rem; font-weight:700; color:var(--rose); }
     .stat-label { font-size:0.95rem; color:var(--text-light); margin-top:4px; }
 
-    /* ===== TESTIMONIALS ===== */
-    .testimonial-carousel { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:24px; }
-    .testimonial-card { perspective:800px; height:220px; }
-    .testimonial-card .card-inner { position:relative; width:100%; height:100%; transition:transform 0.8s; transform-style:preserve-3d; }
-    .testimonial-card:hover .card-inner { transform:rotateY(180deg); }
-    .testimonial-card .card-front, .testimonial-card .card-back { position:absolute; width:100%; height:100%; backface-visibility:hidden; border-radius:16px; padding:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; border:1px solid var(--border); box-shadow:var(--shadow); }
-    .testimonial-card .card-front { background:var(--card-bg); }
-    .testimonial-card .card-back { background:var(--rose); color:white; transform:rotateY(180deg); }
-    .testimonial-avatar { font-size:2.5rem; color:var(--rose); margin-bottom:6px; }
-    .testimonial-quote { font-size:0.9rem; line-height:1.5; font-style:italic; }
-    .testimonial-author { font-weight:600; font-size:0.85rem; color:var(--text-light); margin-top:6px; }
+    /* ===== L1: VOICES (testimonials and community comments share one card) ===== */
+    .aw-voices { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:24px; }
+    .aw-voice { margin:0; background:var(--card-bg); border:1px solid var(--border); border-radius:20px; padding:26px 24px 22px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px; position:relative; }
+    .aw-voice::before { content:"\201C"; position:absolute; top:6px; left:18px; font:700 3.4rem/1 'Playfair Display', Georgia, serif; color:var(--rose-light, #e8c0c0); pointer-events:none; }
+    .aw-voice blockquote { margin:0; padding-top:18px; }
+    .aw-voice blockquote p { margin:0; font-size:1rem; line-height:1.65; color:var(--text); font-style:italic; }
+    .aw-voice figcaption { margin-top:auto; font-weight:600; font-size:.9rem; color:var(--text-light); }
+    .aw-voice figcaption a { color:var(--rose-dark, #a8676a); }
+    .aw-voices-empty { text-align:center; color:var(--text-light); }
+    .aw-invite { margin:28px auto 0; max-width:640px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .aw-invite p { margin:0; color:var(--text-light); }
 
     /* ===== CONTENT GATE ===== */
     .content-gate { background:var(--vanilla); border-top:2px solid var(--rose); border-bottom:2px solid var(--rose); padding:60px 0; }
@@ -485,8 +480,6 @@ if ('serviceWorker' in navigator) {
     .gate-message p { font-size:1.1rem; color:var(--text-light); }
     .gate-buttons { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:16px; }
 
-    /* ===== STICKY CTA ===== */
-   .sticky-cta{position:fixed;bottom:0;left:0;width:100%;background:var(--rose);color:#fff;padding:12px 0;z-index:999;box-shadow:0 -4px 20px rgba(0,0,0,.1)}.sticky-cta .container{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}.sticky-cta p{margin:0;font-size:.95rem;font-weight:600}.sticky-cta-buttons{display:flex!important;gap:10px}.sticky-cta .btn-primary,.sticky-cta .btn-outline{border:2px solid #fff!important}.sticky-cta .btn-primary{background:#fff!important;color:var(--rose)!important}.sticky-cta .btn-primary:hover{background:transparent!important;color:#fff!important}.sticky-cta .btn-outline{background:var(--rose)!important;color:#fff!important}.sticky-cta .btn-outline:hover{background:#fff!important;color:var(--rose)!important}.sticky-cta-close{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;padding:0 4px}
     /* ===== MODAL ===== */
     .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:2000; display:none; align-items:center; justify-content:center; }
     .modal-content { background:var(--card-bg); border-radius:20px; padding:32px; max-width:500px; width:90%; box-shadow:var(--shadow-hover); border:1px solid var(--rose-light); }
@@ -552,8 +545,6 @@ if ('serviceWorker' in navigator) {
     @media (max-width:576px) {
         .about-features-grid { grid-template-columns:1fr; }
         .hero h1 { font-size:1.8rem; }
-        .sticky-cta .container { flex-direction:column; text-align:center; }
-        .testimonial-card { height:200px; }
         .books-grid { grid-template-columns:1fr 1fr; }
         .book-cover-wrapper { height:160px; }
     }
@@ -699,53 +690,39 @@ if ('serviceWorker' in navigator) {
                 <div class="stat-label">Prayers Offered</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number" data-target="<?php echo count($testimonials); ?>">0</div>
+                <div class="stat-number" data-target="<?php echo (int)$testimonial_total; ?>">0</div>
                 <div class="stat-label">Testimonies Shared</div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- TESTIMONIALS -->
-<section class="testimonials-section section-padding">
+<!-- TESTIMONIALS (L1: static cards, three per page load) -->
+<section class="testimonials-section section-padding" id="testimonials">
     <div class="container">
         <div class="section-header">
             <h2>Real Stories. <span class="rose-text">Real Hope.</span></h2>
             <p>Hear from members whose lives have been touched by AngelWrites.</p>
         </div>
-        <?php if ($isLoggedIn): ?>
-        <div class="testimonial-prompt">
-            <p><i class="fas fa-heart" style="color: var(--rose);"></i> Share your AngelWrites story – your testimony could be the hope someone needs today.</p>
-            <button class="btn btn-primary btn-sm" id="testimonialPromptBtn">Share Your Story</button>
-        </div>
-        <?php endif; ?>
-        <div class="testimonial-carousel" id="testimonialCarousel">
-            <?php if (count($testimonials) > 0): ?>
-                <?php foreach ($testimonials as $index => $testimonial): ?>
-                    <?php 
-                    $colors = ['#DBA1A2', '#F7B7A3', '#A8D5BA', '#F3D8C7', '#C4A5C9', '#E8C9A0', '#A3C6D4', '#F0D4D4'];
-                    $color = $colors[$index % count($colors)];
-                    $stmt = $db->prepare("SELECT name FROM users WHERE id = ?");
-                    $stmt->execute([$testimonial['user_id']]);
-                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-                    $name = $user ? $user['name'] : 'Anonymous';
-                    ?>
-                    <div class="testimonial-card" style="--card-color: <?php echo $color; ?>;">
-                        <div class="card-inner">
-                            <div class="card-front">
-                                <div class="testimonial-avatar"><i class="fas fa-user-circle"></i></div>
-                                <p class="testimonial-quote">"<?php echo htmlspecialchars($testimonial['testimony']); ?>"</p>
-                                <span class="testimonial-author">– <?php echo htmlspecialchars($name); ?></span>
-                            </div>
-                            <div class="card-back">
-                                <i class="fas fa-pray"></i>
-                                <p class="testimonial-prayer">Praying for you, <?php echo htmlspecialchars($name); ?>. May God's peace fill your heart.</p>
-                            </div>
-                        </div>
-                    </div>
+        <?php if ($testimonials): ?>
+            <div class="aw-voices">
+                <?php foreach ($testimonials as $t): ?>
+                    <figure class="aw-voice">
+                        <blockquote><p><?php echo htmlspecialchars(aw_voice_short($t['testimony'], 280)); ?></p></blockquote>
+                        <figcaption><?php echo htmlspecialchars(aw_voice_name($t)); ?></figcaption>
+                    </figure>
                 <?php endforeach; ?>
+            </div>
+        <?php else: ?>
+            <p class="aw-voices-empty">No stories have been shared yet.</p>
+        <?php endif; ?>
+        <div class="aw-invite">
+            <?php if ($isLoggedIn): ?>
+                <p>Has something here helped you? Your story could be the hope someone needs today.</p>
+                <button type="button" class="btn btn-primary" id="testimonialPromptBtn">Share your story</button>
             <?php else: ?>
-                <p class="no-content">No stories yet. Be the first to share yours.</p>
+                <p>You do not have to be fixed before you walk in. There is a place here for you.</p>
+                <a href="<?php echo SITE_URL; ?>/register.php" class="btn btn-primary">Join the community</a>
             <?php endif; ?>
         </div>
     </div>
@@ -791,16 +768,6 @@ if ('serviceWorker' in navigator) {
                     <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-outline">Already a member? Log In</a>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="sticky-cta" id="stickyCta">
-        <div class="container">
-            <p><strong>Join AngelWrites Free</strong> – No credit card required. Start your healing journey.</p>
-            <div class="sticky-cta-buttons">
-                <a href="<?php echo SITE_URL; ?>/register.php" class="btn btn-primary btn-sm">Get Started</a>
-                <a href="<?php echo SITE_URL; ?>/login.php" class="btn btn-outline btn-sm">Sign In</a>
-            </div>
-            <button class="sticky-cta-close" onclick="document.getElementById('stickyCta').style.display='none'">×</button>
         </div>
     </div>
 <?php else: ?>
@@ -993,63 +960,29 @@ if ('serviceWorker' in navigator) {
 
 <?php endif; ?>
 
-<!-- ===== CYCLIC COMMENT CAROUSEL ===== -->
-<section class="comment-carousel-section">
+<!-- ===== COMMUNITY VOICES (L1: static cards, three per page load) ===== -->
+<?php if ($community_voices): ?>
+<section class="community-voices-section section-padding" aria-labelledby="voicesTitle">
     <div class="container">
         <div class="section-header">
-            <h2>What the <span class="rose-text">Community</span> Is Saying</h2>
-            <p>Real voices from real readers – <em><?php echo htmlspecialchars($carousel_poem ? $carousel_poem['title'] : 'our latest poem'); ?></em></p>
+            <h2 id="voicesTitle">What the <span class="rose-text">Community</span> Is Saying</h2>
+            <p>Words members left on the poems.</p>
         </div>
-        <?php if ($carousel_poem && count($carousel_comments) > 0): ?>
-            <div class="carousel-container">
-                <div class="carousel-wrapper" id="carouselWrapper">
-                    <?php foreach ($carousel_comments as $index => $comment): ?>
-                        <div class="carousel-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>">
-                            <div class="comment-card">
-                                <div class="comment-author">
-                                    <i class="fas fa-user-circle"></i>
-                                    <?php echo htmlspecialchars($comment['author_name']); ?>
-                                </div>
-                                <?php if ($comment['rating'] > 0): ?>
-                                    <div class="comment-rating">
-                                        <?php for ($i = 1; $i <= 5; $i++): ?>
-                                            <i class="fas fa-star <?php echo $i <= $comment['rating'] ? 'filled' : 'empty'; ?>"></i>
-                                        <?php endfor; ?>
-                                    </div>
-                                <?php endif; ?>
-                                <div class="comment-text">
-                                    <?php echo nl2br(htmlspecialchars(substr($comment['comment'], 0, 200))); ?>
-                                    <?php if (strlen($comment['comment']) > 200): ?>...<?php endif; ?>
-                                </div>
-                                <div class="comment-date">
-                                    <?php echo date('M j, Y', strtotime($comment['created_at'])); ?>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div class="carousel-controls">
-                <button id="carouselPrev"><i class="fas fa-chevron-left"></i></button>
-                <button id="carouselNext"><i class="fas fa-chevron-right"></i></button>
-            </div>
-            <div class="carousel-indicators" id="carouselIndicators">
-                <?php foreach ($carousel_comments as $index => $comment): ?>
-                    <span class="dot <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>"></span>
-                <?php endforeach; ?>
-            </div>
-            <div class="carousel-pause-indicator">Hover to pause</div>
-            <div style="text-align:center; margin-top:12px;">
-                <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $carousel_poem['id']; ?>" class="btn btn-outline btn-sm">Read this poem →</a>
-            </div>
-        <?php else: ?>
-            <div class="empty-state" style="text-align:center; padding:40px;">
-                <i class="fas fa-comments" style="font-size:2.5rem; color:var(--rose);"></i>
-                <p>No comments yet. Be the first to share your thoughts!</p>
-            </div>
-        <?php endif; ?>
+        <div class="aw-voices">
+            <?php foreach ($community_voices as $c): ?>
+                <figure class="aw-voice">
+                    <blockquote><p><?php echo htmlspecialchars(aw_voice_short($c['comment'], 220)); ?></p></blockquote>
+                    <figcaption><?php echo htmlspecialchars(aw_voice_name($c)); ?>, on <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo (int)$c['poem_id']; ?>"><?php echo htmlspecialchars($c['poem_title']); ?></a></figcaption>
+                </figure>
+            <?php endforeach; ?>
+        </div>
+        <div class="aw-invite">
+            <p>Read a poem that speaks to you, and leave a word for the next reader.</p>
+            <a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline">Read the poems</a>
+        </div>
     </div>
 </section>
+<?php endif; ?>
 
 <!-- NEWSLETTER -->
 <section class="newsletter-section section-padding" style="background-color: var(--fantasy);">
@@ -1129,87 +1062,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Sticky CTA Close
-    const stickyCta = document.getElementById('stickyCta');
-    if (stickyCta) {
-        const closeBtn = stickyCta.querySelector('.sticky-cta-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', function() { stickyCta.style.display = 'none'; });
-        }
-    }
-
-    // ===== CYCLIC COMMENT CAROUSEL =====
-    const wrapper = document.getElementById('carouselWrapper');
-    const slides = wrapper ? wrapper.querySelectorAll('.carousel-slide') : [];
-    const prevBtn = document.getElementById('carouselPrev');
-    const nextBtn = document.getElementById('carouselNext');
-    const dots = document.querySelectorAll('.carousel-indicators .dot');
-    let currentIndex = 0;
-    let autoPlayTimer = null;
-    const interval = 5000; // 5 seconds
-
-    if (slides.length > 0) {
-        function goTo(index) {
-            if (index < 0) index = slides.length - 1;
-            if (index >= slides.length) index = 0;
-            currentIndex = index;
-            slides.forEach((slide, i) => {
-                slide.classList.remove('active', 'prev', 'next');
-                if (i === index) {
-                    slide.classList.add('active');
-                } else if (i === (index - 1 + slides.length) % slides.length) {
-                    slide.classList.add('prev');
-                } else if (i === (index + 1) % slides.length) {
-                    slide.classList.add('next');
-                } else {
-                    // hide others
-                    slide.style.opacity = 0;
-                    setTimeout(() => { slide.style.opacity = ''; }, 800);
-                }
-            });
-            dots.forEach((dot, i) => {
-                dot.classList.toggle('active', i === index);
-            });
-        }
-
-        function nextSlide() { goTo(currentIndex + 1); }
-        function prevSlide() { goTo(currentIndex - 1); }
-
-        function startAutoPlay() {
-            if (autoPlayTimer) clearInterval(autoPlayTimer);
-            autoPlayTimer = setInterval(nextSlide, interval);
-        }
-
-        function stopAutoPlay() {
-            if (autoPlayTimer) {
-                clearInterval(autoPlayTimer);
-                autoPlayTimer = null;
-            }
-        }
-
-        // Initialize
-        goTo(0);
-        startAutoPlay();
-
-        // Event listeners
-        if (prevBtn) prevBtn.addEventListener('click', () => { stopAutoPlay(); prevSlide(); startAutoPlay(); });
-        if (nextBtn) nextBtn.addEventListener('click', () => { stopAutoPlay(); nextSlide(); startAutoPlay(); });
-        dots.forEach(dot => {
-            dot.addEventListener('click', function() {
-                const idx = parseInt(this.dataset.index);
-                stopAutoPlay();
-                goTo(idx);
-                startAutoPlay();
-            });
-        });
-
-        // Pause on hover
-        const container = document.querySelector('.carousel-container');
-        if (container) {
-            container.addEventListener('mouseenter', stopAutoPlay);
-            container.addEventListener('mouseleave', startAutoPlay);
-        }
-    }
 });
 </script>
 

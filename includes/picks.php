@@ -119,6 +119,9 @@ function aw_save_picks(PDO $db, array $in) {
         }
         $up->execute(['picks_updated_at', date('Y-m-d H:i:s')]);
         $db->commit();
+        // guests see a cached home page (index.php, 5 minutes): drop it so the new picks show now
+        $cache = dirname(__DIR__) . '/cache/index.html';
+        if (is_file($cache)) @unlink($cache);
         return true;
     } catch (Throwable $e) {
         if ($db->inTransaction()) $db->rollBack();

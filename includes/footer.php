@@ -389,17 +389,11 @@ ADDED: TOC JavaScript (enhanced)
 <!-- ============================================================
 ADDED: Cookie Consent Banner (GDPR compliance)
 ============================================================ -->
-<div id="cookieConsent" style="position:fixed;bottom:0;left:0;width:100%;background:var(--card-bg);padding:12px 20px;box-shadow:0 -4px 12px rgba(0,0,0,0.1);z-index:2000;display:none;border-top:2px solid var(--rose);">
-    <div class="container" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
-        <p style="margin:0;font-size:0.9rem;color:var(--text);">
-            <i class="fas fa-cookie-bite" style="color:var(--rose);margin-right:8px;"></i>
-            This site uses cookies to improve your experience. 
-            <a href="<?php echo SITE_URL; ?>/privacy.php" style="color:var(--rose);font-weight:600;">Learn more</a>.
-        </p>
-        <div style="display:flex;gap:8px;">
-            <button id="cookieAccept" class="btn btn-sm btn-primary">Accept</button>
-            <button id="cookieDecline" class="btn btn-sm btn-outline">Decline</button>
-        </div>
+<div id="cookieConsent" class="aw-cookie" role="region" aria-label="Cookie notice" style="display:none;">
+    <p><i class="fas fa-cookie-bite" aria-hidden="true"></i> This site uses cookies to keep you signed in and remember your settings. <a href="<?php echo SITE_URL; ?>/privacy.php">Learn more</a>.</p>
+    <div class="aw-cookie-actions">
+        <button type="button" id="cookieAccept" class="btn btn-sm btn-primary">Accept</button>
+        <button type="button" id="cookieDecline" class="btn btn-sm btn-outline">Decline</button>
     </div>
 </div>
 <style>
@@ -407,17 +401,19 @@ ADDED: Cookie Consent Banner (GDPR compliance)
    "Post Note") until it was dismissed. While it shows, bottom-fixed panels sit above it and the page
    gets matching bottom padding; on phones the banner is compact. */
 body .bible-notes-panel, body .sticky-cta { bottom:var(--cookie-bar-h, 0px); }
-@media (max-width:480px) {
-    #cookieConsent { padding:8px 12px !important; }
-    #cookieConsent p { font-size:0.8rem !important; }
-    #cookieConsent .btn { padding:6px 16px; min-height:40px; }
-}
+/* L1: the cookie notice is a card from the same family as the home page cards */
+.aw-cookie { position:fixed; left:16px; right:16px; bottom:16px; z-index:2000; max-width:440px; background:var(--card-bg); color:var(--text); border:1px solid var(--border); border-radius:18px; padding:16px 18px; box-shadow:0 12px 36px rgba(44,30,30,.18); }
+.aw-cookie p { margin:0 0 12px; font-size:.9rem; line-height:1.5; }
+.aw-cookie p i { color:var(--rose); margin-right:6px; }
+.aw-cookie a { color:var(--rose-dark, #a8676a); font-weight:600; }
+.aw-cookie-actions { display:flex; gap:8px; }
+.aw-cookie .btn { min-height:40px; }
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var bar = document.getElementById('cookieConsent');
     function awCookieSpace() {
-        var h = bar.style.display === 'none' ? 0 : bar.offsetHeight;
+        var h = bar.style.display === 'none' ? 0 : bar.offsetHeight + 16;
         document.documentElement.style.setProperty('--cookie-bar-h', h + 'px');
         document.body.style.paddingBottom = h ? h + 'px' : '';
     }
