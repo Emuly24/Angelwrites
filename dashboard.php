@@ -320,6 +320,7 @@ $aw_first = trim(explode(' ', awDisplayName($user))[0] ?? '');
         <a href="<?php echo SITE_URL; ?>/videos.php"><i class="fas fa-video" aria-hidden="true"></i> Videos</a>
         <a href="<?php echo SITE_URL; ?>/bible_reader.php"><i class="fas fa-bible" aria-hidden="true"></i> Bible</a>
         <a href="<?php echo SITE_URL; ?>/my_purchases.php"><i class="fas fa-receipt" aria-hidden="true"></i> My purchases</a>
+        <a href="<?php echo SITE_URL; ?>/my_messages.php"><i class="fas fa-envelope" aria-hidden="true"></i> Messages to the team</a><!-- K4 -->
     </nav>
 </div>
 <?php require_once 'includes/footer.php'; ?>

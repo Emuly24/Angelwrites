@@ -51,7 +51,7 @@ $aw_attention = [];
 foreach ([
     ['Orders to confirm', "SELECT COUNT(*) FROM payments WHERE status = 'pending'", 'manage_payments.php', 'fa-money-bill-wave', 'manage_payments'],
     ['Session requests', "SELECT COUNT(*) FROM sessions WHERE status = 'pending'", 'manage_sessions.php?status=pending', 'fa-calendar-check', 'manage_members'],
-    ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'manage_messages.php', 'fa-envelope', 'team_inbox'],
+    ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'inbox.php', 'fa-envelope', 'team_inbox'],
     ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'fa-hands-praying', 'moderate'],
     ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'fa-quote-left', 'moderate'],
     ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'moderation.php', 'fa-flag', 'moderate'],
@@ -187,7 +187,7 @@ $pageTitle = 'Admin Dashboard';
         <section class="alert-card" aria-labelledby="admMessages">
             <h4 id="admMessages"><i class="fas fa-envelope" aria-hidden="true" style="color:var(--rose);"></i> Unread messages</h4>
             <?php if ($recent_messages): ?><ul class="adm-list"><?php foreach ($recent_messages as $m): ?>
-                <li><a href="manage_messages.php"><?php echo htmlspecialchars($m['name']); ?></a><span><?php echo htmlspecialchars(aw_adm_short($m['message'], 40)); ?></span></li>
+                <li><a href="inbox.php"><?php echo htmlspecialchars($m['name']); ?></a><span><?php echo htmlspecialchars(aw_adm_short($m['message'], 40)); ?></span></li>
             <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No unread messages from the contact form.</p><?php endif; ?>
         </section>
         <?php endif; ?>
@@ -241,7 +241,7 @@ $pageTitle = 'Admin Dashboard';
                 <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a>
                 <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a>
                 <a href="manage_prayer_requests.php" class="admin-module-btn"><i class="fas fa-hands-praying"></i><span>Prayer Requests</span></a>
-                <a href="manage_messages.php" class="admin-module-btn"><i class="fas fa-inbox"></i><span>Team Inbox</span></a>
+                <a href="inbox.php" class="admin-module-btn"><i class="fas fa-inbox"></i><span>Team Inbox</span></a>
             </div>
         </div>
         <?php else: ?>

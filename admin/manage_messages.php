@@ -5,6 +5,9 @@ require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
 
 aw_require('team_inbox'); // K1
+// K4: contact messages are answered in the team inbox
+header('Location: ' . SITE_URL . '/admin/inbox.php');
+exit;
 
 $error = '';
 $success = '';
