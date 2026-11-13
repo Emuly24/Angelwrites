@@ -201,11 +201,6 @@ $pageTitle = 'Bible Reader';
                     <label for="bibleVersion1">Version 1</label>
                     <select id="bibleVersion1">
                         <option value="KJV">King James Version (KJV)</option>
-                        <option value="NIV">New International Version (NIV)</option>
-                        <option value="ESV">English Standard Version (ESV)</option>
-                        <option value="NASB">New American Standard Bible (NASB)</option>
-                        <option value="NKJV">New King James Version (NKJV)</option>
-                        <option value="AMP">Amplified Bible (AMP)</option>
                         <option value="ASV">American Standard Version (ASV)</option>
                         <option value="WEB">World English Bible (WEB)</option>
                     </select>
@@ -221,14 +216,10 @@ $pageTitle = 'Bible Reader';
                 <div class="bible-control-group" id="bibleVersion2Group" style="display:none;">
                     <label for="bibleVersion2">Version 2</label>
                     <select id="bibleVersion2">
-                        <option value="NIV">New International Version (NIV)</option>
-                        <option value="KJV">King James Version (KJV)</option>
-                        <option value="ESV">English Standard Version (ESV)</option>
-                        <option value="NASB">New American Standard Bible (NASB)</option>
-                        <option value="NKJV">New King James Version (NKJV)</option>
-                        <option value="AMP">Amplified Bible (AMP)</option>
-                        <option value="ASV">American Standard Version (ASV)</option>
+                        <!-- BL1: only translations the site may lawfully serve in full (public domain) -->
                         <option value="WEB">World English Bible (WEB)</option>
+                        <option value="KJV">King James Version (KJV)</option>
+                        <option value="ASV">American Standard Version (ASV)</option>
                     </select>
                 </div>
 
@@ -272,7 +263,7 @@ $pageTitle = 'Bible Reader';
                         <div class="verse-content" id="bibleVerseContent1p"></div>
                     </div>
                     <div class="verse-column">
-                        <h3 id="bibleParallelTitle2">NIV</h3>
+                        <h3 id="bibleParallelTitle2">WEB</h3>
                         <div class="verse-content" id="bibleVerseContent2p"></div>
                     </div>
                 </div>
@@ -379,13 +370,10 @@ function awGuestOnly(what) {
     // ================================================================
     const VERSION_MAP = {
         'KJV': 'bible_KJV.db',
-        'NIV': 'bible_NIV.db',
-        'ESV': 'bible_ESV.db',
-        'NASB': 'bible_NASB.db',
-        'NKJV': 'bible_NKJV.db',
-        'AMP': 'bible_AMP.db',
         'ASV': 'bible_ASV.db',
         'WEB': 'bible_WEB.db'
+        // BL1: NIV, ESV, NASB, NKJV and AMP removed. They are under copyright and the site holds no licence
+        // to serve them. KJV, ASV and WEB are in the public domain.
         // F24: YLT removed (decision D-I1): there is no bible_YLT.db, and the lookup served KJV under the YLT label.
     };
 
@@ -575,7 +563,7 @@ function awGuestOnly(what) {
     let chapter = 3;
     let verse = 16;
     let version1 = 'KJV';
-    let version2 = 'NIV';
+    let version2 = 'WEB'; // BL1: was NIV
     let parallel = false;
     let progressPercent = 0;
     let saveTimer = null;
