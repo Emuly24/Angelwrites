@@ -77,6 +77,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     }
 }
 
+// ===== R14: MEMBER UPLOAD ALLOWANCE (can be raised when the site moves to a bigger host) =====
+$aw_quota_msg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_upload_quota'])) {
+    $aw_t = (int)($_POST['upload_member_total_mb'] ?? 0);
+    $aw_d = (int)($_POST['upload_member_daily_mb'] ?? 0);
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $aw_quota_msg = ['ok' => false, 'msg' => 'Your session expired. Please reload the page and try again.'];
+    } elseif ($aw_t < 10 || $aw_t > 10000 || $aw_d < 5 || $aw_d > 2000 || $aw_d > $aw_t) {
+        $aw_quota_msg = ['ok' => false, 'msg' => 'Please enter a total between 10 and 10,000 MB and a daily amount between 5 and 2,000 MB that is not larger than the total.'];
+    } else {
+        $aw_up = $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+        $aw_up->execute(['upload_member_total_mb', (string)$aw_t]);
+        $aw_up->execute(['upload_member_daily_mb', (string)$aw_d]);
+        try {
+            $db->prepare("INSERT INTO newsletter_audit_log (user_id, action, details) VALUES (?, ?, ?)")
+               ->execute([$_SESSION['user_id'], 'upload_quota_update', "Member upload allowance set to $aw_t MB in total, $aw_d MB a day"]);
+        } catch (Throwable $e) { /* audit table is optional */ }
+        $_SESSION['aw_quota_flash'] = "Saved: each member may store $aw_t MB in total and upload $aw_d MB a day.";
+        header('Location: ' . SITE_URL . '/admin/settings.php?tab=uploads');
+        exit;
+    }
+}
+if (!empty($_SESSION['aw_quota_flash'])) { $aw_quota_msg = ['ok' => true, 'msg' => $_SESSION['aw_quota_flash']]; unset($_SESSION['aw_quota_flash']); }
+
 // ===== VF3: EMAIL DELIVERY CHECK =====
 // Members reported verification codes not arriving. This sends a real test email and shows the
 // exact reason when it fails, plus the last failures the site recorded.
@@ -133,7 +157,7 @@ $pageTitle = 'Site Settings';
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
             <button class="tab-btn<?php echo $aw_mail_test ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
-            <button class="tab-btn" data-tab="uploads">Uploads</button><!-- R13 -->
+            <button class="tab-btn<?php echo ($aw_quota_msg || ($_GET['tab'] ?? '') === 'uploads') ? ' aw-open-email' : ''; ?>" data-tab="uploads">Uploads</button><!-- R13 -->
         </div>
 
         <!-- ===== GENERAL TAB ===== -->
@@ -272,6 +296,26 @@ $pageTitle = 'Site Settings';
                         </table>
                     </div>
                     <p class="field-hint">All numbers live in <code>includes/upload_limits.php</code>.</p>
+
+                    <h3 style="margin:24px 0 10px;">Member upload allowance</h3><!-- R14 -->
+                    <?php if ($aw_quota_msg): ?>
+                        <div class="alert <?php echo $aw_quota_msg['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_quota_msg['msg']); ?></div>
+                    <?php endif; ?>
+                    <p style="color:var(--text-light);margin:0 0 12px;">The standard allowance is <?php echo (int)$aw_q['default_total_mb']; ?> MB per member, which suits the free hosting plan. Raise it here when the site moves to a plan with more space; no code change is needed.</p>
+                    <form method="POST" class="admin-form" action="<?php echo SITE_URL; ?>/admin/settings.php?tab=uploads">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                            <div class="form-group" style="flex:1;min-width:200px;">
+                                <label for="upload_member_total_mb">Total per member (MB)</label>
+                                <input type="number" id="upload_member_total_mb" name="upload_member_total_mb" min="10" max="10000" step="10" value="<?php echo (int)round($aw_q['total_bytes'] / 1048576); ?>" required>
+                            </div>
+                            <div class="form-group" style="flex:1;min-width:200px;">
+                                <label for="upload_member_daily_mb">Per member per day (MB)</label>
+                                <input type="number" id="upload_member_daily_mb" name="upload_member_daily_mb" min="5" max="2000" step="5" value="<?php echo (int)round($aw_q['per_day_bytes'] / 1048576); ?>" required>
+                            </div>
+                        </div>
+                        <button type="submit" name="save_upload_quota" value="1" class="btn btn-primary"><i class="fas fa-save"></i> Save allowance</button>
+                    </form>
 
                     <h3 style="margin:24px 0 10px;">Recent refused uploads</h3>
                     <?php

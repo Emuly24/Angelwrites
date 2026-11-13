@@ -99,9 +99,23 @@ if (!function_exists('aw_upload_limits')) {
         ];
 
         // ---- Per-member quotas (all types together) ----
+        // R14: 100 MB per member in total. On the free host the media pool is about 3 GB, so 500 MB each
+        // could not be honoured for more than a handful of members. The two numbers can be raised
+        // without touching code, in Admin > Settings > Uploads (stored in the settings table as
+        // upload_member_total_mb / upload_member_daily_mb), for the day the site moves to a paid plan.
+        $totalMb = 100;
+        $dailyMb = 50;
+        if (function_exists('aw_setting')) {
+            $t = (int)aw_setting('upload_member_total_mb', 0);
+            $d = (int)aw_setting('upload_member_daily_mb', 0);
+            if ($t >= 10 && $t <= 10000) $totalMb = $t;
+            if ($d >= 5 && $d <= 2000) $dailyMb = $d;
+        }
         $limits['_quota'] = [
-            'per_day_bytes' => 50 * $MB,          // resets at midnight, server time
-            'total_bytes'   => 500 * $MB,         // everything the member has ever uploaded
+            'per_day_bytes' => min($dailyMb, $totalMb) * $MB,   // resets at midnight, server time
+            'total_bytes'   => $totalMb * $MB,                  // everything the member has stored
+            'default_total_mb' => 100,
+            'default_daily_mb' => 50,
             // Admins publish the site's books and videos, so the member quotas do not apply to them.
             // Their uploads are still counted, so the totals stay visible.
             'exempt_roles'  => ['admin'],
