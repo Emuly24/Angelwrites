@@ -8,6 +8,24 @@ require_once 'includes/mail_helper.php';
 redirectIfNotLoggedIn();
 
 $user_id = $_SESSION['user_id'];
+require_once 'includes/csrf.php';
+require_once 'includes/notifications.php';
+// N1: every change on this page needs the session's token
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !validate_csrf_token($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
+    $_SESSION['aw_notif_flash'] = 'Your session expired, so nothing was changed. Please try again.';
+    header('Location: ' . SITE_URL . '/notifications.php');
+    exit;
+}
+// ===== N1: EMAIL PREFERENCES =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_email_prefs'])) {
+    $ok = aw_notify_save_prefs($db, $user_id, (array)($_POST['email'] ?? []));
+    $_SESSION['aw_notif_flash'] = $ok ? 'Saved. Your email choices are updated.' : 'Your choices could not be saved. Please try again.';
+    header('Location: ' . SITE_URL . '/notifications.php#email-settings');
+    exit;
+}
+$aw_notif_flash = (string)($_SESSION['aw_notif_flash'] ?? '');
+unset($_SESSION['aw_notif_flash']);
+$aw_prefs = aw_notify_prefs($db, $user_id);
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 15;
 $offset = ($page - 1) * $limit;
@@ -25,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_read'])) {
     $notif_id = (int)$_POST['notif_id'];
     $stmt = $db->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?");
     $stmt->execute([$notif_id, $user_id]);
+    if (stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'json') !== false) { header('Content-Type: application/json'); echo json_encode(['success' => true]); exit; } // N1
     header('Location: ' . SITE_URL . '/notifications.php');
     exit;
 }
@@ -34,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_notif'])) {
     $notif_id = (int)$_POST['notif_id'];
     $stmt = $db->prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?");
     $stmt->execute([$notif_id, $user_id]);
+    if (stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'json') !== false) { header('Content-Type: application/json'); echo json_encode(['success' => true]); exit; } // N1
     header('Location: ' . SITE_URL . '/notifications.php');
     exit;
 }
@@ -93,7 +113,7 @@ $pageTitle = 'Notifications';
         <div class="notifications-actions">
             <div class="actions-left">
                 <?php if ($unread_count > 0): ?>
-                    <form method="POST" style="display:inline;">
+                    <form method="POST" style="display:inline;"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                         <button type="submit" name="mark_all_read" class="btn btn-sm btn-primary">
                             <i class="fas fa-check-double"></i> Mark All Read
                         </button>
@@ -105,7 +125,7 @@ $pageTitle = 'Notifications';
             </div>
             <div class="actions-right">
                 <?php if ($total_notifications > 0): ?>
-                    <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete all notifications?');">
+                    <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete all notifications?');"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                         <button type="submit" name="delete_all" class="btn btn-sm btn-danger">
                             <i class="fas fa-trash-alt"></i> Clear All
                         </button>
@@ -180,8 +200,35 @@ $pageTitle = 'Notifications';
                 </a>
             </div>
         <?php endif; ?>
+
+        <!-- N1: what the member wants by email -->
+        <section class="aw-email-prefs" id="email-settings" aria-labelledby="emailPrefsTitle">
+            <h2 id="emailPrefsTitle">Email me about</h2>
+            <p>Everything always appears here in your notifications. Emails are short nudges with a link, never the words someone wrote, and at most one an hour for each kind.</p>
+            <?php if ($aw_notif_flash !== ''): ?><div class="alert alert-success" role="status"><?php echo htmlspecialchars($aw_notif_flash); ?></div><?php endif; ?>
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                <input type="hidden" name="save_email_prefs" value="1">
+                <?php foreach (AW_NOTIFY_KINDS as $k => [$label, $hint]): ?>
+                    <label class="aw-pref">
+                        <input type="checkbox" name="email[<?php echo $k; ?>]" value="1"<?php echo !empty($aw_prefs[$k]) ? ' checked' : ''; ?>>
+                        <span><strong><?php echo htmlspecialchars($label); ?></strong><small><?php echo htmlspecialchars($hint); ?></small></span>
+                    </label>
+                <?php endforeach; ?>
+                <button type="submit" class="btn btn-primary btn-sm">Save email choices</button>
+            </form>
+        </section>
     </div>
 </div>
+<style>
+.aw-email-prefs { margin-top: 32px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; padding: 22px; }
+.aw-email-prefs h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.3rem; margin: 0 0 6px; }
+.aw-email-prefs > p { color: var(--text-light); margin: 0 0 14px; }
+.aw-pref { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.aw-pref input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--rose-dark, #a8676a); flex: none; }
+.aw-pref small { display: block; color: var(--text-light); font-size: .88rem; margin-top: 2px; }
+.aw-email-prefs .btn { margin-top: 12px; min-height: 44px; }
+</style>
 
 <!-- ===== JAVASCRIPT FOR AJAX ===== -->
 <script>
@@ -214,11 +261,14 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function() {
             const id = this.dataset.id;
             const formData = new FormData();
-            formData.append('action', 'mark_read');
+            formData.append('mark_read', '1');
             formData.append('notif_id', id);
-            fetch('<?php echo SITE_URL; ?>/notifications_ajax.php', {
+            formData.append('csrf_token', <?php echo json_encode(generate_csrf_token()); ?>);
+            // N1: this called notifications_ajax.php, which does not exist; the page handles it itself
+            fetch('<?php echo SITE_URL; ?>/notifications.php', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: { 'Accept': 'application/json' }
             })
             .then(r => r.json())
             .then(data => {
@@ -241,11 +291,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!confirm('Delete this notification?')) return;
             const id = this.dataset.id;
             const formData = new FormData();
-            formData.append('action', 'delete_notif');
+            formData.append('delete_notif', '1');
             formData.append('notif_id', id);
-            fetch('<?php echo SITE_URL; ?>/notifications_ajax.php', {
+            formData.append('csrf_token', <?php echo json_encode(generate_csrf_token()); ?>);
+            // N1: this called notifications_ajax.php, which does not exist; the page handles it itself
+            fetch('<?php echo SITE_URL; ?>/notifications.php', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: { 'Accept': 'application/json' }
             })
             .then(r => r.json())
             .then(data => {
@@ -263,7 +316,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===== AJAX: Refresh Notifications =====
     document.getElementById('refreshNotifications').addEventListener('click', function() {
         this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-        fetch('<?php echo SITE_URL; ?>/notifications_ajax.php?action=get_list')
+        location.reload(); return; // N1: the list endpoint never existed; a reload shows the current list
+        fetch('<?php echo SITE_URL; ?>/notifications.php')
             .then(r => r.text())
             .then(html => {
                 document.getElementById('notificationsList').innerHTML = html;
