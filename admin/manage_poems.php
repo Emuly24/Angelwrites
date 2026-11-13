@@ -6,7 +6,7 @@ require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R10: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 // ===== HANDLE FLASH MESSAGES =====
 $flash_message = '';

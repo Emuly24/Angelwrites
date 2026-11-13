@@ -4,7 +4,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
 
-redirectIfNotAdmin();
+aw_require('manage_members'); // K1
 
 $error = '';
 $success = '';

@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-redirectIfNotAdmin();
+aw_require('manage_newsletter'); // K1
 // N3: ?status=active|pending|unsubscribed exports one group; segments and dates are included.
 // Cells that a spreadsheet would run as a formula (=, +, -, @ …) are prefixed with ' so a name
 // typed on the public form cannot become a formula in Excel (CSV injection).

@@ -267,6 +267,7 @@ if ($isLoggedIn) {
     <!-- D1: site-wide design layer, after the header styles so it applies on every page -->
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=1">
     <script src="<?php echo SITE_URL; ?>/assets/js/aw-motion.js?v=1" defer></script><!-- D2 -->
+<?php echo function_exists('aw_staff_csrf_script') ? aw_staff_csrf_script() : ''; /* K3: staff forms and fetches carry the CSRF token */ ?>
 </head>
 <body>
     <a href="#mainContent" class="skip-link">Skip to main content</a>
@@ -310,6 +311,9 @@ if ($isLoggedIn) {
                         <li role="none"><a href="<?php echo SITE_URL; ?>/community.php" class="<?php echo $currentPage === 'community.php' ? 'active' : ''; ?>" role="menuitem">Community</a></li>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/book_session.php" class="<?php echo $currentPage === 'book_session.php' ? 'active' : ''; ?>" role="menuitem">Book Session</a></li>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/profile.php" class="<?php echo $currentPage === 'profile.php' ? 'active' : ''; ?>" role="menuitem">Profile</a></li>
+                        <?php if (function_exists('aw_is_staff') && aw_is_staff()): /* K1: moderators */ ?>
+                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" role="menuitem"><i class="fas fa-shield-heart" aria-hidden="true"></i> Staff</a></li>
+                        <?php endif; ?>
                         <li class="nav-separator" role="separator">|</li>
                         <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                     <?php endif; ?>

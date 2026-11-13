@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../reader_functions.php'; // formatDuration()
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 20;

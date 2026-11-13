@@ -72,6 +72,7 @@ function redirectIfNotAdmin() {
         header('Location: ' . SITE_URL . '/index.php');
         exit;
     }
+    aw_staff_request_guard(); // K3: CSRF on every admin POST, no cross-site acting GETs (includes/roles.php)
 }
 
 /**
@@ -107,4 +108,6 @@ function getUserName() {
 function getUserRole() {
     return $_SESSION['role'] ?? 'guest';
 }
-?>
+
+// K1: roles, capabilities, the staff request guard and the audit log
+require_once __DIR__ . '/roles.php';

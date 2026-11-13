@@ -5,7 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R9: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 require_once __DIR__ . '/../includes/newsletter.php'; // RF3: CSRF helpers and "send to subscribers"
 
 // RF3: a readable, unique address for every reflection (two reflections with the same title used to

@@ -12,7 +12,7 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/commerce.php';
 
-redirectIfNotAdmin();
+aw_require('manage_payments'); // K1
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));

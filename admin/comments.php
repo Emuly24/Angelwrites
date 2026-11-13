@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-redirectIfNotAdmin();
+aw_require('moderate'); // K1
 
 // ============================================================
 // 1. CSRF HELPER (if not already defined)

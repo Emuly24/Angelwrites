@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-redirectIfNotAdmin();
+aw_require('moderate'); // K1
 
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 20;

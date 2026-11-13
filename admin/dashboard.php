@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-redirectIfNotAdmin();
+aw_require('staff_dashboard'); // K1
 
 // E2 (PROGRAM_PLAN.md Phase 1): the admin dashboard shows what needs doing and what happened
 // recently, read once on the server. No charts, no "Live" polling: the page makes no request after
@@ -49,13 +49,14 @@ $open_questions  = aw_adm_rows($db, "SELECT q.id, q.title, q.created_at FROM que
 // for the admin; each query is optional (a table may not exist before the DB repair).
 $aw_attention = [];
 foreach ([
-    ['Orders to confirm', "SELECT COUNT(*) FROM payments WHERE status = 'pending'", 'manage_payments.php', 'fa-money-bill-wave'],
-    ['Session requests', "SELECT COUNT(*) FROM sessions WHERE status = 'pending'", 'manage_sessions.php?status=pending', 'fa-calendar-check'],
-    ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'manage_messages.php', 'fa-envelope'],
-    ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'fa-hands-praying'],
-    ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'fa-quote-left'],
-    ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'manage_community.php', 'fa-flag'],
-] as [$aw_label, $aw_sql, $aw_link, $aw_icon]) {
+    ['Orders to confirm', "SELECT COUNT(*) FROM payments WHERE status = 'pending'", 'manage_payments.php', 'fa-money-bill-wave', 'manage_payments'],
+    ['Session requests', "SELECT COUNT(*) FROM sessions WHERE status = 'pending'", 'manage_sessions.php?status=pending', 'fa-calendar-check', 'manage_members'],
+    ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'manage_messages.php', 'fa-envelope', 'team_inbox'],
+    ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'fa-hands-praying', 'moderate'],
+    ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'fa-quote-left', 'moderate'],
+    ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'manage_community.php', 'fa-flag', 'moderate'],
+] as [$aw_label, $aw_sql, $aw_link, $aw_icon, $aw_cap]) {
+    if (!aw_can($aw_cap)) continue; // K1: each role sees what it can act on
     try {
         $aw_n = (int)$db->query($aw_sql)->fetchColumn();
         if ($aw_n > 0) $aw_attention[] = [$aw_label, $aw_n, $aw_link, $aw_icon];
@@ -66,7 +67,7 @@ foreach ([
 // P0-1: there are no automatic backups on this host; remind the team when the last manual one is a week old
 $aw_last_backup = (string)aw_setting('last_backup_at', '');
 $aw_backup_days = $aw_last_backup !== '' ? (int)floor((time() - strtotime($aw_last_backup)) / 86400) : null;
-if ($aw_backup_days === null || $aw_backup_days >= 7) {
+if (aw_can('backup') && ($aw_backup_days === null || $aw_backup_days >= 7)) {
     $aw_attention[] = [$aw_backup_days === null ? 'backup taken yet: download one' : 'days since the last backup', $aw_backup_days === null ? 'No' : $aw_backup_days, 'backup.php', 'fa-database'];
 }
 
@@ -139,7 +140,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="sub"><?php echo $aw_attention ? 'A few things are waiting for you.' : 'Nothing is waiting for you right now.'; ?></div>
         </div>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-            <button type="button" onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus" aria-hidden="true"></i> Quick add</button>
+            <?php if (aw_can('manage_content')): ?><button type="button" onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus" aria-hidden="true"></i> Quick add</button><?php endif; ?>
         </div>
     </div>
 
@@ -166,42 +167,54 @@ $pageTitle = 'Admin Dashboard';
             <?php endforeach; ?>
         </dl>
         <p class="adm-totals"><?php $bits = []; foreach ($totals as $l => $n) { $bits[] = number_format($n) . ' ' . strtolower($l); } echo htmlspecialchars('On the site: ' . implode(' · ', $bits)); ?>.
+            <?php if (aw_can('see_identities')): ?>
             <button type="button" class="adm-linkbtn" onclick="openStatsModal('views')">Who viewed what</button> ·
             <button type="button" class="adm-linkbtn" onclick="openStatsModal('reading')">Reading sessions</button>
+            <?php endif; ?>
         </p>
     </section>
 
     <div class="adm-grid">
+        <?php if (aw_can('manage_members')): ?>
         <section class="alert-card" aria-labelledby="admSessions">
             <h4 id="admSessions"><i class="fas fa-calendar-check" aria-hidden="true" style="color:var(--rose);"></i> Session requests</h4>
             <?php if ($recent_sessions): ?><ul class="adm-list"><?php foreach ($recent_sessions as $s): ?>
                 <li><a href="manage_sessions.php?status=pending"><?php echo htmlspecialchars(awDisplayName($s)); ?></a><span><?php echo htmlspecialchars(date('M j, g:i a', strtotime($s['date'] . ' ' . $s['time']))); ?></span></li>
             <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No requests waiting. When a member books a session it appears here to confirm.</p><?php endif; ?>
         </section>
+        <?php endif; ?>
+        <?php if (aw_can('team_inbox')): ?>
         <section class="alert-card" aria-labelledby="admMessages">
             <h4 id="admMessages"><i class="fas fa-envelope" aria-hidden="true" style="color:var(--rose);"></i> Unread messages</h4>
             <?php if ($recent_messages): ?><ul class="adm-list"><?php foreach ($recent_messages as $m): ?>
                 <li><a href="manage_messages.php"><?php echo htmlspecialchars($m['name']); ?></a><span><?php echo htmlspecialchars(aw_adm_short($m['message'], 40)); ?></span></li>
             <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No unread messages from the contact form.</p><?php endif; ?>
         </section>
+        <?php endif; ?>
+        <?php if (aw_can('moderate')): ?>
         <section class="alert-card" aria-labelledby="admComments">
             <h4 id="admComments"><i class="fas fa-comment-dots" aria-hidden="true" style="color:var(--rose);"></i> Latest comments</h4>
             <?php if ($recent_comments): ?><ul class="adm-list"><?php foreach ($recent_comments as $c): ?>
                 <li><a href="comments.php"><?php echo htmlspecialchars(awDisplayName($c)); ?></a><span><?php echo htmlspecialchars(aw_adm_short($c['comment'], 48)); ?> · <?php echo htmlspecialchars(date('M j', strtotime($c['created_at']))); ?></span></li>
             <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No comments yet. Comments on poems, books and videos will show here as they arrive.</p><?php endif; ?>
         </section>
+        <?php endif; ?>
+        <?php if (aw_can('moderate')): ?>
         <section class="alert-card" aria-labelledby="admQuestions">
             <h4 id="admQuestions"><i class="fas fa-question-circle" aria-hidden="true" style="color:var(--rose);"></i> Questions with no answer</h4>
             <?php if ($open_questions): ?><ul class="adm-list"><?php foreach ($open_questions as $q): ?>
                 <li><a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo (int)$q['id']; ?>"><?php echo htmlspecialchars(aw_adm_short($q['title'], 60)); ?></a><span>asked <?php echo htmlspecialchars(date('M j', strtotime($q['created_at']))); ?></span></li>
             <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">Every question has at least one answer.</p><?php endif; ?>
         </section>
+        <?php endif; ?>
+        <?php if (aw_can('manage_members')): ?>
         <section class="alert-card" aria-labelledby="admMembers">
             <h4 id="admMembers"><i class="fas fa-user-plus" aria-hidden="true" style="color:var(--rose);"></i> Newest members</h4>
             <?php if ($recent_members): ?><ul class="adm-list"><?php foreach ($recent_members as $u): ?>
                 <li><a href="manage_users.php"><?php echo htmlspecialchars(awDisplayName($u)); ?></a><span>joined <?php echo htmlspecialchars(date('M j', strtotime($u['created_at']))); ?></span></li>
             <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No members yet.</p><?php endif; ?>
         </section>
+        <?php endif; ?>
     </div>
 
     <!-- Deep Dive Stats Modal (opened only when the admin asks) -->
@@ -219,6 +232,19 @@ $pageTitle = 'Admin Dashboard';
 
         <!-- Admin Modules -->
     <div class="admin-grid-container">
+        <?php if (!aw_can('manage_content')): /* K1: a moderator's tools */ ?>
+        <div class="admin-module">
+            <h3>🛡️ Moderation</h3>
+            <div class="admin-module-grid">
+                <a href="manage_community.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Reports</span></a>
+                <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Comments</span></a>
+                <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a>
+                <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a>
+                <a href="manage_prayer_requests.php" class="admin-module-btn"><i class="fas fa-hands-praying"></i><span>Prayer Requests</span></a>
+                <a href="manage_messages.php" class="admin-module-btn"><i class="fas fa-inbox"></i><span>Team Inbox</span></a>
+            </div>
+        </div>
+        <?php else: ?>
         <!-- 1. Books & Poetry -->
         <div class="admin-module">
             <h3>📖 Books & Poetry <a href="manage_poems.php?action=new" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Poem</a></h3>
@@ -283,8 +309,11 @@ $pageTitle = 'Admin Dashboard';
                 <a href="backup.php" class="admin-module-btn"><i class="fas fa-database"></i><span>Database Backup</span></a><!-- P0-1 -->
                 <a href="picks.php" class="admin-module-btn"><i class="fas fa-star"></i><span>Angella's Picks</span></a><!-- C2 -->
                 <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
+                <?php if (aw_can('manage_staff')): ?><a href="staff.php" class="admin-module-btn"><i class="fas fa-user-shield"></i><span>Staff &amp; Roles</span></a><?php endif; ?><!-- K2 -->
+                <?php if (aw_can('audit_log')): ?><a href="audit.php" class="admin-module-btn"><i class="fas fa-clipboard-list"></i><span>Audit Log</span></a><?php endif; ?><!-- K1 -->
             </div>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Quick Add Modal -->
