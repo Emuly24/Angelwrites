@@ -8,6 +8,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
 require_once '../includes/components.php';
+require_once '../includes/twofactor.php';
 
 aw_require('manage_staff');
 
@@ -24,7 +25,19 @@ function aw_staff_find(PDO $db, $q) {
     return count($rows) === 1 ? $rows[0] : null;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_2fa_required'])) {
+    // K5: require two-step sign-in for every staff member (the owner too)
+    $on = $_POST['set_2fa_required'] === '1';
+    if ($on && !aw_2fa_enabled($db, $me)) {
+        $error = 'Turn on two-step sign-in for your own account first (Account security), so you are not locked out.';
+    } else {
+        try {
+            $db->prepare("INSERT INTO settings (key, value) VALUES ('staff_2fa_required', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute([$on ? '1' : '0']);
+            aw_audit('staff_2fa_required', 'setting', null, $on ? 'on' : 'off');
+            header('Location: ' . SITE_URL . '/admin/staff.php'); exit;
+        } catch (Throwable $e) { error_log('2fa required: ' . $e->getMessage()); $error = 'That could not be saved.'; }
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role = (string)($_POST['role'] ?? '');
     $target = null;
     if (isset($_POST['add_staff'])) {
@@ -94,12 +107,13 @@ require_once '../includes/header.php';
         <div class="card" style="margin-bottom:20px;"><div class="card-body">
             <h2 style="font-size:1.2rem;margin:0 0 12px;">Current staff</h2>
             <div class="table-responsive"><table class="admin-table">
-                <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Change</th></tr></thead>
+                <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Two-step sign-in</th><th scope="col">Change</th></tr></thead>
                 <tbody>
                 <?php foreach ($staff as $u): $r = aw_role_of($u); ?>
                     <tr>
                         <td><strong><?php echo htmlspecialchars(awDisplayName($u)); ?></strong><br><small style="color:var(--text-light);"><?php echo htmlspecialchars((string)$u['email']); ?></small></td>
                         <td><?php echo htmlspecialchars(aw_role_label($r)); ?></td>
+                        <td><?php echo aw_2fa_enabled($db, (int)$u['id']) ? 'On' : '<span style="color:#6f4e22;">Off</span>'; ?></td>
                         <td>
                             <?php if ($r === 'owner'): ?>
                                 <span style="color:var(--text-light);">—</span>
@@ -121,6 +135,17 @@ require_once '../includes/header.php';
                 <?php endforeach; ?>
                 </tbody>
             </table></div>
+        </div></div>
+
+        <?php $aw_req = (string)aw_setting('staff_2fa_required', '0') === '1'; ?>
+        <div class="card" style="margin-bottom:20px;"><div class="card-body">
+            <h2 style="font-size:1.2rem;margin:0 0 6px;">Two-step sign-in for staff</h2>
+            <p style="color:var(--text-light);margin:0 0 12px;"><?php echo $aw_req ? 'Required: staff without it are asked to set it up before any staff page opens.' : 'Optional at the moment. Each person can turn it on in Account security.'; ?>
+                <a href="<?php echo SITE_URL; ?>/account_security.php">Your account security</a></p>
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                <?php echo aw_btn($aw_req ? 'Make it optional' : 'Require it for all staff', $aw_req ? 'outline' : 'primary', ['type' => 'submit', 'name' => 'set_2fa_required', 'value' => $aw_req ? '0' : '1', 'small' => true]); ?>
+            </form>
         </div></div>
 
         <div class="card"><div class="card-body">

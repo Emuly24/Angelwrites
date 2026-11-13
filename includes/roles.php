@@ -118,6 +118,8 @@ function aw_require($cap) {
         exit;
     }
     aw_staff_request_guard();
+    require_once __DIR__ . '/twofactor.php';
+    aw_2fa_enforce(); // K5: when the owner requires two-step sign-in for staff
 }
 
 /**

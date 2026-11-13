@@ -242,6 +242,7 @@ $pageTitle = 'Admin Dashboard';
                 <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a>
                 <a href="manage_prayer_requests.php" class="admin-module-btn"><i class="fas fa-hands-praying"></i><span>Prayer Requests</span></a>
                 <a href="inbox.php" class="admin-module-btn"><i class="fas fa-inbox"></i><span>Team Inbox</span></a>
+                <a href="../account_security.php" class="admin-module-btn"><i class="fas fa-lock"></i><span>Account Security</span></a><!-- K5 -->
             </div>
         </div>
         <?php else: ?>
@@ -309,6 +310,7 @@ $pageTitle = 'Admin Dashboard';
                 <a href="backup.php" class="admin-module-btn"><i class="fas fa-database"></i><span>Database Backup</span></a><!-- P0-1 -->
                 <a href="picks.php" class="admin-module-btn"><i class="fas fa-star"></i><span>Angella's Picks</span></a><!-- C2 -->
                 <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
+                <a href="../account_security.php" class="admin-module-btn"><i class="fas fa-lock"></i><span>Account Security</span></a><!-- K5 -->
                 <?php if (aw_can('manage_staff')): ?><a href="staff.php" class="admin-module-btn"><i class="fas fa-user-shield"></i><span>Staff &amp; Roles</span></a><?php endif; ?><!-- K2 -->
                 <?php if (aw_can('audit_log')): ?><a href="audit.php" class="admin-module-btn"><i class="fas fa-clipboard-list"></i><span>Audit Log</span></a><?php endif; ?><!-- K1 -->
             </div>
