@@ -275,7 +275,7 @@ if ($action === 'save_position' && $user_id > 0) {
     ");
     $stmt->execute([$user_id, $book, $chapter, $verse, $percent]);
     
-    // Also track reading progress for challenge
+    // Private record of chapters this member has opened (never shown to anyone else)
     $stmt = $db->prepare("
         INSERT OR IGNORE INTO bible_reading_history (user_id, book, chapter, read_at) 
         VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -286,77 +286,11 @@ if ($action === 'save_position' && $user_id > 0) {
     exit;
 }
 
-// ===== MONTHLY CHALLENGE =====
-if ($action === 'get_monthly_challenge' && $user_id > 0) {
-    $year = date('Y');
-    $month = date('m');
-    
-    // Get or create challenge for this month
-    $stmt = $db->prepare("
-        SELECT id, target, progress FROM bible_monthly_challenges 
-        WHERE user_id = ? AND year = ? AND month = ?
-    ");
-    $stmt->execute([$user_id, $year, $month]);
-    $challenge = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$challenge) {
-        // Default target: 30 chapters per month
-        $stmt = $db->prepare("
-            INSERT INTO bible_monthly_challenges (user_id, year, month, target, progress, created_at) 
-            VALUES (?, ?, ?, 30, 0, CURRENT_TIMESTAMP)
-        ");
-        $stmt->execute([$user_id, $year, $month]);
-        
-        $challenge = [
-            'id' => $db->lastInsertId(),
-            'target' => 30,
-            'progress' => 0
-        ];
-    }
-    
-    // Count unique chapters read this month.
-    // F236: chapters the member reports by hand are stored as 'Daily Reading' chapter 0 (one row per
-    // chapter), so counting DISTINCT book-chapter counted all of them as one. Those rows are now added
-    // one by one; chapters actually opened in the reader are still counted once each.
-    $stmt = $db->prepare("
-        SELECT COUNT(DISTINCT CASE WHEN book = 'Daily Reading' THEN NULL ELSE book || '-' || chapter END)
-             + COALESCE(SUM(CASE WHEN book = 'Daily Reading' THEN 1 ELSE 0 END), 0) as count
-        FROM bible_reading_history 
-        WHERE user_id = ? AND strftime('%Y', read_at) = ? AND strftime('%m', read_at) = ?
-    ");
-    $stmt->execute([$user_id, $year, $month]);
-    $chapters_read = $stmt->fetchColumn();
-    
-    // Update progress
-    $stmt = $db->prepare("UPDATE bible_monthly_challenges SET progress = ? WHERE id = ?");
-    $stmt->execute([$chapters_read, $challenge['id']]);
-    
-    echo json_encode([
-        'success' => true,
-        'goal' => "Read $challenge[target] chapters this month",
-        'target' => (int)$challenge['target'],
-        'progress' => (int)$chapters_read
-    ]);
-    exit;
-}
-
-if ($action === 'update_challenge_progress' && $user_id > 0) {
-    $chapters_read = (int)($_POST['chapters_read'] ?? 0);
-    if ($chapters_read <= 0) {
-        echo json_encode(['success' => false, 'error' => 'Please enter a valid number.']);
-        exit;
-    }
-    
-    // Insert reading entries for today
-    for ($i = 0; $i < $chapters_read; $i++) {
-        $stmt = $db->prepare("
-            INSERT INTO bible_reading_history (user_id, book, chapter, read_at) 
-            VALUES (?, 'Daily Reading', 0, CURRENT_TIMESTAMP)
-        ");
-        $stmt->execute([$user_id]);
-    }
-    
-    echo json_encode(['success' => true]);
+// ===== MONTHLY CHALLENGE (retired) =====
+// C1: the monthly chapter-count challenge was removed with the rest of the points and streaks.
+if ($action === 'get_monthly_challenge' || $action === 'update_challenge_progress') {
+    http_response_code(410);
+    echo json_encode(['success' => false, 'error' => 'The monthly challenge has been retired.']);
     exit;
 }
 

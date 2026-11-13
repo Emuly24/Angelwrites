@@ -3,7 +3,6 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
-require_once 'includes/reputation.php';
 
 $error = '';
 $success = '';
@@ -51,13 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accept_answer'])) {
     
     $stmt = $db->prepare("UPDATE answers SET is_accepted = 1 WHERE id = ?");
     $stmt->execute([$answer_id]);
-    
-    $stmt = $db->prepare("SELECT user_id FROM answers WHERE id = ?");
-    $stmt->execute([$answer_id]);
-    $answer_author = $stmt->fetchColumn();
-    if ($answer_author) {
-        awardReputation($answer_author, 15, 'Answer accepted');
-    }
     
     echo json_encode(['success' => true]);
     exit;
@@ -133,9 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                 $stmt = $db->prepare("UPDATE questions SET answers_count = answers_count + 1 WHERE id = ?");
                 $stmt->execute([$question_id]);
                 $success = 'Your answer has been posted!';
-                
-                // Award reputation to answer author
-                awardReputation($user_id, 5, 'Answered a question');
 
                 // F114: tell the person who asked
                 require_once __DIR__ . '/includes/notifications.php';
@@ -207,10 +196,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
     }
     $stmt = $db->prepare("UPDATE answers SET upvotes = upvotes + 1 WHERE id = ?");
     if ($stmt->execute([$answer_id])) {
-        // Award reputation to answer author for upvotes
-        if ($author_id) {
-            awardReputation($author_id, 1, 'Received an upvote');
-        }
         echo json_encode(['success' => true]);
     } else {
         echo json_encode(['success' => false, 'error' => 'Failed to upvote.']);
@@ -548,33 +533,8 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                     <?php endif; ?>
                 </div>
 
-                <!-- Sidebar: User Reputation & Newsletter -->
+                <!-- Sidebar -->
                 <div class="community-sidebar">
-                    <?php if ($user_id): ?>
-                        <?php
-                        $stmt = $db->prepare("SELECT points, level, badges FROM user_reputations WHERE user_id = ?");
-                        $stmt->execute([$user_id]);
-                        $rep = $stmt->fetch(PDO::FETCH_ASSOC);
-                        if ($rep):
-                            $badges = json_decode($rep['badges'] ?? '[]', true);
-                        ?>
-                            <div class="card">
-                                <div class="card-header"><h4>🏆 Your Reputation</h4></div>
-                                <div class="card-body" style="text-align:center;">
-                                    <div style="font-size:2rem; font-weight:700; color:var(--rose);"><?php echo $rep['points'] ?? 0; ?></div>
-                                    <p>Level <?php echo $rep['level'] ?? 1; ?></p>
-                                    <?php if ($badges): ?>
-                                        <div class="badge-container">
-                                            <?php foreach ($badges as $badge): ?>
-                                                <span class="badge"><?php echo $badge; ?></span>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
                     <div class="card">
                         <div class="card-header"><h4><i class="fas fa-envelope" style="color: var(--rose);"></i> Stay Updated</h4></div>
                         <div class="card-body">

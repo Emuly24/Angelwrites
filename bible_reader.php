@@ -192,8 +192,6 @@ $pageTitle = 'Bible Reader';
                 <button class="reaction-option" data-reaction="🙏" aria-label="Pray">🙏</button>
             </div>
 
-            <!-- ===== CHALLENGE WIDGET ===== -->
-            <div id="bibleChallengeWidget" class="bible-challenge-widget-container" style="display:none;"></div>
 
             <!-- ===== CONTROLS ===== -->
             <div class="bible-controls">
@@ -472,7 +470,6 @@ function awGuestOnly(what) {
     const searchClose = document.getElementById('bibleSearchClose');
     const searchResults = document.getElementById('bibleSearchResults');
     const reactionPicker = document.getElementById('bibleReactionPicker');
-    const challengeWidget = document.getElementById('bibleChallengeWidget');
     const bookSelect = document.getElementById('bibleBookSelect');
     const chapterSelect = document.getElementById('bibleChapterSelect');
     const verseSelect = document.getElementById('bibleVerseSelect');
@@ -1513,59 +1510,6 @@ function awGuestOnly(what) {
     });
 
     // ================================================================
-    // 31. CHALLENGE WIDGET
-    // ================================================================
-    function loadBibleChallenge() {
-        if (userId === 0) return;
-        fetch(`/bible_reader_ajax.php?action=get_monthly_challenge&user_id=${userId}`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    challengeWidget.style.display = 'block';
-                    const percent = Math.min(100, Math.round((data.progress / data.target) * 100));
-                    challengeWidget.innerHTML = `
-                        <div class="bible-challenge-widget">
-                            <h4>📖 Monthly Bible Challenge</h4>
-                            <p>${data.goal}</p>
-                            <div class="bible-challenge-progress">
-                                <div class="bible-challenge-bar" style="width:${percent}%;"></div>
-                                <span class="bible-challenge-percent">${percent}%</span>
-                            </div>
-                            <p class="bible-challenge-stats">${data.progress} / ${data.target} chapters read</p>
-                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;">
-                                <label for="bibleChaptersRead" style="font-size:0.9rem;">Chapters read today</label>
-                                <input type="number" id="bibleChaptersRead" min="1" max="200" inputmode="numeric" style="width:80px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);">
-                                <button class="btn btn-sm btn-primary" onclick="updateBibleChallenge()">📈 Update Progress</button>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-    }
-
-    // Q9: the number of chapters was asked with prompt(); it is now a small field on the card.
-    window.updateBibleChallenge = function() {
-        const input = document.getElementById('bibleChaptersRead');
-        const chapters = input ? input.value : '';
-        if (!(parseInt(chapters) > 0)) { awToast('Enter how many chapters you read (1 or more).', 'info'); if (input) input.focus(); return; }
-        {
-            const formData = new FormData();
-            formData.append('action', 'update_challenge_progress');
-            formData.append('user_id', userId);
-            formData.append('chapters_read', chapters);
-            fetch('/bible_reader_ajax.php', {
-                method: 'POST',
-                body: formData
-            }).then(() => {
-                loadBibleChallenge();
-                awToast('Progress updated.');
-            });
-        }
-    };
-
-    if (userId > 0) loadBibleChallenge();
-
-    // ================================================================
     // 32. SESSION TRACKING
     // ================================================================
     if (userId > 0) {
@@ -1910,14 +1854,6 @@ body.dark-mode {
 .bible-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(44,30,30,0.5); backdrop-filter:blur(4px); z-index:11; display:none; }
 .bible-overlay.active { display:block; }
 
-/* ===== CHALLENGE WIDGET ===== */
-.bible-challenge-widget { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:12px 16px; margin:8px 16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:6px; }
-.bible-challenge-widget h4 { margin:0; font-size:1rem; font-family:'Playfair Display',Georgia,serif; }
-.bible-challenge-widget p { margin:0; font-size:0.9rem; color:var(--text-light); }
-.bible-challenge-progress { position:relative; height:16px; background:var(--border); border-radius:8px; overflow:hidden; }
-.bible-challenge-bar { height:100%; background:var(--rose); transition:width 0.3s; }
-.bible-challenge-percent { position:absolute; top:0; right:8px; font-size:0.7rem; font-weight:600; color:var(--text); line-height:16px; }
-.bible-challenge-stats { font-weight:600; font-size:0.9rem; color:var(--text); }
 
 /* ===== FOCUS MODE ===== */
 .bible-reader-container.focus-mode .bible-reader-header { transform:translateY(-100%); opacity:0; pointer-events:none; }

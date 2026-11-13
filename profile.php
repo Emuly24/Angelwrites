@@ -79,16 +79,6 @@ $stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $videos_watched = $stmt->fetchColumn();
 
-$stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$reading_streak = $stmt->fetchColumn() ?? 0;
-
-$stmt = $db->prepare("SELECT points, level FROM user_reputations WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$rep = $stmt->fetch(PDO::FETCH_ASSOC);
-$rep_points = $rep['points'] ?? 0;
-$rep_level = $rep['level'] ?? 1;
-
 // ===== UPDATE PROFILE =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     // Q31: sign-up asks for first and last name but this form edited a single "name", so the two
@@ -277,18 +267,6 @@ $pageTitle = 'My Profile';
                     <div class="stat-item">
                         <span class="stat-number"><?php echo $videos_watched; ?></span>
                         <span class="stat-label">Videos Watched</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number"><?php echo $reading_streak; ?></span>
-                        <span class="stat-label">Day Streak</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number"><?php echo $rep_points; ?></span>
-                        <span class="stat-label">Reputation Points</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number"><?php echo $rep_level; ?></span>
-                        <span class="stat-label">Level</span>
                     </div>
                 </div>
             </div>

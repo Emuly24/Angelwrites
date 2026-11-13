@@ -220,105 +220,16 @@ function detectChapters($pages) {
 
 // ---------------- GAMIFICATION / LEVEL HELPERS ----------------
 
-/**
- * Calculate reader level based on total reading time (hours).
- * (Older version – kept for backward compatibility.)
- *
- * @param int $user_id
- * @return array ['level', 'name', 'hours_needed']
- */
-function getReaderLevelLegacy($user_id) {
-    global $db;
-    $stmt = $db->prepare("SELECT SUM(duration_seconds) as total_seconds FROM reading_sessions WHERE user_id = ? AND end_time IS NOT NULL");
-    $stmt->execute([$user_id]);
-    $total_seconds = $stmt->fetchColumn() ?? 0;
-    $hours = floor($total_seconds / 3600);
-
-    if ($hours < 10) return ['level' => 1, 'name' => 'Beginner Reader', 'hours_needed' => 10 - $hours];
-    if ($hours < 50) return ['level' => 2, 'name' => 'Avid Reader', 'hours_needed' => 50 - $hours];
-    if ($hours < 200) return ['level' => 3, 'name' => 'Bookworm', 'hours_needed' => 200 - $hours];
-    if ($hours < 500) return ['level' => 4, 'name' => 'Bibliophile', 'hours_needed' => 500 - $hours];
-    return ['level' => 5, 'name' => 'Legendary Reader', 'hours_needed' => 0];
+// C1: reader levels and streak badges are retired (PROGRAM_PLAN.md, wish C). These keep their names
+// and return neutral values so existing callers keep working; nothing reads the old tables.
+function getReaderLevelLegacy($user_id) { return ['level' => 1, 'name' => '']; }
+if (!function_exists('getReaderLevel')) {
+function getReaderLevel($user_id) { return ['level' => 1, 'name' => '', 'xp' => 0, 'xp_to_next' => 0, 'progress' => 0]; }
 }
-
-/**
- * Enhanced level system with XP (requires user_reputations table).
- * Used by the gamification module.
- *
- * @param int $user_id
- * @return array
- */
-function getReaderLevel($user_id) {
-    global $db;
-
-    $data = false;
-    if ($user_id) {
-        $stmt = $db->prepare("SELECT level, xp, xp_to_next FROM user_reputations WHERE user_id = ?");
-        $stmt->execute([$user_id]);
-        $data = $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    if (!$data && !$user_id) {
-        // Guests have no reputation row; show level 1 without writing anything
-        $data = ['level' => 1, 'xp' => 0, 'xp_to_next' => 100];
-    } elseif (!$data) {
-        // Initialize if not exists
-        $stmt = $db->prepare("INSERT INTO user_reputations (user_id, level, xp, xp_to_next) VALUES (?, 1, 0, 100)");
-        $stmt->execute([$user_id]);
-        $data = ['level' => 1, 'xp' => 0, 'xp_to_next' => 100];
-    }
-
-    $level_names = [
-        1  => 'Beginner Reader',
-        2  => 'Avid Reader',
-        3  => 'Bookworm',
-        4  => 'Bibliophile',
-        5  => 'Book Sage',
-        6  => 'Literary Scholar',
-        7  => 'Master Reader',
-        8  => 'Grand Bibliophile',
-        9  => 'Legendary Reader',
-        10 => 'Living Library',
-    ];
-
-    $level = (int)$data['level'];
-    $name = isset($level_names[$level]) ? $level_names[$level] : 'Legendary Reader';
-    $next_level_name = isset($level_names[$level + 1]) ? $level_names[$level + 1] : 'Max Level';
-
-    return [
-        'level' => $level,
-        'name' => $name,
-        'xp' => (int)$data['xp'],
-        'xp_to_next' => (int)$data['xp_to_next'],
-        'next_level_name' => $next_level_name,
-    ];
+if (!function_exists('renderLevelBadge')) {
+function renderLevelBadge($user_id) { return ''; }
 }
-
-
-// ---------------- RENDERING HELPERS ----------------
-
-/**
- * Render a level badge for the toolbar.
- *
- * @param int $user_id
- * @return string HTML
- */
-function renderLevelBadge($user_id) {
-    $level_data = getReaderLevel($user_id);
-    $level = $level_data['level'];
-    $name = $level_data['name'];
-    return '<span class="level-badge" title="' . htmlspecialchars($name) . '">🏆 Lv.' . $level . '</span>';
-}
-
-/**
- * Render a streak badge.
- *
- * @param int $streak_days
- * @return string HTML (empty if $streak_days <= 0)
- */
-function renderStreakBadge($streak_days) {
-    if ($streak_days <= 0) return '';
-    return '<span class="streak-badge">🔥 ' . (int)$streak_days . 'd</span>';
-}
+function renderStreakBadge($streak_days) { return ''; }
 
 /**
  * Render the progress ring (circular progress).

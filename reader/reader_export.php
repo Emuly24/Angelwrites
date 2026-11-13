@@ -74,16 +74,6 @@ $stmt = $db->prepare("SELECT status FROM reading_status WHERE user_id = ? AND bo
 $stmt->execute([$user_id, $book_id]);
 $data['reading_status'] = $stmt->fetchColumn() ?: 'not_started';
 
-// ------------------------- 5. Streak -------------------------
-$stmt = $db->prepare("SELECT current_streak, longest_streak, last_read_date FROM reading_streaks WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$data['streak'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-
-// ------------------------- 6. User Level (from gamification) -------------------------
-require_once __DIR__ . '/reader_gamification.php'; // if in same folder
-$level_data = getReaderLevel($user_id);
-$data['level'] = $level_data;
-
 // ------------------------- 7. Group Notes (if group_id provided) -------------------------
 if ($group_id > 0) {
     // Verify user is a member of the group
@@ -121,17 +111,6 @@ if ($group_id > 0) {
     $data['group_notes'] = null;
 }
 
-// ------------------------- 8. Monthly Challenge -------------------------
-$month = date('m');
-$year = date('Y');
-$stmt = $db->prepare("
-    SELECT goal, target, progress, completed
-    FROM reading_challenges
-    WHERE user_id = ? AND month = ? AND year = ?
-");
-$stmt->execute([$user_id, $month, $year]);
-$data['challenge'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-
 // ------------------------- 9. Reading Sessions Summary -------------------------
 $stmt = $db->prepare("
     SELECT
@@ -144,16 +123,6 @@ $stmt = $db->prepare("
 ");
 $stmt->execute([$user_id, $book_id]);
 $data['sessions'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-
-// ------------------------- 10. Achievements (unlocked for this book) -------------------------
-$stmt = $db->prepare("
-    SELECT achievement_type, unlocked_at
-    FROM achievements
-    WHERE user_id = ?
-    ORDER BY unlocked_at DESC
-");
-$stmt->execute([$user_id]);
-$data['achievements'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ------------------------- Output JSON -------------------------
 // F12: offer the export as a file download instead of raw JSON in the browser window

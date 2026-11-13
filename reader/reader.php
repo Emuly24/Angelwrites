@@ -2,7 +2,7 @@
 // ============================================================
 //  READER.PHP – Final Fully Integrated Reader
 //  Includes all enhancements: StPageFlip, highlights, TTS,
-//  gamification, challenges, sharing, and more.
+//  sharing, and more. (C1: gamification and challenges are retired.)
 // ============================================================
 
 // S7 (F211): errors are logged, never printed to visitors (they leaked server paths).
@@ -46,19 +46,12 @@ if (empty($pages)) {
 $progress_percent = $user_progress['progress_percent'] ?? 0;
 
 // --- Get additional user data ---
-$streak_days = 0;
 $group_id = null;
 $reading_status = 'not_started';
 $reading_speed_wpm = 250;
-$user_level = 1;
 
 if (isLoggedIn()) {
     $user_id = $_SESSION['user_id'];
-
-    // Streak
-    $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $streak_days = (int)$stmt->fetchColumn();
 
     // Group
     $stmt = $db->prepare("SELECT g.id FROM reading_groups g JOIN group_members m ON g.id = m.group_id WHERE g.content_type = 'book' AND g.content_id = ? AND m.user_id = ? LIMIT 1"); // F17: groups store the book as content_type/content_id (book_id is unset)
@@ -75,11 +68,9 @@ if (isLoggedIn()) {
     $stmt->execute([$user_id]);
     $speed = $stmt->fetchColumn();
     if ($speed) $reading_speed_wpm = (int)$speed;
-
-    // User level (from gamification)
-    $level_data = getReaderLevel($user_id);
-    $user_level = $level_data['level'];
 }
+// C1: the reader no longer shows a reading streak, a level, achievements or a monthly challenge
+// (PROGRAM_PLAN.md, wish C).
 
 // --- Bookmarks and highlights ---
 $bookmarks = [];
@@ -145,8 +136,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .toolbar-right { display:flex; align-items:center; gap:8px; }
 .toolbar-right button { background:none; border:none; font-size:1.1rem; cursor:pointer; color:var(--text-light); padding:6px 10px; border-radius:6px; transition:all var(--transition); display:flex; align-items:center; justify-content:center; }
 .toolbar-right button:hover { background:rgba(219,161,162,0.1); color:var(--rose); transform:scale(1.05); }
-.streak-badge { background:var(--rose); color:var(--white); padding:2px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; white-space:nowrap; }
-.level-badge { background:var(--vanilla); color:var(--rose-dark); padding:2px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; white-space:nowrap; border:1px solid var(--rose-light); margin-left:4px;}
 #sidebar { position:fixed; top:var(--toolbar-height); left:0; width:var(--sidebar-width); height:calc(100vh - var(--toolbar-height)); background:var(--card-bg); border-right:1px solid var(--border); z-index:15; display:flex; flex-direction:column; align-items:center; padding:8px 0; gap:4px; overflow-y:auto; transition:transform 0.25s ease; }
 #sidebar.closed { transform:translateX(-100%); }
 #sidebar.open { transform:translateX(0); }
@@ -255,10 +244,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
 .toc-due { font-size:0.75rem; color:var(--rose); white-space:nowrap; }
 .toc-summary { font-size:0.85rem; color:var(--text-light); margin:0 0 10px; }
 .toc-empty { text-align:center; color:var(--text-light); padding:40px 0; }
-#challenge-widget { display:none; margin:8px 16px; padding:12px 16px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); z-index:100001!important; }
-#challenge-widget h4 { margin:0 0 4px; font-size:1rem; }
-.challenge-progress { position:relative; height:12px; background:var(--border); border-radius:6px; overflow:hidden; }
-.challenge-progress .bar { height:100%; background:var(--rose); transition:width 0.3s; }
 #readingStatus { appearance:none; background-color:var(--card-bg); border:1px solid var(--border); border-radius:30px; padding:6px 36px 6px 16px; font-size:0.85rem; font-weight:500; color:var(--text); cursor:pointer; transition:all var(--transition); background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 12px center;background-size:16px; }
 #readingStatus:hover { border-color:var(--rose); }
 #readingStatus:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
@@ -315,7 +300,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
     #highlight-tooltip { flex-wrap:wrap; max-width:92vw; }
     #highlight-tooltip .tooltip-action { min-height:40px; }
     #highlight-tooltip .tooltip-action::after { content:attr(title); font-size:0.75rem; }
-    .toolbar-left .streak-badge, .toolbar-left .level-badge { display:none!important; }
     .page-content-wrapper { padding:6px!important; margin-bottom:20px!important; }
     .page-content-inner { padding:16px!important; min-height:300px!important; font-size:95%!important; }
     #flip-container { padding:0 5px!important; }
@@ -325,7 +309,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     #flipNextBtnWrapper { right:2px!important; }
     .flip-nav-btn-wrapper .aw-nav-btn { width:var(--flip-nav-btn-size)!important; height:var(--flip-nav-btn-size)!important; }
     .flip-nav-btn-wrapper .aw-nav-btn i { font-size:1rem!important; }
-    .modal-wrapper, #search-bar, #challenge-widget, #notes-panel { width:95%!important; max-width:95%!important; padding:16px!important; max-height:80vh!important; }
+    .modal-wrapper, #search-bar, #notes-panel { width:95%!important; max-width:95%!important; padding:16px!important; max-height:80vh!important; }
     #toc-drawer { width:85%!important; right:-85%!important; }
     #toc-drawer.open { right:0!important; }
 }
@@ -365,8 +349,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <div class="toolbar-left">
             <a id="backBtn" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book_id; ?>" aria-label="Back to the book page"><i class="fas fa-arrow-left" aria-hidden="true"></i></a><!-- Q3: a real link (was a JS button) -->
             <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
-            <?php echo renderStreakBadge($streak_days); ?>
-            <?php echo renderLevelBadge($user_id ?? 0); ?>
             <select id="readingStatus">
                 <option value="not_started" <?php echo $reading_status == 'not_started' ? 'selected' : ''; ?>>📌 Not Started</option>
                 <option value="currently_reading" <?php echo $reading_status == 'currently_reading' ? 'selected' : ''; ?>>📖 Currently Reading</option>
@@ -408,7 +390,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights" aria-label="Export Highlights"><i class="fas fa-file-export" aria-hidden="true"></i></button>
         <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress" aria-label="Reset Progress"><i class="fas fa-undo-alt" aria-hidden="true"></i></button>
         <button class="sidebar-btn" id="resumeBtn" title="Resume Position" aria-label="Resume Position"><i class="fas fa-history" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="challengeBtn" title="Challenge" aria-label="Challenge"><i class="fas fa-trophy" aria-hidden="true"></i></button>
         <button class="sidebar-btn" id="shareBtn" title="Share" aria-label="Share"><i class="fas fa-share-alt" aria-hidden="true"></i></button>
     </div>
 
@@ -513,8 +494,6 @@ html,body { height:100%; width:100%; overflow:hidden; }
         <button onclick="document.getElementById('reaction-picker').style.display='none'" style="font-size:0.9rem;background:transparent;border:none;cursor:pointer;color:var(--text-light);">✕</button>
     </div>
 
-    <!-- Challenge Widget (empty – will be filled by reader_challenges.php) -->
-    <div id="challenge-widget"></div>
 
     <!-- Comments Modal -->
     <div id="commentsModal" class="modal-wrapper">
@@ -582,15 +561,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
 <!-- ====== Include all enhanced modules ====== -->
 <script src="https://unpkg.com/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
 <?php
-// Include TTS, sharing, challenges, and gamification toast
+// Include TTS and sharing. (C1: the challenge module and the achievement toast are retired.)
 require_once __DIR__ . '/reader_tts.php';
 require_once __DIR__ . '/reader_share.php';
-require_once __DIR__ . '/reader_challenges.php';
-
-// Render the achievement toast (from gamification)
-if (function_exists('renderAchievementToastJS')) {
-    renderAchievementToastJS();
-}
 ?>
 
 <script>
@@ -703,7 +676,6 @@ if (function_exists('renderAchievementToastJS')) {
     const resetProgressBtn = document.getElementById('resetProgressBtn');
     const exportHighlightsBtn = document.getElementById('exportHighlightsBtn');
     const resumeBtn = document.getElementById('resumeBtn');
-    const challengeBtn = document.getElementById('challengeBtn');
     const commentsBtn = document.getElementById('commentsBtn');
     const commentsModal = document.getElementById('commentsModal');
     const commentList = document.getElementById('commentList');
@@ -1219,7 +1191,6 @@ if (function_exists('renderAchievementToastJS')) {
     commentsBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('view comments.'); return; } loadComments(); openModal('commentsModal'); });
     errorReportBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('report errors.'); return; } errorPageInput.value = currentPage; errorPageNumSpan.textContent = '(current: ' + currentPage + ')'; openModal('errorModal'); });
     prayerBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('submit prayer requests.'); return; } prayerText.value = ''; openModal('prayerModal'); });
-    challengeBtn.addEventListener('click', loadChallenge);
 
     // ----- Analytics / notes / TTS buttons (redirect) -----
     if(analyticsBtn) {
@@ -1260,14 +1231,6 @@ if (function_exists('renderAchievementToastJS')) {
         }
     });
 
-    // ----- Challenge (handled by reader_challenges.php) -----
-    function loadChallenge() {
-        if (window.readerChallenges) {
-            window.readerChallenges.openModal();
-        } else {
-            alert('Challenge system not loaded.');
-        }
-    }
 
     // ----- Selection tooltip -----
     function getSelectedText() { const sel = window.getSelection(); return sel.toString().trim(); }
@@ -1636,7 +1599,6 @@ if (function_exists('renderAchievementToastJS')) {
         tocDrawer.classList.remove('open');
         closeModal('share-modal'); closeModal('commentsModal'); closeModal('errorModal'); closeModal('prayerModal');
         document.getElementById('notes-panel').classList.remove('visible');
-        document.getElementById('challenge-widget').classList.remove('visible');
         document.getElementById('search-bar').classList.remove('visible');
         document.getElementById('reaction-picker').style.display = 'none';
         overlay.classList.remove('active');
@@ -1758,7 +1720,6 @@ if (function_exists('renderAchievementToastJS')) {
     window.closeAll = closeAll;
     window.share = share;
     window.closeShare = closeShare;
-    window.loadChallenge = loadChallenge;
     window.toggleNoteForm = toggleNoteForm;
     window.submitNote = submitNote;
     window.deleteNote = deleteNote;
@@ -1802,7 +1763,6 @@ if (function_exists('renderAchievementToastJS')) {
         data.append('action','start_session');
         data.append('book_id',bookId);
         navigator.sendBeacon('/reader/reader_ajax.php',data);
-        loadChallenge();
     }
     window.addEventListener('beforeunload',function() {
         if (userId > 0) {

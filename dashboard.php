@@ -64,10 +64,7 @@ try { $stmt = $db->prepare("SELECT COUNT(*) FROM video_watches WHERE user_id = ?
 // Questions & Sessions
 try { $stmt = $db->prepare("SELECT COUNT(*) FROM questions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['questions_asked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
 try { $stmt = $db->prepare("SELECT COUNT(*) FROM sessions WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['sessions_booked'] = $stmt->fetchColumn(); } catch (Exception $e) {}
-// Streak & Rep
-try { $stmt = $db->prepare("SELECT current_streak FROM reading_streaks WHERE user_id = ?"); $stmt->execute([$user_id]); $stats['current_streak'] = (int)$stmt->fetchColumn(); /* F118: false (no row) printed as blank */ } catch (Exception $e) {}
-try { $stmt = $db->prepare("SELECT points, level FROM user_reputations WHERE user_id = ?"); $stmt->execute([$user_id]); $rep = $stmt->fetch(PDO::FETCH_ASSOC); $stats['points'] = $rep['points'] ?? 0; $stats['level'] = $rep['level'] ?? 1; } catch (Exception $e) {}
-
+// C1: streaks, points and levels are retired; nothing about them is read here.
 // My total view counts
 $stats['my_views'] = 0;
 try { 
@@ -200,20 +197,6 @@ body.dark-mode .user-module-btn { background: #3a2a2a; color: #e0d0d0; }
         <div>
             <h1>Welcome back, <span style="color:var(--rose);"><?php echo htmlspecialchars(awDisplayName($user)); /* F100 */ ?></span></h1>
             <div class="sub">Your personal dashboard – track your reading journey.</div>
-            <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <?php
-                // Q30: the streak and level badges sat at the top of every dashboard, but nothing fills
-                // user_reputations.points (the reader adds to xp), so everyone saw "Level 1 (0 pts)" and
-                // usually "0 Day Streak". Each badge now only shows when it has something real to say.
-                $aw_level = (int)($stats['level'] ?? 1); $aw_points = (int)($stats['points'] ?? 0);
-                ?>
-                <?php if ((int)$stats['current_streak'] > 0): ?>
-                <span style="background: #c9965a; color: #3d2e2e; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🔥 <?php echo (int)$stats['current_streak']; ?> Day Streak</span>
-                <?php endif; ?>
-                <?php if ($aw_level > 1 || $aw_points > 0): ?>
-                <span style="background: var(--bg); color: #3d2e2e; padding: 2px 12px; border-radius: 20px; font-size:0.75rem; font-weight:600;">🏆 Level <?php echo $aw_level; ?><?php echo $aw_points > 0 ? ' (' . $aw_points . ' pts)' : ''; ?></span>
-                <?php endif; ?>
-            </div>
         </div>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <a href="notifications.php" class="btn btn-outline btn-sm" style="position:relative; border-radius:30px; text-decoration:none;">
