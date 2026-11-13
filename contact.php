@@ -109,7 +109,7 @@ $pageTitle = 'Contact';
                     </div>
                     <div class="form-group">
                         <label for="subject">Subject</label>
-                        <input type="text" id="subject" name="subject" placeholder="What's this about?">
+                        <input type="text" id="subject" name="subject" placeholder="What's this about?" value="<?php echo htmlspecialchars(mb_substr(trim((string)($_POST['subject'] ?? $_GET['subject'] ?? '')), 0, 150)); /* ET4: the "Reply in the app" button in a reply email fills this in */ ?>">
                     </div>
                     <div class="form-group">
                         <label for="message">Message <span class="required">*</span></label>

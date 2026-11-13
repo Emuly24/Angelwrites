@@ -33,8 +33,11 @@ function aw_notify_session_member($db, $session_id, $status) {
         : "Your session on $when has been cancelled. You are welcome to book another time.";
     awNotify($db, $row['uid'], 'session_' . $status, $title, $text, SITE_URL . '/book_session.php');
     if (!empty($row['email'])) {
-        sendEmail($row['email'], $title, 'Hello ' . awDisplayName($row) . ",\n\n$text\n\nYour sessions: " . SITE_URL . "/book_session.php\n\n— AngelWrites",
-            'angelwrites@zohomail.com', 'AngelWrites', false);
+        // ET4: conversational. The member may want to answer or rebook, on the site. The button
+        // opens their sessions page: /session_edit.php?id= only accepts sessions that are still
+        // pending, so for a confirmed or cancelled one it would show an error.
+        sendConversationalEmail($row['email'], $title, 'Hello ' . awDisplayName($row) . ",\n\n$text",
+            SITE_URL . '/book_session.php', 'View my sessions', 'AngelWrites');
     }
 }
 
