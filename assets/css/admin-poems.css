@@ -1,0 +1,145 @@
+/* Admin poems: list and full-page editor (admin/manage_poems.php).
+   Colours come from the site theme tokens (style.css), so light and dark mode both work.
+   Layout: phones and tablets in portrait get one column; from 1024 px (tablet landscape and up)
+   the editor has the text on the left and publishing and media on the right. */
+
+.pe-page { max-width: 1240px; margin: 0 auto; padding: 28px 20px 120px; }
+.pe-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.pe-head h1 { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.7rem, 3.4vw, 2.3rem); margin: 0; color: var(--text); }
+.pe-sub { margin: 6px 0 0; color: var(--text-light); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pe-head-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.pe-crumbs { margin-bottom: 10px; }
+.pe-crumbs a { color: var(--text-light); text-decoration: none; font-weight: 500; display: inline-flex; gap: 6px; align-items: center; min-height: 44px; }
+.pe-crumbs a:hover, .pe-crumbs a:focus-visible { color: var(--rose-dark, #a8676a); }
+.pe-page .btn { min-height: 44px; }
+.pe-page .alert { margin-bottom: 16px; }
+
+/* ---------- badges ---------- */
+.pe-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font: 700 .75rem/1.4 'Inter', sans-serif; letter-spacing: .03em; }
+.pe-badge.is-live { background: #e3efe6; color: #2d5039; }
+.pe-badge.is-draft { background: #f7ecdc; color: #6f4e22; }
+[data-theme="dark"] .pe-badge.is-live { background: rgba(79,138,99,.22); color: #cfe6d6; }
+[data-theme="dark"] .pe-badge.is-draft { background: rgba(201,150,90,.22); color: #f0dcc0; }
+
+/* ---------- list ---------- */
+.pe-search { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.pe-search input { flex: 1 1 240px; min-height: 44px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font: inherit; }
+.pe-bulk { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 16px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px 16px 0 0; border-bottom: 0; }
+.pe-bulk select { min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font: inherit; }
+.pe-check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; min-height: 44px; }
+.pe-check input { width: 20px; height: 20px; accent-color: var(--rose-dark, #a8676a); }
+
+.pe-table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--card-bg); border: 1px solid var(--border); border-radius: 0 0 16px 16px; overflow: hidden; }
+.pe-table th { text-align: left; font: 600 .78rem 'Inter', sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--text-light); padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--vanilla); }
+.pe-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); }
+.pe-table tbody tr:last-child td { border-bottom: 0; }
+.pe-table tbody tr:hover { background: rgba(219,161,162,.06); }
+.pe-c-check { width: 44px; }
+.pe-c-img { width: 64px; }
+.pe-thumb { position: relative; width: 52px; height: 52px; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, var(--fantasy), var(--vanilla)); display: grid; place-items: center; color: var(--rose); }
+.pe-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pe-title { font-weight: 600; color: var(--text); text-decoration: none; font-size: 1rem; }
+.pe-title:hover, .pe-title:focus-visible { color: var(--rose-dark, #a8676a); text-decoration: underline; }
+.pe-dates { display: block; margin-top: 2px; font-size: .82rem; color: var(--text-light); }
+.pe-c-actions { white-space: nowrap; text-align: right; }
+.pe-c-actions .btn { margin: 2px; }
+.pe-danger { background: transparent; border: 1px solid #b4505a; color: #b4505a; }
+.pe-danger:hover, .pe-danger:focus-visible { background: #b4505a; color: #fff; }
+
+/* tablets in portrait and phones: each poem becomes a card */
+@media (max-width: 899px) {
+    .pe-table, .pe-table tbody, .pe-table tr, .pe-table td { display: block; }
+    .pe-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+    .pe-table { border: 0; background: none; border-radius: 0; }
+    .pe-table tr { display: grid; grid-template-columns: 40px 56px 1fr; gap: 4px 12px; align-items: center; background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; margin-top: 12px; }
+    .pe-table tbody tr:hover { background: var(--card-bg); }
+    .pe-table td { border: 0; padding: 0; }
+    .pe-table td[data-label] { grid-column: 3; font-size: .88rem; color: var(--text-light); display: inline-flex; gap: 6px; align-items: center; }
+    .pe-table td[data-label]::before { content: attr(data-label) ":"; font-weight: 600; color: var(--text); }
+    .pe-c-check { grid-row: 1; grid-column: 1; }
+    .pe-c-img { grid-row: 1; grid-column: 2; }
+    .pe-c-title { grid-row: 1; grid-column: 3; }
+    .pe-c-actions { grid-column: 1 / -1; text-align: left; white-space: normal; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; padding-top: 10px !important; border-top: 1px solid var(--border) !important; }
+    .pe-c-actions .btn { margin: 0; }
+    .pe-bulk { border-radius: 16px; border-bottom: 1px solid var(--border); }
+}
+
+/* ---------- editor ---------- */
+.pe-grid { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+@media (min-width: 1024px) {
+    .pe-grid { grid-template-columns: minmax(0, 1fr) 360px; }
+    .pe-side { position: sticky; top: 90px; max-height: calc(100vh - 110px); overflow-y: auto; padding-right: 2px; }
+}
+@media (min-width: 1280px) { .pe-grid { grid-template-columns: minmax(0, 1fr) 380px; } }
+.pe-side { display: flex; flex-direction: column; gap: 20px; }
+.pe-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
+.pe-card h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.15rem; margin: 0 0 14px; color: var(--text); }
+.pe-field { margin: 0 0 18px; border: 0; padding: 0; min-width: 0; }
+.pe-field:last-child { margin-bottom: 0; }
+.pe-field > label, .pe-field legend { display: block; font-weight: 600; margin: 0 0 6px; color: var(--text); padding: 0; }
+.pe-field input[type=text], .pe-field input[type=date], .pe-field textarea {
+    width: 100%; min-height: 44px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--input-bg, var(--card-bg)); color: var(--text); font: inherit; font-size: 1rem;
+}
+.pe-field #title { font-family: 'Playfair Display', Georgia, serif; font-size: 1.35rem; }
+.pe-field textarea { resize: vertical; line-height: 1.6; }
+.pe-field input:focus-visible, .pe-field textarea:focus-visible { outline: none; border-color: var(--rose-dark, #a8676a); box-shadow: 0 0 0 3px rgba(219,161,162,.25); }
+.pe-field [aria-invalid="true"] { border-color: #b4505a; }
+.pe-req { color: #b4505a; }
+.pe-opt { font-weight: 400; color: var(--text-light); font-size: .88rem; }
+.pe-hint { display: block; margin-top: 6px; font-size: .85rem; color: var(--text-light); line-height: 1.45; }
+.pe-status { display: grid; gap: 8px; }
+.pe-radio, .pe-field > .pe-radio { display: flex; font-weight: 400; margin: 0; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+.pe-radio input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--rose-dark, #a8676a); flex: none; }
+.pe-radio span { color: var(--text-light); font-size: .9rem; }
+.pe-radio strong { display: block; color: var(--text); font-size: 1rem; }
+.pe-radio:has(input:checked) { border-color: var(--rose-dark, #a8676a); background: rgba(219,161,162,.1); }
+.pe-link { background: none; border: 0; padding: 6px 0; font: inherit; color: var(--rose-dark, #a8676a); text-decoration: underline; cursor: pointer; min-height: 44px; }
+.pe-link-danger { color: #b4505a; }
+
+.pe-current { margin: 0 0 8px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--fantasy); }
+.pe-current img { display: block; width: 100%; max-height: 220px; object-fit: cover; }
+.pe-missing-note { display: none; padding: 12px; font-size: .88rem; color: #6f4e22; }
+.pe-current.is-missing img { display: none; }
+.pe-current.is-missing .pe-missing-note { display: block; }
+.pe-drop { margin-top: 10px; border: 2px dashed var(--border); border-radius: 14px; padding: 18px; display: flex; gap: 14px; align-items: center; cursor: pointer; background: var(--fantasy); color: var(--text-light); transition: border-color .2s, background .2s; }
+.pe-drop i { font-size: 1.6rem; color: var(--rose); flex: none; }
+.pe-drop strong { color: var(--text); }
+.pe-drop:hover, .pe-drop:focus-visible, .pe-drop.is-over { border-color: var(--rose-dark, #a8676a); background: rgba(219,161,162,.08); outline: none; }
+.pe-drop img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; margin-left: auto; }
+.pe-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.pe-audio { width: 100%; margin: 8px 0; }
+.pe-rec-status { font-size: .88rem; color: var(--text-light); }
+#recordBtn[aria-pressed="true"] { border-color: #b4505a; color: #b4505a; }
+
+/* save bar: always within reach, also on phones and tablets */
+.pe-savebar { position: sticky; bottom: 0; z-index: 20; display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 -8px 24px rgba(44,30,30,.08); }
+@media (max-width: 599px) { .pe-savebar .btn { flex: 1; justify-content: center; } }
+.pe-danger-zone { margin-top: 24px; text-align: right; }
+
+/* ---------- preview dialog ---------- */
+.pe-dialog { position: fixed; inset: 0; z-index: 3000; background: rgba(30,20,20,.6); display: grid; place-items: center; padding: 16px; }
+.pe-dialog[hidden] { display: none; }
+.pe-dialog-box { position: relative; width: min(720px, 100%); max-height: 90vh; overflow-y: auto; background: var(--card-bg); color: var(--text); border-radius: 20px; padding: clamp(24px, 5vw, 48px); }
+.pe-dialog-close { position: absolute; top: 10px; right: 12px; width: 44px; height: 44px; border: 0; background: none; font-size: 1.8rem; color: var(--text-light); cursor: pointer; }
+.pe-pv-kicker { margin: 0; font: 600 .78rem 'Inter', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--text-light); }
+.pe-dialog-box h2 { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 6px 0 4px; }
+.pe-pv-date { margin: 0 0 18px; color: var(--text-light); }
+.pe-pv-intro { white-space: pre-line; font-style: italic; color: var(--text-light); border-left: 3px solid var(--rose); padding-left: 14px; margin-bottom: 22px; }
+.pe-pv-body { font-family: Georgia, serif; font-size: 1.1rem; line-height: 1.9; }
+
+/* ---------- camera ---------- */
+.pe-camera { position: fixed; inset: 0; z-index: 3100; background: #000; display: flex; flex-direction: column; }
+.pe-camera[hidden] { display: none; }
+.pe-camera video { flex: 1; width: 100%; min-height: 0; object-fit: cover; }
+.pe-camera-bar { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px calc(18px + env(safe-area-inset-bottom)); background: #000; }
+.pe-cam-btn { min-width: 88px; min-height: 44px; border-radius: 999px; border: 1px solid rgba(255,255,255,.4); background: rgba(255,255,255,.12); color: #fff; font: inherit; cursor: pointer; }
+.pe-shutter { width: 72px; height: 72px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.85); cursor: pointer; }
+.pe-shutter:focus-visible, .pe-cam-btn:focus-visible { outline: 3px solid var(--rose); outline-offset: 3px; }
+.pe-camera-status { position: absolute; top: 16px; left: 0; right: 0; text-align: center; color: #fff; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .pe-drop { transition: none; } }
+
+/* WCAG 2.2 (2.4.11 focus not obscured): a field brought into view by Tab or by the browser stays clear
+   of the sticky site header above and the sticky save bar below. */
+.pe-form :is(input, textarea, select, button, .pe-drop, .pe-radio, .tox-tinymce) { scroll-margin-top: 110px; scroll-margin-bottom: 120px; }
