@@ -237,7 +237,9 @@ $pageTitle = 'Manage Videos';
                                             <label for="video_file" class="btn btn-outline btn-sm">
                                                 <i class="fas fa-upload"></i> Or Upload Video File
                                             </label>
-                                            <input type="file" id="video_file" name="video_file"<?php echo aw_upload_attrs('video_recording'); ?> style="display:none;">
+                                            <input type="file" id="video_file" name="video_file"<?php /* recorder output (may be WebM) and chosen files share this field: accept both, word it for chosen files */
+                                                echo str_replace(['data-aw-label="video recording"', 'data-aw-toobig="' . htmlspecialchars(aw_upload_limits()['video_recording']['too_big']) . '"'],
+                                                                 ['data-aw-label="video"', 'data-aw-toobig="' . htmlspecialchars(aw_upload_limits()['video']['too_big']) . '"'], aw_upload_attrs('video_recording')); ?> style="display:none;">
                                             <span id="fileChosen" class="file-status">No file chosen</span>
                                             <small style="display:block;margin-top:6px;">Uploaded files: <?php echo htmlspecialchars(aw_upload_hint('video')); ?>. Longer or larger videos: compress them first, or paste a YouTube link above.</small><!-- R6 -->
                                         </div>
