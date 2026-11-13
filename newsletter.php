@@ -113,12 +113,12 @@ $redirect = isset($_POST['redirect']) ? $_POST['redirect'] : '/index.php';
 // S10: only same-site paths. SITE_URL . $redirect must not let the value change the host
 // (e.g. "@evil.example/" turns SITE_URL into userinfo). Require a leading "/" and no
 // backslash, CR/LF or other control characters.
-if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || preg_match('/[\\\x00-\x1f\x7f]/', $redirect)) {
+if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || preg_match('/[\\\\\x00-\x1f\x7f]/', $redirect) /* the earlier pattern did not compile, so this check never ran */) {
     $redirect = '/index.php';
 }
 
 // Store message in session to display after redirect
-session_start();
+if (session_status() !== PHP_SESSION_ACTIVE) session_start(); // auth.php has usually started it already
 if ($error) {
     $_SESSION['newsletter_error'] = $error;
 } elseif ($success) {
