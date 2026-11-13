@@ -62,26 +62,17 @@ FOOTER – Brand, Links, Social
                     <a href="<?php echo SITE_URL; ?>/pinterest" aria-label="Pinterest"><i class="fab fa-pinterest-p"></i></a>
                 </div>
                 <?php
-                // Q37: newsletter.php stored a success/error message and sent the visitor to the homepage,
-                // but nothing showed it, and the form had no name field. The form now returns to this
-                // page and the message is shown here once.
+                // Q37: the result of a no-JavaScript submission is shown here once.
+                // J1: the control itself reads the member's real subscription state (includes/subscribe_control.php).
                 $aw_nl_ok = $_SESSION['newsletter_success'] ?? '';
                 $aw_nl_err = $_SESSION['newsletter_error'] ?? '';
                 unset($_SESSION['newsletter_success'], $_SESSION['newsletter_error']);
-                $aw_nl_back = strtok((string)($_SERVER['REQUEST_URI'] ?? '/index.php'), '#');
-                if ($aw_nl_back === '' || $aw_nl_back[0] !== '/' || strpos($aw_nl_back, '//') === 0) $aw_nl_back = '/index.php';
+                if (isset($db) && $db instanceof PDO) {
+                    require_once __DIR__ . '/subscribe_control.php';
+                    echo aw_subscribe_assets();
+                    echo aw_subscribe_control($db, 'footer', $aw_nl_ok, $aw_nl_err);
+                }
                 ?>
-                <div class="footer-newsletter" id="footer-newsletter">
-                    <p>Get updates straight to your inbox.</p>
-                    <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="footer-newsletter-form">
-                        <input type="text" name="name" placeholder="Your name (optional)" aria-label="Your name (optional)" autocomplete="name">
-                        <input type="email" name="email" placeholder="Your email" aria-label="Your email" autocomplete="email" required>
-                        <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($aw_nl_back . '#footer-newsletter'); ?>">
-                        <button type="submit" aria-label="Subscribe"><i class="fas fa-paper-plane" aria-hidden="true"></i></button>
-                    </form>
-                    <?php if ($aw_nl_ok !== ''): ?><p class="footer-newsletter-msg" role="status" style="margin-top:8px;font-weight:600;">✅ <?php echo htmlspecialchars($aw_nl_ok); ?></p><?php endif; ?>
-                    <?php if ($aw_nl_err !== ''): ?><p class="footer-newsletter-msg" role="alert" style="margin-top:8px;font-weight:600;">⚠️ <?php echo htmlspecialchars($aw_nl_err); ?></p><?php endif; ?>
-                </div>
             </div>
         </div>
 

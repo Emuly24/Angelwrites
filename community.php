@@ -553,19 +553,14 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
 
                 <!-- Sidebar -->
                 <div class="community-sidebar">
+                    <?php // J1: this form posted to community.php, which never handled it; it is now the shared control
+                        require_once 'includes/subscribe_control.php'; $aw_sub_html = aw_subscribe_control($db, 'sidebar'); ?>
+                    <?php if ($aw_sub_html !== ''): ?>
                     <div class="card">
-                        <div class="card-header"><h4><i class="fas fa-envelope" style="color: var(--rose);"></i> Stay Updated</h4></div>
-                        <div class="card-body">
-                            <p>Subscribe to receive free email updates when new questions are answered.</p>
-                            <form method="POST" class="sidebar-newsletter-form">
-                                <div class="form-group">
-                                    <input type="email" name="email" placeholder="Your email address" required>
-                                </div>
-                                <button type="submit" name="subscribe_newsletter" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Subscribe Free</button>
-                            </form>
-                            <small>No spam. Unsubscribe anytime.</small>
-                        </div>
+                        <div class="card-header"><h4><i class="fas fa-envelope" style="color: var(--rose);" aria-hidden="true"></i> Stay Updated</h4></div>
+                        <div class="card-body"><?php echo aw_subscribe_assets(); echo $aw_sub_html; ?></div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php endif; ?>
@@ -842,10 +837,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .community-sidebar .card-body { padding: 20px; }
 .badge-container { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
 .badge-container .badge { background: var(--rose); color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; }
-.sidebar-newsletter-form input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; background: var(--input-bg); color: var(--text); }
-.sidebar-newsletter-form input:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
-.sidebar-newsletter-form .btn-block { width: 100%; }
-.sidebar-newsletter-form small { display: block; text-align: center; margin-top: 8px; color: var(--text-light); font-size: 0.8rem; }
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
 .empty-state h3 { font-size: 1.3rem; margin-bottom: 6px; }
 

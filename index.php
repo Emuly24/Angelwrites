@@ -22,6 +22,11 @@ if (!isLoggedIn() && $_SERVER['REQUEST_METHOD'] === 'GET') {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
         echo str_replace('__AW_CSRF_TOKEN__', $_SESSION['csrf_token'], file_get_contents($cacheFile));
+        // J1: the cache holds the page body only (it is written before the footer is included),
+        // so a cached page had no footer. The footer is rendered fresh for every visitor.
+        require_once 'includes/db.php';
+        require_once 'includes/auth.php';
+        require_once 'includes/footer.php';
         exit;
     }
     ob_start();
@@ -144,30 +149,7 @@ if ($isLoggedIn) {
 
 $greeting = $isLoggedIn ? "Welcome back, " . htmlspecialchars($_SESSION['name'] ?? 'Friend') . "!" : "Welcome Home.";
 
-// ===== NEWSLETTER (with CSRF) =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['newsletter_email'])) {
-    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
-        $newsletter_error = 'Invalid request. Please try again.';
-    } else {
-        $email = trim($_POST['newsletter_email']);
-        $name = isset($_POST['newsletter_name']) ? trim($_POST['newsletter_name']) : '';
-        
-        if (empty($email)) {
-            $newsletter_error = 'Please enter your email address.';
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $newsletter_error = 'Please enter a valid email address.';
-        } else {
-            // F176: double opt-in (includes/newsletter_optin.php)
-            require_once 'includes/newsletter_optin.php';
-            $optin = newsletter_request_optin($db, $email, $name);
-            if ($optin['ok']) {
-                $newsletter_success = $optin['message'];
-            } else {
-                $newsletter_error = $optin['message'];
-            }
-        }
-    }
-}
+// J1: the home page's newsletter form now posts to newsletter.php like the footer one.
 
 // ===== TESTIMONIAL SUBMISSION (with CSRF) =====
 if ($isLoggedIn && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_testimonial'])) {
@@ -984,24 +966,15 @@ if ('serviceWorker' in navigator) {
 </section>
 <?php endif; ?>
 
-<!-- NEWSLETTER -->
+<!-- NEWSLETTER (J1: the shared subscribe control; hidden for members who are subscribed) -->
+<?php require_once 'includes/subscribe_control.php'; $aw_sub_html = aw_subscribe_control($db, 'section'); ?>
+<?php if ($aw_sub_html !== ''): ?>
 <section class="newsletter-section section-padding" style="background-color: var(--fantasy);">
     <div class="container">
-        <div class="newsletter-content">
-            <h2>Stay <span class="rose-text">Inspired</span></h2>
-            <p>Join the newsletter to receive Angella's latest writings, book updates, and free resources directly to your inbox.</p>
-            <?php if (isset($newsletter_error)): ?><div class="alert alert-error"><?php echo htmlspecialchars($newsletter_error); ?></div><?php endif; ?>
-            <?php if (isset($newsletter_success)): ?><div class="alert alert-success"><?php echo htmlspecialchars($newsletter_success); ?></div><?php endif; ?>
-            <form action="<?php echo SITE_URL; ?>/index.php" method="POST" class="newsletter-form">
-                <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-                <input type="email" name="newsletter_email" placeholder="Your email address" required>
-                <input type="text" name="newsletter_name" placeholder="Your name (optional)">
-                <button type="submit" class="btn btn-primary">Subscribe Free</button>
-            </form>
-            <small>No spam. Unsubscribe anytime.</small>
-        </div>
+        <?php echo aw_subscribe_assets(); echo $aw_sub_html; ?>
     </div>
 </section>
+<?php endif; ?>
 
 <!-- ===== JAVASCRIPT ===== -->
 <script>
