@@ -4,6 +4,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/csrf.php'; // VF3
+require_once '../includes/upload.php'; // R13: shared upload limits
 
 redirectIfNotAdmin();
 
@@ -37,31 +38,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     $admin_email = trim($_POST['admin_email']);
     $site_description = trim($_POST['site_description']);
 
-    // ===== LIVE PHOTO CAPTURE =====
-    if (!empty($_FILES['live_logo']['name'])) {
-        $upload_dir = '../assets/uploads/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $photo_filename = 'site_logo_' . time() . '.jpg';
-        if (move_uploaded_file($_FILES['live_logo']['tmp_name'], $upload_dir . $photo_filename)) {
-            $logo_path = 'assets/uploads/' . $photo_filename;
-        } else {
-            $error = 'Failed to upload captured logo.';
-        }
+    // ===== LOGO (camera capture or chosen file) =====
+    // R13: a new logo goes through the shared helper as an 'image': it must really be an image (any
+    // file type was accepted before, under its uploaded name), is resized to 1600 px at most and
+    // keeps its transparency. Brand assets are exempt from member quotas (count_quota = false), and
+    // logo files already on the server are not touched.
+    foreach (['live_logo' => 'site_logo_', 'logo' => 'logo_'] as $aw_f => $aw_prefix) {
+        if (!empty($error)) break;
+        $aw_up = aw_upload_store($_FILES[$aw_f] ?? null, 'image', 'assets/uploads', ['prefix' => $aw_prefix, 'count_quota' => false]);
+        if (!empty($aw_up['ok'])) { $logo_path = $aw_up['path']; }
+        elseif (empty($aw_up['empty'])) { $error = 'Logo: ' . $aw_up['error']; }
     }
 
-    // ===== STANDARD LOGO UPLOAD (FALLBACK) =====
-    if (empty($error) && !empty($_FILES['logo']['name'])) {
-        $upload_dir = '../assets/uploads/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $logo_filename = 'logo_' . time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $_FILES['logo']['name']);
-        if (move_uploaded_file($_FILES['logo']['tmp_name'], $upload_dir . $logo_filename)) {
-            $logo_path = 'assets/uploads/' . $logo_filename;
-        } else {
-            $error = 'Failed to upload logo.';
-        }
-    }
-
-    if (empty($site_name)) {
+    if (!empty($error)) {
+        // the logo was refused: say why and save nothing
+    } elseif (empty($site_name)) {
         $error = 'Site name is required.';
     } elseif (!filter_var($admin_email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
@@ -142,6 +133,7 @@ $pageTitle = 'Site Settings';
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
             <button class="tab-btn<?php echo $aw_mail_test ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
+            <button class="tab-btn" data-tab="uploads">Uploads</button><!-- R13 -->
         </div>
 
         <!-- ===== GENERAL TAB ===== -->
@@ -218,7 +210,8 @@ $pageTitle = 'Site Settings';
                         <!-- ===== STANDARD LOGO UPLOAD ===== -->
                         <div class="form-group">
                             <label for="logo">Or Upload Logo</label>
-                            <input type="file" id="logo" name="logo" accept="image/*">
+                            <input type="file" id="logo" name="logo"<?php echo aw_upload_attrs('image'); ?>>
+                            <small class="field-hint"><?php echo htmlspecialchars(aw_upload_hint('image')); ?>.</small><!-- R13 -->
                             <?php if ($logo_path): ?>
                                 <div class="current-file">
                                     <img src="<?php echo SITE_URL . '/' . $logo_path; ?>" alt="Current logo" style="max-width:150px; max-height:150px; border-radius:12px;">
@@ -233,6 +226,83 @@ $pageTitle = 'Site Settings';
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== R13: UPLOADS TAB: what this server can do, the limits in force, and recent refusals ===== -->
+        <div class="tab-content" id="tab-uploads">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-cloud-arrow-up"></i> Uploads on this server</h2>
+                </div>
+                <div class="card-body">
+                    <?php $aw_tools = aw_upload_image_tools(); $aw_yes = function ($b) { return $b ? '<strong style="color:#3e6f4f;">Yes</strong>' : '<strong style="color:#94404a;">No</strong>'; }; ?>
+                    <?php if (aw_upload_can_process_images()): ?>
+                        <div class="alert alert-success">This server can resize images (GD is available). Large photos are resized, re-encoded and stripped of location data automatically.</div>
+                    <?php else: ?>
+                        <div class="alert alert-error">This server cannot resize images (neither GD nor Imagick is usable). Images over the limit are refused; nothing is compressed.</div>
+                    <?php endif; ?>
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <tbody>
+                                <tr><td>GD (image resizing)</td><td><?php echo $aw_yes($aw_tools['gd']); ?> · JPEG <?php echo $aw_yes($aw_tools['jpeg']); ?> · PNG <?php echo $aw_yes($aw_tools['png']); ?> · WebP <?php echo $aw_yes($aw_tools['webp']); ?></td></tr>
+                                <tr><td>Imagick</td><td><?php echo $aw_yes($aw_tools['imagick']); ?> <small>(not needed when GD is present)</small></td></tr>
+                                <tr><td>EXIF reader / file-type detection / zip</td><td><?php echo $aw_yes($aw_tools['exif']); ?> · <?php echo $aw_yes($aw_tools['finfo']); ?> · <?php echo $aw_yes($aw_tools['zip']); ?></td></tr>
+                                <tr><td>Largest single file the server accepts</td><td><strong><?php echo htmlspecialchars(aw_upload_mb(aw_upload_host_max())); ?></strong> <small>(upload_max_filesize <?php echo htmlspecialchars((string)ini_get('upload_max_filesize')); ?>, post_max_size <?php echo htmlspecialchars((string)ini_get('post_max_size')); ?>, memory_limit <?php echo htmlspecialchars((string)ini_get('memory_limit')); ?>)</small></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 style="margin:24px 0 10px;">Limits in force</h3>
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead><tr><th>Type</th><th>Configured</th><th>Effective on this server</th></tr></thead>
+                            <tbody>
+                            <?php foreach (aw_upload_limits() as $aw_k => $aw_c): if ($aw_k[0] === '_') continue; $aw_e = aw_upload_effective($aw_k); ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars(ucfirst($aw_c['label'])); ?></td>
+                                    <td><?php echo htmlspecialchars(aw_upload_mb((int)$aw_c['max_bytes'])); ?></td>
+                                    <td><?php echo htmlspecialchars(aw_upload_hint($aw_k)); ?><?php if ($aw_e['stored_bytes'] < $aw_c['max_bytes']): ?> <small style="color:#94404a;">(the server's own limit is lower than the configured one)</small><?php endif; ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php $aw_q = aw_upload_limits()['_quota']; ?>
+                                <tr><td>Per member</td><td colspan="2"><?php echo htmlspecialchars(aw_upload_mb($aw_q['per_day_bytes'])); ?> a day, <?php echo htmlspecialchars(aw_upload_mb($aw_q['total_bytes'])); ?> in total. Admins, Bible databases and logo files are exempt.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="field-hint">All numbers live in <code>includes/upload_limits.php</code>.</p>
+
+                    <h3 style="margin:24px 0 10px;">Recent refused uploads</h3>
+                    <?php
+                    $aw_rej = [];
+                    $aw_rej_file = __DIR__ . '/../data/upload_rejections.log';
+                    if (is_file($aw_rej_file)) {
+                        foreach (array_slice(array_reverse((array)@file($aw_rej_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)), 0, 15) as $aw_l) {
+                            $aw_r = json_decode($aw_l, true); if (is_array($aw_r)) $aw_rej[] = $aw_r;
+                        }
+                    }
+                    ?>
+                    <?php if (!$aw_rej): ?>
+                        <p class="no-items">No uploads have been refused.</p>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="admin-table">
+                                <thead><tr><th>When</th><th>Member</th><th>Type</th><th>Size</th><th>Reason</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($aw_rej as $aw_r): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string)($aw_r['at'] ?? '')); ?></td>
+                                        <td><?php echo $aw_r['member'] === null ? '—' : '#' . (int)$aw_r['member']; ?></td>
+                                        <td><?php echo htmlspecialchars((string)($aw_r['type'] ?? '')); ?></td>
+                                        <td><?php echo htmlspecialchars(aw_upload_mb((int)($aw_r['size'] ?? 0))); ?></td>
+                                        <td style="white-space:normal;max-width:420px;"><?php echo htmlspecialchars((string)($aw_r['reason'] ?? '')); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -542,4 +612,5 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 }
 </style>
 
+<?php aw_upload_script(); /* R13 */ ?>
 <?php require_once '../includes/footer.php'; ?>
