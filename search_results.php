@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/poem_card.php'; // M1: poems use the shared poem card
 
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $type = isset($_GET['type']) ? trim($_GET['type']) : 'all';
@@ -187,6 +188,7 @@ function readingTime($content) {
 $pageTitle = 'Search Results: ' . htmlspecialchars($q);
 ?>
 <?php require_once 'includes/header.php'; ?>
+<?php echo aw_poem_assets(); /* M1: poem card styles */ ?>
 
 <!-- ===== READING PROGRESS BAR ===== -->
 <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
@@ -280,6 +282,13 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                         case 'video':
                             $link = SITE_URL . '/video_watch.php?id=' . $item['id'];
                             break;
+                    }
+                    if ($item['type'] === 'poem') {
+                        // M1: a poem looks the same here as on the home page and Poetry
+                        echo aw_poem_card(['id' => $item['id'], 'title' => $item['title'], 'content' => $item['content'] ?? '',
+                            'image_path' => $item['image'] ?? '', 'created_at' => $item['created_at'] ?? ''],
+                            ['title_html' => $title_marked, 'label' => 'Poem']);
+                        continue;
                     }
                     ?>
                     <div class="result-card">
@@ -393,20 +402,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ===== THEME TOGGLE =====
-    const themeToggle = document.getElementById('themeToggle');
-    const currentTheme = localStorage.getItem('searchTheme') || 'light';
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-    }
-
-    window.toggleTheme = function() {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        localStorage.setItem('searchTheme', isDark ? 'dark' : 'light');
-        themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-    };
+    // M1: the page's own theme toggle is gone (the site header has one); its leftover code
+    // looked for a button that no longer exists and stopped the script for anyone who had used it.
 
     // ===== VIEW TOGGLE =====
     const viewToggle = document.getElementById('viewToggle');
@@ -444,30 +441,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-/* ===== BASE & DARK MODE ===== */
-:root {
-    --rose: #94404a;
-    --rose-dark: #94404a;
-    --vanilla: #fdf5e6;
-    --dark: #1a1212;
-    --text-light: #6b5a5a;
-    --input-bg: #fdf9f8;
-    --card-bg: #ffffff;
-    --border: #ece0de;
-    --shadow: 0 4px 20px rgba(0,0,0,0.06);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.10);
-    --bg: #fdf9f8;
-}
-body.dark-mode {
-    --bg: #1a1212;
-    --card-bg: #2c1e1e;
-    --border: #4a3a3a;
-    --text-light: #b8a8a8;
-    --input-bg: #3d2e2e;
-    --vanilla: #2c1e1e;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
-}
+/* ===== BASE ===== */
+/* M1: colours come from the site theme (style.css), so this page follows light and dark mode. */
 body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
 
 .search-results-page { padding: 32px 0 60px; }
@@ -481,7 +456,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .filter-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: center; background: var(--card-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border); }
 .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
 .filter-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
-.filter-group select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 0.9rem; }
+.filter-group select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg, var(--card-bg)); color: var(--text); font-size: 0.9rem; }
 .filter-group select:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 3px rgba(219,161,162,0.15); }
 .filter-form .btn { padding: 8px 20px; border-radius: 30px; }
 
@@ -491,6 +466,9 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 /* ===== RESULTS GRID ===== */
 .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; margin-bottom: 32px; }
 .results-grid.list-view { grid-template-columns: 1fr; }
+.results-grid.list-view .aw-card { flex-direction: row; }
+.results-grid.list-view .aw-card-img { flex: 0 0 220px; aspect-ratio: auto; min-height: 160px; }
+@media (max-width: 600px) { .results-grid.list-view .aw-card { flex-direction: column; } .results-grid.list-view .aw-card-img { flex-basis: auto; aspect-ratio: 16 / 10; } }
 .result-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; }
 .result-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
 

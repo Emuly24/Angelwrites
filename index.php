@@ -224,11 +224,13 @@ if ($carousel_poem) {
 
 // C2: "Angella's picks" — a poem, a story and a reflection chosen by the team (admin/picks.php)
 require_once 'includes/picks.php';
+require_once 'includes/poem_card.php'; // M1
 $aw_picks = aw_picks($db);
 
 $pageTitle = 'AngelWrites — Christian Writing & Community';
 ?>
 <?php require_once 'includes/header.php'; ?>
+<?php echo aw_poem_assets(); /* M1: poem card styles */ ?>
 
 <!-- PWA Manifest and Service Worker -->
 <link rel="manifest" href="/manifest.json">
@@ -515,17 +517,6 @@ if ('serviceWorker' in navigator) {
     .book-price { font-size:0.9rem; font-weight:600; color:var(--text); }
     .free-text { color:#4f8a63; }
     .sale-text { color:#b4505a; text-decoration:line-through; }
-
-    /* ===== POEMS ===== */
-    .poem-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:24px; }
-    .poem-card { background:var(--card-bg); border-radius:16px; padding:20px; border:1px solid var(--border); transition:all var(--transition); }
-    .poem-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-hover); }
-    .poem-thumbnail { width:100%; height:180px; border-radius:12px; overflow:hidden; margin-bottom:12px; }
-    .poem-thumbnail img { width:100%; height:100%; object-fit:cover; }
-    .poem-content h3 { font-size:1.1rem; margin:0 0 6px; }
-    .intro-label { display:block; font-size:0.7rem; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px; }
-    .poem-excerpt { font-size:0.9rem; color:var(--text-light); }
-    .poem-audio audio { width:100%; margin-top:8px; border-radius:8px; }
 
     /* ===== BLOG ===== */
     .blog-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:24px; }
@@ -931,40 +922,10 @@ if ('serviceWorker' in navigator) {
                 <h2>Latest <span class="rose-text">Poems</span></h2>
                 <p>Words that speak to the soul.</p>
             </div>
-            <div class="poem-grid">
+            <!-- M1: the same poem card as the Poetry page -->
+            <div class="aw-cat-grid">
                 <?php foreach ($latest_poems as $poem): ?>
-                    <?php 
-                    $intro_parts = explode("\n\n", $poem['intro'] ?? '');
-                    $verse = $intro_parts[0] ?? '';
-                    $purpose = $intro_parts[1] ?? '';
-                    ?>
-                    <div class="poem-card">
-                        <?php if ($poem['image_path']): ?>
-                            <div class="poem-thumbnail">
-                                <img src="<?php echo get_image_url($poem['image_path']); ?>" alt="<?php echo htmlspecialchars($poem['title']); ?>" loading="lazy">
-                            </div>
-                        <?php endif; ?>
-                        <div class="poem-content">
-                            <h3><?php echo htmlspecialchars($poem['title']); ?></h3>
-                            <?php if ($verse): ?>
-                                <div class="poem-intro-preview">
-                                    <span class="intro-label">✧ Verse</span>
-                                    <p><?php echo htmlspecialchars(substr($verse, 0, 150)); ?><?php if (strlen($verse) > 150) echo '...'; ?></p>
-                                </div>
-                            <?php endif; ?>
-                            <?php if ($purpose): ?>
-                                <p class="poem-excerpt"><?php echo htmlspecialchars(substr($purpose, 0, 120)); ?><?php if (strlen($purpose) > 120) echo '...'; ?></p>
-                            <?php endif; ?>
-                            <a href="<?php echo SITE_URL; ?>/poem_view.php?id=<?php echo $poem['id']; ?>" class="read-more">Read full poem →</a>
-                        </div>
-                        <?php if ($poem['audio_path']): ?>
-                            <div class="poem-audio">
-                                <audio controls>
-                                    <source src="<?php echo SITE_URL . '/' . $poem['audio_path']; ?>" type="audio/mpeg">
-                                </audio>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                    <?php echo aw_poem_card($poem); ?>
                 <?php endforeach; ?>
             </div>
             <div class="section-footer">
