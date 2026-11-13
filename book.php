@@ -172,15 +172,22 @@ $pageTitle = htmlspecialchars($book['title']);
             <!-- Book Cover Section -->
             <div class="book-cover-section">
                 <div class="book-cover-card">
+                    <div class="placeholder-cover" aria-hidden="true"><span><?php echo htmlspecialchars($book['title']); ?></span><small><?php echo htmlspecialchars((string)$book['author']); ?></small></div>
                     <?php if ($book['cover_path']): ?>
-                        <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" class="cover-image">
-                    <?php else: ?>
-                        <div class="placeholder-cover">
-                            <i class="fas fa-book"></i>
-                        </div>
+                        <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="Cover of <?php echo htmlspecialchars($book['title']); ?>" class="cover-image" onerror="this.remove()">
                     <?php endif; ?>
                 </div>
 
+            </div>
+
+            <!-- Title, author and what you can do with the book -->
+            <div class="book-head">
+                <h1 class="book-title"><?php echo htmlspecialchars($book['title']); ?></h1>
+                <p class="book-byline"><?php echo htmlspecialchars((string)$book['author']); ?></p>
+                <div class="book-meta">
+                    <?php if (!empty($book['file_type'])): ?><span class="meta-format"><?php echo strtoupper(htmlspecialchars((string)$book['file_type'])); ?></span><?php endif; ?>
+                    <?php if ($total_reviews > 0): ?><a class="meta-rating" href="#reviews"><i class="fas fa-star" aria-hidden="true"></i> <?php echo number_format($avg_rating, 1); ?> <span>(<?php echo (int)$total_reviews; ?>)</span></a><?php endif; ?>
+                </div>
                 <!-- Price & Actions -->
                 <div class="book-action-row">
                     <div class="price-display">
@@ -229,10 +236,10 @@ $pageTitle = htmlspecialchars($book['title']);
                             </a>
                         <?php endif; ?>
                         <?php if ($owns_book && !$is_free_book && !isAdmin()): ?>
-                            <p style="margin-top:8px;">✅ You own this book. <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a></p>
+                            <p class="book-owned"><i class="fas fa-circle-check" aria-hidden="true"></i> You own this book · <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a></p>
                         <?php endif; ?>
                     </div>
-                    <p style="text-align:center;margin-top:8px;"><a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>">👥 Reading groups for this book</a></p><!-- F51 -->
+                    <p class="book-groups"><a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>"><i class="fas fa-user-group" aria-hidden="true"></i> Reading groups for this book</a></p><!-- F51 -->
                     <?php if (isLoggedIn()):
                         // F111: add this book to the member's library from its own page (the catalogue
                         // and book page had no way to do so). Posts to library.php's existing handler.
@@ -241,10 +248,10 @@ $pageTitle = htmlspecialchars($book['title']);
                         $my_status = (string)$ls->fetchColumn();
                         $ls->closeCursor();
                     ?>
-                        <form method="POST" action="<?php echo SITE_URL; ?>/library.php" class="library-add-form" style="margin-top:10px;text-align:center;">
+                        <form method="POST" action="<?php echo SITE_URL; ?>/library.php" class="library-add-form">
                             <input type="hidden" name="book_id" value="<?php echo (int)$book_id; ?>">
                             <input type="hidden" name="update_status" value="1">
-                            <label for="libraryStatus" style="font-size:0.9rem;">My library:</label>
+                            <label for="libraryStatus">My library</label>
                             <select id="libraryStatus" name="status" onchange="this.form.submit()">
                                 <option value=""<?php echo $my_status === '' ? ' selected' : ''; ?>>Add to my library…</option>
                                 <option value="want to read"<?php echo $my_status === 'want to read' ? ' selected' : ''; ?>>Want to Read</option>
@@ -256,16 +263,10 @@ $pageTitle = htmlspecialchars($book['title']);
                     <?php endif; ?>
                 </div>
 
-                <!-- Meta Info -->
-                <div class="book-meta">
-                    <span class="meta-author">by <?php echo htmlspecialchars($book['author']); ?></span>
-                    <span class="meta-format"><?php echo strtoupper($book['file_type']); ?></span>
-                </div>
             </div>
 
             <!-- Book Details Section -->
             <div class="book-details-section">
-                <h1 class="book-title"><?php echo htmlspecialchars($book['title']); ?></h1>
                 
                 <div class="book-description" id="bookDescription">
                     <?php if ($book['description']): ?>
@@ -331,8 +332,9 @@ $pageTitle = htmlspecialchars($book['title']);
                                 <div class="review-item" id="review-<?php echo $review['id']; ?>">
                                     <div class="review-header">
                                         <div class="review-author">
-                                            <div class="review-avatar"><?php echo substr($review['author_name'], 0, 1); ?></div>
-                                            <span class="author-name"><?php echo htmlspecialchars($review['author_name']); ?></span>
+                                            <?php $rv_name = trim((string)($review['author_name'] ?? '')) ?: 'A reader'; // reviews whose author left have no name ?>
+                                            <div class="review-avatar"><?php echo htmlspecialchars(mb_substr($rv_name, 0, 1)); ?></div>
+                                            <span class="author-name"><?php echo htmlspecialchars($rv_name); ?></span>
                                         </div>
                                         <span class="review-date"><?php echo date('M j, Y', strtotime($review['created_at'])); ?></span>
                                     </div>
@@ -503,48 +505,58 @@ p { line-height:1.6; }
 .back-link:hover { color:var(--rose); }
 .back-link i { margin-right:6px; }
 
-/* ===== BOOK CONTENT WRAPPER ===== */
+/* ===== LAYOUT: cover on the left; title, actions and description beside it ===== */
 .book-content-wrapper {
-    display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start;
+    display:grid; grid-template-columns:minmax(180px, 300px) minmax(0, 1fr); column-gap:clamp(28px, 5vw, 56px); row-gap:28px;
+    grid-template-areas: "cover head" "cover details"; align-items:start;
 }
-@media (max-width:992px) {
-    .book-content-wrapper { grid-template-columns:1fr; }
-}
+.book-cover-section { grid-area:cover; position:sticky; top:96px; }
+.book-head { grid-area:head; display:flex; flex-direction:column; gap:6px; }
+.book-details-section { grid-area:details; display:flex; flex-direction:column; gap:28px; min-width:0; }
 
-/* ===== COVER SECTION ===== */
-.book-cover-section {
-    display:flex; flex-direction:column; gap:16px; position:sticky; top:20px;
-}
-.book-cover-card {
-    background:var(--card-bg); border-radius:20px; padding:20px;
-    border:1px solid var(--border); box-shadow:var(--shadow);
-    display:flex; align-items:center; justify-content:center;
-    transition:all var(--transition);
-}
-.book-cover-card:hover { box-shadow:var(--shadow-hover); border-color:var(--rose-light); }
-.cover-image { width:100%; height:auto; border-radius:12px; }
-.placeholder-cover {
-    width:100%; height:300px; display:flex; align-items:center; justify-content:center;
-    background:var(--vanilla); border-radius:12px; font-size:4rem; color:var(--rose);
-}
+/* ===== COVER: shaped like a book ===== */
+.book-cover-card { position:relative; aspect-ratio:2 / 3; border-radius:5px 12px 12px 5px; overflow:hidden; box-shadow:0 2px 4px rgba(44,30,30,.10), 0 22px 50px rgba(44,30,30,.24); background:none; border:0; padding:0; }
+.book-cover-card::after { content:''; position:absolute; inset:0; pointer-events:none; z-index:2; background:linear-gradient(90deg, rgba(0,0,0,.18) 0, rgba(255,255,255,.18) 2.5%, rgba(0,0,0,0) 6%); }
+.cover-image { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:0; z-index:1; }
+.placeholder-cover { position:absolute; inset:0; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:24px; text-align:center; border-radius:0; background:linear-gradient(160deg, #e9c9c9 0%, #c48f91 100%); color:#fff; font-size:1rem; }
+.placeholder-cover span { font-family:'Playfair Display', Georgia, serif; font-size:1.5rem; line-height:1.3; font-weight:600; }
+.placeholder-cover small { font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; opacity:.9; }
+html[data-theme="dark"] .book-cover-card { box-shadow:0 22px 50px rgba(0,0,0,.6); }
 
-/* ===== ACTIONS ===== */
-.book-action-row { display:flex; flex-direction:column; gap:12px; }
-.price-display { display:flex; justify-content:center; }
-.free-badge { background:#4f8a63; color:white; padding:4px 16px; border-radius:20px; font-weight:700; font-size:1rem; }
-.sale-price { color:#b4505a; font-weight:700; font-size:1.1rem; }
+/* ===== TITLE, AUTHOR, FACTS ===== */
+.book-title { font-size:2.4rem; margin:0; line-height:1.15; letter-spacing:-.01em; }
+.book-byline { margin:0; font-size:1.15rem; color:var(--text-light); }
+.book-meta { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 4px; color:var(--text-light); font-size:.85rem; }
+.meta-format, .meta-rating { display:inline-flex; align-items:center; gap:5px; min-height:28px; padding:0 12px; border-radius:999px; background:rgba(219,161,162,.16); color:var(--text); font-weight:600; font-size:.78rem; letter-spacing:.04em; text-decoration:none; }
+.meta-rating i { color:#b07a35; }
+.meta-rating span { color:var(--text-light); font-weight:500; }
+
+/* ===== PRICE AND ACTIONS ===== */
+.book-action-row { display:flex; flex-direction:column; align-items:flex-start; gap:12px; margin-top:14px; }
+.price-display { display:flex; }
+.free-badge { background:none; color:#2f6b45; padding:0; font-weight:700; font-size:1.05rem; }
+.sale-price { color:#9e3c46; font-weight:700; font-size:1.1rem; }
+.sale-price s { color:var(--text-light); font-weight:400; margin-right:4px; }
 .regular-price { font-weight:700; font-size:1.1rem; color:var(--text); }
-.action-buttons { display:flex; justify-content:center; }
-.book-meta { text-align:center; color:var(--text-light); font-size:0.9rem; }
-.meta-author { display:block; }
-.meta-format { display:inline-block; background:var(--vanilla); padding:2px 12px; border-radius:12px; margin-top:4px; }
+html[data-theme="dark"] .free-badge { color:#8fd1a5; }
+html[data-theme="dark"] .sale-price { color:#f2a7b0; }
+.action-buttons { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
+.action-buttons .btn-lg { min-height:48px; padding:0 30px; border-radius:999px; font-size:1rem; font-weight:700; display:inline-flex; align-items:center; gap:10px; background:#9c5457; border-color:#9c5457; color:#fff; box-shadow:none; }
+.action-buttons .btn-lg:hover { filter:brightness(.93); transform:none; }
+.action-buttons .btn-outline.btn-lg { background:transparent; color:var(--text-light); border:1px solid var(--border); }
+html[data-theme="dark"] .action-buttons .btn-primary.btn-lg { background:#f0c4c5; border-color:#f0c4c5; color:#2c1e1e; }
+.book-owned { margin:0; font-size:.88rem; color:var(--text-light); }
+.book-owned i { color:#2f6b45; }
+.book-groups { margin:0; font-size:.9rem; }
+.book-groups a { color:var(--text); text-decoration:none; display:inline-flex; align-items:center; gap:8px; min-height:36px; }
+.book-groups a:hover { color:#9c5457; text-decoration:underline; }
+.library-add-form { display:flex; align-items:center; gap:10px; margin:0; font-size:.9rem; color:var(--text-light); }
+.library-add-form select { min-height:38px; padding:0 34px 0 14px; border-radius:999px; border:1px solid var(--border); background:var(--card-bg) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 12px center / 14px; color:var(--text); font:inherit; font-size:.88rem; -webkit-appearance:none; appearance:none; cursor:pointer; }
 
-/* ===== DETAILS SECTION ===== */
-.book-details-section { display:flex; flex-direction:column; gap:24px; }
-.book-title { font-size:2.4rem; margin:0 0 4px; line-height:1.2; }
-.book-description { border-top:1px solid var(--border); padding-top:16px; }
-.description-content { line-height:1.8; color:var(--text); }
-.read-more-btn { margin-top:8px; }
+/* ===== DESCRIPTION ===== */
+.book-description { border-top:1px solid var(--border); padding-top:20px; }
+.description-content { line-height:1.8; color:var(--text); font-size:1.02rem; max-width:44em; }
+.read-more-btn { margin-top:10px; border-radius:999px; }
 
 /* ===== REVIEWS ===== */
 .reviews-header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; margin-bottom:16px; }
@@ -605,19 +617,21 @@ p { line-height:1.6; }
 .share-btn.whatsapp { background:#25d366; }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width:768px) {
-    .book-title { font-size:2rem; }
+@media (max-width:720px) {
+    /* phones: the cover, then the title and the main button, then the rest */
+    .book-content-wrapper { grid-template-columns:minmax(0, 1fr); grid-template-areas: "cover" "head" "details"; row-gap:22px; }
+    .book-cover-section { position:relative; top:0; display:flex; justify-content:center; }
+    /* Q22: the cover is capped so the price and the Read/Download button show without scrolling. */
+    .book-cover-card { width:min(40vw, 190px); }
+    .book-head { align-items:center; text-align:center; }
+    .book-meta, .book-action-row, .action-buttons { justify-content:center; align-items:center; }
+    .book-title { font-size:1.9rem; }
     .reviews-header { flex-direction:column; align-items:flex-start; gap:8px; }
-    .book-cover-section { position:relative; top:0; }
-    .book-cover-card { padding:12px; }
-    /* Q22: a full-width cover filled the first phone screen and pushed the price and Read/Download
-       button below the fold; it is now capped so they are visible without scrolling. */
-    .cover-image { width:auto; max-width:100%; max-height:42vh; object-fit:contain; }
-    .placeholder-cover { height:160px; }
 }
 @media (max-width:480px) {
     .book-title { font-size:1.6rem; }
-    .book-content-wrapper { gap:20px; }
+    .action-buttons .btn-lg { width:100%; justify-content:center; }
+    .action-buttons, .book-action-row { align-self:stretch; }
 }
 </style>
 
