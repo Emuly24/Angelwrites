@@ -339,7 +339,9 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
             
             <?php if ($comments_total > 0): ?>
                 <div class="comments-list">
-                    <?php foreach ($comments as $comment): ?>
+                    <?php require_once __DIR__ . '/includes/moderation.php'; $aw_blocked = aw_blocked_ids($db, (int)($_SESSION['user_id'] ?? 0)); ?>
+                    <?php foreach ($comments as $comment): $aw_fold = isset($aw_blocked[(int)($comment['user_id'] ?? 0)]); /* N4 */ ?>
+                        <?php if ($aw_fold): ?><details class="aw-blocked-fold"><summary>A comment from someone you blocked</summary><?php endif; ?>
                         <div class="comment-item <?php echo $comment['is_admin_reply'] ? 'admin-reply' : ''; ?>">
                             <div class="comment-author">
                                 <i class="fas fa-user-circle"></i>
@@ -375,8 +377,10 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                                         🙏 <span id="prays-<?php echo $comment['id']; ?>"><?php echo $comment['prays']; ?></span>
                                     </button>
                                 </div>
+                                <?php if (!$comment['is_admin_reply']) echo aw_report_controls('reflection_comment', (int)$comment['id'], (int)($comment['user_id'] ?? 0), (string)$comment['author_name']); /* N4 */ ?>
                             </div>
                         </div>
+                        <?php if ($aw_fold): ?></details><?php endif; ?>
                     <?php endforeach; ?>
                 </div>
                 <?php echo aw_pager($comments_total, $cpage, $cper, 'comments'); // P13 ?>
@@ -847,4 +851,5 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 </style>
 
 <?php aw_upload_script(); /* R3 */ ?>
+<?php require_once __DIR__ . '/includes/moderation.php'; echo aw_report_assets(); /* N4 */ ?>
 <?php require_once 'includes/footer.php'; ?>

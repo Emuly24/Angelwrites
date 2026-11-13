@@ -54,7 +54,7 @@ foreach ([
     ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'manage_messages.php', 'fa-envelope', 'team_inbox'],
     ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'fa-hands-praying', 'moderate'],
     ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'fa-quote-left', 'moderate'],
-    ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'manage_community.php', 'fa-flag', 'moderate'],
+    ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'moderation.php', 'fa-flag', 'moderate'],
 ] as [$aw_label, $aw_sql, $aw_link, $aw_icon, $aw_cap]) {
     if (!aw_can($aw_cap)) continue; // K1: each role sees what it can act on
     try {
@@ -236,7 +236,7 @@ $pageTitle = 'Admin Dashboard';
         <div class="admin-module">
             <h3>🛡️ Moderation</h3>
             <div class="admin-module-grid">
-                <a href="manage_community.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Reports</span></a>
+                <a href="moderation.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Moderation</span></a>
                 <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Comments</span></a>
                 <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a>
                 <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a>
@@ -275,7 +275,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="admin-module-grid">
                 <a href="manage_users.php" class="admin-module-btn"><i class="fas fa-users"></i><span>Manage Users</span></a>
                 <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a><!-- Q35: was the reports screen -->
-                <a href="manage_community.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Community Reports</span></a>
+                <a href="moderation.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Moderation</span></a>
                 <a href="manage_groups.php" class="admin-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
                 <a href="manage_sessions.php" class="admin-module-btn"><i class="fas fa-calendar-check"></i><span>Booked Sessions</span></a>
             </div>

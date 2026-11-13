@@ -218,6 +218,30 @@ $pageTitle = 'Notifications';
                 <button type="submit" class="btn btn-primary btn-sm">Save email choices</button>
             </form>
         </section>
+
+        <?php // N4: people this member has blocked
+        require_once 'includes/moderation.php';
+        $aw_bl = [];
+        if (aw_moderation_tables($db)) {
+            try { $q = $db->prepare("SELECT u.id, u.name, u.first_name, u.last_name, u.username FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = ? ORDER BY b.created_at DESC");
+                  $q->execute([$user_id]); $aw_bl = $q->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $e) { error_log('blocked list: ' . $e->getMessage()); }
+        } ?>
+        <section class="aw-email-prefs" id="blocked" aria-labelledby="blockedTitle">
+            <h2 id="blockedTitle">People you blocked</h2>
+            <?php if (!$aw_bl): ?>
+                <p>Nobody. If someone makes you uncomfortable, use “Block” under their comment: you will not hear from them, and their comments are folded away for you.</p>
+            <?php else: ?>
+                <p>You get no notifications or mentions from these members, and their comments are folded away for you.</p>
+                <?php foreach ($aw_bl as $b): ?>
+                    <form method="POST" action="<?php echo SITE_URL; ?>/block.php" class="aw-pref" style="justify-content:space-between;align-items:center;">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <input type="hidden" name="user_id" value="<?php echo (int)$b['id']; ?>">
+                        <span><strong><?php echo htmlspecialchars(awDisplayName($b)); ?></strong></span>
+                        <button type="submit" class="btn btn-outline btn-sm" style="margin:0;">Unblock</button>
+                    </form>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </section>
     </div>
 </div>
 <style>

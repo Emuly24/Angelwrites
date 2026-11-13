@@ -114,6 +114,10 @@ if (!function_exists('awNotify')) {
         if (!$user_id || !$db instanceof PDO) return false;
         $actor = (int)($opts['actor'] ?? ($_SESSION['user_id'] ?? 0));
         if ($actor && $actor === (int)$user_id && empty($opts['self_ok'])) return false;
+        if ($actor) { // N4: nothing reaches a member from someone they blocked
+            try { $b = $db->prepare("SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?"); $b->execute([(int)$user_id, $actor]); if ($b->fetchColumn()) return false; }
+            catch (Throwable $e) { /* no blocks table yet */ }
+        }
         try {
             $db->prepare("INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at) VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)")
                ->execute([(int)$user_id, $type, $title, $message, $link]);

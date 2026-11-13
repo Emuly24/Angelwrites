@@ -4,6 +4,9 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
 aw_require('moderate'); // K1
+// N4: one moderation queue for every kind of report
+header('Location: ' . SITE_URL . '/admin/moderation.php');
+exit;
 
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 20;

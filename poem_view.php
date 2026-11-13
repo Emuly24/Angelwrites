@@ -292,6 +292,10 @@ function aw_rx_buttons($type, $tid) {
 
 function render_comment($comment, $level = 0) {
     $id = $GLOBALS['id'];
+    // N4: a comment from someone this member blocked is folded away (they can still open it)
+    require_once __DIR__ . '/includes/moderation.php';
+    $aw_fold = !empty($comment['user_id']) && isset(aw_blocked_ids($GLOBALS['db'], (int)($_SESSION['user_id'] ?? 0))[(int)$comment['user_id']]);
+    if ($aw_fold) echo '<details class="aw-blocked-fold"><summary>A comment from someone you blocked</summary>';
     ?>
     <div class="review-item" style="margin-left:<?php echo $level*20; ?>px; border-left:<?php echo $level>0?'2px solid var(--rose)':'none'; ?>; padding-left:<?php echo $level>0?'12px':'0'; ?>;">
         <div class="review-header">
@@ -319,6 +323,7 @@ function render_comment($comment, $level = 0) {
             <?php echo aw_rx_buttons('comment', $comment['id']); /* L2: rendered with the page */ ?>
         </div>
         <button type="button" class="reply-link" data-comment-id="<?php echo (int)$comment['id']; ?>" aria-expanded="false">Reply</button><!-- A1: was a clickable div -->
+        <?php echo aw_report_controls('review', (int)$comment['id'], (int)($comment['user_id'] ?? 0), (string)$comment['author_name']); /* N4 */ ?>
         <div class="comment-reply-form" style="display:none;">
             <form method="POST" class="reply-form">
                 <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
@@ -337,6 +342,7 @@ function render_comment($comment, $level = 0) {
         <?php endif; ?>
     </div>
     <?php
+    if ($aw_fold) echo '</details>';
 }
 
 // ============================================================
@@ -980,4 +986,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php require_once __DIR__ . '/includes/moderation.php'; echo aw_report_assets(); /* N4 */ ?>
 <?php require_once 'includes/footer.php'; ?>
