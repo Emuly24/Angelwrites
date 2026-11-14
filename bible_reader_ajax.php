@@ -7,6 +7,15 @@ require_once 'includes/mail_helper.php';
 // ===== AUTHENTICATION REQUIRED FOR MOST ACTIONS =====
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
+header('Content-Type: application/json; charset=utf-8');
+// B2: every change needs the session's token (the old reader sent none)
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    require_once __DIR__ . '/includes/csrf.php';
+    if (!validate_csrf_token((string)($_POST['csrf_token'] ?? ''))) {
+        echo json_encode(['success' => false, 'error' => 'Your session expired. Please reload the page.']);
+        exit;
+    }
+}
 
 // ===== SANITIZE INPUT =====
 function sanitize($input) {
@@ -32,6 +41,8 @@ if ($action === 'get_notes' && $user_id > 0) {
     
     // Fetch reactions for each note
     foreach ($notes as &$note) {
+        $note['mine'] = (int)$note['user_id'] === (int)$user_id; // B2: the reader offers "Delete" on your own notes
+        unset($note['email'], $note['password']);
         $stmt2 = $db->prepare("
             SELECT reaction_type, COUNT(*) as count 
             FROM bible_reactions 

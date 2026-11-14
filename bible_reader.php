@@ -1,1895 +1,258 @@
 <?php
+/**
+ * B2: the Bible reader, rebuilt as a quiet, focused reading room (docs/BIBLE_PLAN.md §E, §F).
+ *
+ * The page is only the passage. No site header, footer, prompts or badges: one thin bar (reference,
+ * version, search, text settings) that steps aside while you read and comes back on a tap, a scroll
+ * up, a key press or keyboard focus. Everything else opens on request in a sheet.
+ *
+ * URL: bible_reader.php?v=KJV&b=John&c=3[&vs=16] (the old ?version=&book=&chapter=&verse= still works).
+ * Data: bible_api.php (versions, books, chapters, search). Members' highlights, notes, bookmarks and
+ * reading place: bible_reader_ajax.php (POST + CSRF). Guests keep settings and their place on the device.
+ */
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php';
+require_once 'includes/csrf.php';
+require_once 'includes/bible_versions.php';
 
-$pageTitle = 'Bible Reader';
-?>
-<?php require_once 'includes/header.php'; ?>
+$versions = aw_bible_versions();
+$v = strtoupper((string)($_GET['v'] ?? $_GET['version'] ?? ''));
+$b = (string)($_GET['b'] ?? $_GET['book'] ?? '');
+$c = (int)($_GET['c'] ?? $_GET['chapter'] ?? 0);
+$vs = (int)($_GET['vs'] ?? $_GET['verse'] ?? 0);
+$fromLink = $b !== '';
 
-<div class="bible-reader-page" id="bibleReader">
-    <div class="container">
-        <!-- Page Header -->
-        <div class="page-header">
-            <h1>Bible Reader</h1>
-            <p>Read, copy, compare, highlight, take notes, and track your reading journey.</p>
+// a member's last place, when the link names no passage
+$resume = null;
+if (isLoggedIn()) {
+    try {
+        $st = $db->prepare("SELECT book, chapter, verse FROM bible_reading_positions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1");
+        $st->execute([(int)$_SESSION['user_id']]);
+        $resume = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Throwable $e) { error_log('bible resume: ' . $e->getMessage()); }
+}
+if (!isset($versions[$v])) $v = isset($versions['KJV']) ? 'KJV' : (string)array_key_first($versions);
+$books = aw_bible_books($v);
+$bookList = array_column($books, null, 'book');
+if (!$fromLink && $resume && isset($bookList[$resume['book']])) { $b = $resume['book']; $c = (int)$resume['chapter']; $vs = (int)$resume['verse']; }
+if (!isset($bookList[$b])) { $b = isset($bookList['John']) ? 'John' : ($books[0]['book'] ?? 'Genesis'); $c = $c ?: 1; }
+$c = max(1, min($c ?: 1, (int)($bookList[$b]['chapters'] ?? 1)));
+
+// the first chapter is rendered on the server, so the page reads even before scripts run
+$chapter = aw_bible_chapter($v, $b, $c);
+$ver = $versions[$v] ?? null;
+$langAttr = $ver ? $ver['lang'] : 'en';
+$title = ($chapter['book_name'] ?? $b) . ' ' . $c . ' · ' . ($ver['short'] ?? $v);
+$csrf = isLoggedIn() ? generate_csrf_token() : '';
+
+function aw_br_verses($chapter) {
+    if (!$chapter) return '<p class="br-empty">This chapter is not in this version.</p>';
+    $h = '';
+    if (!empty($chapter['title'])) $h .= '<p class="br-title">' . htmlspecialchars($chapter['title']) . '</p>';
+    $open = false;
+    foreach ($chapter['verses'] as $i => $vv) {
+        foreach ($vv['heads'] as $hd) {
+            if ($open) { $h .= '</p>'; $open = false; }
+            $h .= '<h2 class="br-head' . ($hd['level'] > 1 ? ' is-minor' : '') . '">' . htmlspecialchars($hd['text']) . '</h2>';
+        }
+        if (!$open || $vv['para']) { if ($open) $h .= '</p>'; $h .= '<p class="br-para">'; $open = true; }
+        $poem = strpos($vv['text'], "\n") !== false;
+        $h .= '<span class="br-v' . ($poem ? ' is-poem' : '') . '" id="v' . $vv['v'] . '" data-v="' . $vv['v'] . '" tabindex="-1"><sup class="br-num" aria-hidden="true">' . $vv['v'] . '</sup>'
+            . '<span class="sr-only">verse ' . $vv['v'] . ' </span>' . nl2br(htmlspecialchars($vv['text']), false) . '</span> ';
+    }
+    if ($open) $h .= '</p>';
+    return $h;
+}
+?><!doctype html>
+<html lang="<?php echo htmlspecialchars($langAttr); ?>" data-br-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7F3ED">
+<title><?php echo htmlspecialchars($title); ?> · AngelWrites Bible</title>
+<meta name="description" content="Read the Bible quietly on AngelWrites, in English, Chichewa and Chiyao.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/bible.css?v=2">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-saves.css?v=1"><script src="<?php echo SITE_URL; ?>/assets/js/aw-saves.js?v=2" defer></script>
+<script>
+// apply the reader's settings before the first paint (no flash of the wrong theme or size)
+(function () { try { var s = JSON.parse(localStorage.getItem('awBible') || '{}'), r = document.documentElement;
+  if (s.theme) r.setAttribute('data-br-theme', s.theme);
+  else if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) r.setAttribute('data-br-theme', 'dark');
+  ['size','leading','width','font','nums'].forEach(function (k) { if (s[k] != null) r.setAttribute('data-br-' + k, s[k]); });
+} catch (e) {} })();
+</script>
+</head>
+<body>
+<a class="br-skip" href="#brText">Skip to the reading</a>
+
+<header class="br-bar" id="brBar">
+    <a class="br-icon" href="<?php echo SITE_URL; ?>/<?php echo isLoggedIn() ? 'dashboard.php' : 'index.php'; ?>" aria-label="Leave the Bible and go back to AngelWrites">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <div class="br-bar-mid">
+        <button type="button" class="br-ref" id="brRefBtn" aria-haspopup="dialog" aria-controls="brChooser">
+            <span id="brRefLabel"><?php echo htmlspecialchars(($chapter['book_name'] ?? $b) . ' ' . $c); ?></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button type="button" class="br-ver" id="brVerBtn" aria-haspopup="dialog" aria-controls="brVersions" aria-label="Version: <?php echo htmlspecialchars($ver['name'] ?? $v); ?>"><span id="brVerLabel"><?php echo htmlspecialchars($ver['short'] ?? $v); ?></span></button>
+    </div>
+    <button type="button" class="br-icon" id="brSearchBtn" aria-label="Search" aria-haspopup="dialog" aria-controls="brSearch">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+    </button>
+    <button type="button" class="br-icon" id="brSetBtn" aria-label="Reading settings" aria-haspopup="dialog" aria-controls="brSettings">
+        <span class="br-aa" aria-hidden="true">Aa</span>
+    </button>
+</header>
+
+<main class="br-main" id="brMain">
+    <?php if (!$fromLink && $resume && $resume['book'] === $b): ?>
+        <p class="br-resume" id="brResume" role="status">Welcome back. You were reading here.</p>
+    <?php endif; ?>
+    <div class="br-cols" id="brCols">
+        <article class="br-text" id="brText" lang="<?php echo htmlspecialchars($langAttr); ?>" aria-labelledby="brChapterTitle">
+            <h1 class="br-chapter" id="brChapterTitle"><span class="br-chapter-book"><?php echo htmlspecialchars($chapter['book_name'] ?? $b); ?></span> <span class="br-chapter-num"><?php echo $c; ?></span></h1>
+            <div id="brBody"><?php echo aw_br_verses($chapter); ?></div>
+        </article>
+        <article class="br-text br-text-b" id="brTextB" hidden aria-label="Second version"></article>
+    </div>
+    <nav class="br-pager" aria-label="Chapters">
+        <button type="button" class="br-pg" id="brPrev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Previous</span></button>
+        <button type="button" class="br-pg" id="brNext"><span>Next</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    </nav>
+    <footer class="br-credit" id="brCredit">
+        <?php if ($ver): ?><?php echo htmlspecialchars($ver['credit']); ?><?php if ($ver['license']): ?> <a href="<?php echo htmlspecialchars($ver['license']); ?>" rel="license noopener" target="_blank">Licence</a><?php endif; ?><?php endif; ?>
+    </footer>
+</main>
+
+<!-- book and chapter -->
+<div class="br-sheet" id="brChooser" role="dialog" aria-modal="true" aria-labelledby="brChooserTitle" hidden>
+    <div class="br-sheet-box br-sheet-tall">
+        <div class="br-sheet-head">
+            <h2 id="brChooserTitle">Choose a passage</h2>
+            <button type="button" class="br-icon br-close" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
-
-        <!-- ===== READING PROGRESS BAR ===== -->
-        <div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
-
-        <!-- ===== READER CONTAINER ===== -->
-        <div class="bible-reader-container" id="bibleReaderContainer">
-
-            <!-- ===== HEADER ===== -->
-            <header class="bible-reader-header" id="bibleReaderHeader">
-                <div class="bible-reader-header-left">
-                    <?php if (isLoggedIn()): ?>
-                        <a href="<?php echo SITE_URL; ?>/<?php echo isAdmin() ? 'admin/dashboard.php' : 'dashboard.php'; ?>" class="bible-reader-back">
-                            <i class="fas fa-arrow-left"></i> Back
-                        </a>
-                    <?php else: ?>
-                        <a href="<?php echo SITE_URL; ?>/index.php" class="bible-reader-back">
-                            <i class="fas fa-arrow-left"></i> Back
-                        </a>
-                    <?php endif; ?>
-                </div>
-                <div class="bible-reader-header-right">
-                    <!-- Progress Ring -->
-                    <svg class="bible-progress-ring" width="36" height="36" viewBox="0 0 36 36">
-                        <circle class="bible-progress-ring-bg" cx="18" cy="18" r="16" stroke="var(--border)" stroke-width="2" fill="none"/>
-                        <circle class="bible-progress-ring-fill" cx="18" cy="18" r="16" stroke="var(--rose)" stroke-width="2" fill="none"
-                                stroke-dasharray="100" stroke-dashoffset="100"
-                                transform="rotate(-90 18 18)" id="bibleProgressRing"/>
-                        <text x="18" y="21" text-anchor="middle" font-size="8" fill="var(--text)" id="bibleProgressText">0%</text>
-                    </svg>
-                    <!-- Bookmarks -->
-                    <button class="bible-reader-bookmark-btn" id="bibleBookmarkBtn" aria-label="Bookmark this verse">
-                        <i class="far fa-bookmark"></i>
-                    </button>
-                    <!-- Settings -->
-                    <button class="bible-reader-settings-btn" id="bibleSettingsToggle" aria-label="Settings">
-                        <i class="fas fa-cog"></i>
-                    </button>
-                    <!-- TOC -->
-                    <button class="bible-reader-toc-btn" id="bibleTocToggle" aria-label="Table of Contents">
-                        <i class="fas fa-list-ul"></i>
-                    </button>
-                    <!-- Focus mode -->
-                    <button class="bible-reader-focus-btn" id="bibleFocusToggle" aria-label="Focus mode">
-                        <i class="fas fa-expand"></i>
-                    </button>
-                    <!-- Share -->
-                    <button class="bible-reader-share-btn" id="bibleShareBtn" aria-label="Share">
-                        <i class="fas fa-share-alt"></i>
-                    </button>
-                    <!-- Notes -->
-                    <button class="bible-reader-notes-btn" id="bibleNotesToggle" aria-label="Notes">
-                        <i class="fas fa-sticky-note"></i>
-                    </button>
-                    <!-- ===== DARK MODE TOGGLE (Added) ===== -->
-                    <button class="bible-reader-theme-btn" id="bibleThemeToggle" aria-label="Toggle theme">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                </div>
-            </header>
-
-            <!-- ===== SETTINGS PANEL ===== -->
-            <div class="bible-reader-settings" id="bibleSettingsPanel">
-                <div class="bible-settings-grid">
-                    <!-- Theme -->
-                    <div class="bible-setting-group">
-                        <label>Theme</label>
-                        <div class="bible-theme-options">
-                            <button class="bible-theme-btn" data-theme="paper"><span class="color-preview paper"></span> Paper</button>
-                            <button class="bible-theme-btn active" data-theme="light"><span class="color-preview light"></span> Light</button>
-                            <button class="bible-theme-btn" data-theme="dark"><span class="color-preview dark"></span> Dark</button>
-                            <button class="bible-theme-btn" data-theme="sepia"><span class="color-preview sepia"></span> Sepia</button>
-                        </div>
-                    </div>
-                    <!-- Font -->
-                    <div class="bible-setting-group">
-                        <label>Font</label>
-                        <div class="bible-font-options">
-                            <button class="bible-font-btn active" data-font="serif">Serif</button>
-                            <button class="bible-font-btn" data-font="sans">Sans</button>
-                            <button class="bible-font-btn" data-font="mono">Mono</button>
-                        </div>
-                    </div>
-                    <!-- Font Size -->
-                    <div class="bible-setting-group">
-                        <label>Font Size</label>
-                        <div class="bible-size-controls">
-                            <button class="bible-size-btn" id="bibleDecreaseSize"><i class="fas fa-font" style="font-size:0.8rem;"></i></button>
-                            <input type="range" id="bibleSizeSlider" min="80" max="160" value="100" step="5">
-                            <button class="bible-size-btn" id="bibleIncreaseSize"><i class="fas fa-font" style="font-size:1.2rem;"></i></button>
-                            <span id="bibleSizeLabel">100%</span>
-                        </div>
-                    </div>
-                    <!-- Line Height -->
-                    <div class="bible-setting-group">
-                        <label>Line Height</label>
-                        <div class="bible-size-controls">
-                            <button class="bible-size-btn" id="bibleDecreaseLine"><i class="fas fa-arrows-alt-v" style="font-size:0.8rem;"></i></button>
-                            <input type="range" id="bibleLineSlider" min="140" max="220" value="180" step="10">
-                            <button class="bible-size-btn" id="bibleIncreaseLine"><i class="fas fa-arrows-alt-v" style="font-size:1.2rem;"></i></button>
-                            <span id="bibleLineLabel">1.8</span>
-                        </div>
-                    </div>
-                    <!-- Letter Spacing -->
-                    <div class="bible-setting-group">
-                        <label>Letter Spacing</label>
-                        <div class="bible-size-controls">
-                            <button class="bible-size-btn" id="bibleDecreaseSpacing"><i class="fas fa-text-width" style="font-size:0.8rem;"></i></button>
-                            <input type="range" id="bibleSpacingSlider" min="-2" max="4" value="0" step="1">
-                            <button class="bible-size-btn" id="bibleIncreaseSpacing"><i class="fas fa-text-width" style="font-size:1.2rem;"></i></button>
-                            <span id="bibleSpacingLabel">0</span>
-                        </div>
-                    </div>
-                    <!-- Reading Mode -->
-                    <div class="bible-setting-group">
-                        <label>Reading Mode</label>
-                        <div class="bible-mode-options">
-                            <button class="bible-mode-btn active" data-mode="scroll">Scroll</button>
-                            <button class="bible-mode-btn" data-mode="flip">Page Flip</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ===== TOC DRAWER ===== -->
-            <div class="bible-toc-drawer" id="bibleTocDrawer">
-                <div class="bible-toc-header">
-                    <h3>Books of the Bible</h3>
-                    <button class="bible-toc-close" id="bibleTocClose">&times;</button>
-                </div>
-                <div class="bible-toc-body" id="bibleTocBody">
-                    <ul class="bible-toc-list" id="bibleBookList"></ul>
-                </div>
-            </div>
-
-            <!-- ===== NOTES PANEL ===== -->
-            <div class="bible-notes-panel" id="bibleNotesPanel">
-                <div class="bible-notes-header">
-                    <div class="bible-notes-title">
-                        <h3>📝 Notes</h3>
-                        <span class="badge" id="bibleNoteBadge">0</span>
-                    </div>
-                    <div class="bible-notes-actions">
-                        <button class="btn btn-sm btn-primary" id="bibleAddNoteBtn">+ Add Note</button>
-                        <button class="btn btn-sm btn-outline" id="bibleNotesClose"><i class="fas fa-times"></i></button>
-                    </div>
-                </div>
-                <div class="bible-notes-body" id="bibleNotesBody">
-                    <div class="notes-list" id="bibleNotesList">
-                        <p class="empty-notes">No notes for this book.</p>
-                    </div>
-                    <div id="bibleAddNoteForm" style="display:none; padding:12px; border-top:1px solid var(--border);">
-                        <form id="bibleNoteForm">
-                            <div class="form-group">
-                                <textarea id="bibleNoteText" rows="2" placeholder="Add a note about this verse..." required></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label>
-                                    <input type="checkbox" id="bibleNotePrivate"> Make this note private
-                                </label>
-                            </div>
-                            <div style="display:flex;gap:8px;">
-                                <button type="submit" class="btn btn-sm btn-primary">Post Note</button>
-                                <button type="button" class="btn btn-sm btn-secondary" id="bibleNoteCancel">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ===== REACTION PICKER ===== -->
-            <div id="bibleReactionPicker" style="display:none; position:fixed; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:6px 10px; box-shadow:var(--shadow-hover); z-index:50;">
-                <!-- Q36: the same three reactions as the rest of the site (like / love / pray) -->
-                <button class="reaction-option" data-reaction="👍" aria-label="Like">👍</button>
-                <button class="reaction-option" data-reaction="❤️" aria-label="Love">❤️</button>
-                <button class="reaction-option" data-reaction="🙏" aria-label="Pray">🙏</button>
-            </div>
-
-
-            <!-- ===== CONTROLS ===== -->
-            <div class="bible-controls">
-                <div class="bible-control-group">
-                    <label for="bibleVersion1">Version 1</label>
-                    <select id="bibleVersion1">
-                        <option value="KJV">King James Version (KJV)</option>
-                        <option value="ASV">American Standard Version (ASV)</option>
-                        <option value="WEB">World English Bible (WEB)</option>
-                    </select>
-                </div>
-
-                <div class="bible-control-group toggle-group">
-                    <label for="bibleParallelMode">
-                        <input type="checkbox" id="bibleParallelMode">
-                        <span>🔀 Parallel</span>
-                    </label>
-                </div>
-
-                <div class="bible-control-group" id="bibleVersion2Group" style="display:none;">
-                    <label for="bibleVersion2">Version 2</label>
-                    <select id="bibleVersion2">
-                        <!-- BL1: only translations the site may lawfully serve in full (public domain) -->
-                        <option value="WEB">World English Bible (WEB)</option>
-                        <option value="KJV">King James Version (KJV)</option>
-                        <option value="ASV">American Standard Version (ASV)</option>
-                    </select>
-                </div>
-
-                <div class="bible-control-group">
-                    <label for="bibleBookSelect">Book</label>
-                    <select id="bibleBookSelect"></select>
-                </div>
-                <div class="bible-control-group">
-                    <label for="bibleChapterSelect">Chapter</label>
-                    <select id="bibleChapterSelect"></select>
-                </div>
-                <div class="bible-control-group">
-                    <label for="bibleVerseSelect">Verse</label>
-                    <select id="bibleVerseSelect"></select>
-                </div>
-
-                <div class="bible-control-group action-group">
-                    <button id="biblePrevChapterBtn" class="btn btn-secondary btn-sm">◀ Prev</button>
-                    <button id="bibleNextChapterBtn" class="btn btn-secondary btn-sm">Next ▶</button>
-                </div>
-                <div class="bible-control-group action-group">
-                    <button id="bibleGoToBtn" class="btn btn-primary btn-sm">Go</button>
-                    <input type="text" id="bibleGoToInput" placeholder="e.g. John 3:16" value="John 3:16">
-                </div>
-                <div class="bible-control-group action-group">
-                    <button id="bibleCopyBtn" class="btn btn-secondary btn-sm">📋 Copy</button>
-                    <button id="bibleHighlightBtn" class="btn btn-secondary btn-sm">🖌️ Highlight</button>
-                    <button id="bibleNotesBtn" class="btn btn-secondary btn-sm">📝 Notes</button>
-                </div>
-            </div>
-
-            <!-- ===== READER DISPLAY ===== -->
-            <div class="bible-display">
-                <div id="bibleSingleView" class="verse-container">
-                    <div class="verse-content" id="bibleVerseContent1"></div>
-                </div>
-
-                <div id="bibleParallelView" class="verse-container parallel" style="display:none;">
-                    <div class="verse-column">
-                        <h3 id="bibleParallelTitle1">KJV</h3>
-                        <div class="verse-content" id="bibleVerseContent1p"></div>
-                    </div>
-                    <div class="verse-column">
-                        <h3 id="bibleParallelTitle2">WEB</h3>
-                        <div class="verse-content" id="bibleVerseContent2p"></div>
-                    </div>
-                </div>
-
-                <div class="bible-chapter-nav-bottom">
-                    <button id="biblePrevChapterBtn2" class="btn btn-secondary btn-sm">◀ Prev Chapter</button>
-                    <span id="bibleChapterDisplay"></span>
-                    <button id="bibleNextChapterBtn2" class="btn btn-secondary btn-sm">Next Chapter ▶</button>
-                </div>
-            </div>
-
-            <!-- ===== HIGHLIGHT TOOLTIP ===== -->
-            <div class="bible-highlight-tooltip" id="bibleHighlightTooltip">
-                <button class="bible-highlight-color" data-color="yellow"></button>
-                <button class="bible-highlight-color" data-color="green"></button>
-                <button class="bible-highlight-color" data-color="blue"></button>
-                <button class="bible-highlight-color" data-color="pink"></button>
-                <button class="bible-highlight-btn" id="bibleHighlightAnnotate"><i class="fas fa-pen"></i></button>
-            </div>
-
-            <!-- ===== ANNOTATION POPUP ===== -->
-            <div class="bible-annotation-popup" id="bibleAnnotationPopup">
-                <textarea id="bibleAnnotationText" rows="3" placeholder="Add a note…"></textarea>
-                <div class="bible-annotation-actions">
-                    <button class="bible-annotation-save" id="bibleAnnotationSave">Save</button>
-                    <button class="bible-annotation-cancel" id="bibleAnnotationCancel">Cancel</button>
-                </div>
-            </div>
-
-            <!-- ===== SEARCH BAR ===== -->
-            <div class="bible-search-bar" id="bibleSearchBar">
-                <input type="text" id="bibleSearchInput" placeholder="Search in this chapter…">
-                <button id="bibleSearchClose"><i class="fas fa-times"></i></button>
-                <div id="bibleSearchResults"></div>
-            </div>
-
-            <!-- ===== SHARE MODAL ===== -->
-            <div id="bibleShareModal" class="bible-share-modal">
-                <div class="bible-share-modal-content">
-                    <h3>Share this verse</h3>
-                    <div class="bible-share-options">
-                        <button class="bible-share-facebook"><i class="fab fa-facebook-f"></i> Facebook</button>
-                        <button class="bible-share-twitter"><i class="fab fa-twitter"></i> Twitter/X</button>
-                        <button class="bible-share-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</button>
-                        <button class="bible-share-copy"><i class="fas fa-link"></i> Copy Link</button>
-                    </div>
-                    <button class="bible-share-modal-close">Close</button>
-                </div>
-            </div>
-
-            <!-- ===== OVERLAY ===== -->
-            <div class="bible-overlay" id="bibleOverlay" onclick="closeAllBibleMenus()"></div>
+        <div class="br-tabs" role="tablist" aria-label="Testament">
+            <button type="button" role="tab" id="brTabOt" aria-selected="false" data-t="ot">Old Testament</button>
+            <button type="button" role="tab" id="brTabNt" aria-selected="true" data-t="nt">New Testament</button>
+        </div>
+        <div class="br-books" id="brBooks" role="list"></div>
+        <div class="br-chapters" id="brChapters" hidden>
+            <button type="button" class="br-back-books" id="brBackBooks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg> <span id="brChBook">Books</span></button>
+            <div class="br-ch-grid" id="brChGrid" role="list"></div>
         </div>
     </div>
 </div>
 
-<!-- ============================================================ -->
-<!--  JAVASCRIPT – FULL BIBLE READER ENGINE (ALL FEATURES KEPT)   -->
-<!-- ============================================================ -->
+<!-- versions -->
+<div class="br-sheet" id="brVersions" role="dialog" aria-modal="true" aria-labelledby="brVersionsTitle" hidden>
+    <div class="br-sheet-box">
+        <div class="br-sheet-head">
+            <h2 id="brVersionsTitle">Version</h2>
+            <button type="button" class="br-icon br-close" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <div class="br-ver-list" id="brVerList"></div>
+        <h3 class="br-sub">Read two side by side</h3>
+        <div class="br-ver-list br-ver-par" id="brParList"></div>
+    </div>
+</div>
+
+<!-- search -->
+<div class="br-sheet" id="brSearch" role="dialog" aria-modal="true" aria-labelledby="brSearchTitle" hidden>
+    <div class="br-sheet-box br-sheet-tall">
+        <div class="br-sheet-head">
+            <h2 id="brSearchTitle">Find</h2>
+            <button type="button" class="br-icon br-close" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <form class="br-search-form" id="brSearchForm" role="search">
+            <label class="sr-only" for="brSearchInput">A reference like John 3:16, or words to find</label>
+            <input type="search" id="brSearchInput" placeholder="John 3:16, or words to find" autocomplete="off" enterkeyhint="search">
+            <button type="submit" class="br-btn">Go</button>
+        </form>
+        <p class="br-hint" id="brSearchHint">Type a reference (Psalm 23, Yohane 3:16) to go there, or at least 3 letters to search this version.</p>
+        <ol class="br-results" id="brResults" aria-live="polite"></ol>
+    </div>
+</div>
+
+<!-- reading settings -->
+<div class="br-sheet" id="brSettings" role="dialog" aria-modal="true" aria-labelledby="brSettingsTitle" hidden>
+    <div class="br-sheet-box">
+        <div class="br-sheet-head">
+            <h2 id="brSettingsTitle">Reading settings</h2>
+            <button type="button" class="br-icon br-close" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <fieldset class="br-set"><legend>Theme</legend>
+            <div class="br-seg br-themes">
+                <label><input type="radio" name="theme" value="light"><span class="br-sw br-sw-light"></span>Light</label>
+                <label><input type="radio" name="theme" value="sepia"><span class="br-sw br-sw-sepia"></span>Sepia</label>
+                <label><input type="radio" name="theme" value="dark"><span class="br-sw br-sw-dark"></span>Dark</label>
+            </div>
+        </fieldset>
+        <fieldset class="br-set"><legend>Typeface</legend>
+            <div class="br-seg"><label><input type="radio" name="font" value="serif"><span class="br-f-serif">Literata</span></label><label><input type="radio" name="font" value="sans"><span class="br-f-sans">Inter</span></label></div>
+        </fieldset>
+        <div class="br-set"><span class="br-set-label" id="brSizeLbl">Text size</span>
+            <div class="br-stepper" role="group" aria-labelledby="brSizeLbl"><button type="button" data-step="size:-1" aria-label="Smaller text">A−</button><output id="brSizeOut">3</output><button type="button" data-step="size:1" aria-label="Larger text">A+</button></div>
+        </div>
+        <fieldset class="br-set"><legend>Line spacing</legend>
+            <div class="br-seg"><label><input type="radio" name="leading" value="1">Snug</label><label><input type="radio" name="leading" value="2">Easy</label><label><input type="radio" name="leading" value="3">Airy</label></div>
+        </fieldset>
+        <fieldset class="br-set"><legend>Page width</legend>
+            <div class="br-seg"><label><input type="radio" name="width" value="1">Narrow</label><label><input type="radio" name="width" value="2">Comfortable</label><label><input type="radio" name="width" value="3">Wide</label></div>
+        </fieldset>
+        <label class="br-toggle"><input type="checkbox" id="brNums"> <span>Show verse numbers</span></label>
+        <p class="br-hint">Keys: ← → chapters · G go to · / find · + − size · T theme · Esc close</p>
+    </div>
+</div>
+
+<!-- a verse -->
+<div class="br-pop" id="brVerseMenu" role="dialog" aria-modal="false" aria-labelledby="brVmTitle" hidden>
+    <div class="br-pop-head"><strong id="brVmTitle">Verse</strong><button type="button" class="br-icon br-close" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="br-tints" role="group" aria-label="Highlight">
+        <button type="button" class="br-tint t-yellow" data-tint="yellow" aria-label="Highlight gold"></button>
+        <button type="button" class="br-tint t-pink" data-tint="pink" aria-label="Highlight rose"></button>
+        <button type="button" class="br-tint t-green" data-tint="green" aria-label="Highlight sage"></button>
+        <button type="button" class="br-tint t-blue" data-tint="blue" aria-label="Highlight sky"></button>
+        <button type="button" class="br-tint t-none" data-tint="none" aria-label="Remove highlight"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="br-actions">
+        <button type="button" data-act="note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>Note</button>
+        <button type="button" data-act="bookmark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg><span>Bookmark</span></button>
+        <button type="button" data-act="save"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21l-1.4-1.3C5.4 15 2 12 2 8.5 2 5.4 4.4 3 7.5 3c1.7 0 3.4.8 4.5 2.1C13.1 3.8 14.8 3 16.5 3 19.6 3 22 5.4 22 8.5c0 3.5-3.4 6.5-8.6 11.2z"/></svg>Save</button><!-- F2: to the library -->
+        <button type="button" data-act="copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M5 16V5a1 1 0 0 1 1-1h9"/></svg>Copy</button>
+        <button type="button" data-act="share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 13v7h14v-7"/></svg>Share</button>
+    </div>
+    <p class="br-hint" id="brVmHint" hidden><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI'] ?? '/bible_reader.php'); ?>">Sign in</a> to keep highlights, notes and bookmarks.</p>
+</div>
+
+<!-- note -->
+<div class="br-sheet" id="brNote" role="dialog" aria-modal="true" aria-labelledby="brNoteTitle" hidden>
+    <div class="br-sheet-box">
+        <div class="br-sheet-head"><h2 id="brNoteTitle">Note</h2><button type="button" class="br-icon br-close" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        <form id="brNoteForm">
+            <label class="sr-only" for="brNoteText">Your note</label>
+            <textarea id="brNoteText" rows="5" maxlength="2000" placeholder="What is this verse saying to you?"></textarea>
+            <label class="br-toggle"><input type="checkbox" id="brNotePrivate" checked> <span>Only I can see this note</span></label>
+            <div class="br-row"><button type="submit" class="br-btn">Save note</button></div>
+        </form>
+        <div id="brNoteList" class="br-notes" aria-live="polite"></div>
+    </div>
+</div>
+
+<div class="br-toast" id="brToast" role="status" aria-live="polite" hidden></div>
+
 <script>
-// Q9: feedback used alert()/prompt() (blocking pop-ups) and showed raw server errors. Messages now
-// appear as a short toast at the bottom of the screen; `html` is only used for our own fixed markup.
-function awToast(msg, type, html) {
-    let box = document.getElementById('awToast');
-    if (!box) {
-        box = document.createElement('div');
-        box.id = 'awToast';
-        box.setAttribute('role', 'status');
-        box.style.cssText = 'position:fixed;left:50%;bottom:calc(20px + var(--cookie-bar-h, 0px));transform:translateX(-50%);z-index:3000;max-width:92vw;padding:12px 18px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.18);font-size:0.95rem;color:#fff;transition:opacity 0.3s;';
-        document.body.appendChild(box);
-    }
-    box.style.background = type === 'error' ? '#b03a3a' : (type === 'info' ? '#6b5a5a' : '#3f7d4f');
-    if (html) box.innerHTML = msg; else box.textContent = msg;
-    box.style.opacity = '1';
-    clearTimeout(box._t);
-    box._t = setTimeout(function () { box.style.opacity = '0'; }, html ? 6000 : 3500);
-}
-// Q10: some translations carry translators' footnotes inline as {note} (330 verses in WEB, 9 in NIV),
-// which showed as raw braces in the middle of the verse. They become a small * that shows the note.
-function awVerseHtml(text) {
-    const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    return String(text).replace(/\\/g, '').replace(/\{([^}]*)\}/g, function (m, note) {
-        return '<sup class="bible-fn" tabindex="0" role="button" title="' + esc(note) + '" aria-label="Footnote: ' + esc(note) + '" data-note="' + esc(note) + '" style="color:var(--rose-dark);cursor:pointer;padding:0 3px;">*</sup>';
-    });
-}
-document.addEventListener('click', function (e) {
-    const fn = e.target.closest && e.target.closest('.bible-fn');
-    if (fn) awToast(fn.dataset.note, 'info');
-});
-document.addEventListener('keydown', function (e) {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('bible-fn')) { e.preventDefault(); awToast(e.target.dataset.note, 'info'); }
-});
-// Q12: guests trying a member-only action got a technical alert (or a silent failure) and no way
-// to sign in. They now get a toast with Log in / Create account links that return to this page.
-function awGuestOnly(what) {
-    const back = encodeURIComponent(location.pathname + location.search);
-    awToast('Please log in to ' + what + '. <a href="<?php echo SITE_URL; ?>/login.php?redirect=' + back + '" style="color:#fff;text-decoration:underline;">Log in</a> or <a href="<?php echo SITE_URL; ?>/register.php" style="color:#fff;text-decoration:underline;">create an account</a>.', 'info', true);
-}
-(function() {
-    'use strict';
-
-    // ================================================================
-    // 1. CONFIGURATION
-    // ================================================================
-    const VERSION_MAP = {
-        'KJV': 'bible_KJV.db',
-        'ASV': 'bible_ASV.db',
-        'WEB': 'bible_WEB.db'
-        // BL1: NIV, ESV, NASB, NKJV and AMP removed. They are under copyright and the site holds no licence
-        // to serve them. KJV, ASV and WEB are in the public domain.
-        // F24: YLT removed (decision D-I1): there is no bible_YLT.db, and the lookup served KJV under the YLT label.
-    };
-
-    const BOOKS = [
-        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-        "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
-        "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
-        "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
-        "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
-        "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-        "Haggai", "Zechariah", "Malachi",
-        "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
-        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
-        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
-        "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
-        "Jude", "Revelation"
-    ];
-
-    const CHAPTER_COUNTS = {
-        "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
-        "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24,
-        "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36,
-        "Ezra": 10, "Nehemiah": 13, "Esther": 10, "Job": 42, "Psalms": 150,
-        "Proverbs": 31, "Ecclesiastes": 12, "Song of Solomon": 8,
-        "Isaiah": 66, "Jeremiah": 52, "Lamentations": 5, "Ezekiel": 48,
-        "Daniel": 12, "Hosea": 14, "Joel": 3, "Amos": 9, "Obadiah": 1,
-        "Jonah": 4, "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3,
-        "Haggai": 2, "Zechariah": 14, "Malachi": 4,
-        "Matthew": 28, "Mark": 16, "Luke": 24, "John": 21, "Acts": 28,
-        "Romans": 16, "1 Corinthians": 16, "2 Corinthians": 13,
-        "Galatians": 6, "Ephesians": 6, "Philippians": 4, "Colossians": 4,
-        "1 Thessalonians": 5, "2 Thessalonians": 3,
-        "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1,
-        "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3,
-        "1 John": 5, "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22
-    };
-
-    const VERSE_COUNTS = {
-        "Psalms": 150, "Proverbs": 31, "Job": 42, "Isaiah": 66, "Jeremiah": 52,
-        "Ezekiel": 48, "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36,
-        "Deuteronomy": 34, "Joshua": 24, "Judges": 21, "1 Samuel": 31, "2 Samuel": 24,
-        "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36,
-        "Ezra": 10, "Nehemiah": 13, "Esther": 10, "Ruth": 4, "Daniel": 12,
-        "Hosea": 14, "Joel": 3, "Amos": 9, "Obadiah": 1, "Jonah": 4,
-        "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3, "Haggai": 2,
-        "Zechariah": 14, "Malachi": 4, "Matthew": 28, "Mark": 16, "Luke": 24,
-        "John": 21, "Acts": 28, "Romans": 16, "1 Corinthians": 16,
-        "2 Corinthians": 13, "Galatians": 6, "Ephesians": 6, "Philippians": 4,
-        "Colossians": 4, "1 Thessalonians": 5, "2 Thessalonians": 3,
-        "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1,
-        "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3, "1 John": 5,
-        "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22,
-        "Song of Solomon": 8, "Ecclesiastes": 12, "Lamentations": 5
-    };
-
-    // ================================================================
-    // 2. DOM REFS
-    // ================================================================
-    const reader = document.getElementById('bibleReaderContainer');
-    const content = document.querySelector('.bible-display');
-    const textContainer = document.getElementById('bibleVerseContent1');
-    const textContainer1p = document.getElementById('bibleVerseContent1p');
-    const textContainer2p = document.getElementById('bibleVerseContent2p');
-    const header = document.getElementById('bibleReaderHeader');
-    const settingsPanel = document.getElementById('bibleSettingsPanel');
-    const tocDrawer = document.getElementById('bibleTocDrawer');
-    const notesPanel = document.getElementById('bibleNotesPanel');
-    const notesList = document.getElementById('bibleNotesList');
-    const noteBadge = document.getElementById('bibleNoteBadge');
-    const addNoteBtn = document.getElementById('bibleAddNoteBtn');
-    const noteForm = document.getElementById('bibleNoteForm');
-    const noteText = document.getElementById('bibleNoteText');
-    const notePrivate = document.getElementById('bibleNotePrivate');
-    const noteCancel = document.getElementById('bibleNoteCancel');
-    const notesClose = document.getElementById('bibleNotesClose');
-    const overlay = document.getElementById('bibleOverlay');
-    const progressRing = document.getElementById('bibleProgressRing');
-    const progressText = document.getElementById('bibleProgressText');
-    const bookmarkBtn = document.getElementById('bibleBookmarkBtn');
-    const settingsToggle = document.getElementById('bibleSettingsToggle');
-    const tocToggle = document.getElementById('bibleTocToggle');
-    const tocClose = document.getElementById('bibleTocClose');
-    const focusToggle = document.getElementById('bibleFocusToggle');
-    const shareBtn = document.getElementById('bibleShareBtn');
-    const shareModal = document.getElementById('bibleShareModal');
-    const notesToggle = document.getElementById('bibleNotesToggle');
-    const highlightTooltip = document.getElementById('bibleHighlightTooltip');
-    const annotationPopup = document.getElementById('bibleAnnotationPopup');
-    const annotationText = document.getElementById('bibleAnnotationText');
-    const annotationSave = document.getElementById('bibleAnnotationSave');
-    const annotationCancel = document.getElementById('bibleAnnotationCancel');
-    const searchBar = document.getElementById('bibleSearchBar');
-    const searchInput = document.getElementById('bibleSearchInput');
-    const searchClose = document.getElementById('bibleSearchClose');
-    const searchResults = document.getElementById('bibleSearchResults');
-    const reactionPicker = document.getElementById('bibleReactionPicker');
-    const bookSelect = document.getElementById('bibleBookSelect');
-    const chapterSelect = document.getElementById('bibleChapterSelect');
-    const verseSelect = document.getElementById('bibleVerseSelect');
-    const version1Select = document.getElementById('bibleVersion1');
-    const version2Select = document.getElementById('bibleVersion2');
-    const version2Group = document.getElementById('bibleVersion2Group');
-    const parallelToggle = document.getElementById('bibleParallelMode');
-    const singleView = document.getElementById('bibleSingleView');
-    const parallelView = document.getElementById('bibleParallelView');
-    const parallelTitle1 = document.getElementById('bibleParallelTitle1');
-    const parallelTitle2 = document.getElementById('bibleParallelTitle2');
-    const chapterDisplay = document.getElementById('bibleChapterDisplay');
-    const goToInput = document.getElementById('bibleGoToInput');
-    const goToBtn = document.getElementById('bibleGoToBtn');
-    const prevBtn1 = document.getElementById('biblePrevChapterBtn');
-    const nextBtn1 = document.getElementById('bibleNextChapterBtn');
-    const prevBtn2 = document.getElementById('biblePrevChapterBtn2');
-    const nextBtn2 = document.getElementById('bibleNextChapterBtn2');
-    const copyBtn = document.getElementById('bibleCopyBtn');
-    const highlightBtn = document.getElementById('bibleHighlightBtn');
-    const notesBtn = document.getElementById('bibleNotesBtn');
-    const annotateBtn = document.getElementById('bibleHighlightAnnotate');
-    const themeToggleBtn = document.getElementById('bibleThemeToggle');
-
-    // ================================================================
-    // 3. STATE
-    // ================================================================
-    // Q13: the reader's settings were six separate localStorage keys and its theme setting was
-    // never applied (no handlers), so it could disagree with the site's light/dark choice. Settings
-    // now live in one 'bibleSettings' object (old keys are read once and removed). Light/Dark set the
-    // site theme itself; Paper/Sepia only tint the Bible text.
-    const awBible = (function () {
-        let st = {};
-        try { st = JSON.parse(localStorage.getItem('bibleSettings') || 'null') || {}; } catch (e) { st = {}; }
-        const old = { tint: 'bibleTheme', font: 'bibleFont', fontSize: 'bibleFontSize', lineHeight: 'bibleLineHeight', letterSpacing: 'bibleLetterSpacing', readingMode: 'bibleReadingMode' };
-        try {
-            Object.keys(old).forEach(function (k) {
-                const v = localStorage.getItem(old[k]);
-                if (v !== null && st[k] === undefined) st[k] = v;
-                localStorage.removeItem(old[k]);
-            });
-            if (st.tint !== 'paper' && st.tint !== 'sepia') st.tint = '';
-            localStorage.setItem('bibleSettings', JSON.stringify(st));
-        } catch (e) {}
-        return {
-            get: function (k, d) { return st[k] !== undefined && st[k] !== '' ? st[k] : d; },
-            set: function (k, v) { st[k] = v; try { localStorage.setItem('bibleSettings', JSON.stringify(st)); } catch (e) {} }
-        };
-    })();
-    function awSiteTheme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
-    function awSetSiteTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-        try { localStorage.setItem('angelwrites_theme', theme); } catch (e) {}
-    }
-    function awApplyBibleTheme() {
-        const tint = awBible.get('tint', '');
-        const box = document.getElementById('bibleReaderContainer');
-        if (box) { box.classList.remove('bible-tint-paper', 'bible-tint-sepia'); if (tint) box.classList.add('bible-tint-' + tint); }
-        const active = tint || awSiteTheme();
-        document.querySelectorAll('.bible-theme-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.theme === active); });
-    }
-    document.querySelectorAll('.bible-theme-btn').forEach(function (b) {
-        b.addEventListener('click', function () {
-            const t = this.dataset.theme;
-            if (t === 'light' || t === 'dark') { awSetSiteTheme(t); awBible.set('tint', ''); } else { awBible.set('tint', t); }
-            awApplyBibleTheme();
-        });
-    });
-    if (themeToggleBtn) themeToggleBtn.addEventListener('click', function () {
-        awSetSiteTheme(awSiteTheme() === 'dark' ? 'light' : 'dark'); awBible.set('tint', ''); awApplyBibleTheme();
-    });
-    awApplyBibleTheme();
-
-    let currentFont = awBible.get('font', 'serif');
-    let fontSize = parseInt(awBible.get('fontSize', 100)) || 100;
-    let lineHeight = parseInt(awBible.get('lineHeight', 180)) || 180;
-    let letterSpacing = parseInt(awBible.get('letterSpacing', 0)) || 0;
-    let readingMode = awBible.get('readingMode', 'scroll');
-    let focusMode = false;
-    let scrollTimeout;
-    let selectedText = '';
-    let selectedRange = null;
-    let isBookmarked = false;
-    let currentChapter = 0;
-    let currentPage = 1;
-    let book = 'John';
-    let chapter = 3;
-    let verse = 16;
-    let version1 = 'KJV';
-    let version2 = 'WEB'; // BL1: was NIV
-    let parallel = false;
-    let progressPercent = 0;
-    let saveTimer = null;
-    let userId = <?php echo isLoggedIn() ? $_SESSION['user_id'] : 0; ?>;
-    let currentNoteId = null;
-    let currentReactionPicker = null;
-    let findCount = 0;
-    let findIndex = 0;
-
-    // ================================================================
-    // 4. HELPER FUNCTIONS
-    // ================================================================
-    function getVerseText(version, book, chapter, verse) {
-        let url = `/includes/bible_lookup.php?book=${encodeURIComponent(book)}&chapter=${chapter}&version=${version}`;
-        if (verse > 0) {
-            url += `&verse_start=${verse}&verse_end=${verse}`;
-        }
-        return fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.data && data.data.length > 0) {
-                    return data.data;
-                } else {
-                    // F25: some translations on this site are incomplete (the ASV file stops at
-                    // Proverbs 28). Say so plainly instead of "[ASV Isaiah 1 not found]".
-                    return `${book} ${chapter} is not available in the ${version} text on this site. Please choose another version for this passage.`;
-                }
-            })
-            .catch(error => {
-                console.error('Fetch error:', error);
-                return `${book} ${chapter} could not be loaded. Check your connection and try again.`; // Q9: was "[Error loading chapter]"
-            });
-    }
-
-    function timeAgo(timestamp) {
-        const time = new Date(timestamp).getTime();
-        const now = Date.now();
-        const diff = Math.floor((now - time) / 1000);
-        if (diff < 60) return 'just now';
-        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
-        return new Date(timestamp).toLocaleDateString();
-    }
-
-    function getSelectedText() {
-        const sel = window.getSelection();
-        return sel.toString().trim();
-    }
-
-    function getSelectionRange() {
-        const sel = window.getSelection();
-        return sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-    }
-
-    // ================================================================
-    // 5. POPULATE SELECTORS
-    // ================================================================
-    function populateBooks() {
-        bookSelect.innerHTML = '';
-        BOOKS.forEach(b => {
-            const opt = document.createElement('option');
-            opt.value = b;
-            opt.textContent = b;
-            bookSelect.appendChild(opt);
-        });
-        bookSelect.value = book;
-    }
-
-    function populateChapters() {
-        chapterSelect.innerHTML = '';
-        const count = CHAPTER_COUNTS[book] || 21;
-        for (let i = 1; i <= count; i++) {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = 'Chapter ' + i;
-            chapterSelect.appendChild(opt);
-        }
-        chapterSelect.value = chapter;
-    }
-
-    function populateVerses() {
-        verseSelect.innerHTML = '';
-        const count = VERSE_COUNTS[book] || 30;
-        for (let i = 1; i <= count; i++) {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = 'Verse ' + i;
-            verseSelect.appendChild(opt);
-        }
-        verseSelect.value = verse;
-    }
-
-    // ================================================================
-    // 6. RENDER VERSE (CORE)
-    // ================================================================
-    function renderVerse() {
-        const b = book;
-        const c = chapter;
-        const v = verse;
-
-        if (parallel) {
-            parallelView.style.display = 'grid';
-            singleView.style.display = 'none';
-            parallelTitle1.textContent = version1;
-            parallelTitle2.textContent = version2;
-
-            textContainer1p.innerHTML = '<p>Loading...</p>';
-            textContainer2p.innerHTML = '<p>Loading...</p>';
-
-            Promise.all([
-                getVerseText(version1, b, c, 0),
-                getVerseText(version2, b, c, 0)
-            ]).then(([data1, data2]) => {
-                if (Array.isArray(data1)) {
-                    textContainer1p.innerHTML = data1.map(v => `<p>${v.verse}. ${awVerseHtml(v.text)}</p>`).join(''); // Q10
-                    applyHighlights(textContainer1p);
-                } else {
-                    textContainer1p.innerHTML = `<p>${data1}</p>`;
-                }
-                
-                if (Array.isArray(data2)) {
-                    textContainer2p.innerHTML = data2.map(v => `<p>${v.verse}. ${awVerseHtml(v.text)}</p>`).join(''); // Q10
-                    applyHighlights(textContainer2p);
-                } else {
-                    textContainer2p.innerHTML = `<p>${data2}</p>`;
-                }
-            });
-        } else {
-            parallelView.style.display = 'none';
-            singleView.style.display = 'block';
-            textContainer.innerHTML = '<p>Loading...</p>';
-
-            getVerseText(version1, b, c, 0).then(data => {
-                if (Array.isArray(data)) {
-                    textContainer.innerHTML = data.map(v => {
-                        return `<p>${v.verse}. ${awVerseHtml(v.text)}</p>`; // Q10 (also removes the stray backslashes, as before)
-                    }).join('');
-                    applyHighlights(textContainer);
-                } else {
-                    textContainer.innerHTML = `<p>${data}</p>`;
-                }
-            });
-        }
-
-        chapterDisplay.textContent = `${b} ${c}`;
-        // F23: #notesVerseRef is not in the markup; the null access threw on every chapter load
-        // and the "Go to" box below was never updated.
-        const notesVerseRef = document.getElementById('notesVerseRef');
-        if (notesVerseRef) notesVerseRef.textContent = `${b} ${c}`;
-        goToInput.value = `${b} ${c}:${v}`;
-    }
-
-    function loadVerse() {
-        bookSelect.value = book;
-        chapterSelect.value = chapter;
-        verseSelect.value = verse;
-        version1Select.value = version1;
-        version2Select.value = version2;
-        renderVerse();
-    }
-
-    // ===== FIX: loadBibleVerse (missing from original) =====
-    function loadBibleVerse() {
-        loadVerse();
-    }
-
-    // ================================================================
-    // 7. HIGHLIGHTS
-    // ================================================================
-    // F28: verse number of the paragraph a selection starts in ("16. For God so loved…" → 16).
-    function verseNumberFromRange(range) {
-        if (!range) return 0;
-        let n = range.startContainer;
-        if (n && n.nodeType === 3) n = n.parentElement;
-        const p = n && n.closest ? n.closest('p') : null;
-        const m = p ? p.textContent.trim().match(/^(\d+)\./) : null;
-        return m ? parseInt(m[1], 10) : 0;
-    }
-
-    function applyHighlights(container) {
-        // F28: members' highlights are stored on the server per verse; draw them on every load.
-        if (userId > 0) {
-            const hb = book, hc = chapter;
-            fetch(`/bible_reader_ajax.php?action=get_highlights&book=${encodeURIComponent(hb)}&chapter=${hc}`)
-                .then(r => r.json())
-                .then(d => {
-                    const map = {};
-                    (d.highlights || []).forEach(h => { map[h.verse] = h.color; });
-                    container.querySelectorAll('p').forEach(p => {
-                        const m = p.textContent.trim().match(/^(\d+)\./);
-                        const color = m ? map[m[1]] : null;
-                        p.classList.remove('highlighted', 'highlight-yellow', 'highlight-green', 'highlight-blue', 'highlight-pink');
-                        if (color) p.classList.add('highlighted', 'highlight-' + color);
-                    });
-                })
-                .catch(() => {});
-            return;
-        }
-        const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
-        const paragraphs = container.querySelectorAll('p');
-        paragraphs.forEach(p => {
-            const text = p.textContent.trim();
-            const key = `${book}-${chapter}-${text.split('.')[0]}`;
-            if (saved[key]) {
-                p.classList.add('highlighted');
-            } else {
-                p.classList.remove('highlighted');
-            }
-        });
-    }
-
-    function toggleHighlight() {
-        const selText = getSelectedText();
-        const range = getSelectionRange();
-        if (!selText || !range) {
-            awToast('Please select a verse to highlight.', 'info');
-            return;
-        }
-        // F27: highlight the verse the selection is in (it used the verse dropdown, so the
-        // wrong verse lit up), and save members' highlights on the server (all devices).
-        const selVerse = verseNumberFromRange(range) || verse;
-        if (userId > 0) {
-            const fd = new FormData();
-            fd.append('action', 'toggle_highlight');
-            fd.append('book', book);
-            fd.append('chapter', chapter);
-            fd.append('verse', selVerse);
-            fetch('/bible_reader_ajax.php', { method: 'POST', body: fd }).then(() => renderVerse());
-            return;
-        }
-        const key = `${book}-${chapter}-${selVerse}`;
-        const saved = JSON.parse(localStorage.getItem('bibleHighlights') || '{}');
-        if (saved[key]) {
-            delete saved[key];
-        } else {
-            saved[key] = true;
-        }
-        localStorage.setItem('bibleHighlights', JSON.stringify(saved));
-        renderVerse();
-    }
-
-    // ================================================================
-    // 8. COPY
-    // ================================================================
-    function copyVerse() {
-        getVerseText(version1, book, chapter, verse).then(text => {
-            const content = `${version1} ${book} ${chapter}:${verse}\n${text}`;
-            navigator.clipboard.writeText(content).then(() => {
-                awToast('Verse copied.');
-            }).catch(() => {
-                prompt('Copy manually:', content);
-            });
-        });
-    }
-
-    // ================================================================
-    // 9. NOTES
-    // ================================================================
-    function toggleNotesPanel() {
-        if (notesPanel.style.display === 'none' || notesPanel.style.display === '') {
-            notesPanel.style.display = 'flex';
-            loadBibleNotes();
-            overlay.classList.add('active');
-        } else {
-            notesPanel.style.display = 'none';
-            overlay.classList.remove('active');
-        }
-    }
-
-    function loadBibleNotes() {
-        fetch(`/bible_reader_ajax.php?action=get_notes&book=${encodeURIComponent(book)}&chapter=${chapter}`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    let html = '';
-                    data.notes.forEach(note => {
-                        let reactionsHtml = '';
-                        if (note.reactions && note.reactions.length > 0) {
-                            note.reactions.forEach(reaction => {
-                                reactionsHtml += `<button type="button" class="reaction" onclick="reactBibleNote(${note.id}, '${reaction.reaction_type}')">
-                                    ${reaction.reaction_type} ${reaction.count}
-                                </button>`;
-                            });
-                        }
-                        const isMyNote = note.user_id == userId;
-                        const canReact = !note.is_private || isMyNote;
-                        html += `<div class="note-card ${note.is_private ? 'private' : ''}">
-                            <div class="note-author">
-                                ${note.avatar ? `<img src="${note.avatar}" class="note-avatar">` : `<div class="note-avatar-placeholder">${(note.display_name || note.username).charAt(0).toUpperCase()}</div>`}
-                                <div class="note-author-info">
-                                    <strong>${note.display_name || note.username}</strong>
-                                    <small>${timeAgo(note.created_at)}</small>
-                                    ${note.is_private ? '<span class="badge-private">🔒 Private</span>' : ''}
-                                </div>
-                            </div>
-                            <p class="note-text">${note.text}</p>
-                            <div class="note-footer">
-                                <div class="note-reactions">
-                                    ${reactionsHtml}
-                                    ${canReact ? `<button class="btn btn-sm btn-outline" onclick="showBibleReactionPicker(${note.id}, event)">➕ React</button>` : ''}
-                                </div>
-                                ${isMyNote ? `<button class="btn btn-sm btn-danger" onclick="deleteBibleNote(${note.id})">🗑️</button>` : ''}
-                            </div>
-                        </div>`;
-                    });
-                    notesList.innerHTML = html || '<p class="empty-notes">No notes for this book.</p>';
-                    noteBadge.textContent = data.notes.length;
-                }
-            });
-    }
-
-    function submitBibleNote(e) {
-        e.preventDefault();
-        if (userId === 0) { awGuestOnly('post notes'); return; }
-        const text = noteText.value.trim();
-        const isPrivate = notePrivate.checked ? 1 : 0;
-        if (!text) {
-            awToast('Please write your note first.', 'info');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('action', 'add_note');
-        formData.append('book', book);
-        formData.append('chapter', chapter);
-        formData.append('verse', verse);
-        formData.append('text', text);
-        formData.append('is_private', isPrivate);
-        fetch('/bible_reader_ajax.php', {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                loadBibleNotes();
-                noteText.value = '';
-                notePrivate.checked = false;
-                document.getElementById('bibleAddNoteForm').style.display = 'none';
-            } else {
-                awToast('Your note could not be saved. Please try again.', 'error'); console.warn(data.error);
-            }
-        });
-    }
-
-    function deleteBibleNote(noteId) {
-        if (!confirm('Delete this note?')) return;
-        const formData = new FormData();
-        formData.append('action', 'delete_note');
-        formData.append('note_id', noteId);
-        fetch('/bible_reader_ajax.php', {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(data => {
-            if (data.success) loadBibleNotes();
-        });
-    }
-
-    function reactBibleNote(noteId, reactionType) {
-        if (userId === 0) { awGuestOnly('react to notes'); return; }
-        const formData = new FormData();
-        formData.append('action', 'toggle_reaction');
-        formData.append('note_id', noteId);
-        formData.append('reaction_type', reactionType);
-        fetch('/bible_reader_ajax.php', {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(data => {
-            if (data.success) loadBibleNotes();
-        });
-    }
-
-    function showBibleReactionPicker(noteId, event) {
-        currentNoteId = noteId;
-        const btn = event.target.closest('.btn-outline');
-        const rect = btn.getBoundingClientRect();
-        reactionPicker.style.top = (rect.bottom + 8) + 'px';
-        reactionPicker.style.left = (rect.left) + 'px';
-        reactionPicker.style.display = 'flex';
-        currentReactionPicker = reactionPicker;
-    }
-
-    // ================================================================
-    // 10. BOOKMARKS
-    // ================================================================
-    function checkBookmark() {
-        if (userId === 0) return;
-        fetch(`/bible_reader_ajax.php?action=check_bookmark&book=${encodeURIComponent(book)}&chapter=${chapter}&verse=${verse}`)
-            .then(r => r.json())
-            .then(data => {
-                isBookmarked = data.bookmarked;
-                bookmarkBtn.querySelector('i').className = data.bookmarked ? 'fas fa-bookmark' : 'far fa-bookmark';
-                bookmarkBtn.classList.toggle('active', data.bookmarked);
-            });
-    }
-
-    function toggleBookmark() {
-        if (userId === 0) { awGuestOnly('bookmark verses'); return; }
-        const formData = new FormData();
-        formData.append('action', isBookmarked ? 'remove_bookmark' : 'add_bookmark');
-        formData.append('book', book);
-        formData.append('chapter', chapter);
-        formData.append('verse', verse);
-        fetch('/bible_reader_ajax.php', {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                isBookmarked = !isBookmarked;
-                bookmarkBtn.querySelector('i').className = isBookmarked ? 'fas fa-bookmark' : 'far fa-bookmark';
-                bookmarkBtn.classList.toggle('active', isBookmarked);
-            }
-        });
-    }
-
-
-    // ================================================================
-    // 12. FONT ENGINE
-    // ================================================================
-    function applyFont(font) {
-        currentFont = font;
-        reader.setAttribute('data-font', font);
-        awBible.set('font', font);
-        document.querySelectorAll('.bible-font-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector(`.bible-font-btn[data-font="${font}"]`)?.classList.add('active');
-    }
-
-    document.querySelectorAll('.bible-font-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            applyFont(this.dataset.font);
-        });
-    });
-    applyFont(currentFont);
-
-    // ================================================================
-    // 13. FONT SIZE ENGINE
-    // ================================================================
-    function applySize(size) {
-        fontSize = Math.min(160, Math.max(80, size));
-        textContainer.style.fontSize = fontSize + '%';
-        if (textContainer1p) textContainer1p.style.fontSize = fontSize + '%';
-        if (textContainer2p) textContainer2p.style.fontSize = fontSize + '%';
-        document.getElementById('bibleSizeLabel').textContent = fontSize + '%';
-        document.getElementById('bibleSizeSlider').value = fontSize;
-        awBible.set('fontSize', fontSize);
-    }
-
-    document.getElementById('bibleSizeSlider').addEventListener('input', function() {
-        applySize(parseInt(this.value));
-    });
-    document.getElementById('bibleDecreaseSize').addEventListener('click', () => applySize(fontSize - 5));
-    document.getElementById('bibleIncreaseSize').addEventListener('click', () => applySize(fontSize + 5));
-    applySize(fontSize);
-
-    // ================================================================
-    // 14. LINE HEIGHT ENGINE
-    // ================================================================
-    function applyLine(height) {
-        lineHeight = Math.min(220, Math.max(140, height));
-        textContainer.style.lineHeight = lineHeight / 100;
-        if (textContainer1p) textContainer1p.style.lineHeight = lineHeight / 100;
-        if (textContainer2p) textContainer2p.style.lineHeight = lineHeight / 100;
-        document.getElementById('bibleLineLabel').textContent = (lineHeight / 100).toFixed(1);
-        document.getElementById('bibleLineSlider').value = lineHeight;
-        awBible.set('lineHeight', lineHeight);
-    }
-
-    document.getElementById('bibleLineSlider').addEventListener('input', function() {
-        applyLine(parseInt(this.value));
-    });
-    document.getElementById('bibleDecreaseLine').addEventListener('click', () => applyLine(lineHeight - 10));
-    document.getElementById('bibleIncreaseLine').addEventListener('click', () => applyLine(lineHeight + 10));
-    applyLine(lineHeight);
-
-    // ================================================================
-    // 15. LETTER SPACING ENGINE
-    // ================================================================
-    function applySpacing(spacing) {
-        letterSpacing = Math.min(4, Math.max(-2, spacing));
-        textContainer.style.letterSpacing = letterSpacing + 'px';
-        if (textContainer1p) textContainer1p.style.letterSpacing = letterSpacing + 'px';
-        if (textContainer2p) textContainer2p.style.letterSpacing = letterSpacing + 'px';
-        document.getElementById('bibleSpacingLabel').textContent = letterSpacing;
-        document.getElementById('bibleSpacingSlider').value = letterSpacing;
-        awBible.set('letterSpacing', letterSpacing);
-    }
-
-    document.getElementById('bibleSpacingSlider').addEventListener('input', function() {
-        applySpacing(parseInt(this.value));
-    });
-    document.getElementById('bibleDecreaseSpacing').addEventListener('click', () => applySpacing(letterSpacing - 1));
-    document.getElementById('bibleIncreaseSpacing').addEventListener('click', () => applySpacing(letterSpacing + 1));
-    applySpacing(letterSpacing);
-
-    // ================================================================
-    // 16. READING MODE ENGINE
-    // ================================================================
-    function applyReadingMode(mode) {
-        readingMode = mode;
-        reader.setAttribute('data-mode', mode);
-        awBible.set('readingMode', mode);
-        document.querySelectorAll('.bible-mode-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector(`.bible-mode-btn[data-mode="${mode}"]`)?.classList.add('active');
-    }
-
-    document.querySelectorAll('.bible-mode-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            applyReadingMode(this.dataset.mode);
-        });
-    });
-    reader.setAttribute('data-mode', readingMode);
-    document.querySelector(`.bible-mode-btn[data-mode="${readingMode}"]`)?.classList.add('active');
-
-    // ================================================================
-    // 17. PROGRESS UPDATE
-    // ================================================================
-    function updateProgress(scrollTop) {
-        const scrollHeight = content.scrollHeight - content.clientHeight;
-        if (scrollHeight <= 0) return;
-        let percent = Math.min(100, Math.round((scrollTop / scrollHeight) * 100));
-        progressPercent = percent;
-        const radius = 16;
-        const circumference = 2 * Math.PI * radius;
-        const offset = circumference - (percent / 100) * circumference;
-        progressRing.setAttribute('stroke-dashoffset', offset);
-        progressText.textContent = percent + '%';
-        if (userId > 0) {
-            clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => {
-                const formData = new FormData();
-                formData.append('action', 'save_position');
-                formData.append('book', book);
-                formData.append('chapter', chapter);
-                formData.append('verse', verse);
-                formData.append('percent', percent);
-                fetch('/bible_reader_ajax.php', {
-                    method: 'POST',
-                    body: formData
-                }).catch(() => {});
-            }, 2000);
-        }
-    }
-
-    // ================================================================
-    // 18. SCROLL EVENT
-    // ================================================================
-    content.addEventListener('scroll', function() {
-        const scrollTop = content.scrollTop;
-        updateProgress(scrollTop);
-        clearTimeout(scrollTimeout);
-        header.classList.remove('hidden');
-        scrollTimeout = setTimeout(() => {
-            if (!focusMode && !settingsPanel.classList.contains('open')) {
-                header.classList.add('hidden');
-            }
-        }, 3000);
-    });
-
-    // ================================================================
-    // 19. NAVIGATION
-    // ================================================================
-    function prevChapter() {
-        if (chapter > 1) {
-            chapter = chapter - 1;
-            verse = 1;
-            populateVerses();
-            loadVerse();
-        } else {
-            const idx = BOOKS.indexOf(book);
-            if (idx > 0) {
-                book = BOOKS[idx - 1];
-                chapter = CHAPTER_COUNTS[book] || 21;
-                verse = 1;
-                populateChapters();
-                populateVerses();
-                loadVerse();
-            }
-        }
-    }
-
-    function nextChapter() {
-        const max = CHAPTER_COUNTS[book] || 21;
-        if (chapter < max) {
-            chapter = chapter + 1;
-            verse = 1;
-            populateVerses();
-            loadVerse();
-        } else {
-            const idx = BOOKS.indexOf(book);
-            if (idx < BOOKS.length - 1) {
-                book = BOOKS[idx + 1];
-                chapter = 1;
-                verse = 1;
-                populateChapters();
-                populateVerses();
-                loadVerse();
-            }
-        }
-    }
-
-    function goToVerse(input) {
-        const match = input.match(/^([\d\s\w]+)\s+(\d+):(\d+)$/i);
-        if (match) {
-            const b = match[1].trim();
-            const c = parseInt(match[2], 10);
-            const v = parseInt(match[3], 10);
-            let found = BOOKS.find(bk => bk.toLowerCase() === b.toLowerCase());
-            if (!found) {
-                found = BOOKS.find(bk => bk.toLowerCase().includes(b.toLowerCase()));
-            }
-            if (found) {
-                book = found;
-                chapter = c;
-                verse = v;
-                populateChapters();
-                populateVerses();
-                loadVerse();
-                return;
-            }
-        }
-        awToast('Type a verse like "John 3:16" (book, chapter:verse).', 'info');
-    }
-
-    // ================================================================
-    // 20. SETTINGS PANEL
-    // ================================================================
-    settingsToggle.addEventListener('click', function() {
-        settingsPanel.classList.toggle('open');
-        if (settingsPanel.classList.contains('open')) {
-            overlay.classList.add('active');
-        } else {
-            overlay.classList.remove('active');
-        }
-    });
-
-    // ================================================================
-    // 21. TOC DRAWER
-    // ================================================================
-    tocToggle.addEventListener('click', function() {
-        tocDrawer.classList.toggle('open');
-        if (tocDrawer.classList.contains('open')) {
-            overlay.classList.add('active');
-        } else {
-            overlay.classList.remove('active');
-        }
-    });
-    tocClose.addEventListener('click', function() {
-        tocDrawer.classList.remove('open');
-        overlay.classList.remove('active');
-    });
-
-    // ================================================================
-    // 22. FOCUS MODE
-    // ================================================================
-    focusToggle.addEventListener('click', function() {
-        focusMode = !focusMode;
-        reader.classList.toggle('focus-mode', focusMode);
-        this.querySelector('i').className = focusMode ? 'fas fa-compress' : 'fas fa-expand';
-        if (focusMode) {
-            header.classList.add('hidden');
-            settingsPanel.classList.remove('open');
-            overlay.classList.remove('active');
-            searchBar.classList.remove('visible');
-        } else {
-            header.classList.remove('hidden');
-        }
-    });
-
-    // ================================================================
-    // 23. OVERLAY
-    // ================================================================
-    overlay.addEventListener('click', function() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.style.display = 'none';
-        shareModal.classList.remove('visible');
-        overlay.classList.remove('active');
-        highlightTooltip.classList.remove('visible');
-        annotationPopup.classList.remove('visible');
-        searchBar.classList.remove('visible');
-    });
-
-    // ================================================================
-    // 24. CLOSE ALL
-    // ================================================================
-    window.closeAllBibleMenus = function() {
-        settingsPanel.classList.remove('open');
-        tocDrawer.classList.remove('open');
-        notesPanel.style.display = 'none';
-        shareModal.classList.remove('visible');
-        overlay.classList.remove('active');
-        highlightTooltip.classList.remove('visible');
-        annotationPopup.classList.remove('visible');
-        searchBar.classList.remove('visible');
-    };
-
-    // ================================================================
-    // 25. BOOKMARKS (Event)
-    // ================================================================
-    bookmarkBtn.addEventListener('click', toggleBookmark);
-
-    // ================================================================
-    // 26. HIGHLIGHTS (Event)
-    // ================================================================
-    function showHighlightTooltip() {
-        const text = getSelectedText();
-        const range = getSelectionRange();
-        if (!text || !range) {
-            highlightTooltip.classList.remove('visible');
-            return;
-        }
-        const rect = range.getBoundingClientRect();
-        highlightTooltip.style.top = (rect.top - 50) + 'px';
-        highlightTooltip.style.left = (rect.left + rect.width / 2 - 60) + 'px';
-        highlightTooltip.classList.add('visible');
-        selectedText = text;
-        selectedRange = range;
-    }
-
-    document.addEventListener('mouseup', showHighlightTooltip);
-    document.addEventListener('touchend', function() {
-        setTimeout(showHighlightTooltip, 300);
-    });
-
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.bible-highlight-tooltip') && !e.target.closest('.bible-annotation-popup')) {
-            highlightTooltip.classList.remove('visible');
-            annotationPopup.classList.remove('visible');
-        }
-    });
-
-    // Highlight colors
-    document.querySelectorAll('.bible-highlight-color').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const color = this.dataset.color;
-            if (userId === 0) { awGuestOnly('save highlights'); return; }
-            if (selectedText && selectedRange) {
-                const formData = new FormData();
-                formData.append('action', 'add_highlight');
-                formData.append('book', book);
-                formData.append('chapter', chapter);
-                formData.append('verse', verseNumberFromRange(selectedRange)); // F28: stored per verse
-                formData.append('text', selectedText);
-                formData.append('color', color);
-                fetch('/bible_reader_ajax.php', {
-                    method: 'POST',
-                    body: formData
-                }).then(() => {
-                    const span = document.createElement('span');
-                    span.className = 'highlight-' + color;
-                    span.textContent = selectedText;
-                    selectedRange.deleteContents();
-                    selectedRange.insertNode(span);
-                    highlightTooltip.classList.remove('visible');
-                });
-            }
-        });
-    });
-
-    // Annotation
-    annotateBtn.addEventListener('click', function() {
-        if (selectedText && selectedRange) {
-            annotationPopup.classList.add('visible');
-            annotationText.value = '';
-            annotationText.focus();
-            highlightTooltip.classList.remove('visible');
-        }
-    });
-
-    annotationSave.addEventListener('click', function() {
-        const note = annotationText.value.trim();
-        if (userId === 0) { awGuestOnly('save notes on verses'); return; }
-        if (note && selectedText && selectedRange) {
-            const formData = new FormData();
-            formData.append('action', 'add_highlight');
-            formData.append('book', book);
-            formData.append('chapter', chapter);
-            formData.append('verse', verseNumberFromRange(selectedRange)); // F28: stored per verse
-            formData.append('text', selectedText);
-            formData.append('color', 'yellow');
-            formData.append('note', note);
-            fetch('/bible_reader_ajax.php', {
-                method: 'POST',
-                body: formData
-            }).then(() => {
-                const span = document.createElement('span');
-                span.className = 'highlight-yellow annotation';
-                span.textContent = selectedText;
-                selectedRange.deleteContents();
-                selectedRange.insertNode(span);
-                annotationPopup.classList.remove('visible');
-            });
-        }
-    });
-
-    annotationCancel.addEventListener('click', function() {
-        annotationPopup.classList.remove('visible');
-    });
-
-    // ================================================================
-    // 27. SEARCH
-    // ================================================================
-    searchInput.addEventListener('input', function() {
-        const query = this.value.toLowerCase().trim();
-        if (query.length < 2) {
-            searchResults.innerHTML = '';
-            searchResults.style.display = 'none';
-            return;
-        }
-        const container = parallel ? parallelView : textContainer;
-        const text = container.innerText;
-        const lines = text.split('\n');
-        let resultsHtml = '';
-        let count = 0;
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].toLowerCase().includes(query)) {
-                resultsHtml += '<div class="bible-search-result">' + lines[i] + '</div>';
-                count++;
-                if (count > 20) break;
-            }
-        }
-        if (resultsHtml) {
-            searchResults.innerHTML = resultsHtml;
-            searchResults.style.display = 'block';
-        } else {
-            searchResults.innerHTML = 'No matches found.';
-            searchResults.style.display = 'block';
-        }
-    });
-
-    searchClose.addEventListener('click', function() {
-        searchBar.classList.remove('visible');
-        searchResults.innerHTML = '';
-        searchResults.style.display = 'none';
-    });
-
-    // ================================================================
-    // 28. KEYBOARD SHORTCUTS
-    // ================================================================
-    document.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            searchBar.classList.toggle('visible');
-            if (searchBar.classList.contains('visible')) {
-                searchInput.focus();
-            }
-        }
-        if (e.key === 'Escape') {
-            closeAllBibleMenus();
-            searchBar.classList.remove('visible');
-        }
-    });
-
-    // ================================================================
-    // 29. SHARE
-    // ================================================================
-    shareBtn.addEventListener('click', function() {
-        shareModal.classList.add('visible');
-        overlay.classList.add('active');
-    });
-
-    document.querySelectorAll('.bible-share-modal-close').forEach(btn => {
-        btn.addEventListener('click', function() {
-            shareModal.classList.remove('visible');
-            overlay.classList.remove('active');
-        });
-    });
-
-    document.querySelectorAll('.bible-share-facebook').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const url = window.location.origin + '/bible_reader.php?book=' + encodeURIComponent(book) + '&chapter=' + chapter + '&verse=' + verse + '&share=1';
-            window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank');
-            shareModal.classList.remove('visible');
-            overlay.classList.remove('active');
-        });
-    });
-
-    document.querySelectorAll('.bible-share-twitter').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const url = window.location.origin + '/bible_reader.php?book=' + encodeURIComponent(book) + '&chapter=' + chapter + '&verse=' + verse + '&share=1';
-            window.open('https://twitter.com/intent/tweet?text=Reading&url=' + encodeURIComponent(url), '_blank');
-            shareModal.classList.remove('visible');
-            overlay.classList.remove('active');
-        });
-    });
-
-    document.querySelectorAll('.bible-share-whatsapp').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const url = window.location.origin + '/bible_reader.php?book=' + encodeURIComponent(book) + '&chapter=' + chapter + '&verse=' + verse + '&share=1';
-            window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(url), '_blank');
-            shareModal.classList.remove('visible');
-            overlay.classList.remove('active');
-        });
-    });
-
-    document.querySelectorAll('.bible-share-copy').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const url = window.location.origin + '/bible_reader.php?book=' + encodeURIComponent(book) + '&chapter=' + chapter + '&verse=' + verse + '&share=1';
-            navigator.clipboard.writeText(url).then(() => {
-                awToast('Link copied.');
-                shareModal.classList.remove('visible');
-                overlay.classList.remove('active');
-            }).catch(() => {
-                const textarea = document.createElement('textarea');
-                textarea.value = url;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                awToast('Link copied.');
-                shareModal.classList.remove('visible');
-                overlay.classList.remove('active');
-            });
-        });
-    });
-
-    // ================================================================
-    // 30. REACTIONS (Event)
-    // ================================================================
-    document.querySelectorAll('.reaction-option').forEach(btn => {
-        btn.addEventListener('click', function() {
-            if (!currentNoteId) return;
-            if (userId === 0) { awGuestOnly('react to notes'); return; }
-            const reaction = this.dataset.reaction;
-            const formData = new FormData();
-            formData.append('action', 'add_reaction');
-            formData.append('note_id', currentNoteId);
-            formData.append('reaction_type', reaction);
-            fetch('/bible_reader_ajax.php', {
-                method: 'POST',
-                body: formData
-            }).then(r => r.json()).then(data => {
-                if (data.success) {
-                    loadBibleNotes();
-                    reactionPicker.style.display = 'none';
-                    currentNoteId = null;
-                    currentReactionPicker = null;
-                }
-            });
-        });
-    });
-
-    document.addEventListener('click', function(e) {
-        if (currentReactionPicker && !currentReactionPicker.contains(e.target) && !e.target.closest('.btn-outline') && !e.target.closest('.reaction')) {
-            currentReactionPicker.style.display = 'none';
-            currentReactionPicker = null;
-            currentNoteId = null;
-        }
-    });
-
-    // ================================================================
-    // 32. SESSION TRACKING
-    // ================================================================
-    if (userId > 0) {
-        fetch('/bible_reader_ajax.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=start_session&book=' + encodeURIComponent(book) + '&chapter=' + chapter
-        });
-        window.addEventListener('beforeunload', function() {
-            navigator.sendBeacon('/bible_reader_ajax.php', new URLSearchParams({
-                action: 'end_session',
-                book: book,
-                chapter: chapter
-            }));
-        });
-    }
-
-    // ================================================================
-    // 33. EVENT LISTENERS (Controls)
-    // ================================================================
-    bookSelect.addEventListener('change', function() {
-        book = this.value;
-        chapter = 1;
-        verse = 1;
-        populateChapters();
-        populateVerses();
-        loadVerse();
-        checkBookmark();
-    });
-
-    chapterSelect.addEventListener('change', function() {
-        chapter = parseInt(this.value, 10);
-        verse = 1;
-        populateVerses();
-        loadVerse();
-        checkBookmark();
-    });
-
-    verseSelect.addEventListener('change', function() {
-        verse = parseInt(this.value, 10);
-        loadVerse();
-        checkBookmark();
-    });
-
-    version1Select.addEventListener('change', function() {
-        version1 = this.value;
-        loadVerse();
-    });
-
-    version2Select.addEventListener('change', function() {
-        version2 = this.value;
-        if (parallel) loadVerse();
-    });
-
-    parallelToggle.addEventListener('change', function() {
-        parallel = this.checked;
-        version2Group.style.display = parallel ? 'block' : 'none';
-        loadVerse();
-    });
-
-    prevBtn1.addEventListener('click', prevChapter);
-    nextBtn1.addEventListener('click', nextChapter);
-    prevBtn2.addEventListener('click', prevChapter);
-    nextBtn2.addEventListener('click', nextChapter);
-
-    goToBtn.addEventListener('click', function() {
-        goToVerse(goToInput.value);
-    });
-    goToInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') goToVerse(goToInput.value);
-    });
-
-    copyBtn.addEventListener('click', copyVerse);
-    highlightBtn.addEventListener('click', toggleHighlight);
-
-    notesBtn.addEventListener('click', function() {
-        toggleNotesPanel();
-    });
-    notesToggle.addEventListener('click', toggleNotesPanel);
-    notesClose.addEventListener('click', function() {
-        notesPanel.style.display = 'none';
-        overlay.classList.remove('active');
-    });
-
-    addNoteBtn.addEventListener('click', function() {
-        const form = document.getElementById('bibleAddNoteForm');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        if (form.style.display === 'block') {
-            noteText.focus();
-        }
-    });
-    noteCancel.addEventListener('click', function() {
-        document.getElementById('bibleAddNoteForm').style.display = 'none';
-        noteText.value = '';
-        notePrivate.checked = false;
-    });
-    noteForm.addEventListener('submit', submitBibleNote);
-
-    // ================================================================
-    // 34. INITIAL LOAD
-    // ================================================================
-    // F29: open the passage named in the link (?book=John&chapter=3&verse=16, as built by the
-    // share buttons); the page used to ignore it and always open the default passage.
-    (function applyLinkedPassage() {
-        const q = new URLSearchParams(window.location.search);
-        const qb = q.get('book');
-        if (!qb || !BOOKS.includes(qb)) return;
-        book = qb;
-        const maxCh = CHAPTER_COUNTS[qb] || 21;
-        const qc = parseInt(q.get('chapter'), 10);
-        chapter = (qc >= 1 && qc <= maxCh) ? qc : 1;
-        const qv = parseInt(q.get('verse'), 10);
-        verse = qv >= 1 ? qv : 1;
-    })();
-    populateBooks();
-    populateChapters();
-    populateVerses();
-    loadVerse();
-    checkBookmark();
-
-    // Update progress ring
-    setTimeout(() => {
-        updateProgress(content.scrollTop);
-    }, 200);
-
-})();
+window.AW_BIBLE = <?php echo json_encode([
+    'site' => SITE_URL,
+    'v' => $v, 'b' => $b, 'c' => $c, 'vs' => $vs,
+    'versions' => array_map(function ($code, $x) { return ['code' => $code, 'name' => $x['name'], 'short' => $x['short'], 'lang' => $x['lang'], 'language' => $x['language'], 'scope' => $x['scope'], 'credit' => $x['credit'], 'license' => $x['license']]; }, array_keys($versions), $versions),
+    'books' => $books,
+    'member' => isLoggedIn(),
+    'csrf' => $csrf,
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
 </script>
-
-<!-- ============================================================ -->
-<!--  STYLES – FULLY BRANDED & RESPONSIVE                         -->
-<!-- ============================================================ -->
-<style>
-/* ===== BRAND VARIABLES (Matches index, dashboard, videos) ===== */
-:root {
-    --rose: #DBA1A2;
-    --rose-dark: #c08a8b;
-    --rose-light: #e8c0c0;
-    --vanilla: #EFD8D6;
-    --fantasy: #F7F3ED;
-    --white: #ffffff;
-    --dark: #2c1e1e;
-    --text: #3d2e2e;
-    --text-light: #6b5a5a;
-    --bg: #F7F3ED;
-    --card-bg: #ffffff;
-    --border: #e5d5d5;
-    --shadow: 0 4px 16px rgba(44,30,30,0.08);
-    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
-    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
-}
-
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
-
-/* ===== BUTTONS (Exact match from index) ===== */
-.btn {
-    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
-    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
-    cursor:pointer; text-decoration:none; transition:all var(--transition);
-    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
-}
-.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
-.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
-.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
-.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
-.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
-.btn-outline:hover { background:var(--rose); color:var(--white); }
-.btn-white { background:var(--white); color:var(--dark); border:2px solid var(--white); }
-.btn-white:hover { background:var(--vanilla); border-color:var(--vanilla); }
-.btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
-.btn-danger:hover { background:#94404a; border-color:#94404a; }
-.btn-success { background:#4f8a63; color:white; border:2px solid #4f8a63; }
-.btn-success:hover { background:#3e6f4f; border-color:#3e6f4f; }
-
-/* ===== DARK MODE SUPPORT ===== */
-body.dark-mode {
-    --bg: #1a1212;
-    --card-bg: #2c1e1e;
-    --text: #e8dddd;
-    --text-light: #a08a8a;
-    --border: #4a3a3a;
-    --vanilla: #2c1e1e;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-hover: 0 12px 40px rgba(0,0,0,0.5);
-}
-
-/* ===== BIBLE READER PAGE ===== */
-.bible-reader-page { padding:32px 0 60px; }
-.page-header { text-align:center; margin-bottom:24px; }
-.page-header h1 { font-size:2.2rem; margin-bottom:4px; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
-.page-header p { color:var(--text-light); font-size:1.05rem; }
-
-/* ===== CONTAINER ===== */
-.bible-reader-container { display:flex; flex-direction:column; min-height:400px; position:relative; background:var(--card-bg); border-radius:20px; border:1px solid var(--rose-light); box-shadow:var(--shadow); padding:0; overflow:hidden; }
-
-/* ===== HEADER ===== */
-.bible-reader-header { display:flex; justify-content:space-between; align-items:center; padding:12px 20px; background:var(--card-bg); border-bottom:1px solid var(--border); z-index:10; }
-.bible-reader-header-left { display:flex; align-items:center; gap:12px; }
-.bible-reader-back { color:var(--rose); font-weight:500; text-decoration:none; font-size:0.9rem; display:flex; align-items:center; gap:4px; transition:color 0.2s; }
-.bible-reader-back:hover { color:var(--rose-dark); }
-.bible-reader-header-right { display:flex; align-items:center; gap:8px; }
-.bible-reader-header-right button { background:none; border:none; font-size:1.1rem; color:var(--text); cursor:pointer; padding:4px 8px; border-radius:6px; transition:all 0.2s; }
-.bible-reader-header-right button:hover { background:rgba(219,161,162,0.1); color:var(--rose); }
-
-/* ===== PROGRESS RING ===== */
-.bible-progress-ring { vertical-align:middle; }
-.bible-progress-ring-bg { stroke:var(--border); }
-.bible-progress-ring-fill { stroke:var(--rose); transition:stroke-dashoffset 0.3s; }
-
-/* ===== SETTINGS ===== */
-.bible-reader-settings { display:none; background:var(--card-bg); border-bottom:1px solid var(--border); padding:12px 16px; }
-.bible-reader-settings.open { display:block; }
-.bible-settings-grid { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
-.bible-setting-group { display:flex; flex-direction:column; gap:4px; }
-.bible-setting-group label { font-size:0.7rem; font-weight:600; text-transform:uppercase; color:var(--text-light); letter-spacing:0.5px; }
-.bible-theme-options, .bible-font-options, .bible-mode-options { display:flex; gap:4px; }
-.bible-theme-btn, .bible-font-btn, .bible-mode-btn { padding:4px 8px; border:1px solid var(--border); border-radius:6px; background:transparent; cursor:pointer; font-size:0.75rem; transition:all 0.2s; }
-.bible-theme-btn:hover, .bible-font-btn:hover, .bible-mode-btn:hover { border-color:var(--rose); }
-.bible-theme-btn.active, .bible-font-btn.active, .bible-mode-btn.active { border-color:var(--rose); background:var(--rose); color:white; }
-.color-preview { display:inline-block; width:10px; height:10px; border-radius:50%; vertical-align:middle; margin-right:4px; border:1px solid var(--border); }
-.bible-size-controls { display:flex; align-items:center; gap:6px; }
-.bible-size-btn { background:transparent; border:1px solid var(--border); border-radius:50%; width:24px; height:24px; cursor:pointer; color:var(--text); transition:all 0.2s; display:flex; align-items:center; justify-content:center; }
-.bible-size-btn:hover { border-color:var(--rose); color:var(--rose); }
-.bible-size-controls input[type="range"] { width:80px; accent-color:var(--rose); }
-.bible-theme-extra { margin-top:4px; }
-
-/* ===== TOC DRAWER ===== */
-.bible-toc-drawer { position:fixed; top:0; right:-320px; width:320px; height:100vh; background:var(--card-bg); box-shadow:-4px 0 20px rgba(44,30,30,0.1); z-index:20; transition:right 0.3s ease; display:flex; flex-direction:column; }
-.bible-toc-drawer.open { right:0; }
-.bible-toc-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
-.bible-toc-header h3 { margin:0; font-size:1.1rem; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
-.bible-toc-close { background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text); padding:0 4px; }
-.bible-toc-body { flex:1; overflow-y:auto; padding:12px 20px; }
-.bible-toc-list { list-style:none; padding:0; margin:0; }
-.bible-toc-list li { padding:4px 8px; cursor:pointer; border-radius:4px; transition:background 0.2s; }
-.bible-toc-list li:hover { background:rgba(219,161,162,0.1); }
-
-/* ===== NOTES PANEL ===== */
-.bible-notes-panel { position:fixed; bottom:0; right:0; width:380px; max-height:60vh; background:var(--card-bg); border:1px solid var(--border); border-radius:12px 12px 0 0; box-shadow:0 -4px 20px rgba(44,30,30,0.1); display:none; flex-direction:column; z-index:25; }
-.bible-notes-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--vanilla); border-radius:12px 12px 0 0; }
-.bible-notes-title h3 { margin:0; font-size:1rem; font-family:'Playfair Display',Georgia,serif; }
-.bible-notes-title .badge { background:var(--rose); color:white; padding:0 8px; border-radius:12px; font-size:0.75rem; }
-.bible-notes-body { flex:1; overflow-y:auto; padding:12px 16px; }
-.note-card { border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:12px; }
-.note-card.private { border-left:4px solid #7a6868; }
-.note-author { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-.note-avatar { width:32px; height:32px; border-radius:50%; object-fit:cover; }
-.note-avatar-placeholder { width:32px; height:32px; border-radius:50%; background:var(--rose); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem; }
-.note-author-info { flex:1; }
-.note-author-info small { color:var(--text-light); }
-.note-text { margin:0 0 8px; font-size:0.95rem; }
-.note-footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
-.note-reactions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
-.reaction { border:0; font-family:inherit; color:inherit; background:var(--vanilla); padding:0 8px; border-radius:12px; font-size:0.8rem; cursor:pointer; transition:all 0.2s; }
-.reaction:hover { background:rgba(219,161,162,0.2); }
-.badge-private { background:#7a6868; color:white; padding:0 6px; border-radius:4px; font-size:0.7rem; }
-.empty-notes { color:var(--text-light); text-align:center; padding:24px 12px; }
-#bibleAddNoteForm { padding:12px 16px; border-top:1px solid var(--border); }
-#bibleAddNoteForm textarea { width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; resize:vertical; background:var(--input-bg); color:var(--text); }
-#bibleAddNoteForm textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-#bibleAddNoteForm .btn { padding:4px 12px; font-size:0.8rem; }
-
-/* ===== CONTROLS ===== */
-.bible-controls { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; padding:16px 20px; background:var(--card-bg); border-bottom:1px solid var(--border); }
-.bible-control-group { display:flex; flex-direction:column; gap:4px; min-width:100px; flex:1; }
-.bible-control-group label { font-size:0.8rem; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:0.5px; }
-.bible-control-group select, .bible-control-group input { padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--input-bg); color:var(--text); font-size:0.9rem; }
-.bible-control-group select:focus, .bible-control-group input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.bible-control-group.action-group { display:flex; flex-wrap:wrap; align-items:center; gap:4px; flex-direction:row; min-width:auto; }
-.bible-control-group.action-group .btn-sm { padding:4px 10px; font-size:0.75rem; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }
-.bible-control-group.toggle-group { flex:0 0 auto; justify-content:center; }
-.bible-control-group.toggle-group label { display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:500; font-size:0.9rem; color:var(--text); }
-.bible-control-group.toggle-group input[type="checkbox"] { appearance:none; -webkit-appearance:none; width:40px; height:22px; background:var(--border); border-radius:11px; cursor:pointer; transition:background 0.3s; position:relative; flex-shrink:0; }
-.bible-control-group.toggle-group input[type="checkbox"]:checked { background:var(--rose); }
-.bible-control-group.toggle-group input[type="checkbox"]::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:white; border-radius:50%; transition:transform 0.3s; }
-.bible-control-group.toggle-group input[type="checkbox"]:checked::after { transform:translateX(18px); }
-
-/* ===== DISPLAY ===== */
-.bible-display { padding:20px; min-height:400px; position:relative; background:var(--card-bg); }
-.verse-container { position:relative; }
-.verse-container.parallel { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-.verse-column { padding:16px; background:var(--vanilla); border-radius:12px; border-left:4px solid var(--rose); }
-.verse-column h3 { font-size:1rem; margin-bottom:8px; color:var(--dark); font-family:'Playfair Display',Georgia,serif; }
-.verse-content { font-family:'Georgia',serif; font-size:1.05rem; line-height:1.9; color:var(--text); min-height:200px; text-align:justify; }
-.verse-content p { margin-bottom:12px; cursor:pointer; padding:4px 8px; border-radius:4px; transition:background 0.2s; }
-.verse-content p:hover { background:rgba(219,161,162,0.1); }
-.verse-content p.highlighted { background:#fff3b0; }
-/* F28: the colour classes the highlight picker applies had no styles */
-.verse-content .highlight-yellow { background:#fff3b0; }
-.verse-content .highlight-green { background:#d4f5d4; }
-.verse-content .highlight-blue { background:#d6e8ff; }
-.verse-content .highlight-pink { background:#fbd9e3; }
-.bible-chapter-nav-bottom { display:flex; justify-content:center; align-items:center; gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
-.bible-chapter-nav-bottom .btn { padding:6px 16px; font-size:0.85rem; }
-#bibleChapterDisplay { font-weight:600; color:var(--text); font-family:'Playfair Display',Georgia,serif; }
-
-/* ===== HIGHLIGHT TOOLTIP ===== */
-.bible-highlight-tooltip { position:fixed; display:none; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:6px 10px; box-shadow:var(--shadow-hover); z-index:30; gap:4px; align-items:center; }
-.bible-highlight-tooltip.visible { display:flex; }
-.bible-highlight-color { width:20px; height:20px; border-radius:50%; border:1px solid var(--border); cursor:pointer; transition:transform 0.2s; }
-.bible-highlight-color:hover { transform:scale(1.15); }
-.bible-highlight-color[data-color="yellow"] { background:#ffeb3b; }
-.bible-highlight-color[data-color="green"] { background:#a5d6a7; }
-.bible-highlight-color[data-color="blue"] { background:#90caf9; }
-.bible-highlight-color[data-color="pink"] { background:#f48fb1; }
-.bible-highlight-btn { background:none; border:none; cursor:pointer; color:var(--text); font-size:0.9rem; padding:0 4px; transition:color 0.2s; }
-.bible-highlight-btn:hover { color:var(--rose); }
-
-/* ===== ANNOTATION POPUP ===== */
-.bible-annotation-popup { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:320px; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:20px; box-shadow:var(--shadow-hover); z-index:30; display:none; }
-.bible-annotation-popup.visible { display:block; }
-.bible-annotation-popup textarea { width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; resize:vertical; min-height:60px; font-size:0.9rem; background:var(--input-bg); color:var(--text); }
-.bible-annotation-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
-.bible-annotation-actions button { padding:4px 12px; border-radius:6px; border:none; cursor:pointer; font-size:0.8rem; }
-.bible-annotation-save { background:var(--rose); color:white; }
-.bible-annotation-cancel { background:var(--border); color:var(--text); }
-
-/* ===== SEARCH BAR ===== */
-.bible-search-bar { position:absolute; top:56px; right:16px; width:320px; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow-hover); z-index:15; display:none; }
-.bible-search-bar.visible { display:block; }
-.bible-search-bar input { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:0.9rem; background:var(--input-bg); color:var(--text); }
-.bible-search-bar input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.bible-search-bar #bibleSearchClose { position:absolute; top:6px; right:8px; background:none; border:none; cursor:pointer; color:var(--text-light); font-size:1rem; }
-#bibleSearchResults { margin-top:8px; max-height:200px; overflow-y:auto; display:none; }
-.bible-search-result { padding:4px 8px; font-size:0.85rem; border-bottom:1px solid var(--border); cursor:pointer; }
-.bible-search-result:hover { background:rgba(219,161,162,0.1); }
-
-/* ===== SHARE MODAL ===== */
-.bible-share-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(44,30,30,0.6); backdrop-filter:blur(4px); z-index:30; display:none; align-items:center; justify-content:center; }
-.bible-share-modal.visible { display:flex; }
-.bible-share-modal-content { background:var(--card-bg); border-radius:20px; padding:28px; max-width:400px; width:90%; text-align:center; box-shadow:var(--shadow-hover); border:1px solid var(--rose-light); }
-.bible-share-modal-content h3 { margin-top:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
-.bible-share-options { display:flex; flex-direction:column; gap:8px; margin:16px 0; }
-.bible-share-options button { padding:8px 16px; border:1px solid var(--border); border-radius:50px; background:var(--card-bg); cursor:pointer; transition:all 0.2s; font-size:0.9rem; display:flex; align-items:center; gap:8px; justify-content:center; }
-.bible-share-options button:hover { border-color:var(--rose); background:rgba(219,161,162,0.1); }
-.bible-share-modal-close { background:var(--rose); color:white; border:none; padding:8px 24px; border-radius:50px; cursor:pointer; font-weight:600; transition:background 0.2s; margin-top:8px; }
-.bible-share-modal-close:hover { background:var(--rose-dark); }
-
-/* ===== OVERLAY ===== */
-.bible-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(44,30,30,0.5); backdrop-filter:blur(4px); z-index:11; display:none; }
-.bible-overlay.active { display:block; }
-
-
-/* ===== FOCUS MODE ===== */
-.bible-reader-container.focus-mode .bible-reader-header { transform:translateY(-100%); opacity:0; pointer-events:none; }
-.bible-reader-container.focus-mode .bible-reader-settings { display:none !important; }
-.bible-reader-container.focus-mode .bible-search-bar { display:none !important; }
-
-/* ===== THEME VARIANTS ===== */
-.bible-reader-container[data-theme="paper"] { --bg: #f5f0e1; --card-bg: #faf6ed; --text: #3d2b1f; --text-light: #6b4f3a; --border: #d4c5a9; --vanilla: #faf6ed; --input-bg: #f5f0e1; }
-.bible-reader-container[data-theme="light"] { --bg: #fdf9f8; --card-bg: #ffffff; --text: #1a1212; --text-light: #6b5a5a; --border: #ece0de; --vanilla: #fdf5e6; --input-bg: #fdf9f8; }
-.bible-reader-container[data-theme="dark"] { --bg: #1a1212; --card-bg: #2c1e1e; --text: #ece0de; --text-light: #b8a8a8; --border: #4a3a3a; --vanilla: #2c1e1e; --input-bg: #3d2e2e; }
-.bible-reader-container[data-theme="sepia"] { --bg: #f4e8d1; --card-bg: #fdf5e6; --text: #4a3728; --text-light: #7a5a3a; --border: #d4c5a9; --vanilla: #fdf5e6; --input-bg: #f4e8d1; }
-
-/* ===== FONT VARIANTS ===== */
-.bible-reader-container[data-font="serif"] .verse-content { font-family:'Georgia',serif; }
-.bible-reader-container[data-font="sans"] .verse-content { font-family:'Helvetica','Arial',sans-serif; }
-.bible-reader-container[data-font="mono"] .verse-content { font-family:'Courier New',monospace; }
-
-/* ===== READING MODE ===== */
-.bible-reader-container[data-mode="flip"] .bible-display { overflow:hidden; }
-.bible-reader-container[data-mode="flip"] .verse-content { column-count:1; column-gap:2em; }
-.bible-reader-container[data-mode="scroll"] .bible-display { overflow-y:auto; }
-
-/* ===== RESPONSIVE ===== */
-@media (max-width:768px) {
-    .bible-controls { flex-direction:column; align-items:stretch; }
-    .bible-control-group { min-width:auto; }
-    .verse-container.parallel { grid-template-columns:1fr; }
-    .bible-control-group.toggle-group { align-items:center; }
-    .bible-notes-panel { width:100%; max-height:50vh; border-radius:0; }
-    .bible-toc-drawer { width:280px; right:-280px; }
-    .bible-search-bar { width:260px; right:8px; }
-}
-
-/* Q13: Paper / Sepia tint only the Bible text area; Light / Dark follow the site theme */
-.bible-tint-paper .bible-verse-content, .bible-tint-paper [id^="bibleVerseContent"] { background:#fbf7ee; color:#2b2620; }
-.bible-tint-sepia .bible-verse-content, .bible-tint-sepia [id^="bibleVerseContent"] { background:#f1e3c8; color:#3b2f22; }
-</style>
-
-<?php require_once 'includes/footer.php'; ?>
+<script src="<?php echo SITE_URL; ?>/assets/js/bible.js?v=3" defer></script>
+</body>
+</html>

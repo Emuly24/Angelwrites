@@ -2,6 +2,8 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/csrf.php';
+require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/commerce.php';
 require_once 'includes/mail_helper.php';
 
@@ -152,8 +154,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['react_to_review']) &&
 }
 
 $pageTitle = htmlspecialchars($book['title']);
+// Link previews: the book's cover (as a 1200x630 JPEG), its title, author and description.
+// Before this the preview always showed the site logo.
+require_once __DIR__ . '/includes/og.php';
+$og_title = $book['title'] . (trim((string)($book['author'] ?? '')) !== '' ? ' by ' . $book['author'] : '');
+$og_description = aw_og_text((string)($book['description'] ?? '') !== '' ? $book['description'] : 'A book on AngelWrites.', 180);
+$og_url = rtrim(SITE_URL, '/') . '/book.php?id=' . (int)$book_id;
+$og_image = aw_og_image_url($db, 'book', (int)$book_id);
+$og_image_width = 1200; $og_image_height = 630;
+$og_image_alt = 'Cover of the book “' . $book['title'] . '”';
+$aw_share_url = aw_share_url('book', (int)$book_id);
 ?>
-<?php require_once 'includes/header.php'; ?>
+<?php require_once 'includes/header.php'; echo aw_save_assets(); ?>
 
 <div class="book-page">
     <div class="container">
@@ -239,6 +251,7 @@ $pageTitle = htmlspecialchars($book['title']);
                             <p class="book-owned"><i class="fas fa-circle-check" aria-hidden="true"></i> You own this book · <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a></p>
                         <?php endif; ?>
                     </div>
+                    <?php echo aw_save_button('book', (int)$book_id); ?>
                     <p class="book-groups"><a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>"><i class="fas fa-user-group" aria-hidden="true"></i> Reading groups for this book</a></p><!-- F51 -->
                     <?php if (isLoggedIn()):
                         // F111: add this book to the member's library from its own page (the catalogue
@@ -251,6 +264,8 @@ $pageTitle = htmlspecialchars($book['title']);
                         <form method="POST" action="<?php echo SITE_URL; ?>/library.php" class="library-add-form">
                             <input type="hidden" name="book_id" value="<?php echo (int)$book_id; ?>">
                             <input type="hidden" name="update_status" value="1">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                            <input type="hidden" name="return" value="/book.php?id=<?php echo (int)$book_id; ?>">
                             <label for="libraryStatus">My library</label>
                             <select id="libraryStatus" name="status" onchange="this.form.submit()">
                                 <option value=""<?php echo $my_status === '' ? ' selected' : ''; ?>>Add to my library…</option>
@@ -376,13 +391,13 @@ $pageTitle = htmlspecialchars($book['title']);
                 <div class="share-section">
                     <span class="share-label">Share this book:</span>
                     <div class="share-icons">
-                        <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/book.php?id=' . $book_id); ?>" target="_blank" class="share-btn facebook">
+                        <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode($aw_share_url); ?>" target="_blank" class="share-btn facebook">
                             <i class="fab fa-facebook-f"></i>
                         </a>
-                        <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode('Check out this book: ' . $book['title']); ?>&url=<?php echo urlencode(SITE_URL . '/book.php?id=' . $book_id); ?>" target="_blank" class="share-btn twitter">
+                        <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode('Check out this book: ' . $book['title']); ?>&url=<?php echo urlencode($aw_share_url); ?>" target="_blank" class="share-btn twitter">
                             <i class="fab fa-twitter"></i>
                         </a>
-                        <a href="https://api.whatsapp.com/send?text=<?php echo urlencode('Check out this book: ' . SITE_URL . '/book.php?id=' . $book_id); ?>" target="_blank" class="share-btn whatsapp">
+                        <a href="https://api.whatsapp.com/send?text=<?php echo urlencode('Check out this book: ' . $aw_share_url); ?>" target="_blank" class="share-btn whatsapp">
                             <i class="fab fa-whatsapp"></i>
                         </a>
                     </div>

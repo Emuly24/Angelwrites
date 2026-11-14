@@ -2,6 +2,8 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/saves.php'; // F2: the Save control
+require_once 'includes/og.php'; // link previews: the cover as a 1200x630 JPEG, and the link to share
 
 // ============================================================
 // 1. CSRF PROTECTION HELPER
@@ -144,10 +146,12 @@ if (isLoggedIn()) {
 // 8. OPEN GRAPH META
 // ============================================================
 $base_url = rtrim(SITE_URL, '/');
-$share_url = $base_url . '/poem_view.php?id=' . $id;
+$page_url = $base_url . '/poem_view.php?id=' . $id;
+$share_url = aw_share_url('poem', $id); // through the preview relay when one is set up (includes/og.php)
 $og_title = htmlspecialchars($poem['title']);
-$og_desc = htmlspecialchars(substr($poem['intro'] ?? strip_tags($poem['content']), 0, 150));
-$og_image = $base_url . '/img/' . $id . '?v=' . time();
+$og_desc = htmlspecialchars(aw_og_text(($poem['intro'] ?? '') !== '' ? $poem['intro'] : $poem['content'], 150));
+// a stable 1200x630 JPEG of the cover (was a WebP at an address that changed on every visit)
+$og_image = aw_og_image_url($db, 'poem', $id);
 
 // ============================================================
 // 9. HANDLE POST REQUESTS (Comment / Reply / Private)
@@ -368,11 +372,14 @@ $total_reviews = $rating_data['total'] ?? 0;
 // generic ones. The header now gets the poem's title, description, URL and image (it escapes them).
 $pageTitle = $poem['title'];
 $og_title = $poem['title'];
-$og_description = mb_substr(trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags((string)(($poem['intro'] ?? '') !== '' ? $poem['intro'] : $poem['content'])), ENT_QUOTES, 'UTF-8'))), 0, 150);
-$og_url = $share_url;
+$og_description = aw_og_text(($poem['intro'] ?? '') !== '' ? $poem['intro'] : $poem['content'], 180);
+$og_url = $page_url; // the page itself (the canonical address), even when sharing goes through the relay
 $og_image_width = 1200;
 $og_image_height = 630;
+$og_image_alt = 'Cover of the poem “' . $poem['title'] . '” on AngelWrites';
+$aw_share_url = $share_url;
 require_once 'includes/header.php';
+echo aw_save_assets();
 ?>
 
 <style>
@@ -758,6 +765,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
         </div>
 
         <div class="poem-footer-actions aw-hide-focus">
+            <?php echo aw_save_button('poem', $id); ?>
             <div class="share-section">
                 <span>Share:</span>
                 <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode($share_url); ?>&display=popup" target="_blank" class="share-btn facebook"><i class="fab fa-facebook-f"></i></a>

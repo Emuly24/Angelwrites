@@ -12,5 +12,21 @@ if (!isLoggedIn()) { echo json_encode(['ok' => false, 'message' => 'Please sign 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !validate_csrf_token($_POST['csrf_token'] ?? '')) {
     echo json_encode(['ok' => false, 'message' => 'Your session expired. Please reload the page and try again.']); exit;
 }
+// D1: a Stories & Help post or reply can only be reported by someone who can see it
+$aw_rt = (string)($_POST['target_type'] ?? '');
+if ($aw_rt === 'community_post' || $aw_rt === 'community_reply') {
+    require_once 'includes/community_posts.php';
+    $aw_pid = (int)($_POST['target_id'] ?? 0);
+    if ($aw_rt === 'community_reply') { try { $q = $db->prepare("SELECT post_id FROM community_replies WHERE id = ? AND status = 'published'"); $q->execute([$aw_pid]); $aw_pid = (int)$q->fetchColumn(); } catch (Throwable $e) { $aw_pid = 0; } }
+    $aw_post = $aw_pid ? aw_cp_get($db, $aw_pid) : null;
+    if (!$aw_post || !aw_cp_can_view($aw_post)) { echo json_encode(['ok' => false, 'message' => 'This has already been removed.']); exit; }
+}
+// I1: only someone in the conversation can report a message in it
+if ($aw_rt === 'message') {
+    require_once 'includes/messaging.php';
+    try { $q = $db->prepare("SELECT thread_id FROM messages WHERE id = ? AND status = 'sent'"); $q->execute([(int)($_POST['target_id'] ?? 0)]); $aw_tid = (int)$q->fetchColumn(); } catch (Throwable $e) { $aw_tid = 0; }
+    $aw_o = $aw_tid ? aw_msg_open($db, $aw_tid, (int)$_SESSION['user_id']) : null;
+    if (!$aw_o || $aw_o['staff']) { echo json_encode(['ok' => false, 'message' => 'This has already been removed.']); exit; }
+}
 echo json_encode(aw_report_create($db, (int)$_SESSION['user_id'], (string)($_POST['target_type'] ?? ''), (int)($_POST['target_id'] ?? 0),
     (string)($_POST['reason'] ?? ''), (string)($_POST['details'] ?? '')));
