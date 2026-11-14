@@ -7,6 +7,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/reading_groups.php';
 
 redirectIfNotLoggedIn();
@@ -99,7 +100,7 @@ $type_label = ucfirst($content_type);
 
 $pageTitle = htmlspecialchars($group['name']);
 ?>
-<?php require_once 'includes/header.php'; ?>
+<?php require_once 'includes/header.php'; echo aw_save_assets(); ?>
 
 <div class="group-page">
     <div class="container">
@@ -119,6 +120,7 @@ $pageTitle = htmlspecialchars($group['name']);
                 <?php endif; ?>
             </div>
             <div class="group-actions">
+                <?php echo aw_save_button('group', (int)$group_id); ?>
                 <span class="invite-code">
                     <strong>Invite Code:</strong> <code><?php echo $group['invite_code']; ?></code>
                     <button onclick="copyInviteCode()" class="btn btn-sm btn-outline">📋 Copy</button>

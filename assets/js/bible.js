@@ -183,7 +183,7 @@
   menu.addEventListener('click', function (e) {
     var t = e.target.closest('.br-tint'), a = e.target.closest('[data-act]'), n = st.sel; if (!n) return;
     if (t) highlight(n, t.dataset.tint);
-    if (a) ({ note: openNote, bookmark: bookmark, copy: copyVerse, share: shareVerse })[a.dataset.act](n);
+    if (a) ({ note: openNote, bookmark: bookmark, copy: copyVerse, share: shareVerse, save: saveVerse })[a.dataset.act](n);
   });
   function highlight(n, tint) {
     var el = $('v' + n), had = st.hl[n];
@@ -206,6 +206,19 @@
     var data = { title: ref(n), text: '“' + verseText(n) + '” ' + ref(n), url: link(n) };
     if (navigator.share) navigator.share(data).catch(function () {});
     else (navigator.clipboard ? navigator.clipboard.writeText(data.text + '\n' + data.url) : Promise.reject()).then(function () { toast('Link copied'); }).catch(function () {});
+  }
+  // F2: save the verse to the library (the shared Save dialog in aw-saves.js picks the collection)
+  function saveVerse(n) {
+    if (!C.member) { toast('Sign in to save verses to your library'); return; }
+    var f = document.getElementById('brSaveForm');
+    if (!f) {
+      f = document.createElement('form'); f.id = 'brSaveForm'; f.method = 'post'; f.action = site + '/save.php'; f.hidden = true; f.setAttribute('data-save', '');
+      f.innerHTML = '<input name="csrf_token"><input name="type" value="verse"><input name="key"><input name="action" value="save"><input name="back"><button type="submit" class="aw-save-btn"><i></i><span></span></button>';
+      document.body.appendChild(f);
+    }
+    f.csrf_token.value = C.csrf; f.key.value = st.v + '|' + st.b + '|' + st.c + '|' + n; f.back.value = '/bible_reader.php';
+    closeAll();
+    f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
   }
   function bookmark(n) {
     if (!C.member) { toast('Sign in to keep bookmarks'); return; }

@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/commerce.php';
 require_once 'includes/mail_helper.php';
 
@@ -153,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['react_to_review']) &&
 
 $pageTitle = htmlspecialchars($book['title']);
 ?>
-<?php require_once 'includes/header.php'; ?>
+<?php require_once 'includes/header.php'; echo aw_save_assets(); ?>
 
 <div class="book-page">
     <div class="container">
@@ -239,6 +240,7 @@ $pageTitle = htmlspecialchars($book['title']);
                             <p class="book-owned"><i class="fas fa-circle-check" aria-hidden="true"></i> You own this book · <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a></p>
                         <?php endif; ?>
                     </div>
+                    <?php echo aw_save_button('book', (int)$book_id); ?>
                     <p class="book-groups"><a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>"><i class="fas fa-user-group" aria-hidden="true"></i> Reading groups for this book</a></p><!-- F51 -->
                     <?php if (isLoggedIn()):
                         // F111: add this book to the member's library from its own page (the catalogue

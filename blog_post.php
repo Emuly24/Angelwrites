@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/mail_helper.php';
 require_once 'includes/csrf.php';
 require_once 'includes/upload.php'; // R3: shared upload limits
@@ -225,7 +226,7 @@ $reading_progress = null;
 
 $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 ?>
-<?php require_once 'includes/header.php'; ?>
+<?php require_once 'includes/header.php'; echo aw_save_assets(); ?>
 
 <div class="blog-post-page">
     <div class="container">
@@ -301,6 +302,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
+                <?php echo aw_save_button('post', (int)$post['id']); ?>
                 <div class="share-section">
                     <span>Share:</span>
                     <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/blog_post.php?slug=' . $slug); ?>" target="_blank" class="share-btn facebook">

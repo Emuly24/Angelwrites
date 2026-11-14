@@ -4,6 +4,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/csrf.php';
 require_once 'includes/components.php';
 require_once 'includes/community_posts.php';
@@ -83,6 +84,7 @@ $pageTitle = $post['title'] . ' · Stories & Help';
 $aw_noindex = true;
 require_once 'includes/header.php';
 echo aw_cp_assets();
+echo aw_save_assets();
 if ($canReply) echo aw_cp_editor_assets();
 ?>
 <main class="cp" id="main">
@@ -146,6 +148,7 @@ if ($canReply) echo aw_cp_editor_assets();
             <div class="cp-body"><?php echo aw_clean_html($post['body'], 'member'); ?></div>
         <?php endif; ?>
         <div class="cp-actions">
+            <?php if ($post['status'] === 'published' && $post['visibility'] !== 'team') echo aw_save_button('story', $id); ?>
             <?php if ($isAuthor): ?>
                 <a class="cp-btn cp-btn-soft cp-btn-sm" href="<?php echo SITE_URL; ?>/story_write.php?id=<?php echo $id; ?>"><i class="fas fa-pen" aria-hidden="true"></i> Edit</a>
                 <form method="post" onsubmit="return confirm('Delete this post? Replies to it will go too. You cannot undo this.');"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="action" value="delete_post"><button class="cp-btn cp-btn-danger cp-btn-sm" type="submit">Delete</button></form>

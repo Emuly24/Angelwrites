@@ -75,6 +75,7 @@ function aw_br_verses($chapter) {
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/bible.css?v=2">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-saves.css?v=1"><script src="<?php echo SITE_URL; ?>/assets/js/aw-saves.js?v=1" defer></script>
 <script>
 // apply the reader's settings before the first paint (no flash of the wrong theme or size)
 (function () { try { var s = JSON.parse(localStorage.getItem('awBible') || '{}'), r = document.documentElement;
@@ -219,6 +220,7 @@ function aw_br_verses($chapter) {
     <div class="br-actions">
         <button type="button" data-act="note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>Note</button>
         <button type="button" data-act="bookmark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg><span>Bookmark</span></button>
+        <button type="button" data-act="save"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21l-1.4-1.3C5.4 15 2 12 2 8.5 2 5.4 4.4 3 7.5 3c1.7 0 3.4.8 4.5 2.1C13.1 3.8 14.8 3 16.5 3 19.6 3 22 5.4 22 8.5c0 3.5-3.4 6.5-8.6 11.2z"/></svg>Save</button><!-- F2: to the library -->
         <button type="button" data-act="copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M5 16V5a1 1 0 0 1 1-1h9"/></svg>Copy</button>
         <button type="button" data-act="share"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 13v7h14v-7"/></svg>Share</button>
     </div>
@@ -251,6 +253,6 @@ window.AW_BIBLE = <?php echo json_encode([
     'csrf' => $csrf,
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
 </script>
-<script src="<?php echo SITE_URL; ?>/assets/js/bible.js?v=2" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/bible.js?v=3" defer></script>
 </body>
 </html>

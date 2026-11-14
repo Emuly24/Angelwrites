@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/saves.php'; // F2: the Save control
 
 // ============================================================
 // 1. CSRF PROTECTION HELPER
@@ -373,6 +374,7 @@ $og_url = $share_url;
 $og_image_width = 1200;
 $og_image_height = 630;
 require_once 'includes/header.php';
+echo aw_save_assets();
 ?>
 
 <style>
@@ -758,6 +760,7 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
         </div>
 
         <div class="poem-footer-actions aw-hide-focus">
+            <?php echo aw_save_button('poem', $id); ?>
             <div class="share-section">
                 <span>Share:</span>
                 <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode($share_url); ?>&display=popup" target="_blank" class="share-btn facebook"><i class="fab fa-facebook-f"></i></a>
