@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/commerce.php';
+require_once 'includes/book_card.php';
 
 // ===== SEARCH & FILTER =====
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -72,6 +73,7 @@ if (isLoggedIn()) {
 $pageTitle = 'Books';
 ?>
 <?php require_once 'includes/header.php'; ?>
+<?php echo aw_book_assets(); ?>
 
 <div class="books-page">
     <div class="container">
@@ -121,82 +123,9 @@ $pageTitle = 'Books';
 
         <!-- ===== BOOK GRID ===== -->
         <?php if (count($books) > 0): ?>
-            <div class="books-grid">
-                <?php foreach ($books as $book): ?>
-                    <div class="book-card" id="book-<?php echo (int)$book['id']; ?>">
-                        <!-- Cover Wrapper -->
-                        <div class="book-cover-wrapper">
-                            <?php if ($book['cover_path']): ?>
-                                <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                            <?php else: ?>
-                                <div class="placeholder-cover">
-                                    <i class="fas fa-book"></i>
-                                </div>
-                            <?php endif; ?>
-                            
-                            <!-- Badges -->
-                            <div class="book-badges">
-                                <?php if (isset($owned[(int)$book['id']])): // Q14 ?>
-                                    <span class="badge free">Owned</span>
-                                <?php elseif ($book['is_free']): ?>
-                                    <span class="badge free">Free</span>
-                                <?php elseif (aw_book_on_sale($book)): // F79 ?>
-                                    <span class="badge sale">Sale</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-
-                        <!-- Book Details -->
-                        <div class="book-details">
-                            <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                            <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-
-                            <!-- Description -->
-                            <div class="book-description-wrapper">
-                                <div class="book-description" id="desc-<?php echo $book['id']; ?>">
-                                    <?php echo nl2br(htmlspecialchars($book['description'] ?? 'A beautiful story waiting to be read.')); ?>
-                                </div>
-                                <?php if (strlen($book['description'] ?? '') > 400): ?>
-                                    <button class="toggle-desc-btn" data-id="<?php echo $book['id']; ?>">Read More</button>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Bottom: Price & Actions -->
-                            <div class="book-bottom">
-                                <div class="book-price">
-                                    <?php if ($book['is_free']): ?>
-                                        <span class="free-text">Free</span>
-                                    <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
-                                        <span>Not yet on sale</span>
-                                    <?php elseif (aw_book_on_sale($book)): ?>
-                                        <span class="sale-text"><s><?php echo aw_mwk($book['price']); ?></s> <?php echo aw_mwk($book['sale_price']); ?></span><!-- F79 -->
-                                    <?php else: ?>
-                                        <span><?php echo aw_mwk($book['price']); ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="book-actions">
-                                    <?php if (isset($readable[(int)$book['id']])): // F86 ?>
-                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-primary">
-                                        <i class="fas fa-book-open"></i> Read
-                                    </a>
-                                    <?php else: ?>
-                                    <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book['id']; ?>" class="btn btn-outline">
-                                        <i class="fas fa-info-circle"></i> Details
-                                    </a>
-                                    <?php endif; ?>
-                                    <?php if (isLoggedIn() && ($book['is_free'] || isset($owned[(int)$book['id']]) || (float)$book['price'] > 0)): // F80, F34 ?>
-                                        <button class="btn btn-secondary download-btn" data-id="<?php echo $book['id']; ?>" data-free="<?php echo ($book['is_free'] || isset($owned[(int)$book['id']])) ? '1' : '0'; ?>" data-price="<?php echo aw_book_price($book); ?>">
-                                            <i class="fas fa-download"></i> Download
-                                        </button>
-                                    <?php elseif (!isLoggedIn() && ($book['is_free'] || (float)$book['price'] > 0)): // Q14: guests were not told ?>
-                                        <a class="btn btn-secondary" href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode('/books.php#book-' . (int)$book['id']); ?>">
-                                            <i class="fas fa-sign-in-alt"></i> Log in to <?php echo $book['is_free'] ? 'download' : 'buy'; ?>
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="bk-grid">
+                <?php foreach ($books as $book): $bid = (int)$book['id']; ?>
+                    <?php echo aw_book_card($book, ['readable' => isset($readable[$bid]), 'owned' => isset($owned[$bid]), 'buy' => true]); ?>
                 <?php endforeach; ?>
             </div>
             <?php echo aw_pager($total_books, $page, $per_page); // P1 ?>
@@ -271,29 +200,13 @@ $pageTitle = 'Books';
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== READ MORE TOGGLE =====
-    const toggleBtns = document.querySelectorAll('.toggle-desc-btn');
-    toggleBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const id = this.dataset.id;
-            const desc = document.getElementById('desc-' + id);
-            if (desc.classList.contains('expanded')) {
-                desc.classList.remove('expanded');
-                this.textContent = 'Read More';
-            } else {
-                desc.classList.add('expanded');
-                this.textContent = 'Show Less';
-            }
-        });
-    });
-
     // ===== DOWNLOAD BUTTON =====
     const downloadBtns = document.querySelectorAll('.download-btn');
     downloadBtns.forEach(btn => {
         btn.addEventListener('click', function() {
             const bookId = this.dataset.id;
             const isFree = this.dataset.free === '1';
-            const bookTitle = this.closest('.book-card').querySelector('h3').textContent;
+            const bookTitle = this.closest('.bk-card, .book-card').querySelector('h3').textContent.trim();
 
             if (isFree) {
                 // Free book – download directly
@@ -490,67 +403,6 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 .action-group { display: flex; gap: 8px; }
 .action-group .btn-sm { padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; }
 
-/* ===== BOOK GRID ===== */
-.books-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 28px; margin: 0 auto;
-}
-
-/* ===== BOOK CARD ===== */
-.book-card {
-    background: var(--card-bg); border-radius: 16px; overflow: hidden;
-    border: 1px solid var(--border); box-shadow: var(--shadow);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex; flex-direction: column; height: 100%;
-}
-.book-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-hover); }
-
-/* ===== COVER ===== */
-.book-cover-wrapper {
-    position: relative; height: 280px; background: var(--vanilla);
-    display: flex; align-items: center; justify-content: center; overflow: hidden;
-}
-.book-cover-wrapper img {
-    width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;
-}
-.book-card:hover .book-cover-wrapper img { transform: scale(1.03); }
-.placeholder-cover { font-size: 4rem; color: var(--rose); opacity: 0.5; }
-.book-badges {
-    position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px;
-}
-.badge {
-    padding: 4px 14px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.5px; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-.badge.free { background: #4f8a63; }
-.badge.sale { background: #b4505a; }
-
-/* ===== BOOK DETAILS ===== */
-.book-details { padding: 20px 24px 24px; flex: 1; display: flex; flex-direction: column; }
-.book-details h3 { font-size: 1.2rem; margin: 0 0 4px; font-weight: 600; color: var(--text); line-height: 1.3; }
-.book-author { font-size: 0.9rem; color: var(--text-light); margin-bottom: 10px; }
-
-/* ===== DESCRIPTION ===== */
-.book-description-wrapper { flex: 1; }
-.book-description { font-size: 0.9rem; line-height: 1.6; color: var(--text); max-height: 80px; overflow: hidden; transition: max-height 0.4s ease; }
-.book-description.expanded { max-height: none; }
-.toggle-desc-btn { background: none; border: none; color: var(--rose); font-size: 0.8rem; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 8px; }
-.toggle-desc-btn:hover { color: var(--rose-dark); text-decoration: underline; }
-
-/* ===== BOTTOM ===== */
-.book-bottom {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
-}
-.book-price { font-weight: 700; font-size: 1rem; color: var(--text); }
-.free-text { color: #4f8a63; }
-.sale-text { color: #b4505a; }
-.book-actions { display: flex; gap: 8px; }
-.book-actions .btn { padding: 6px 16px; border-radius: 30px; font-size: 0.8rem; font-weight: 600; transition: all 0.2s ease; }
-.book-actions .btn-primary { background: var(--rose); color: white; border: none; }
-.book-actions .btn-primary:hover { background: var(--rose-dark); transform: translateY(-2px); }
-.book-actions .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
-.book-actions .btn-secondary:hover { border-color: var(--rose); color: var(--rose); transform: translateY(-2px); box-shadow: var(--shadow); }
-
 /* ===== EMPTY STATE ===== */
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-light); }
 .empty-state-icon { font-size: 4rem; color: var(--rose); opacity: 0.4; margin-bottom: 16px; }
@@ -617,22 +469,13 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
     .books-header { flex-direction: column; align-items: flex-start; }
-    .books-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
     .search-form { flex-direction: column; align-items: stretch; }
     .search-input-group { min-width: auto; }
     .filter-group .filter-select { width: 100%; }
     .action-group { justify-content: stretch; }
     .action-group .btn { flex: 1; justify-content: center; }
-    .book-cover-wrapper { height: 220px; }
     .payment-options { flex-direction: column; }
     .payment-option { flex-direction: row; justify-content: center; padding: 10px; }
-}
-@media (max-width: 480px) {
-    .books-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-    .book-cover-wrapper { height: 180px; }
-    .book-details { padding: 14px 16px 16px; }
-    .book-details h3 { font-size: 1rem; }
-    .book-actions .btn { padding: 4px 12px; font-size: 0.7rem; }
 }
 
 /* Q21 */

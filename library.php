@@ -1,707 +1,292 @@
 <?php
+/**
+ * F3: My Library (PROGRAM_PLAN.md Phase 4, wish F).
+ *   Continue reading   books you have open, straight back into the reader (no progress bars)
+ *   Saved              everything you saved, by collection (includes/saves.php)
+ *   Book lists         want to read, finished
+ *   Groups             your reading groups, and open groups you can join
+ *   Your contributions what you have shared and written
+ * The book page's "My library" form still posts here (update_status / remove_status), now with CSRF.
+ */
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
-require_once 'includes/mail_helper.php';
+require_once 'includes/csrf.php';
+require_once 'includes/components.php';
+require_once 'includes/saves.php';
+require_once 'includes/book_card.php';
 
 redirectIfNotLoggedIn();
+$uid = (int)$_SESSION['user_id'];
+aw_save_tables($db);
+$error = ''; $success = '';
+$back = function ($q = '', $anchor = '') { header('Location: ' . SITE_URL . '/library.php' . ($q !== '' ? '?' . $q : '') . ($anchor !== '' ? '#' . $anchor : '')); exit; };
 
-$user_id = $_SESSION['user_id'];
-$error = '';
-$success = '';
-
-// ===== SEARCH & FILTER =====
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$status_filter = isset($_GET['status']) ? trim($_GET['status']) : '';
-$sort_by = isset($_GET['sort']) ? trim($_GET['sort']) : '';
-
-// ===== FETCH READING STATS =====
-$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'currently reading'");
-$stmt->execute([$user_id]);
-$stats['reading'] = $stmt->fetchColumn();
-
-$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'want to read'");
-$stmt->execute([$user_id]);
-$stats['want_to_read'] = $stmt->fetchColumn();
-
-$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ? AND status = 'finished'");
-$stmt->execute([$user_id]);
-$stats['finished'] = $stmt->fetchColumn();
-
-$stmt = $db->prepare("SELECT COUNT(*) FROM reading_status WHERE user_id = ?");
-$stmt->execute([$user_id]);
-$stats['total'] = $stmt->fetchColumn();
-
-// ===== HANDLE STATUS UPDATE =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
-    $book_id = (int)$_POST['book_id'];
-    $status = $_POST['status'];
-    
-    $valid_statuses = ['currently reading', 'want to read', 'finished'];
-    if (in_array($status, $valid_statuses)) {
-        $stmt = $db->prepare("SELECT id FROM reading_status WHERE user_id = ? AND book_id = ?");
-        $stmt->execute([$user_id, $book_id]);
-        $exists = $stmt->fetch();
-        
-        if ($exists) {
-            $stmt = $db->prepare("UPDATE reading_status SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND book_id = ?");
-            $stmt->execute([$status, $user_id, $book_id]);
-        } else {
-            $stmt = $db->prepare("INSERT INTO reading_status (user_id, book_id, status) VALUES (?, ?, ?)");
-            $stmt->execute([$user_id, $book_id, $status]);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $error = 'Your session expired. Please try again.';
+    } elseif (isset($_POST['update_status'])) {
+        $bid = (int)($_POST['book_id'] ?? 0);
+        $status = (string)($_POST['status'] ?? '');
+        if ($bid && in_array($status, ['currently reading', 'want to read', 'finished'], true)) {
+            try {
+                $st = $db->prepare("SELECT id FROM reading_status WHERE user_id = ? AND book_id = ?");
+                $st->execute([$uid, $bid]);
+                if ($st->fetchColumn()) $db->prepare("UPDATE reading_status SET status = ?, updated_at = CURRENT_TIMESTAMP" . ($status === 'finished' ? ", finished_at = CURRENT_TIMESTAMP" : '') . " WHERE user_id = ? AND book_id = ?")->execute([$status, $uid, $bid]);
+                else $db->prepare("INSERT INTO reading_status (user_id, book_id, status) VALUES (?, ?, ?)")->execute([$uid, $bid, $status]);
+            } catch (Throwable $e) { error_log('library status: ' . $e->getMessage()); }
+            $ret = (string)($_POST['return'] ?? '');
+            if (preg_match('#^/book\.php\?id=\d+$#', $ret)) { header('Location: ' . SITE_URL . $ret . '&library=1'); exit; }
+            $back('msg=status', 'books');
         }
-        $success = 'Reading status updated successfully.';
+    } elseif (isset($_POST['remove_status'])) {
+        try { $db->prepare("DELETE FROM reading_status WHERE user_id = ? AND book_id = ?")->execute([$uid, (int)($_POST['book_id'] ?? 0)]); } catch (Throwable $e) { error_log('library remove: ' . $e->getMessage()); }
+        $back('msg=removed', 'books');
+    } elseif (isset($_POST['new_collection'])) {
+        $err = '';
+        $cid = aw_collection_create($db, $uid, (string)$_POST['new_collection'], $err);
+        if ($cid) $back('c=' . $cid . '&msg=created', 'saved');
+        $error = $err;
+    } elseif (isset($_POST['rename_collection'])) {
+        aw_collection_rename($db, $uid, (int)$_POST['rename_collection'], (string)($_POST['name'] ?? '')) ? $back('c=' . (int)$_POST['rename_collection'] . '&msg=renamed', 'saved') : $error = 'Please give the collection a name (up to 60 characters).';
+    } elseif (isset($_POST['delete_collection'])) {
+        aw_collection_delete($db, $uid, (int)$_POST['delete_collection']);
+        $back('msg=deleted', 'saved');
     }
 }
+$success = ['status' => 'Your book list was updated.', 'removed' => 'The book was taken off your lists.', 'created' => 'Collection created. Use Save on anything to file it here.',
+            'renamed' => 'Collection renamed.', 'deleted' => 'Collection deleted. What was in it is still in your library.'][$_GET['msg'] ?? ''] ?? '';
+if (!empty($_GET['save_error'])) $error = 'That could not be saved.';
 
-// ===== HANDLE REMOVE STATUS =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_status'])) {
-    $book_id = (int)$_POST['book_id'];
-    $stmt = $db->prepare("DELETE FROM reading_status WHERE user_id = ? AND book_id = ?");
-    $stmt->execute([$user_id, $book_id]);
-    $success = 'Book removed from your library.';
+// ----- Continue reading: books open in the reader, most recent first -----
+$continue = [];
+try {
+    $st = $db->prepare("SELECT b.*, rp.last_accessed_at, COALESCE(CAST(rp.position_section AS INTEGER), rs.last_read_page) AS page
+                        FROM books b
+                        LEFT JOIN reading_progress rp ON rp.book_id = b.id AND rp.user_id = ?
+                        LEFT JOIN reading_status rs ON rs.book_id = b.id AND rs.user_id = ?
+                        WHERE (rs.status = 'currently reading' OR (rp.id IS NOT NULL AND rp.finished_at IS NULL AND COALESCE(rs.status, '') <> 'finished'))
+                        ORDER BY COALESCE(rp.last_accessed_at, rs.updated_at) DESC LIMIT 12");
+    $st->execute([$uid, $uid]);
+    $continue = $st->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { error_log('library continue: ' . $e->getMessage()); }
+
+// planned reads (reader v1) that are due
+$plans = [];
+if (is_file(__DIR__ . '/includes/reading_plans.php')) {
+    require_once __DIR__ . '/includes/reading_plans.php';
+    $plans = aw_plans_upcoming($db, $uid, 6);
 }
 
-// ===== FETCH USER'S BOOKS WITH STATUS =====
-$sql = "
-    SELECT 
-        b.id, b.title, b.author, b.cover_path, b.file_path, b.file_type, b.is_free, b.price, b.is_sale,
-        rs.status,
-        -- R8: progress comes from where the reader saves it (reading_status.progress was never written)
-        COALESCE(rp.progress_percent, rs.progress, 0) AS progress,
-        COALESCE(CAST(rp.position_section AS INTEGER), rs.last_read_page) AS last_read_page,
-        rp.last_accessed_at
-    FROM books b
-    LEFT JOIN reading_status rs ON b.id = rs.book_id AND rs.user_id = ?
-    LEFT JOIN reading_progress rp ON b.id = rp.book_id AND rp.user_id = rs.user_id
-    WHERE 1=1
-";
-$params = [$user_id];
+// ----- Saved -----
+$collections = aw_collections($db, $uid);
+$cid = isset($_GET['c']) ? (int)$_GET['c'] : null;   // null all, 0 not in a collection
+if ($cid && !array_filter($collections, function ($c) use ($cid) { return (int)$c['id'] === $cid; })) $cid = null;
+$saves = aw_saves_list($db, $uid, $cid);
+$curName = $cid === null ? 'Everything you saved' : ($cid === 0 ? 'Not in a collection' : '');
+foreach ($collections as $c) if ((int)$c['id'] === $cid) $curName = $c['name'];
 
-if ($search) {
-    $sql .= " AND (b.title LIKE ? OR b.author LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-}
+// ----- Book lists -----
+$lists = ['want to read' => [], 'finished' => []];
+try {
+    $st = $db->prepare("SELECT b.*, rs.status, rs.finished_at, rs.updated_at FROM reading_status rs JOIN books b ON b.id = rs.book_id
+                        WHERE rs.user_id = ? AND rs.status IN ('want to read', 'finished') ORDER BY rs.updated_at DESC");
+    $st->execute([$uid]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $b) $lists[$b['status']][] = $b;
+} catch (Throwable $e) { error_log('library lists: ' . $e->getMessage()); }
 
-if ($status_filter && in_array($status_filter, ['currently reading', 'want to read', 'finished'])) {
-    $sql .= " AND rs.status = ?";
-    $params[] = $status_filter;
-}
+// ----- Groups -----
+$myGroups = []; $openGroups = [];
+try {
+    $st = $db->prepare("SELECT g.id, g.name, g.description, (SELECT COUNT(*) FROM group_members m2 WHERE m2.group_id = g.id) AS members
+                        FROM reading_groups g JOIN group_members m ON m.group_id = g.id AND m.user_id = ? ORDER BY g.name");
+    $st->execute([$uid]);
+    $myGroups = $st->fetchAll(PDO::FETCH_ASSOC);
+    $st = $db->prepare("SELECT g.id, g.name, g.description, (SELECT COUNT(*) FROM group_members m2 WHERE m2.group_id = g.id) AS members
+                        FROM reading_groups g WHERE COALESCE(g.is_private, 0) = 0 AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
+                        ORDER BY g.created_at DESC LIMIT 6");
+    $st->execute([$uid]);
+    $openGroups = $st->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { error_log('library groups: ' . $e->getMessage()); }
 
-// Sorting
-switch ($sort_by) {
-    case 'title_asc':
-        $sql .= " ORDER BY b.title ASC";
-        break;
-    case 'title_desc':
-        $sql .= " ORDER BY b.title DESC";
-        break;
-    case 'recent':
-        $sql .= " ORDER BY rs.updated_at DESC, b.created_at DESC";
-        break;
-    default:
-        $sql .= "
-            ORDER BY 
-                CASE 
-                    WHEN rs.status = 'currently reading' THEN 1
-                    WHEN rs.status = 'want to read' THEN 2
-                    WHEN rs.status = 'finished' THEN 3
-                    ELSE 4
-                END,
-                b.title ASC
-        ";
-}
+// ----- Your contributions -----
+$contrib = ['stories' => 0, 'comments' => []];
+try { $st = $db->prepare("SELECT COUNT(*) FROM community_posts WHERE author_id = ? AND status <> 'removed'"); $st->execute([$uid]); $contrib['stories'] = (int)$st->fetchColumn(); } catch (Throwable $e) { /* no Stories & Help yet */ }
+try {
+    $st = $db->prepare("SELECT 'review' AS kind, comment AS text, created_at, CASE target_type WHEN 'poem' THEN 'poem_view.php?id=' || target_id WHEN 'book' THEN 'book.php?id=' || target_id ELSE 'index.php' END || '#comments' AS link
+                        FROM reviews WHERE user_id = ? AND deleted_at IS NULL
+                        UNION ALL SELECT 'reflection', comment, created_at, 'blog_post.php?slug=' || (SELECT slug FROM blog_posts b WHERE b.id = reflection_id) || '#comments' FROM reflection_comments WHERE user_id = ?
+                        UNION ALL SELECT 'video', content, created_at, 'video_watch.php?id=' || video_id FROM video_comments WHERE user_id = ?
+                        ORDER BY created_at DESC LIMIT 6");
+    $st->execute([$uid, $uid, $uid]);
+    $contrib['comments'] = $st->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { error_log('library contributions: ' . $e->getMessage()); }
 
-$stmt = $db->prepare($sql);
-$stmt->execute($params);
-$books = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// ===== GROUP BOOKS BY STATUS =====
-$grouped = [
-    'currently reading' => [],
-    'want to read' => [],
-    'finished' => [],
-    'none' => []
-];
-
-foreach ($books as $book) {
-    $status = $book['status'] ?? 'none';
-    if (!isset($grouped[$status])) {
-        $status = 'none';
-    }
-    $grouped[$status][] = $book;
-}
-
-// P2: "All Books" (every book not on one of the member's lists, i.e. most of the catalogue) was
-// shown in full. It is paged, 12 at a time; the member's own three lists stay complete.
-require_once __DIR__ . '/includes/pagination.php';
-[$page, $per_page] = aw_page(12);
-$all_books_total = count($grouped['none']);
-[$page, $offset] = aw_clamp($all_books_total, $page, $per_page);
-$grouped['none'] = array_slice($grouped['none'], $offset, $per_page);
-
+$token = generate_csrf_token();
 $pageTitle = 'My Library';
+require_once 'includes/header.php';
+echo aw_book_assets();
+echo aw_save_assets();
 ?>
-<?php require_once 'includes/header.php'; ?>
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-library.css?v=1">
+<main class="lib" id="main">
+<div class="container">
+    <header class="lib-head">
+        <h1>My Library</h1>
+        <p>Everything you are reading and everything you saved, in one quiet place.</p>
+        <nav class="lib-jump" aria-label="Sections">
+            <a href="#continue">Continue reading</a><a href="#saved">Saved</a><a href="#books">Book lists</a><a href="#groups">Groups</a><a href="#contrib">Your contributions</a>
+        </nav>
+    </header>
+    <?php echo aw_alert('error', $error); echo aw_alert('success', $success); ?>
 
-<div class="library-page">
-    <div class="container">
-        <!-- ===== PAGE HEADER ===== -->
-        <div class="library-header">
-            <div class="library-header-content">
-                <h1>My Library</h1>
-                <p>Your reading journey, all in one place.</p>
+    <section class="lib-sec" id="continue" aria-labelledby="hContinue">
+        <h2 id="hContinue">Continue reading</h2>
+        <?php if ($plans): ?>
+            <ul class="lib-plans" aria-label="Your planned reads">
+            <?php foreach ($plans as $pl): ?>
+                <li><i class="far fa-calendar" aria-hidden="true"></i> <span><strong><?php echo htmlspecialchars(aw_plan_when($pl['plan_date'])); ?>:</strong> <?php echo htmlspecialchars($pl['book_title']); ?><?php echo $pl['label'] ? ' — ' . htmlspecialchars($pl['label']) : ''; ?></span>
+                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$pl['book_id']; ?><?php echo $pl['page'] ? '&page=' . (int)$pl['page'] : ''; ?>">Read now</a></li>
+            <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+        <?php if (!$continue): ?>
+            <?php echo aw_empty('Nothing open yet', 'When you start reading a book, it waits for you here, at the page where you stopped.', [SITE_URL . '/books.php', 'Browse books'], 'fa-book-open'); ?>
+        <?php else: ?>
+            <div class="bk-grid">
+            <?php foreach ($continue as $b): ?>
+                <article class="bk-card">
+                    <a class="bk-cover" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>" tabindex="-1" aria-hidden="true">
+                        <?php if ($u = aw_book_cover_url($b)): ?><img src="<?php echo htmlspecialchars($u); ?>" alt="" loading="lazy" onerror="this.remove()"><?php endif; ?>
+                        <span class="bk-cover-ph"><span><?php echo htmlspecialchars($b['title']); ?></span></span>
+                    </a>
+                    <div class="bk-body">
+                        <h3 class="bk-title"><a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['title']); ?></a></h3>
+                        <p class="bk-author"><?php echo $b['page'] ? 'Page ' . (int)$b['page'] : 'Not started'; ?><?php echo $b['last_accessed_at'] ? ' · ' . htmlspecialchars(date('j M', strtotime($b['last_accessed_at']))) : ''; ?></p>
+                        <div class="bk-foot"><span class="bk-actions"><a class="bk-btn bk-btn-primary" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$b['id']; ?>" aria-label="Continue reading <?php echo htmlspecialchars($b['title']); ?>">Continue</a></span></div>
+                    </div>
+                </article>
+            <?php endforeach; ?>
             </div>
-            <div class="library-header-stats">
-                <div class="stat-pill">
-                    <i class="fas fa-book-open" style="color: var(--rose);"></i>
-                    <span><?php echo $stats['reading']; ?></span>
-                    <small>Reading</small>
-                </div>
-                <div class="stat-pill">
-                    <i class="fas fa-bookmark" style="color: #8a6f86;"></i>
-                    <span><?php echo $stats['want_to_read']; ?></span>
-                    <small>Want to Read</small>
-                </div>
-                <div class="stat-pill">
-                    <i class="fas fa-check-circle" style="color: #4f8a63;"></i>
-                    <span><?php echo $stats['finished']; ?></span>
-                    <small>Finished</small>
-                </div>
-                <div class="stat-pill">
-                    <i class="fas fa-layer-group" style="color: var(--text-light);"></i>
-                    <span><?php echo $stats['total']; ?></span>
-                    <small>Total</small>
-                </div>
-            </div>
-        </div>
+        <?php endif; ?>
+    </section>
 
-        <!-- ===== SEARCH & FILTER ===== -->
-        <div class="library-tools">
-            <form method="GET" class="search-form">
-                <div class="search-input-group">
-                    <i class="fas fa-search"></i>
-                    <input type="text" name="search" placeholder="Search your library..." value="<?php echo htmlspecialchars($search); ?>">
-                </div>
-                <select name="status" class="filter-select">
-                    <option value="">All Statuses</option>
-                    <option value="currently reading" <?php echo $status_filter === 'currently reading' ? 'selected' : ''; ?>>Currently Reading</option>
-                    <option value="want to read" <?php echo $status_filter === 'want to read' ? 'selected' : ''; ?>>Want to Read</option>
-                    <option value="finished" <?php echo $status_filter === 'finished' ? 'selected' : ''; ?>>Finished</option>
-                </select>
-                <select name="sort" class="sort-select">
-                    <option value="">Default Order</option>
-                    <option value="title_asc" <?php echo $sort_by === 'title_asc' ? 'selected' : ''; ?>>Title A-Z</option>
-                    <option value="title_desc" <?php echo $sort_by === 'title_desc' ? 'selected' : ''; ?>>Title Z-A</option>
-                    <option value="recent" <?php echo $sort_by === 'recent' ? 'selected' : ''; ?>>Recently Added</option>
-                </select>
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="fas fa-sliders-h"></i> Apply
-                </button>
-                <a href="<?php echo SITE_URL; ?>/library.php" class="btn btn-outline btn-sm">
-                    <i class="fas fa-times"></i> Clear
-                </a>
+    <section class="lib-sec" id="saved" aria-labelledby="hSaved">
+        <div class="lib-sec-head">
+            <h2 id="hSaved">Saved</h2>
+            <form method="post" class="lib-inline">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>">
+                <label class="sr-only" for="newCol">New collection name</label>
+                <input type="text" id="newCol" name="new_collection" maxlength="60" placeholder="New collection" required>
+                <button type="submit" class="lib-btn">Create</button>
             </form>
         </div>
-
-        <!-- ===== ALERT MESSAGES ===== -->
-        <?php if ($error): ?>
-            <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?></div>
+        <nav class="lib-tabs" aria-label="Collections">
+            <a href="?#saved"<?php echo $cid === null ? ' aria-current="page"' : ''; ?>>Everything</a>
+            <?php foreach ($collections as $c): ?><a href="?c=<?php echo (int)$c['id']; ?>#saved"<?php echo $cid === (int)$c['id'] ? ' aria-current="page"' : ''; ?>><?php echo htmlspecialchars($c['name']); ?> <small><?php echo (int)$c['n']; ?></small></a><?php endforeach; ?>
+            <?php if ($collections): ?><a href="?c=0#saved"<?php echo $cid === 0 ? ' aria-current="page"' : ''; ?>>Not in a collection</a><?php endif; ?>
+        </nav>
+        <?php if ($cid): ?>
+            <details class="lib-manage"><summary>Rename or delete “<?php echo htmlspecialchars($curName); ?>”</summary>
+                <form method="post" class="lib-inline"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>">
+                    <label class="sr-only" for="renCol">New name</label><input type="text" id="renCol" name="name" maxlength="60" value="<?php echo htmlspecialchars($curName); ?>" required>
+                    <button type="submit" name="rename_collection" value="<?php echo (int)$cid; ?>" class="lib-btn">Rename</button></form>
+                <form method="post" class="lib-inline" onsubmit="return confirm('Delete this collection? What is in it stays in your library.');"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>">
+                    <button type="submit" name="delete_collection" value="<?php echo (int)$cid; ?>" class="lib-btn lib-btn-quiet">Delete collection</button></form>
+            </details>
         <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success); ?></div>
+        <?php if (!$saves): ?>
+            <?php echo aw_empty($cid === null ? 'Nothing saved yet' : 'This collection is empty', 'Use the Save button on a poem, a story, a reflection, a video, a book, a verse or a reading group, and it appears here.', [SITE_URL . '/poetry.php', 'Find something to save'], 'fa-bookmark'); ?>
+        <?php else: ?>
+            <ul class="lib-saves">
+            <?php foreach ($saves as $s): ?>
+                <li class="lib-save">
+                    <a class="lib-thumb" href="<?php echo htmlspecialchars($s['link']); ?>" tabindex="-1" aria-hidden="true"><?php if ($s['image']): ?><img src="<?php echo htmlspecialchars($s['image']); ?>" alt="" loading="lazy" onerror="this.remove()"><?php endif; ?><i class="fas <?php echo htmlspecialchars($s['icon']); ?>"></i></a>
+                    <div class="lib-save-body">
+                        <p class="lib-kind"><?php echo htmlspecialchars($s['label']); ?><?php echo $s['type'] !== 'verse' && $s['sub'] !== '' ? ' · ' . htmlspecialchars($s['sub']) : ''; ?></p>
+                        <h3><a href="<?php echo htmlspecialchars($s['link']); ?>"><?php echo htmlspecialchars($s['title']); ?></a></h3>
+                        <?php if ($s['type'] === 'verse'): ?><p class="lib-verse">“<?php echo htmlspecialchars(mb_strimwidth($s['sub'], 0, 220, '…')); ?>”</p><?php endif; ?>
+                    </div>
+                    <div class="lib-save-acts">
+                        <form method="post" action="<?php echo SITE_URL; ?>/save.php" class="lib-inline">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="type" value="<?php echo htmlspecialchars($s['type']); ?>"><input type="hidden" name="key" value="<?php echo htmlspecialchars($s['key']); ?>">
+                            <input type="hidden" name="action" value="save"><input type="hidden" name="back" value="/library.php<?php echo $cid !== null ? '?c=' . (int)$cid : ''; ?>#saved">
+                            <label class="sr-only" for="mv<?php echo $s['save_id']; ?>">Collection for <?php echo htmlspecialchars($s['title']); ?></label>
+                            <select id="mv<?php echo $s['save_id']; ?>" name="collection_id" onchange="this.form.submit()">
+                                <option value="0"<?php echo !$s['collection_id'] ? ' selected' : ''; ?>>No collection</option>
+                                <?php foreach ($collections as $c): ?><option value="<?php echo (int)$c['id']; ?>"<?php echo (int)$c['id'] === $s['collection_id'] ? ' selected' : ''; ?>><?php echo htmlspecialchars($c['name']); ?></option><?php endforeach; ?>
+                            </select>
+                            <noscript><button type="submit" class="lib-btn">Move</button></noscript>
+                        </form>
+                        <form method="post" action="<?php echo SITE_URL; ?>/save.php" class="lib-inline">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="type" value="<?php echo htmlspecialchars($s['type']); ?>"><input type="hidden" name="key" value="<?php echo htmlspecialchars($s['key']); ?>">
+                            <input type="hidden" name="action" value="remove"><input type="hidden" name="back" value="/library.php<?php echo $cid !== null ? '?c=' . (int)$cid : ''; ?>#saved">
+                            <button type="submit" class="lib-link" aria-label="Remove <?php echo htmlspecialchars($s['title']); ?> from your library">Remove</button>
+                        </form>
+                    </div>
+                </li>
+            <?php endforeach; ?>
+            </ul>
         <?php endif; ?>
+    </section>
 
-        <!-- ===== CURRENTLY READING SECTION ===== -->
-        <section class="library-section" id="currently-reading">
-            <div class="section-header">
-                <div class="section-title-group">
-                    <h2 class="section-title">
-                        <span class="section-icon reading">📖</span>
-                        Currently Reading
-                        <span class="section-count">(<?php echo count($grouped['currently reading']); ?>)</span>
-                    </h2>
-                    <p class="section-subtitle">Pick up where you left off.</p>
-                </div>
-            </div>
-            <?php if (count($grouped['currently reading']) > 0): ?>
-                <div class="book-grid">
-                    <?php foreach ($grouped['currently reading'] as $book): ?>
-                        <div class="book-card">
-                            <div class="book-cover-wrapper">
-                                <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                                <?php else: ?>
-                                    <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
-                                <?php endif; ?>
-                                <span class="badge status-reading">Reading</span>
-                                <?php if ($book['is_free']): ?>
-                                    <span class="badge free">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
-                                    <span class="badge sale">Sale</span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="book-info">
-                                <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-                                <div class="book-progress">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: <?php echo min($book['progress'] ?? 0, 100); ?>%;"></div>
-                                    </div>
-                                    <span class="progress-text"><?php echo min($book['progress'] ?? 0, 100); ?>% complete<?php if (!empty($book['last_read_page'])): ?> · page <?php echo (int)$book['last_read_page']; ?><?php endif; ?><?php if (!empty($book['last_accessed_at'])): ?> · <?php echo date('M j', strtotime($book['last_accessed_at'])); ?><?php endif; ?></span>
-                                </div>
-                                <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-book-open"></i> Continue
-                                    </a>
-                                    <div class="action-group">
-                                        <form method="POST" class="status-form" style="display:inline;">
-                                            <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                            <input type="hidden" name="status" value="finished">
-                                            <input type="hidden" name="update_status" value="1">
-                                            <button type="submit" class="btn btn-sm btn-success" title="Mark as finished">
-                                                <i class="fas fa-check"></i> Finish
-                                            </button>
-                                        </form>
-                                        <form method="POST" class="status-form" style="display:inline;" onsubmit="return confirm('Remove this book from your library?');">
-                                            <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                            <input type="hidden" name="remove_status" value="1">
-                                            <button type="submit" class="btn btn-sm btn-outline" title="Remove from library">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+    <section class="lib-sec" id="books" aria-labelledby="hBooks">
+        <h2 id="hBooks">Book lists</h2>
+        <div class="lib-cols">
+        <?php foreach (['want to read' => 'Want to read', 'finished' => 'Finished'] as $k => $title): ?>
+            <div class="lib-col">
+                <h3><?php echo $title; ?> <small><?php echo count($lists[$k]); ?></small></h3>
+                <?php if (!$lists[$k]): ?><p class="lib-muted"><?php echo $k === 'finished' ? 'Books you finish are kept here.' : 'Choose “Want to read” on a book page to keep it for later.'; ?></p>
+                <?php else: ?><ul class="lib-rows">
+                    <?php foreach ($lists[$k] as $b): ?>
+                    <li>
+                        <a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['title']); ?></a>
+                        <span class="lib-row-acts">
+                            <?php if ($k === 'want to read'): ?>
+                            <form method="post" class="lib-inline"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="book_id" value="<?php echo (int)$b['id']; ?>"><input type="hidden" name="status" value="currently reading"><button class="lib-link" name="update_status" value="1">Start reading</button></form>
+                            <?php endif; ?>
+                            <form method="post" class="lib-inline" onsubmit="return confirm('Take this book off your lists?');"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="book_id" value="<?php echo (int)$b['id']; ?>"><button class="lib-link" name="remove_status" value="1" aria-label="Take <?php echo htmlspecialchars($b['title']); ?> off your lists">Remove</button></form>
+                        </span>
+                    </li>
                     <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="fas fa-book-open"></i></div>
-                    <h3>No books in progress</h3>
-                    <p>You're not reading any books yet. <a href="<?php echo SITE_URL; ?>/books.php">Browse books</a> to get started.</p>
-                </div>
-            <?php endif; ?>
-        </section>
+                </ul><?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+        </div>
+    </section>
 
-        <!-- ===== WANT TO READ SECTION ===== -->
-        <section class="library-section" id="want-to-read">
-            <div class="section-header">
-                <div class="section-title-group">
-                    <h2 class="section-title">
-                        <span class="section-icon want">📌</span>
-                        Want to Read
-                        <span class="section-count">(<?php echo count($grouped['want to read']); ?>)</span>
-                    </h2>
-                    <p class="section-subtitle">Books you've saved for later.</p>
-                </div>
+    <section class="lib-sec" id="groups" aria-labelledby="hGroups">
+        <h2 id="hGroups">Groups</h2>
+        <div class="lib-cols">
+            <div class="lib-col">
+                <h3>Your groups</h3>
+                <?php if (!$myGroups): ?><p class="lib-muted">You are not in a reading group yet.</p>
+                <?php else: ?><ul class="lib-rows"><?php foreach ($myGroups as $g): ?><li><a href="<?php echo SITE_URL; ?>/group.php?id=<?php echo (int)$g['id']; ?>"><?php echo htmlspecialchars($g['name']); ?></a><span class="lib-muted"><?php echo (int)$g['members']; ?> members</span></li><?php endforeach; ?></ul><?php endif; ?>
             </div>
-            <?php if (count($grouped['want to read']) > 0): ?>
-                <div class="book-grid">
-                    <?php foreach ($grouped['want to read'] as $book): ?>
-                        <div class="book-card">
-                            <div class="book-cover-wrapper">
-                                <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                                <?php else: ?>
-                                    <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
-                                <?php endif; ?>
-                                <span class="badge status-want">Want to Read</span>
-                                <?php if ($book['is_free']): ?>
-                                    <span class="badge free">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
-                                    <span class="badge sale">Sale</span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="book-info">
-                                <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-                                <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-book-open"></i> Start Reading
-                                    </a>
-                                    <div class="action-group">
-                                        <form method="POST" class="status-form" style="display:inline;">
-                                            <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                            <input type="hidden" name="status" value="currently reading">
-                                            <input type="hidden" name="update_status" value="1">
-                                            <button type="submit" class="btn btn-sm btn-secondary">
-                                                <i class="fas fa-arrow-right"></i> Move to Reading
-                                            </button>
-                                        </form>
-                                        <form method="POST" class="status-form" style="display:inline;" onsubmit="return confirm('Remove this book from your library?');">
-                                            <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                            <input type="hidden" name="remove_status" value="1">
-                                            <button type="submit" class="btn btn-sm btn-outline" title="Remove from library">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="fas fa-bookmark"></i></div>
-                    <h3>No books saved</h3>
-                    <p>You haven't added any books to your "Want to Read" list. <a href="<?php echo SITE_URL; ?>/books.php">Explore books</a> to save some.</p>
-                </div>
-            <?php endif; ?>
-        </section>
+            <div class="lib-col">
+                <h3>Groups you can join</h3>
+                <?php if (!$openGroups): ?><p class="lib-muted">No open groups right now. <a href="<?php echo SITE_URL; ?>/create_group.php">Start one</a>.</p>
+                <?php else: ?><ul class="lib-rows"><?php foreach ($openGroups as $g): ?><li><a href="<?php echo SITE_URL; ?>/group.php?id=<?php echo (int)$g['id']; ?>"><?php echo htmlspecialchars($g['name']); ?></a><span class="lib-muted"><?php echo (int)$g['members']; ?> members</span></li><?php endforeach; ?></ul>
+                <p><a href="<?php echo SITE_URL; ?>/groups.php">See all groups</a></p><?php endif; ?>
+            </div>
+        </div>
+    </section>
 
-        <!-- ===== FINISHED BOOKS SECTION ===== -->
-        <section class="library-section" id="finished">
-            <div class="section-header">
-                <div class="section-title-group">
-                    <h2 class="section-title">
-                        <span class="section-icon finished">✅</span>
-                        Finished Books
-                        <span class="section-count">(<?php echo count($grouped['finished']); ?>)</span>
-                    </h2>
-                    <p class="section-subtitle">Books you have read to the end.</p>
-                </div>
+    <section class="lib-sec" id="contrib" aria-labelledby="hContrib">
+        <h2 id="hContrib">Your contributions</h2>
+        <div class="lib-cols">
+            <div class="lib-col">
+                <h3>Stories &amp; Help</h3>
+                <p class="lib-muted"><?php echo $contrib['stories'] ? 'You have shared ' . $contrib['stories'] . ($contrib['stories'] === 1 ? ' post' : ' posts') . '. Only you can see this list.' : 'Nothing shared yet.'; ?></p>
+                <p><a href="<?php echo SITE_URL; ?>/my_stories.php">My Stories &amp; Help</a></p>
             </div>
-            <?php if (count($grouped['finished']) > 0): ?>
-                <div class="book-grid">
-                    <?php foreach ($grouped['finished'] as $book): ?>
-                        <div class="book-card finished">
-                            <div class="book-cover-wrapper">
-                                <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                                <?php else: ?>
-                                    <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
-                                <?php endif; ?>
-                                <span class="badge status-finished">Finished</span>
-                                <span class="finished-check">✅</span>
-                                <?php if ($book['is_free']): ?>
-                                    <span class="badge free">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
-                                    <span class="badge sale">Sale</span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="book-info">
-                                <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-                                <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-outline">
-                                        <i class="fas fa-eye"></i> Re-read
-                                    </a>
-                                    <div class="action-group">
-                                        <form method="POST" class="status-form" style="display:inline;">
-                                            <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                            <input type="hidden" name="status" value="want to read">
-                                            <input type="hidden" name="update_status" value="1">
-                                            <button type="submit" class="btn btn-sm btn-secondary">
-                                                <i class="fas fa-redo"></i> Read Again
-                                            </button>
-                                        </form>
-                                        <form method="POST" class="status-form" style="display:inline;" onsubmit="return confirm('Remove this book from your library?');">
-                                            <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                            <input type="hidden" name="remove_status" value="1">
-                                            <button type="submit" class="btn btn-sm btn-outline" title="Remove from library">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
-                    <h3>No finished books yet</h3>
-                    <p>You haven't finished any books yet. Keep reading – you've got this!</p>
-                </div>
-            <?php endif; ?>
-        </section>
-
-        <!-- ===== ALL BOOKS (NO STATUS) SECTION ===== -->
-        <section class="library-section" id="all-books">
-            <div class="section-header">
-                <div class="section-title-group">
-                    <h2 class="section-title">
-                        <span class="section-icon other">📚</span>
-                        All Books
-                        <span class="section-count">(<?php echo $all_books_total; ?>)</span>
-                    </h2>
-                    <p class="section-subtitle">Books you haven't added to any list yet.</p>
-                </div>
+            <div class="lib-col">
+                <h3>Recent comments</h3>
+                <?php if (!$contrib['comments']): ?><p class="lib-muted">Your comments on poems, books, reflections and videos appear here.</p>
+                <?php else: ?><ul class="lib-rows"><?php foreach ($contrib['comments'] as $c): ?><li><a href="<?php echo htmlspecialchars(SITE_URL . '/' . $c['link']); ?>"><?php echo htmlspecialchars(mb_strimwidth(trim(strip_tags((string)$c['text'])), 0, 80, '…')); ?></a><span class="lib-muted"><?php echo htmlspecialchars(date('j M', strtotime($c['created_at']))); ?></span></li><?php endforeach; ?></ul><?php endif; ?>
             </div>
-            <?php if ($all_books_total > 0): ?>
-                <div class="book-grid">
-                    <?php foreach ($grouped['none'] as $book): ?>
-                        <div class="book-card">
-                            <div class="book-cover-wrapper">
-                                <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
-                                <?php else: ?>
-                                    <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
-                                <?php endif; ?>
-                                <?php if ($book['is_free']): ?>
-                                    <span class="badge free">Free</span>
-                                <?php elseif ($book['is_sale']): ?>
-                                    <span class="badge sale">Sale</span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="book-info">
-                                <h3><?php echo htmlspecialchars($book['title']); ?></h3>
-                                <p class="book-author">by <?php echo htmlspecialchars($book['author']); ?></p>
-                                <div class="book-actions">
-                                    <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-book-open"></i> Read
-                                    </a>
-                                    <form method="POST" class="status-form">
-                                        <input type="hidden" name="book_id" value="<?php echo $book['id']; ?>">
-                                        <select name="status" onchange="this.form.submit()" class="status-select">
-                                            <option value="">Add to list...</option>
-                                            <option value="currently reading">Currently Reading</option>
-                                            <option value="want to read">Want to Read</option>
-                                            <option value="finished">Finished</option>
-                                        </select>
-                                        <input type="hidden" name="update_status" value="1">
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-                <?php echo aw_pager($all_books_total, $page, $per_page, 'all-books'); // P2 ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="fas fa-layer-group"></i></div>
-                    <h3>All books are in your lists</h3>
-                    <p>Every book you've explored is organized. <a href="<?php echo SITE_URL; ?>/books.php">Find more books</a> to read.</p>
-                </div>
-            <?php endif; ?>
-        </section>
-    </div>
+        </div>
+    </section>
 </div>
-
-<!-- ===== READING PROGRESS BAR (optional) ===== -->
-<div id="readingProgressBar" style="position:fixed;top:0;left:0;width:0%;height:4px;background:var(--rose);z-index:9999;transition:width 0.3s;"></div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Reading progress bar
-    window.addEventListener('scroll', function() {
-        const scrollTop = window.scrollY;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercent = (scrollTop / docHeight) * 100;
-        document.getElementById('readingProgressBar').style.width = scrollPercent + '%';
-    });
-});
-</script>
-
-<style>
-/* ===== BRAND VARIABLES ===== */
-:root {
-    --rose: #DBA1A2;
-    --rose-dark: #c08a8b;
-    --rose-light: #e8c0c0;
-    --vanilla: #EFD8D6;
-    --fantasy: #F7F3ED;
-    --white: #ffffff;
-    --dark: #2c1e1e;
-    --text: #3d2e2e;
-    --text-light: #6b5a5a;
-    --bg: #F7F3ED;
-    --card-bg: #ffffff;
-    --border: #e5d5d5;
-    --shadow: 0 4px 16px rgba(44,30,30,0.08);
-    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
-    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
-}
-
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
-
-h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
-.rose-text { color:var(--rose); }
-
-/* ===== BUTTONS ===== */
-.btn {
-    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
-    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
-    cursor:pointer; text-decoration:none; transition:all var(--transition);
-    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
-}
-.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
-.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
-.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
-.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
-.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
-.btn-outline:hover { background:var(--rose); color:var(--white); }
-.btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-success { background:#4f8a63; color:white; border:2px solid #4f8a63; }
-.btn-success:hover { background:#3e6f4f; border-color:#3e6f4f; }
-.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
-.btn-danger:hover { background:#94404a; border-color:#94404a; }
-
-/* ===== PAGE LAYOUT ===== */
-.library-page { padding:40px 0 80px; }
-
-/* ===== HEADER ===== */
-.library-header {
-    display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;
-    margin-bottom:32px; gap:16px;
-}
-.library-header-content h1 { font-size:2.4rem; margin:0 0 4px; font-weight:700; color:var(--dark); }
-.library-header-content p { font-size:1.05rem; color:var(--text-light); margin:0; }
-
-.library-header-stats { display:flex; gap:12px; flex-wrap:wrap; }
-.stat-pill {
-    background:var(--card-bg); border:1px solid var(--border);
-    border-radius:20px; padding:8px 18px; display:flex; align-items:center; gap:8px;
-    font-size:0.85rem; font-weight:500; color:var(--text);
-    transition:all 0.2s ease; box-shadow:var(--shadow);
-}
-.stat-pill:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.stat-pill i { font-size:0.9rem; }
-.stat-pill span { font-weight:700; font-size:1rem; }
-.stat-pill small { color:var(--text-light); font-weight:400; font-size:0.75rem; }
-
-/* ===== TOOLS ===== */
-.library-tools { margin-bottom:24px; }
-.search-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-
-.search-input-group { flex:1; min-width:200px; position:relative; }
-.search-input-group i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-light); }
-.search-input-group input {
-    width:100%; padding:10px 12px 10px 36px; border:1px solid var(--border);
-    border-radius:50px; font-size:0.95rem; background:var(--card-bg); color:var(--text);
-    transition:all 0.2s ease;
-}
-.search-input-group input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-
-.filter-select, .sort-select {
-    padding:10px 16px; border:1px solid var(--border); border-radius:50px;
-    font-size:0.9rem; background:var(--card-bg); color:var(--text); cursor:pointer;
-    transition:all 0.2s ease;
-}
-.filter-select:focus, .sort-select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.search-form .btn-sm { padding:10px 20px; border-radius:50px; font-weight:600; }
-
-/* ===== SECTIONS ===== */
-.library-section { margin-bottom:48px; }
-.section-header { margin-bottom:16px; }
-.section-title-group { display:flex; flex-direction:column; gap:2px; }
-.section-title {
-    font-size:1.6rem; margin:0; display:flex; align-items:center; gap:10px;
-    font-weight:700; color:var(--dark);
-}
-.section-icon { display:inline-block; font-size:1.4rem; }
-.section-count { font-size:0.9rem; color:var(--text-light); font-weight:400; }
-.section-subtitle { font-size:0.95rem; color:var(--text-light); margin:2px 0 0 0; }
-
-/* ===== BOOK CARDS ===== */
-.book-grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
-    gap:24px;
-}
-
-.book-card {
-    background:var(--card-bg); border-radius:20px; overflow:hidden;
-    border:1px solid var(--border); box-shadow:var(--shadow);
-    transition:all var(--transition); position:relative;
-}
-.book-card:hover { transform:translateY(-6px); box-shadow:var(--shadow-hover); border-color:var(--rose-light); }
-.book-card.finished { opacity:0.85; }
-
-.book-cover-wrapper {
-    position:relative; height:220px; background:var(--vanilla);
-    display:flex; align-items:center; justify-content:center; overflow:hidden;
-}
-.book-cover-wrapper img { width:100%; height:100%; object-fit:cover; transition:transform 0.4s; }
-.book-card:hover .book-cover-wrapper img { transform:scale(1.05); }
-.book-cover-placeholder { font-size:3.5rem; color:var(--rose-light); }
-
-.badge {
-    position:absolute; top:12px; right:12px; padding:4px 14px; border-radius:20px;
-    font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:white;
-    box-shadow:0 2px 8px rgba(0,0,0,0.15);
-}
-.badge.status-reading { background:var(--rose); }
-.badge.status-want { background:#8a6f86; }
-.badge.status-finished { background:#4f8a63; }
-.badge.free { background:#4f8a63; top:12px; left:12px; right:auto; }
-.badge.sale { background:#b4505a; top:12px; left:12px; right:auto; }
-
-.finished-check {
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    font-size:3rem; opacity:0.2; pointer-events:none;
-}
-
-.book-info { padding:20px; }
-.book-info h3 { font-size:1.05rem; margin:0 0 2px; font-weight:600; color:var(--text); }
-.book-author { font-size:0.85rem; color:var(--text-light); margin:0 0 8px; }
-
-.book-progress { margin:8px 0 12px; }
-.progress-bar {
-    height:6px; background:var(--border); border-radius:4px; overflow:hidden; margin-bottom:4px;
-}
-.progress-fill { height:100%; background:var(--rose); border-radius:4px; transition:width 0.4s ease; }
-.progress-text { font-size:0.75rem; color:var(--text-light); font-weight:500; }
-
-.book-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
-.book-actions .btn-sm { padding:4px 14px; font-size:0.75rem; border-radius:50px; font-weight:600; }
-.action-group { display:flex; gap:4px; }
-
-.status-form { display:inline; }
-.status-select {
-    padding:4px 10px; border-radius:50px; border:1px solid var(--border);
-    font-size:0.8rem; background:var(--card-bg); color:var(--text); cursor:pointer;
-    transition:all 0.2s ease;
-}
-.status-select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-
-/* ===== EMPTY STATE ===== */
-.empty-state {
-    background:var(--card-bg); border-radius:20px; padding:48px 32px;
-    text-align:center; color:var(--text-light); border:2px dashed var(--border);
-}
-.empty-state-icon { font-size:3rem; color:var(--rose); opacity:0.5; margin-bottom:12px; }
-.empty-state h3 { font-size:1.2rem; margin:0 0 4px; color:var(--dark); }
-.empty-state p { margin:0; font-size:0.95rem; }
-.empty-state a { color:var(--rose); font-weight:600; text-decoration:none; transition:color 0.2s; }
-.empty-state a:hover { text-decoration:underline; }
-
-/* ===== ALERTS ===== */
-.alert {
-    padding:12px 20px; border-radius:16px; margin-bottom:16px; font-size:0.95rem;
-    display:flex; align-items:center; gap:10px;
-}
-.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
-.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
-
-/* ===== RESPONSIVE ===== */
-@media (max-width:1024px) {
-    .book-grid { grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); }
-}
-@media (max-width:768px) {
-    .library-header { flex-direction:column; align-items:flex-start; }
-    .library-header-stats { width:100%; justify-content:flex-start; }
-    .stat-pill { padding:4px 12px; font-size:0.75rem; }
-    .stat-pill span { font-size:0.9rem; }
-    .search-form { flex-direction:column; align-items:stretch; }
-    .search-input-group { min-width:auto; }
-    .filter-select, .sort-select { width:100%; }
-    .book-grid { grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
-    .book-cover-wrapper { height:160px; }
-    .book-info h3 { font-size:0.95rem; }
-}
-@media (max-width:480px) {
-    .book-grid { grid-template-columns:1fr 1fr; gap:10px; }
-    .book-cover-wrapper { height:140px; }
-    .section-title { font-size:1.2rem; }
-}
-</style>
-
+</main>
 <?php require_once 'includes/footer.php'; ?>

@@ -14,6 +14,8 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/saves.php'; // F2/G1: save the book to a collection
 require_once __DIR__ . '/../includes/mail_helper.php';
 
 // --- Load book data using the enhanced book_data.php ---
@@ -87,6 +89,8 @@ if (isLoggedIn()) {
 }
 
 $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter : 1;
+// G1: a planned read (or any link) can open a given page: reader.php?id=N&page=P
+if (isset($_GET['page']) && (int)$_GET['page'] >= 1 && (int)$_GET['page'] <= $total_pages) $last_page = (int)$_GET['page'];
 $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 ?>
 <!DOCTYPE html>
@@ -99,227 +103,8 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
-<style>
-/* ----- All styles remain the same as before (with the flip nav buttons restored) ----- */
-:root {
-    --rose: #DBA1A2; --rose-dark: #c08a8b; --rose-light: #e8c0c0; --vanilla: #EFD8D6; --fantasy: #F7F3ED; --white: #ffffff; --dark: #2c1e1e; --text: #3d2e2e; --text-light: #6b5a5a; --bg: #F7F3ED; --card-bg: #ffffff; --border: #e5d5d5; --shadow: 0 4px 16px rgba(44,30,30,0.08); --shadow-hover: 0 8px 30px rgba(44,30,30,0.15); --input-bg: #ffffff; --transition: 0.3s cubic-bezier(0.4,0,0.2,1); --toolbar-height: 60px; --sidebar-width: 48px; --sidebar-btn-size: 36px; --flip-nav-btn-size: 44px;
-}
-.theme-paper { --bg: #EFD8D6; --card-bg: #fffdf9; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
-.theme-light { --bg: #F7F3ED; --card-bg: #ffffff; --text: #3d2e2e; --border: #e5d5d5; --input-bg: #ffffff; }
-.theme-dark { --bg: #1a1212; --card-bg: #2c1e1e; --text: #e8dddd; --border: #4a3a3a; --input-bg: #2c1e1e; }
-/* R13: high contrast – black on white, strong borders and darker accents (WCAG AAA text contrast) */
-.theme-contrast { --bg: #ffffff; --card-bg: #ffffff; --text: #000000; --text-light: #1a1212; --dark: #000000; --border: #000000; --input-bg: #ffffff; --rose: #7a1f22; --rose-dark: #5c1215; --vanilla: #f2f2f2; }
-.theme-contrast .page-content-inner, .theme-contrast .flip-page-custom { color:#000!important; background:#fff!important; }
-.theme-contrast a { text-decoration:underline; }
-.theme-sepia { --bg: #fbf3e9; --card-bg: #fdf5ec; --text: #4a3d36; --border: #d9c9b8; --input-bg: #fdf5ec; }
-/* R12: announcements for screen readers only; a clear focus ring for keyboard users */
-.aw-sr-only { position:absolute!important; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
-#reader-app :focus-visible { outline:3px solid var(--rose-dark); outline-offset:2px; }
-* { margin:0; padding:0; box-sizing:border-box; }
-html,body { height:100%; width:100%; overflow:hidden; }
-#reader-app { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; transition:background var(--transition), color var(--transition); }
-#overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(30,20,20,0.65); z-index:99999 !important; display:none; pointer-events:auto; }
-#overlay.active { display:block; }
-#toolbar { flex-shrink:0; height:var(--toolbar-height); min-height:var(--toolbar-height); display:flex; justify-content:space-between; align-items:center; padding:0 20px; background:var(--card-bg); border-bottom:1px solid var(--border); box-shadow:var(--shadow); z-index:20; }
-.toolbar-left { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
-.toolbar-left .title { font-family:'Playfair Display',Georgia,serif; font-weight:700; font-size:1.15rem; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dark); }
-.toolbar-left button, .toolbar-left a#backBtn { text-decoration:none; background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-light); width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:color var(--transition); }
-.toolbar-left button:hover, .toolbar-left a#backBtn:hover { color:var(--rose); background:rgba(219,161,162,0.1); }
-.toolbar-center { display:flex; align-items:center; gap:16px; font-size:0.95rem; color:var(--text-light); flex-wrap:wrap; justify-content:center; }
-.progress-ring { position:relative; width:36px; height:36px; }
-.progress-ring svg { width:100%; height:100%; transform:rotate(-90deg); }
-.progress-ring .bg { stroke:var(--border); stroke-width:2; fill:none; }
-.progress-ring .fill { stroke:var(--rose); stroke-width:2; fill:none; transition:stroke-dashoffset var(--transition); }
-.progress-ring .percent { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:0.7rem; font-weight:600; color:var(--text-light); }
-#chapterInfo { font-size:0.9rem; color:var(--text-light); white-space:nowrap; }
-#remainingInfo { font-size:0.85rem; color:var(--text-light); white-space:nowrap; }
-.toolbar-right { display:flex; align-items:center; gap:8px; }
-.toolbar-right button { background:none; border:none; font-size:1.1rem; cursor:pointer; color:var(--text-light); padding:6px 10px; border-radius:6px; transition:all var(--transition); display:flex; align-items:center; justify-content:center; }
-.toolbar-right button:hover { background:rgba(219,161,162,0.1); color:var(--rose); transform:scale(1.05); }
-#sidebar { position:fixed; top:var(--toolbar-height); left:0; width:var(--sidebar-width); height:calc(100vh - var(--toolbar-height)); background:var(--card-bg); border-right:1px solid var(--border); z-index:15; display:flex; flex-direction:column; align-items:center; padding:8px 0; gap:4px; overflow-y:auto; transition:transform 0.25s ease; }
-#sidebar.closed { transform:translateX(-100%); }
-#sidebar.open { transform:translateX(0); }
-.sidebar-btn { width:var(--sidebar-btn-size); height:var(--sidebar-btn-size); border:none; background:transparent; color:var(--text-light); font-size:1rem; cursor:pointer; border-radius:8px; transition:all var(--transition); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.sidebar-btn:hover { background:rgba(219,161,162,0.1); color:var(--rose); transform:scale(1.05); }
-.sidebar-btn.active { color:var(--rose); background:rgba(219,161,162,0.15); }
-.sidebar-separator { width:28px; border:none; border-top:1px solid var(--border); margin:4px 0; }
-#page-viewport { margin-left:var(--sidebar-width); height:calc(100vh - var(--toolbar-height)); position:relative; overflow:hidden; background:var(--bg); display:flex; justify-content:center; align-items:center; transition:margin 0.3s ease, height 0.3s ease, width 0.3s ease; }
-#scroll-container { height:100%; width:100%; overflow-y:auto; overflow-x:hidden; padding:20px 20px 120px 20px; display:flex; flex-direction:column; align-items:center; }
-#scroll-container .cover-image-wrapper { width:100%; max-width:900px; margin:0 auto 40px auto; padding:10px; background:linear-gradient(145deg,var(--rose-light),var(--vanilla)); border-radius:20px; box-shadow:var(--shadow-hover); border:1px solid var(--rose); display:flex; justify-content:center; align-items:center; }
-#scroll-container .cover-image-wrapper img { width:100%; height:auto; max-height:70vh; object-fit:contain; border-radius:12px; }
-#scroll-container .cover-image-container { width:100%; display:flex; justify-content:center; }
-.page-content-wrapper { width:100%; max-width:900px; margin:0 auto 40px auto; padding:10px; background:linear-gradient(145deg,var(--rose-light),var(--vanilla)); border-radius:20px; box-shadow:var(--shadow-hover); border:1px solid var(--rose); transition:transform 0.3s ease; }
-.page-content-wrapper:hover { transform:translateY(-2px); }
-.page-content-inner { width:100%; padding:30px 40px; background:var(--card-bg); border-radius:12px; box-shadow:inset 0 0 20px rgba(0,0,0,0.03); font-size:1.05rem; line-height:1.8; color:var(--text); min-height:400px; }
-.page-content-inner h1, .page-content-inner h2, .page-content-inner h3 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
-.page-content-inner h1, .page-content-inner h2 { text-align:center; margin-bottom:1.2rem; }
-.page-content-inner p { margin-bottom:16px; }
-.page-content-inner p:last-child { margin-bottom:0; }
-
-/* Flip container for StPageFlip */
-#flip-container { width:100%; height:100%; position:relative; display:none; justify-content:center; align-items:center; background:var(--bg); padding:0 20px; }
-#flip-book-wrapper { width:100%; max-width:900px; height:100%; max-height:92%; position:relative; }
-.flip-page-custom { width:100%; height:100%; padding:30px 40px; background:var(--card-bg); border-radius:12px; box-shadow:inset 0 0 20px rgba(0,0,0,0.03); font-size:1.05rem; line-height:1.8; color:var(--text); overflow:hidden; display:flex; flex-direction:column; }
-.flip-page-custom.special-page { justify-content:center; align-items:center; text-align:center; }
-.cover-image-wrapper-flip { width:100%; height:100%; border-radius:12px; overflow:hidden; background:var(--card-bg); display:flex; align-items:center; justify-content:center; }
-.cover-image-wrapper-flip img { width:100%; height:100%; object-fit:contain; display:block; }
-.cover-placeholder-flip { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; background:linear-gradient(135deg,var(--vanilla),var(--fantasy)); color:var(--text-light); text-align:center; padding:40px; }
-.cover-placeholder-flip i { font-size:4rem; color:var(--rose); margin-bottom:16px; }
-.cover-placeholder-flip p { font-family:'Playfair Display',Georgia,serif; font-size:1.5rem; font-weight:600; color:var(--dark); }
-
-/* Restyled flip navigation buttons */
-.flip-nav-btn-wrapper { position:absolute; top:50%; transform:translateY(-50%); width:var(--flip-nav-btn-size); height:var(--flip-nav-btn-size); border-radius:50%; background:rgba(255,255,255,0.85); backdrop-filter:blur(4px); box-shadow:0 4px 16px rgba(0,0,0,0.1); display:flex; align-items:center; justify-content:center; z-index:10; transition:background .3s; border:1px solid var(--rose-light); }
-.flip-nav-btn-wrapper:hover { background:rgba(255,255,255,1); box-shadow:0 4px 24px rgba(0,0,0,0.15); }
-.flip-nav-btn-wrapper .aw-nav-btn { position:static!important; transform:none!important; background:transparent!important; border:none!important; box-shadow:none!important; color:var(--text)!important; width:var(--flip-nav-btn-size); height:var(--flip-nav-btn-size); margin:0; padding:0; display:flex; align-items:center; justify-content:center; }
-.flip-nav-btn-wrapper .aw-nav-btn i { font-size:1.2rem; }
-.flip-nav-btn-wrapper .aw-nav-btn:hover { color:var(--rose)!important; transform:scale(1.1)!important; }
-#flipPrevBtnWrapper { left:16px; }
-#flipNextBtnWrapper { right:16px; }
-
-.highlight-yellow { background:#fff9c4; padding:0 4px; border-radius:3px; }
-.highlight-green { background:#c8e6c9; padding:0 4px; border-radius:3px; }
-.highlight-blue { background:#bbdefb; padding:0 4px; border-radius:3px; }
-.highlight-pink { background:#f8bbd0; padding:0 4px; border-radius:3px; }
-.highlight-purple { background:#e8d5f5; padding:0 4px; border-radius:3px; }
-.highlight-underline { text-decoration: underline; text-decoration-color: var(--rose); text-decoration-thickness: 2px; text-underline-offset: 3px; padding:0 4px; }
-
-#highlight-tooltip, #reaction-picker, #annotation-popup, #search-bar, #share-modal, #notes-panel, #toc-drawer, #settings-panel { position:fixed!important; z-index:9999!important; }
-#highlight-tooltip { display:none; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:12px 16px; box-shadow:var(--shadow-hover); min-width:280px; pointer-events:auto; }
-#highlight-tooltip.visible { display:block; }
-#highlight-tooltip .highlight-color { width:24px; height:24px; border-radius:50%; border:2px solid var(--border); cursor:pointer; transition:all 0.2s; }
-#highlight-tooltip .highlight-color:hover { transform:scale(1.15); border-color:var(--rose); }
-#highlight-tooltip .tooltip-action { background:transparent; border:1px solid var(--border); border-radius:6px; padding:4px 8px; cursor:pointer; color:var(--text); transition:all 0.2s; font-size:0.9rem; display:flex; align-items:center; gap:4px; }
-#highlight-tooltip .tooltip-action:hover { border-color:var(--rose); color:var(--rose); background:rgba(219,161,162,0.05); }
-#reaction-picker { display:none; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:8px 12px; box-shadow:var(--shadow-hover); gap:6px; pointer-events:auto; bottom:80px!important; right:20px!important; left:auto!important; }
-#reaction-picker button { background:none; border:none; font-size:1.5rem; cursor:pointer; padding:4px; transition:transform var(--transition); }
-#reaction-picker button:hover { transform:scale(1.2); }
-#annotation-popup { display:none; width:320px; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:var(--shadow-hover); pointer-events:auto; bottom:140px!important; right:20px!important; left:auto!important; }
-#annotation-popup.visible { display:block; }
-#annotation-popup textarea { width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; resize:vertical; min-height:60px; font-size:0.9rem; background:var(--input-bg); color:var(--text); font-family:'Inter',sans-serif; }
-#annotation-popup textarea:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-#search-bar { display:none; width:300px; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow-hover); pointer-events:auto; top:70px!important; left:50px!important; z-index:100001!important; }
-#search-bar.visible { display:block; }
-#search-bar input { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:0.9rem; background:var(--input-bg); color:var(--text); font-family:'Inter',sans-serif; }
-#search-bar input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-#search-bar .search-header { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-#search-bar .search-header button { background:none; border:none; cursor:pointer; color:var(--text-light); font-size:0.9rem; transition:color var(--transition); }
-#search-bar .search-header button:hover { color:var(--rose); }
-#searchResults { margin-top:8px; max-height:200px; overflow-y:auto; font-size:0.85rem; }
-.search-result { display:block; width:100%; text-align:left; background:none; border:0; font:inherit; color:inherit; padding:6px 8px; border-bottom:1px solid var(--border); cursor:pointer; transition:background var(--transition); }
-.note-reactions .reaction { background:var(--vanilla); border:0; border-radius:12px; padding:2px 8px; margin-right:4px; font:inherit; font-size:.8rem; color:inherit; cursor:pointer; } /* A1: reactions are buttons */
-.search-result:hover { background:rgba(219,161,162,0.1); }
-.search-result strong { color:var(--rose); }
-#settings-panel { bottom:0; left:0; right:0; background:var(--card-bg); border-top:1px solid var(--border); padding:16px 20px; transform:translateY(100%); transition:transform 0.25s ease; max-height:50vh; overflow-y:auto; pointer-events:auto; z-index:100001!important; }
-#settings-panel.open { transform:translateY(0); }
-.settings-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
-.settings-group label { font-size:0.7rem; font-weight:600; text-transform:uppercase; color:var(--text-light); display:block; margin-bottom:4px; }
-.settings-group .btn-group { display:flex; gap:4px; flex-wrap:wrap; }
-.settings-group .btn-group button { padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:transparent; cursor:pointer; font-size:0.75rem; transition:var(--transition); }
-.settings-group .btn-group button.active { border-color:var(--rose); background:var(--rose); color:var(--white); }
-.settings-group .btn-group button:hover { border-color:var(--rose); }
-.slider-group { display:flex; align-items:center; gap:6px; }
-.slider-group input[type="range"] { width:80px; accent-color:var(--rose); }
-.font-select-wrapper select { width:100%; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--input-bg); color:var(--text); font-size:0.85rem; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 10px center;background-size:14px; }
-.font-select-wrapper select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-#toc-drawer { top:0; right:-340px; width:340px; height:100vh; background:var(--card-bg); box-shadow:-4px 0 20px rgba(44,30,30,0.1); transition:right 0.25s ease; display:flex; flex-direction:column; pointer-events:auto; z-index:100001!important; }
-#toc-drawer.open { right:0; }
-.toc-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--vanilla); }
-.toc-header h3 { margin:0; font-size:1.1rem; font-family:'Playfair Display',Georgia,serif; color:var(--dark); }
-.toc-close { background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text); width:36px; height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:background var(--transition); }
-.toc-close:hover { background:rgba(219,161,162,0.1); }
-.toc-body { flex:1; overflow-y:auto; padding:12px 20px; }
-.toc-list { list-style:none; padding:0; margin:0; }
-.toc-list li { padding:2px 0; }
-.toc-list a { color:var(--text); text-decoration:none; display:block; padding:6px 8px; border-radius:6px; transition:all var(--transition); }
-.toc-list a:hover { background:rgba(219,161,162,0.1); color:var(--rose); }
-/* R7: contents show page numbers, where you are and what you have read */
-.toc-list a { display:flex!important; align-items:baseline; gap:8px; }
-.toc-title { flex:1; }
-.toc-page { font-size:0.8rem; color:var(--text-light); white-space:nowrap; }
-.toc-mark { width:1.1em; flex:none; color:var(--rose); }
-.toc-list a.toc-done .toc-mark::before { content:'✓'; }
-.toc-list a.toc-current { background:rgba(219,161,162,0.15); font-weight:600; }
-.toc-list a.toc-current .toc-mark::before { content:'▸'; }
-.toc-group { border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin:0 0 12px; font-size:0.9rem; background:rgba(219,161,162,0.06); }
-.toc-group a { color:var(--rose); }
-.toc-due { font-size:0.75rem; color:var(--rose); white-space:nowrap; }
-.toc-summary { font-size:0.85rem; color:var(--text-light); margin:0 0 10px; }
-.toc-empty { text-align:center; color:var(--text-light); padding:40px 0; }
-#readingStatus { appearance:none; background-color:var(--card-bg); border:1px solid var(--border); border-radius:30px; padding:6px 36px 6px 16px; font-size:0.85rem; font-weight:500; color:var(--text); cursor:pointer; transition:all var(--transition); background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a5a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 12px center;background-size:16px; }
-#readingStatus:hover { border-color:var(--rose); }
-#readingStatus:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.focus-mode #toolbar { transform:translateY(-100%); opacity:0; pointer-events:none; transition:all var(--transition); }
-.focus-mode #sidebar { transform:translateX(-100%)!important; }
-.focus-mode #page-viewport { margin-left:0!important; height:100vh!important; width:100%!important; max-width:100%!important; }
-.focus-mode #settings-panel.open { display:none!important; }
-#exitFocusBtn { position:fixed; bottom:24px; right:24px; z-index:100001!important; display:none; align-items:center; gap:8px; background:var(--rose); color:white; border:none; padding:10px 16px; border-radius:30px; font-weight:600; box-shadow:var(--shadow-hover); cursor:pointer; transition:all 0.3s; }
-#exitFocusBtn:hover { transform:scale(1.05); background:var(--rose-dark); }
-.focus-mode #exitFocusBtn { display:flex!important; }
-.modal-wrapper { position:fixed!important; top:50%!important; left:50%!important; transform:translate(-50%,-50%)!important; z-index:999999 !important; width:90%; max-width:520px; max-height:85vh; overflow-y:auto; background:var(--card-bg); border-radius:24px; padding:30px 28px 28px; box-shadow:0 24px 80px rgba(0,0,0,0.35); border:1px solid var(--rose-light); display:none!important; flex-direction:column; pointer-events:auto; transition:opacity 0.25s ease,transform 0.25s ease; backdrop-filter:blur(4px); }
-.modal-wrapper.visible { display:flex!important; z-index:999999 !important; }
-#share-modal.modal-wrapper { z-index:999999 !important; }
-.modal-close { position:absolute!important; top:14px!important; right:18px!important; background:transparent!important; border:none!important; font-size:1.5rem!important; cursor:pointer!important; color:var(--text-light)!important; transition:transform 0.3s ease,color 0.3s ease!important; padding:4px 8px!important; border-radius:8px!important; }
-.modal-close:hover { color:var(--rose)!important; transform:rotate(90deg) scale(1.1)!important; background:rgba(219,161,162,0.1)!important; }
-.modal-wrapper h3 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); margin-top:0; margin-bottom:16px; font-size:1.3rem; }
-#share-modal .share-btn { display:flex!important; align-items:center!important; gap:12px!important; width:100%!important; padding:12px 16px!important; margin-bottom:8px!important; border-radius:14px!important; border:1px solid var(--border)!important; background:var(--input-bg)!important; color:var(--text)!important; cursor:pointer!important; font-size:0.95rem!important; transition:all 0.2s ease!important; }
-#share-modal .share-btn:last-child { margin-bottom:0!important; }
-#share-modal .share-btn:hover { border-color:var(--rose)!important; background:rgba(219,161,162,0.08)!important; transform:translateX(4px)!important; }
-#share-modal .share-btn i { width:24px!important; text-align:center!important; font-size:1.2rem!important; }
-#shareQuotePreview { margin:8px 0; padding:12px; background:var(--bg); border-radius:8px; font-style:italic; display:none; }
-#shareQuotePreview span { color:var(--text); }
-#notes-panel { max-width:550px!important; }
-.notes-header { border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
-#noteForm { margin-top:16px; }
-#noteText { width:100%; min-height:80px; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--input-bg); color:var(--text); font-family:'Inter',sans-serif; font-size:0.9rem; }
-#noteHighlightId { display:none; }
-.note-submit { background:var(--rose); color:white; border:none; padding:8px 20px; border-radius:30px; font-weight:600; cursor:pointer; transition:background 0.2s; }
-.note-submit:hover { background:var(--rose-dark); }
-.note-cancel { background:var(--border); color:var(--text); border:none; padding:8px 20px; border-radius:30px; font-weight:600; cursor:pointer; transition:0.2s; }
-@media (max-width:768px) {
-    :root { --toolbar-height:50px; --sidebar-width:40px; --sidebar-btn-size:32px; --flip-nav-btn-size:32px; }
-    #toolbar { height:var(--toolbar-height)!important; min-height:var(--toolbar-height)!important; padding:0 8px!important; }
-    .toolbar-left { gap:4px!important; flex-wrap:nowrap!important; }
-    .toolbar-left { flex:1 1 0%!important; min-width:0!important; }
-    .toolbar-left .title { max-width:none!important; min-width:0!important; flex:1 1 0%!important; font-size:0.8rem!important; } /* Q1: shrinks first */
-    .toolbar-center { flex-shrink:0!important; white-space:nowrap!important; }
-    #backBtn { flex-shrink:0!important; font-size:1rem!important; width:32px!important; height:32px!important; padding:0!important; }
-    #readingStatus { font-size:0.65rem!important; padding:2px 10px 2px 6px!important; max-width:60px!important; background-size:10px!important; background-position:right 4px center!important; }
-    .toolbar-center { font-size:0.7rem!important; gap:6px!important; }
-    #chapterInfo, #remainingInfo { display:none!important; }
-    .progress-ring { width:28px!important; height:28px!important; }
-    #pageNum, #totalPages { font-size:0.7rem!important; }
-    /* Q1: on phones the 20-tool sidebar no longer sits permanently beside the text. It starts hidden;
-       the menu button slides it in over the page with each tool's name, and choosing a tool closes it. */
-    #sidebar { width:220px!important; padding:8px!important; align-items:stretch!important; transform:translateX(-100%); box-shadow:4px 0 20px rgba(0,0,0,0.15); z-index:40!important; }
-    #sidebar.open { transform:translateX(0)!important; }
-    .sidebar-btn { width:100%!important; height:44px!important; font-size:0.95rem!important; justify-content:flex-start!important; gap:12px; padding:0 12px!important; }
-    .sidebar-btn::after { content:attr(title); font-size:0.9rem; color:var(--text); }
-    .sidebar-separator { width:100%!important; }
-    #page-viewport { margin-left:0!important; }
-    #backBtn, #sidebarToggle { width:44px!important; height:44px!important; }
-    /* Q2: hover tooltips never show on touch screens, so the selection actions show their names */
-    #highlight-tooltip { flex-wrap:wrap; max-width:92vw; }
-    #highlight-tooltip .tooltip-action { min-height:40px; }
-    #highlight-tooltip .tooltip-action::after { content:attr(title); font-size:0.75rem; }
-    .page-content-wrapper { padding:6px!important; margin-bottom:20px!important; }
-    .page-content-inner { padding:16px!important; min-height:300px!important; font-size:95%!important; }
-    #flip-container { padding:0 5px!important; }
-    .flip-page-custom { padding:12px!important; font-size:90%!important; line-height:1.6!important; }
-    .flip-nav-btn-wrapper { width:var(--flip-nav-btn-size)!important; height:var(--flip-nav-btn-size)!important; top:50%!important; }
-    #flipPrevBtnWrapper { left:2px!important; }
-    #flipNextBtnWrapper { right:2px!important; }
-    .flip-nav-btn-wrapper .aw-nav-btn { width:var(--flip-nav-btn-size)!important; height:var(--flip-nav-btn-size)!important; }
-    .flip-nav-btn-wrapper .aw-nav-btn i { font-size:1rem!important; }
-    .modal-wrapper, #search-bar, #notes-panel { width:95%!important; max-width:95%!important; padding:16px!important; max-height:80vh!important; }
-    #toc-drawer { width:85%!important; right:-85%!important; }
-    #toc-drawer.open { right:0!important; }
-}
-@media (max-width:480px) {
-    .toolbar-left .title { font-size:0.75rem!important; max-width:none!important; flex:1 1 0%!important; } /* Q1: was clipped to 50 px */
-    .page-content-inner { padding:12px!important; }
-    .flip-page-custom { padding:10px!important; }
-}
-</style>
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/book-reader.css?v=2" />
+<?php echo aw_save_assets(); ?><!-- the reader's look: a quiet, page-first design -->
 <?php if (!empty($processed['reader_css'])): // F90: the per-book CSS saved in admin/process_book.php was never applied ?>
 <style id="book-reader-css"><?php echo str_ireplace('</style', '', (string)$processed['reader_css']); ?></style>
 <?php endif; ?>
@@ -346,52 +131,61 @@ html,body { height:100%; width:100%; overflow:hidden; }
     });
     </script>
 <?php endif; ?>
+    <!-- Top bar: back, contents, title, then Aa (themes & settings), search, bookmark and the "…" menu.
+         It fades away while you read; tap the page to bring it back. -->
     <div id="toolbar">
         <div class="toolbar-left">
-            <a id="backBtn" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book_id; ?>" aria-label="Back to the book page"><i class="fas fa-arrow-left" aria-hidden="true"></i></a><!-- Q3: a real link (was a JS button) -->
-            <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
-            <select id="readingStatus">
-                <option value="not_started" <?php echo $reading_status == 'not_started' ? 'selected' : ''; ?>>📌 Not Started</option>
-                <option value="currently_reading" <?php echo $reading_status == 'currently_reading' ? 'selected' : ''; ?>>📖 Currently Reading</option>
-                <option value="finished" <?php echo $reading_status == 'finished' ? 'selected' : ''; ?>>✅ Finished</option>
-                <option value="want_to_read" <?php echo $reading_status == 'want_to_read' ? 'selected' : ''; ?>>📚 Want to Read</option>
-                <option value="dropped" <?php echo $reading_status == 'dropped' ? 'selected' : ''; ?>>❌ Dropped</option>
-            </select>
+            <a id="backBtn" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$book_id; ?>" aria-label="Close the book"><i class="fas fa-chevron-left" aria-hidden="true"></i></a><!-- Q3: a real link (was a JS button) -->
+            <button type="button" class="rb-icon" id="tocBtn" title="Contents" aria-label="Contents" aria-controls="toc-drawer" aria-expanded="false"><i class="fas fa-list-ul" aria-hidden="true"></i></button>
         </div>
         <div class="toolbar-center">
-            <div class="progress-ring">
-                <svg viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="16"/><circle class="fill" id="progressFill" cx="18" cy="18" r="16" stroke-dasharray="100.53" stroke-dashoffset="100.53"/></svg>
-                <span class="percent" id="progressPercent">0%</span>
-            </div>
-            <span id="pageNum">1</span> / <span id="totalPages"><?php echo $total_pages; ?></span>
-            <span id="chapterInfo"></span>
-            <span id="remainingInfo"></span>
+            <span class="title"><?php echo htmlspecialchars($book['title']); ?></span>
+            <span class="subtitle" id="rbChapter" aria-hidden="true"></span>
         </div>
         <div class="toolbar-right">
-            <button id="sidebarToggle" aria-label="Reader tools" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i></button>
+            <button type="button" class="rb-icon rb-aa" id="settingsBtn" title="Themes &amp; settings" aria-label="Themes and settings" aria-controls="settings-panel" aria-expanded="false"><small>A</small>A</button>
+            <button type="button" class="rb-icon" id="searchBtn" title="Search this book" aria-label="Search this book"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
+            <button type="button" class="rb-icon rb-hide-sm" id="bookmarkBtn" title="Bookmark this page" aria-label="Bookmark this page"><i class="far fa-bookmark" aria-hidden="true"></i></button>
+            <button type="button" id="sidebarToggle" title="More" aria-label="More" aria-haspopup="true" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-ellipsis" aria-hidden="true"></i></button>
         </div>
     </div>
 
-    <div id="sidebar">
-        <button class="sidebar-btn" id="searchBtn" title="Search" aria-label="Search"><i class="fas fa-search" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="bookmarkBtn" title="Bookmark" aria-label="Bookmark"><i class="fas fa-bookmark" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="tocBtn" title="Table of Contents" aria-label="Table of Contents"><i class="fas fa-list-ul" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="notesBtn" title="Group Notes" aria-label="Group Notes"><i class="fas fa-sticky-note" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="settingsBtn" title="Settings" aria-label="Settings"><i class="fas fa-cog" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="focusBtn" title="Focus Mode" aria-label="Focus Mode"><i class="fas fa-expand" aria-hidden="true"></i></button>
-        <hr class="sidebar-separator">
-        <button class="sidebar-btn" id="commentsBtn" title="Comments" aria-label="Comments"><i class="fas fa-comments" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="errorReportBtn" title="Report Error" aria-label="Report Error"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="prayerBtn" title="Prayer Request" aria-label="Prayer Request"><i class="fas fa-hands-praying" aria-hidden="true"></i></button>
-        <hr class="sidebar-separator">
-        <button class="sidebar-btn" id="analyticsBtn" title="Analytics" aria-label="Analytics"><i class="fas fa-chart-pie" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="myNotesBtn" title="My Personal Notes" aria-label="My Personal Notes"><i class="fas fa-pen-fancy" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="ttsBtn" title="Text to Speech" aria-label="Text to Speech"><i class="fas fa-volume-up" aria-hidden="true"></i></button>
-        <hr class="sidebar-separator">
-        <button class="sidebar-btn" id="exportHighlightsBtn" title="Export Highlights" aria-label="Export Highlights"><i class="fas fa-file-export" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="resetProgressBtn" title="Reset Progress" aria-label="Reset Progress"><i class="fas fa-undo-alt" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="resumeBtn" title="Resume Position" aria-label="Resume Position"><i class="fas fa-history" aria-hidden="true"></i></button>
-        <button class="sidebar-btn" id="shareBtn" title="Share" aria-label="Share"><i class="fas fa-share-alt" aria-hidden="true"></i></button>
+    <!-- The "…" menu: every other reader tool, with its name. -->
+    <div id="sidebar" role="dialog" aria-label="More" tabindex="-1">
+        <div class="rb-menu-group">
+            <div class="rb-status"><label for="readingStatus">Reading status</label>
+                <select id="readingStatus">
+                    <option value="not_started" <?php echo $reading_status == 'not_started' ? 'selected' : ''; ?>>Not started</option>
+                    <option value="currently_reading" <?php echo $reading_status == 'currently_reading' ? 'selected' : ''; ?>>Reading</option>
+                    <option value="finished" <?php echo $reading_status == 'finished' ? 'selected' : ''; ?>>Finished</option>
+                    <option value="want_to_read" <?php echo $reading_status == 'want_to_read' ? 'selected' : ''; ?>>Want to read</option>
+                    <option value="dropped" <?php echo $reading_status == 'dropped' ? 'selected' : ''; ?>>Stopped</option>
+                </select>
+            </div>
+            <button type="button" class="sidebar-btn" id="rbBookmarkMenu" aria-label="Bookmark this page"><i class="far fa-bookmark" aria-hidden="true"></i><span>Bookmark this page</span></button>
+            <button type="button" class="sidebar-btn" id="resumeBtn" aria-label="Go to my last place"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i><span>Go to my last place</span></button>
+            <button type="button" class="sidebar-btn" id="focusBtn" aria-label="Focus mode"><i class="fas fa-expand" aria-hidden="true"></i><span>Focus mode</span></button>
+            <button type="button" class="sidebar-btn" id="planBtn" aria-label="Plan a read"><i class="far fa-calendar-plus" aria-hidden="true"></i><span>Plan a read</span></button><!-- G1 -->
+            <?php if (empty($preview_version)) echo aw_save_button('book', (int)$book_id, ['class' => 'rb-save', 'back' => '/reader/reader.php?id=' . (int)$book_id]); ?>
+        </div>
+        <div class="rb-menu-group">
+            <button type="button" class="sidebar-btn" id="myNotesBtn" aria-label="My notes and highlights"><i class="fas fa-pen" aria-hidden="true"></i><span>My notes &amp; highlights</span></button>
+            <button type="button" class="sidebar-btn" id="notesBtn" aria-label="Group notes"><i class="fas fa-user-group" aria-hidden="true"></i><span>Group notes</span></button>
+            <button type="button" class="sidebar-btn" id="commentsBtn" aria-label="Comments"><i class="far fa-comments" aria-hidden="true"></i><span>Comments</span></button>
+            <button type="button" class="sidebar-btn" id="exportHighlightsBtn" aria-label="Export highlights"><i class="fas fa-file-export" aria-hidden="true"></i><span>Export highlights</span></button>
+        </div>
+        <div class="rb-menu-group">
+            <button type="button" class="sidebar-btn" id="ttsBtn" aria-label="Read aloud"><i class="fas fa-volume-high" aria-hidden="true"></i><span>Read aloud</span></button>
+            <button type="button" class="sidebar-btn" id="shareBtn" aria-label="Share"><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i><span>Share</span></button>
+            <button type="button" class="sidebar-btn" id="prayerBtn" aria-label="Prayer request"><i class="fas fa-hands-praying" aria-hidden="true"></i><span>Prayer request</span></button>
+            <button type="button" class="sidebar-btn" id="errorReportBtn" aria-label="Report a mistake"><i class="far fa-flag" aria-hidden="true"></i><span>Report a mistake</span></button>
+        </div>
+        <div class="rb-menu-group">
+<?php if (isAdmin()): // the reading report is an admin page; members were sent to a page they could not open ?>
+            <button type="button" class="sidebar-btn" id="analyticsBtn" aria-label="Reading report (admin)"><i class="fas fa-chart-simple" aria-hidden="true"></i><span>Reading report (admin)</span></button>
+<?php endif; ?>
+            <button type="button" class="sidebar-btn rb-danger" id="resetProgressBtn" aria-label="Start this book again"><i class="fas fa-rotate-left" aria-hidden="true"></i><span>Start this book again</span></button>
+        </div>
     </div>
 
     <div id="page-viewport">
@@ -418,29 +212,72 @@ html,body { height:100%; width:100%; overflow:hidden; }
         </div>
     </div>
 
-    <!-- Settings Panel -->
-    <div id="settings-panel">
-        <div class="settings-grid">
-            <div class="settings-group"><label>Mode</label><div class="btn-group" id="modeGroup"><button data-mode="scroll" class="active">Scroll</button><button data-mode="flip">Page Flip</button></div></div>
-            <div class="settings-group"><label>Theme</label><div class="btn-group" id="themeGroup"><button data-theme="paper">Paper</button><button data-theme="light" class="active">Light</button><button data-theme="dark">Dark</button><button data-theme="sepia">Sepia</button></div></div>
-            <div class="settings-group"><label>Font Size</label><div class="slider-group"><button onclick="adjustFontSize(-5)">A-</button><input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5"><button onclick="adjustFontSize(5)">A+</button><span id="fontSizeLabel">100%</span></div></div>
-            <div class="settings-group"><label>Font Type</label><div class="font-select-wrapper"><select id="fontTypeSelect"><option value="Inter, sans-serif">Inter</option><option value="Georgia, serif">Georgia</option><option value="'Playfair Display', Georgia, serif">Playfair Display</option><option value="'Atkinson Hyperlegible', Verdana, sans-serif">Atkinson Hyperlegible (easy to read)</option></select></div></div>
-            <div class="settings-group"><label>Line Height</label><div class="slider-group"><button onclick="adjustLineHeight(-10)">-</button><input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10"><button onclick="adjustLineHeight(10)">+</button><span id="lineHeightLabel">1.8</span></div></div>
-            <div class="settings-group"><label>Reading Speed</label><div class="slider-group"><input type="range" id="readingSpeedSlider" min="100" max="500" value="<?php echo $reading_speed_wpm; ?>" step="10"><span id="readingSpeedLabel"><?php echo $reading_speed_wpm; ?> wpm</span></div></div>
+    <!-- Bottom bar: drag to move through the book. -->
+    <div id="rbFoot">
+        <div class="rb-foot-inner">
+            <input type="range" id="rbScrub" min="1" max="<?php echo max(1, (int)$total_pages); ?>" value="1" step="1" aria-label="Page" aria-valuetext="">
+            <div class="rb-foot-meta">
+                <span id="chapterInfo"></span>
+                <span class="rb-pages">Page <span id="pageNum">1</span> of <span id="totalPages"><?php echo $total_pages; ?></span></span>
+                <span id="remainingInfo"></span>
+            </div>
         </div>
+        <div class="progress-ring" aria-hidden="true"><svg viewBox="0 0 36 36"><circle class="fill" id="progressFill" cx="18" cy="18" r="16" stroke-dasharray="100.53" stroke-dashoffset="100.53"/></svg><span id="progressPercent">0%</span></div>
+    </div>
+
+    <!-- Themes & Settings (the Aa button) -->
+    <div id="settings-panel" role="dialog" aria-labelledby="rsTitle" tabindex="-1">
+        <div class="rs-title"><span id="rsTitle">Themes &amp; Settings</span><button type="button" class="rs-close" onclick="closeAll()" aria-label="Close">&times;</button></div>
+        <div class="rs-size">
+            <button type="button" class="rs-small" onclick="adjustFontSize(-5)" aria-label="Smaller text">A</button>
+            <input type="range" id="fontSizeSlider" min="70" max="160" value="100" step="5" aria-label="Text size">
+            <button type="button" class="rs-big" onclick="adjustFontSize(5)" aria-label="Larger text">A</button>
+        </div>
+        <p class="rs-caption">Text size <span id="fontSizeLabel">100%</span></p>
+        <div class="rs-label" id="rsThemes">Themes</div>
+        <div class="rs-themes" id="themeGroup" role="group" aria-labelledby="rsThemes">
+            <button type="button" data-theme="light" class="active"><span class="sw">Aa</span>Original</button>
+            <button type="button" data-theme="paper"><span class="sw">Aa</span>Paper</button>
+            <button type="button" data-theme="sepia"><span class="sw">Aa</span>Calm</button>
+            <button type="button" data-theme="dark"><span class="sw">Aa</span>Night</button>
+            <button type="button" data-theme="contrast" title="High contrast: black on white"><span class="sw">Aa</span>Contrast</button>
+        </div>
+        <div class="rs-row"><label for="fontTypeSelect">Font</label>
+            <div class="rs-ctl"><select id="fontTypeSelect">
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif">Palatino</option>
+                <option value="'Playfair Display', Georgia, serif">Playfair Display</option>
+                <option value="Inter, sans-serif">Inter</option>
+                <option value="'Atkinson Hyperlegible', Verdana, sans-serif">Atkinson Hyperlegible (easy to read)</option>
+            </select></div>
+        </div>
+        <div class="rs-row"><span>Line spacing</span>
+            <div class="rs-ctl"><button type="button" onclick="adjustLineHeight(-10)" aria-label="Less line spacing">&minus;</button><input type="range" id="lineHeightSlider" min="140" max="220" value="180" step="10" aria-label="Line spacing"><button type="button" onclick="adjustLineHeight(10)" aria-label="More line spacing">+</button><span class="rs-val" id="lineHeightLabel">1.8</span></div>
+        </div>
+        <div class="rs-row"><span id="rsLayout">Layout</span>
+            <div class="rs-seg" id="modeGroup" role="group" aria-labelledby="rsLayout"><button type="button" data-mode="scroll" class="active">Scroll</button><button type="button" data-mode="flip">Pages</button></div>
+        </div>
+        <div class="rs-row"><span>Reading pace</span>
+            <div class="rs-ctl"><input type="range" id="readingSpeedSlider" min="100" max="500" value="<?php echo $reading_speed_wpm; ?>" step="10" aria-label="Reading pace in words per minute"><span class="rs-val" id="readingSpeedLabel"><?php echo $reading_speed_wpm; ?> wpm</span></div>
+        </div>
+        <p class="rs-note">Your pace is only used to estimate the time left in a chapter.</p>
     </div>
 
     <!-- TOC Drawer -->
     <div id="toc-drawer">
         <div class="toc-header">
-            <h3>Table of Contents</h3>
-            <button class="toc-close" id="tocClose" aria-label="Close">&times;</button>
+            <h3>Contents</h3>
+            <button class="toc-close" id="tocClose" aria-label="Close contents">&times;</button>
+        </div>
+        <div class="toc-book">
+            <?php if (!empty($cover_path)): ?><img src="<?php echo $cover_path; ?>" alt="" onerror="this.remove()"><?php endif; ?>
+            <div><strong><?php echo htmlspecialchars($book['title']); ?></strong><?php if (!empty($author)): ?><span><?php echo htmlspecialchars($author); ?></span><?php endif; ?></div>
         </div>
         <div class="toc-body" id="tocBody">
             <?php if (count($tocEntries) > 0): ?>
             <p class="toc-summary" id="tocSummary"></p>
             <div class="toc-group" id="tocGroup" hidden></div>
-            <p><button type="button" class="btn btn-sm btn-outline" id="tocPrint">🖨 Print or save this chapter</button></p><!-- R14 -->
+            <p class="toc-tools"><button type="button" id="tocPrint"><i class="fas fa-print" aria-hidden="true"></i> Print or save this chapter</button></p><!-- R14 -->
             <ul class="toc-list">
                 <?php foreach ($tocEntries as $entry): ?>
                 <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><span class="toc-mark" aria-hidden="true"></span><span class="toc-title"><?php echo htmlspecialchars($entry['title']); ?></span><span class="toc-page">p. <?php echo (int)($entry['page'] ?? 1); ?></span></a></li>
@@ -508,9 +345,9 @@ html,body { height:100%; width:100%; overflow:hidden; }
     <!-- Error Report Modal -->
     <div id="errorModal" class="modal-wrapper">
         <button class="modal-close" onclick="closeModal(\'errorModal\')" aria-label="Close">&times;</button>
-        <h3><i class="fas fa-exclamation-triangle" style="color:var(--rose);"></i> Report Error</h3>
+        <h3><i class="far fa-flag"></i> Report a mistake</h3>
         <div style="margin:12px 0;">
-            <label style="font-weight:600;font-size:0.9rem;">Page number:</label>
+            <label for="errorPageInput" style="font-weight:600;font-size:0.9rem;">Page number <span id="errorPageNum"></span>:</label>
             <input type="number" id="errorPageInput" min="1" max="<?php echo $total_pages; ?>" value="<?php echo $last_page; ?>" style="width:80px;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
         </div>
         <div style="margin:12px 0;">
@@ -518,6 +355,29 @@ html,body { height:100%; width:100%; overflow:hidden; }
             <textarea id="errorText" rows="3" placeholder="Describe the error..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);"></textarea>
         </div>
         <button onclick="submitError()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Submit Error Report</button>
+    </div>
+
+    <!-- G1: planned reads -->
+    <div id="planModal" class="modal-wrapper" role="dialog" aria-labelledby="planTitle">
+        <button class="modal-close" onclick="closeModal('planModal')" aria-label="Close">&times;</button>
+        <h3 id="planTitle"><i class="far fa-calendar-plus"></i> Plan a read</h3>
+        <p class="plan-intro">Choose a day. When you next open AngelWrites on or after it, we will remind you, and email you if you like.</p>
+        <form id="planForm" class="plan-form">
+            <label for="planDate">Day</label>
+            <input type="date" id="planDate" name="date" required min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d', strtotime('+1 day')); ?>">
+            <label for="planPage">Where to start</label>
+            <select id="planPage" name="page">
+                <option value="">Where I left off</option>
+                <?php foreach ($tocEntries as $entry): ?><option value="<?php echo (int)($entry['page'] ?? 1); ?>" data-label="<?php echo htmlspecialchars($entry['title']); ?>"><?php echo htmlspecialchars($entry['title']); ?> (p. <?php echo (int)($entry['page'] ?? 1); ?>)</option><?php endforeach; ?>
+            </select>
+            <label for="planNote">Note <span>(optional)</span></label>
+            <input type="text" id="planNote" name="note" maxlength="300" placeholder="e.g. with my group, before Sunday">
+            <label class="plan-check"><input type="checkbox" name="email" value="1"> Email me a reminder too</label>
+            <p class="plan-msg" role="status" aria-live="polite"></p>
+            <button type="submit" class="note-submit">Plan it</button>
+        </form>
+        <h4 class="plan-h">Planned for this book</h4>
+        <ul id="planList" class="plan-list"><li class="plan-empty">Nothing planned yet.</li></ul>
     </div>
 
     <!-- Prayer Request Modal -->
@@ -541,7 +401,7 @@ html,body { height:100%; width:100%; overflow:hidden; }
     </div>
 
     <!-- Exit Focus Button -->
-    <button id="exitFocusBtn" onclick="toggleFocus()"><i class="fas fa-compress"></i> Exit Focus</button>
+    <button type="button" id="exitFocusBtn" onclick="toggleFocus()"><i class="fas fa-compress" aria-hidden="true"></i> Exit focus</button>
 
     <!-- Overlay -->
     <!-- Selection toolbar for highlights; filled in by initSelectionTooltip() -->
@@ -825,8 +685,9 @@ require_once __DIR__ . '/reader_share.php';
             pageNumEl.textContent = 'Cover';
             progressFill.setAttribute('stroke-dashoffset', '100.53');
             progressPercent.textContent = '0%';
-            chapterInfoEl.textContent = '📖 Cover';
+            chapterInfoEl.textContent = 'Cover';
             remainingInfoEl.textContent = '';
+            rbSync(0, '');
             return;
         }
         if (readingMode === 'flip') {
@@ -840,8 +701,11 @@ require_once __DIR__ . '/reader_share.php';
         progressFill.setAttribute('stroke-dashoffset', offset);
         progressPercent.textContent = percent + '%';
         const ch = getChapterForPage(page);
-        chapterInfoEl.textContent = `📖 ${getChapterTitle(ch)}`;
-        remainingInfoEl.textContent = `⏳ ${getRemainingPagesInChapter(page)} pages remaining • ${estimateTimeRemaining(page)} min left`;
+        chapterInfoEl.textContent = getChapterTitle(ch);
+        // Calm wording, as in a printed book's running footer: no counters to beat.
+        const inCh = getPagesInChapter(ch).indexOf(page) !== -1, left = getRemainingPagesInChapter(page), mins = estimateTimeRemaining(page);
+        remainingInfoEl.textContent = !inCh ? '' : left > 0 ? `${left} ${left === 1 ? 'page' : 'pages'} left in chapter${mins > 0 ? ' · about ' + mins + ' min' : ''}` : 'Last page of chapter';
+        rbSync(page, getChapterTitle(ch));
         markToc(page);
         // R12: tell screen-reader users where they are after a page turn (not on start-up).
         const ann = document.getElementById('awPageAnnounce');
@@ -922,12 +786,13 @@ require_once __DIR__ . '/reader_share.php';
 
     function goToPage(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
+        const near = Math.abs(pageNum - currentPage) <= 2; // long jumps land at once instead of scrolling past every page
         currentPage = pageNum;
         if (readingMode === 'flip' && pageFlip) {
             pageFlip.turnToPage(pageNum);
         } else {
             const target = document.querySelector(`.page-content-inner[data-page="${pageNum}"]`);
-            if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+            if (target) { rbLockScroll(); target.scrollIntoView({ behavior: near ? 'smooth' : 'auto', block:'start' }); }
             updateUI(pageNum);
             applyHighlights(scrollContainer);
         }
@@ -991,6 +856,8 @@ require_once __DIR__ . '/reader_share.php';
 
     // ----- Keyboard shortcuts -----
     document.addEventListener('keydown',function(e) {
+        // Arrow keys belong to the control in use (sliders, menus, text boxes), not to page turning.
+        if (e.key !== 'Escape' && e.target.closest && e.target.closest('input, select, textarea, [contenteditable], .modal-wrapper, #sidebar, #settings-panel, #toc-drawer')) return;
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
             e.preventDefault();
             if (readingMode === 'flip' && pageFlip) pageFlip.turnToNextPage();
@@ -1003,13 +870,18 @@ require_once __DIR__ . '/reader_share.php';
     });
 
     // ----- Click/touch navigation -----
+    // A tap in the middle of the page shows or hides the bars. In page-turn mode a tap near the
+    // left or right edge turns the page.
     document.getElementById('page-viewport').addEventListener('click',function(e) {
-        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('#highlight-tooltip')) return;
-        if (readingMode === 'flip' && pageFlip) {
-            const rect = this.getBoundingClientRect();
-            if (e.clientX - rect.left > rect.width/2) pageFlip.turnToNextPage();
-            else pageFlip.turnToPrevPage();
+        if (e.target.closest('button, a, input, select, textarea, #highlight-tooltip, [class^="highlight-"], [class*=" highlight-"]')) return;
+        if (String(window.getSelection ? window.getSelection() : '').trim() !== '') return; // finishing a text selection
+        const rect = this.getBoundingClientRect(), x = (e.clientX - rect.left) / rect.width;
+        if (readingMode === 'flip' && pageFlip && (x < 0.3 || x > 0.7)) {
+            if (x > 0.5) pageFlip.turnToNextPage(); else pageFlip.turnToPrevPage();
+            rbChrome(false);
+            return;
         }
+        rbChrome(document.getElementById('reader-app').classList.contains('rb-quiet'));
     });
 
     document.addEventListener('touchstart',function(e) { touchStartX = e.changedTouches[0].screenX; });
@@ -1029,14 +901,24 @@ require_once __DIR__ . '/reader_share.php';
         if (isBookmarked) {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
             const fd = new FormData(); fd.append('action','remove_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); xhr.send(fd); // F235
-            isBookmarked = false; bookmarkBtn.querySelector('i').className = 'far fa-bookmark'; bookmarkBtn.style.color = '#5a4848';
+            isBookmarked = false; rbBookmarkShow();
         } else {
             const xhr = new XMLHttpRequest(); xhr.open('POST','/reader/reader_ajax.php',true);
             const fd = new FormData(); fd.append('action','add_bookmark'); fd.append('book_id',bookId); fd.append('chapter',currentPage); fd.append('offset',0); xhr.send(fd);
-            isBookmarked = true; bookmarkBtn.querySelector('i').className = 'fas fa-bookmark'; bookmarkBtn.style.color = 'var(--rose)';
+            isBookmarked = true; rbBookmarkShow();
         }
     });
 
+    function rbBookmarkShow() {
+        const label = isBookmarked ? 'Remove bookmark' : 'Bookmark this page';
+        [bookmarkBtn, document.getElementById('rbBookmarkMenu')].forEach(b => {
+            if (!b) return;
+            b.querySelector('i').className = (isBookmarked ? 'fas' : 'far') + ' fa-bookmark';
+            b.classList.toggle('is-on', isBookmarked);
+            b.setAttribute('aria-label', label); b.setAttribute('aria-pressed', String(isBookmarked));
+            const t = b.querySelector('span'); if (t) t.textContent = label;
+        });
+    }
     function loadBookmarkStatus() {
         if (userId === 0) return;
         // Q4: this was a synchronous XMLHttpRequest, which froze the whole page (scrolling, taps) until
@@ -1049,8 +931,7 @@ require_once __DIR__ . '/reader_share.php';
                 let exists = false;
                 data.bookmarks.forEach(b => { if (b.chapter_index == currentPage) exists = true; });
                 isBookmarked = exists;
-                bookmarkBtn.querySelector('i').className = exists ? 'fas fa-bookmark' : 'far fa-bookmark';
-                bookmarkBtn.style.color = exists ? 'var(--rose)' : '#5a4848';
+                rbBookmarkShow();
             })
             .catch(() => {});
     }
@@ -1078,20 +959,18 @@ require_once __DIR__ . '/reader_share.php';
         });
     });
 
-    // R13: high-contrast theme (added here so the theme buttons line stays as it is)
-    document.getElementById('themeGroup').insertAdjacentHTML('beforeend', '<button data-theme="contrast" title="High contrast: black on white">Contrast</button>');
     document.querySelectorAll('#themeGroup button').forEach(btn => {
         btn.addEventListener('click',function() {
             const theme = this.dataset.theme;
-            document.querySelectorAll('#themeGroup button').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
+            document.querySelectorAll('#themeGroup button').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
+            this.classList.add('active'); this.setAttribute('aria-pressed', 'true');
             applyTheme(theme);
         });
     });
 
     const savedTheme = localStorage.getItem('reader_theme') || 'light';
     applyTheme(savedTheme);
-    document.querySelector('#themeGroup [data-theme="'+savedTheme+'"]')?.classList.add('active');
+    document.querySelectorAll('#themeGroup button').forEach(b => { const on = b.dataset.theme === savedTheme; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
 
     // ----- Font size -----
     document.getElementById('fontSizeSlider').addEventListener('input',function() {
@@ -1133,8 +1012,8 @@ require_once __DIR__ . '/reader_share.php';
 
     // ----- Font type -----
     const fontTypeSelect = document.getElementById('fontTypeSelect');
-    const savedFont = localStorage.getItem('reader_font_family') || 'Inter,sans-serif';
-    if (savedFont) { fontTypeSelect.value = savedFont; applyFontType(savedFont); }
+    const savedFont = localStorage.getItem('reader_font_family') || 'Georgia, serif'; // a book face by default
+    if (savedFont) { fontTypeSelect.value = savedFont; if (!fontTypeSelect.value) fontTypeSelect.selectedIndex = 0; applyFontType(savedFont); }
     fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); awPrefsChanged(); });
     function applyFontType(font) { document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontFamily = font); }
 
@@ -1165,19 +1044,34 @@ require_once __DIR__ . '/reader_share.php';
         fetch('/reader/reader_ajax.php', { method:'POST', body:data });
     });
 
-    // ----- Sidebar toggles -----
-    // Q1: on phones the sidebar is an overlay opened with the menu button and closed after a choice.
-    const awPhone = window.matchMedia('(max-width: 768px)');
-    sidebarToggle.addEventListener('click',function() {
-        if (awPhone.matches) sidebar.classList.toggle('open'); else sidebar.classList.toggle('closed');
-        sidebarToggle.setAttribute('aria-expanded', String(awPhone.matches ? sidebar.classList.contains('open') : !sidebar.classList.contains('closed')));
-    });
+    // ----- The "…" menu, Aa and Contents -----
+    // The old side rail is now a menu that opens from the "…" button; choosing a tool closes it.
+    function rbPopover(panel, btn, cls) {
+        const open = !panel.classList.contains(cls);
+        closeAll();
+        if (!open) return;
+        panel.classList.add(cls);
+        btn.setAttribute('aria-expanded', 'true');
+        overlay.classList.add('active', 'rb-clear'); // a tap anywhere closes it; the page stays visible
+        panel.focus({ preventScroll: true }); // Tab moves on to the first control
+    }
+    sidebarToggle.addEventListener('click', function () { rbPopover(sidebar, sidebarToggle, 'open'); });
     sidebar.addEventListener('click', function (e) {
-        if (awPhone.matches && e.target.closest('.sidebar-btn')) sidebar.classList.remove('open');
+        if (e.target.closest('.sidebar-btn')) { sidebar.classList.remove('open'); sidebarToggle.setAttribute('aria-expanded', 'false'); overlay.classList.remove('rb-clear'); }
     });
-    settingsBtn.addEventListener('click',function() { settingsPanel.classList.toggle('open'); overlay.classList.toggle('active',settingsPanel.classList.contains('open')); });
-    tocBtn.addEventListener('click', function() { markToc(currentPage || 1); const cur = document.querySelector('.toc-link.toc-current'); tocDrawer.classList.toggle('open'); if (cur) cur.scrollIntoView({ block: 'center' }); overlay.classList.toggle('active', tocDrawer.classList.contains('open')); });
-    tocClose.addEventListener('click', function() { tocDrawer.classList.remove('open'); overlay.classList.remove('active'); });
+    document.getElementById('rbBookmarkMenu').addEventListener('click', function () { bookmarkBtn.click(); });
+    settingsBtn.addEventListener('click', function () { rbPopover(settingsPanel, settingsBtn, 'open'); });
+    tocBtn.addEventListener('click', function() {
+        const open = !tocDrawer.classList.contains('open');
+        closeAll();
+        if (!open) return;
+        markToc(currentPage || 1);
+        tocDrawer.classList.add('open'); tocBtn.setAttribute('aria-expanded', 'true'); overlay.classList.add('active');
+        const cur = document.querySelector('.toc-link.toc-current');
+        if (cur) cur.scrollIntoView({ block: 'center' });
+        tocClose.focus({ preventScroll: true });
+    });
+    tocClose.addEventListener('click', function() { closeAll(); tocBtn.focus(); });
     shareBtn.addEventListener('click', function() {
         const preview = document.getElementById('shareQuotePreview');
         const quoteSpan = document.getElementById('shareQuoteText');
@@ -1190,7 +1084,7 @@ require_once __DIR__ . '/reader_share.php';
         openModal('share-modal');
     });
     commentsBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('view comments.'); return; } loadComments(); openModal('commentsModal'); });
-    errorReportBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('report errors.'); return; } errorPageInput.value = currentPage; errorPageNumSpan.textContent = '(current: ' + currentPage + ')'; openModal('errorModal'); });
+    errorReportBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('report errors.'); return; } errorPageInput.value = currentPage; if (errorPageNumSpan) errorPageNumSpan.textContent = '(you are on ' + currentPage + ')'; openModal('errorModal'); });
     prayerBtn.addEventListener('click', function() { if (userId === 0) { awNeedLogin('submit prayer requests.'); return; } prayerText.value = ''; openModal('prayerModal'); });
 
     // ----- Analytics / notes / TTS buttons (redirect) -----
@@ -1598,7 +1492,10 @@ require_once __DIR__ . '/reader_share.php';
     function closeAll() {
         settingsPanel.classList.remove('open');
         tocDrawer.classList.remove('open');
-        closeModal('share-modal'); closeModal('commentsModal'); closeModal('errorModal'); closeModal('prayerModal');
+        sidebar.classList.remove('open');
+        [sidebarToggle, settingsBtn, tocBtn].forEach(b => b.setAttribute('aria-expanded', 'false'));
+        overlay.classList.remove('rb-clear');
+        closeModal('share-modal'); closeModal('commentsModal'); closeModal('errorModal'); closeModal('prayerModal'); closeModal('planModal');
         document.getElementById('notes-panel').classList.remove('visible');
         document.getElementById('search-bar').classList.remove('visible');
         document.getElementById('reaction-picker').style.display = 'none';
@@ -1735,6 +1632,109 @@ require_once __DIR__ . '/reader_share.php';
     window.openModal = openModal;
     window.closeModal = closeModal;
     window.toggleFocus = toggleFocus;
+
+    // ----- Quiet reading: bars that step aside, a page scrubber, and the page you are on -----
+    var rbScrollLockUntil = 0, rbLastTop = 0, rbTicking = false, rbPagesCache = null;
+    function rbLockScroll() { rbScrollLockUntil = Date.now() + 1500; }
+    function rbChrome(show) {
+        const app = document.getElementById('reader-app');
+        if (!show && (sidebar.classList.contains('open') || settingsPanel.classList.contains('open') || tocDrawer.classList.contains('open') || searchBar.classList.contains('visible'))) return;
+        if (!show && document.activeElement && document.activeElement.closest && document.activeElement.closest('#toolbar, #rbFoot')) return;
+        app.classList.toggle('rb-quiet', !show);
+    }
+    // Called by updateUI: the footer, the scrubber and the chapter under the title.
+    function rbSync(page, chapterTitle) {
+        const scrub = document.getElementById('rbScrub'), sub = document.getElementById('rbChapter');
+        if (sub) sub.textContent = chapterTitle || '';
+        if (!scrub || scrub.dataset.dragging === '1') return;
+        scrub.value = Math.max(1, page);
+        const pct = totalPages > 1 ? ((Math.max(1, page) - 1) / (totalPages - 1)) * 100 : 100;
+        scrub.style.setProperty('--fill', pct + '%');
+        scrub.setAttribute('aria-valuetext', page ? `Page ${page} of ${totalPages}${chapterTitle ? ', ' + chapterTitle : ''}` : 'Cover');
+    }
+    (function () {
+        const scrub = document.getElementById('rbScrub');
+        scrub.addEventListener('input', function () {
+            const p = parseInt(this.value, 10);
+            this.dataset.dragging = '1';
+            pageNumEl.textContent = p;
+            chapterInfoEl.textContent = getChapterTitle(getChapterForPage(p));
+            this.style.setProperty('--fill', (totalPages > 1 ? (p - 1) / (totalPages - 1) * 100 : 100) + '%');
+            this.setAttribute('aria-valuetext', `Page ${p} of ${totalPages}`);
+        });
+        scrub.addEventListener('change', function () { this.dataset.dragging = ''; goToPage(parseInt(this.value, 10)); });
+
+        // Scroll mode: follow the page in view, so the page number, progress and saved place keep up.
+        function pageInView() {
+            if (!rbPagesCache) rbPagesCache = Array.from(document.querySelectorAll('#scroll-container .page-content-inner'));
+            const line = scrollContainer.getBoundingClientRect().top + scrollContainer.clientHeight * 0.35;
+            let lo = 0, hi = rbPagesCache.length - 1, found = 0;
+            while (lo <= hi) { // pages are in order, so a binary search finds the one under the reading line
+                const mid = (lo + hi) >> 1;
+                if (rbPagesCache[mid].getBoundingClientRect().top <= line) { found = mid; lo = mid + 1; } else hi = mid - 1;
+            }
+            return rbPagesCache[found] ? parseInt(rbPagesCache[found].dataset.page, 10) : 1;
+        }
+        scrollContainer.addEventListener('scroll', function () {
+            const top = scrollContainer.scrollTop, delta = top - rbLastTop;
+            if (Math.abs(delta) > 24) { if (Date.now() > rbScrollLockUntil && top > 40) rbChrome(false); rbLastTop = top; }
+            if (top <= 4) rbChrome(true);
+            if (rbTicking || readingMode !== 'scroll') return;
+            rbTicking = true;
+            requestAnimationFrame(function () {
+                rbTicking = false;
+                const p = pageInView();
+                if (p && p !== currentPage) {
+                    currentPage = p; updateUI(p); applyHighlights(scrollContainer); savePosition();
+                    clearTimeout(rbBookmarkTimer); rbBookmarkTimer = setTimeout(loadBookmarkStatus, 1200);
+                }
+            });
+        }, { passive: true });
+        var rbBookmarkTimer = null;
+        // Desktop: moving the pointer to the top or bottom edge brings the bars back.
+        document.addEventListener('mousemove', function (e) {
+            if (e.clientY < 64 || e.clientY > window.innerHeight - 88) rbChrome(true);
+        }, { passive: true });
+        document.getElementById('toolbar').addEventListener('focusin', function () { rbChrome(true); });
+        document.getElementById('rbFoot').addEventListener('focusin', function () { rbChrome(true); });
+        // Fonts and sizes change the page heights; the next scroll measures again.
+        ['fontSizeSlider', 'lineHeightSlider', 'fontTypeSelect'].forEach(id => document.getElementById(id).addEventListener('input', function () { rbPagesCache = null; }));
+        // The bars step aside a moment after the book opens; a tap brings them back.
+        setTimeout(function () { rbChrome(false); }, 2500);
+    })();
+
+    // ----- G1: planned reads -----
+    const planToken = <?php echo json_encode(isLoggedIn() ? generate_csrf_token() : ''); ?>;
+    function planPost(action, extra) {
+        const fd = new FormData(); fd.append('action', action); fd.append('book_id', bookId); fd.append('csrf_token', planToken);
+        Object.keys(extra || {}).forEach(k => fd.append(k, extra[k]));
+        return fetch('<?php echo SITE_URL; ?>/reading_plan.php', { method: 'POST', body: fd, headers: { Accept: 'application/json' }, credentials: 'same-origin' }).then(r => r.json());
+    }
+    function planEsc(t) { return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function planRender(list) {
+        const ul = document.getElementById('planList');
+        if (!list || !list.length) { ul.innerHTML = '<li class="plan-empty">Nothing planned yet.</li>'; return; }
+        ul.innerHTML = list.map(p => '<li><span><strong>' + planEsc(p.when) + '</strong>' + (p.label ? ' · ' + planEsc(p.label) : '') + (p.note ? '<br><small>' + planEsc(p.note) + '</small>' : '') + (p.email ? '<br><small>Email reminder on</small>' : '') + '</span>'
+            + '<span class="plan-acts"><button type="button" data-plan="done" data-id="' + p.id + '">Read it</button><button type="button" data-plan="delete" data-id="' + p.id + '">Remove</button></span></li>').join('');
+    }
+    document.getElementById('planBtn').addEventListener('click', function () {
+        if (userId === 0) { awNeedLogin('plan a read.'); return; }
+        openModal('planModal'); document.getElementById('planDate').focus();
+        planPost('list').then(r => planRender(r.plans)).catch(() => {});
+    });
+    document.getElementById('planForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const f = this, msg = f.querySelector('.plan-msg'), opt = f.page.selectedOptions[0];
+        msg.textContent = 'Saving…';
+        planPost('add', { date: f.date.value, page: f.page.value, label: opt && opt.value ? opt.dataset.label : '', note: f.note.value, email: f.email.checked ? '1' : '' })
+            .then(r => { msg.textContent = r.message || ''; if (r.ok) { f.note.value = ''; planRender(r.plans); } })
+            .catch(() => { msg.textContent = 'That was not saved. Check your connection.'; });
+    });
+    document.getElementById('planList').addEventListener('click', function (e) {
+        const b = e.target.closest('[data-plan]'); if (!b) return;
+        planPost(b.dataset.plan, { id: b.dataset.id }).then(r => planRender(r.plans)).catch(() => {});
+    });
+    window.closeModal = window.closeModal || closeModal;
 
     // ----- Initialization -----
     totalPagesEl.textContent = totalPages;

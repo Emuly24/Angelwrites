@@ -55,6 +55,9 @@ foreach ([
     ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'fa-hands-praying', 'moderate'],
     ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'fa-quote-left', 'moderate'],
     ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'moderation.php', 'fa-flag', 'moderate'],
+    // D3: Stories & Help
+    ['Stories waiting for a first read', "SELECT COUNT(*) FROM community_posts WHERE status = 'held' AND visibility <> 'team'", 'community.php', 'fa-seedling', 'moderate'],
+    ['Private requests not yet answered', "SELECT COUNT(*) FROM community_posts p WHERE visibility = 'team' AND status = 'published' AND NOT EXISTS (SELECT 1 FROM community_replies r WHERE r.post_id = p.id AND r.as_team = 1)", 'community.php?view=private', 'fa-lock', 'see_identities'],
 ] as [$aw_label, $aw_sql, $aw_link, $aw_icon, $aw_cap]) {
     if (!aw_can($aw_cap)) continue; // K1: each role sees what it can act on
     try {
@@ -237,6 +240,7 @@ $pageTitle = 'Admin Dashboard';
             <h3>🛡️ Moderation</h3>
             <div class="admin-module-grid">
                 <a href="moderation.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Moderation</span></a>
+                <a href="community.php" class="admin-module-btn"><i class="fas fa-seedling"></i><span>Stories &amp; Help</span></a><!-- D3 -->
                 <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Comments</span></a>
                 <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a>
                 <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a>
@@ -308,6 +312,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="admin-module-grid">
                 <a href="settings.php" class="admin-module-btn"><i class="fas fa-sliders-h"></i><span>System Settings</span></a>
                 <a href="backup.php" class="admin-module-btn"><i class="fas fa-database"></i><span>Database Backup</span></a><!-- P0-1 -->
+                <?php if (aw_can('manage_settings')): ?><a href="db_setup.php" class="admin-module-btn"><i class="fas fa-screwdriver-wrench"></i><span>Database Setup</span></a><?php endif; ?><!-- DB: create missing tables -->
                 <a href="picks.php" class="admin-module-btn"><i class="fas fa-star"></i><span>Angella's Picks</span></a><!-- C2 -->
                 <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
                 <a href="../account_security.php" class="admin-module-btn"><i class="fas fa-lock"></i><span>Account Security</span></a><!-- K5 -->
