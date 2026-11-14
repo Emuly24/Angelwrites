@@ -281,3 +281,28 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 @media print {
     #toolbar, #rbFoot, #sidebar, #settings-panel { display: none !important; }
 }
+
+/* G1: Plan a read, and Save to a collection in the "…" menu */
+#sidebar .rb-save { display: block; margin: 0; }
+#sidebar .rb-save .aw-save-btn { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font-size: .92rem; font-weight: 400; justify-content: flex-start; }
+#sidebar .rb-save .aw-save-btn i { width: 20px; text-align: center; color: var(--text-light); }
+#sidebar .rb-save .aw-save-btn:hover { background: var(--accent-soft); }
+#sidebar .rb-save .aw-save-btn[aria-pressed="true"] i { color: var(--accent); }
+#sidebar .rb-save .aw-save-btn span::after { content: ' to a collection'; }
+#sidebar .rb-save .aw-save-btn[aria-pressed="true"] span::after { content: ' in your library'; }
+.plan-intro { margin: 0 0 14px; color: var(--text-light); font-size: .9rem; }
+.plan-form { display: grid; gap: 6px; }
+.plan-form label { font-weight: 600; font-size: .88rem; margin-top: 6px; }
+.plan-form label span { font-weight: 400; color: var(--text-light); }
+.plan-form input[type=date], .plan-form input[type=text], .plan-form select { min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--input-bg); color: var(--text); font: inherit; }
+.plan-check { display: flex; align-items: center; gap: 10px; font-weight: 400 !important; min-height: 44px; }
+.plan-check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.plan-msg { min-height: 1.2em; margin: 4px 0; font-weight: 600; font-size: .88rem; }
+.plan-form .note-submit { justify-self: start; min-height: 44px; }
+.plan-h { margin: 18px 0 8px; font-size: .95rem; }
+.plan-list { list-style: none; margin: 0; padding: 0; }
+.plan-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; padding: 10px 0; border-top: 1px solid var(--border); font-size: .9rem; }
+.plan-list small { color: var(--text-light); }
+.plan-acts { display: inline-flex; gap: 6px; }
+.plan-acts button { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font: inherit; font-size: .82rem; }
+.plan-empty { color: var(--text-light); }

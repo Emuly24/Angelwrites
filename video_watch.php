@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/saves.php'; // F2: the Save control
 require_once __DIR__ . '/reader/reader_functions.php'; // time_ago()
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -124,7 +125,7 @@ $relatedVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = htmlspecialchars($video['title']);
 ?>
-<?php require_once 'includes/header.php'; ?>
+<?php require_once 'includes/header.php'; echo aw_save_assets(); ?>
 
 <!-- Plyr CSS -->
 <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
@@ -181,6 +182,7 @@ $pageTitle = htmlspecialchars($video['title']);
                                         <?php echo $emoji; ?> <span id="count-<?php echo $rt; ?>"><?php echo $reactionCounts[$rt]; ?></span>
                                     </button>
                                 <?php endforeach; ?>
+                                <?php echo aw_save_button('video', $id); ?>
                                 <button class="btn-icon share-btn" onclick="copyLink()">
                                     <i class="fas fa-share-alt"></i> Share
                                 </button>
