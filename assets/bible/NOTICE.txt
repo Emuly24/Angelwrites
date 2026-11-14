@@ -1,0 +1,23 @@
+Bible texts in this folder
+==========================
+
+bible_KJV.db   King James Version (1769). Public domain.
+bible_WEB.db   World English Bible. Public domain.
+bible_ASV.db   American Standard Version (1901). Public domain.
+
+bible_NYA.sqlite3
+  Biblica® Tsekulani Mawu a Mulungu mu Chichewa Chalero™
+  Mwini © 2002, 2016 ndi Biblica, Inc.
+  Biblica® Open God's Word in Contemporary Chichewa™
+  Copyright © 2002, 2016 by Biblica, Inc.
+  "Biblica" is a trademark registered in the United States Patent and Trademark Office by Biblica, Inc. Used with permission.
+  Licence: Creative Commons Attribution-ShareAlike 4.0 International, https://creativecommons.org/licenses/by-sa/4.0/
+  Source: https://ebible.org/nya/ (USFM). Redistributed unmodified: the verse text is word for word;
+  only the USFM formatting codes were removed. Section headings, psalm titles and book names are kept
+  in their own tables exactly as published.
+
+bible_YAO.sqlite3
+  Lilangano lya Sambano (Yao New Testament)
+  Yao Bible Version Translation Project, copyright © 2018 The Word for the World International.
+  Licence: Creative Commons Attribution 4.0 International, https://creativecommons.org/licenses/by/4.0/
+  Source: https://ebible.org/yao/ (USFM). The verse text is unchanged; only formatting codes were removed.

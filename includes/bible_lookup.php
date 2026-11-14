@@ -1,25 +1,12 @@
 <?php
 function getBibleText($book, $chapter, $verse_start = 1, $verse_end = 0, $version = 'KJV') {
-    $version_map = [
-        'ASV'  => 'bible_ASV.db',
-        'KJV'  => 'bible_KJV.db',
-        'WEB'  => 'bible_WEB.db',
-    ];
-    
-    // BL1: NIV, ESV, NASB, NKJV and AMP were removed: copyrighted translations the site has no licence to
-    // serve. A request for one of them gets the "not available" answer below.
-    // F24: an unknown version (e.g. YLT, which has no database) used to fall back silently to
-    // KJV while the page still said YLT. It is now reported instead.
-    if (!isset($version_map[$version])) {
+    // B1: versions come from the registry (includes/bible_versions.php)
+    require_once __DIR__ . '/bible_versions.php';
+    if (!isset(aw_bible_versions()[$version])) {
         return ["error" => "The $version translation is not available."];
     }
-    $db_file = $version_map[$version];
-    $bible_db = __DIR__ . '/../assets/bible/' . $db_file;
-    
-    if (!file_exists($bible_db)) {
-        return ["error" => "Database file for $version not found."];
-    }
-    
+    $bible_db = aw_bible_file($version);
+
     try {
         $db = new PDO('sqlite:' . $bible_db);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

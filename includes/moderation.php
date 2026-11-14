@@ -35,6 +35,8 @@ function aw_report_types() {
         // D1: Stories & Help. 'status' mode: removal sets status = 'removed' (kept 90 days, then purged)
         'community_post'     => ['community_posts', 'author_id', "title || ' — ' || body", "'story.php?id=' || id", 'status'],
         'community_reply'    => ['community_replies', 'author_id', 'body', "'story.php?id=' || post_id || '#reply-' || id", 'status'],
+        // I1: a private message; moderators see only the reported message, never the conversation
+        'message'            => ['messages', 'sender_id', 'body', "'admin/moderation.php'", 'status'],
     ];
 }
 
@@ -139,6 +141,7 @@ function aw_report_decide(PDO $db, $report_id, $decision, $note = '') {
             $db->prepare("INSERT INTO moderation_archive (target_type, target_id, row_json, removed_by, reason) VALUES (?, ?, ?, ?, ?)")
                ->execute([$type, $tid, json_encode($row->fetch(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE), $me, (string)$rep['reason']]);
             if ($mode === 'soft') $db->prepare("UPDATE $table SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$tid]);
+            elseif ($mode === 'status' && $table === 'messages') $db->prepare("UPDATE messages SET status = 'removed' WHERE id = ?")->execute([$tid]);
             elseif ($mode === 'status') $db->prepare("UPDATE $table SET status = 'removed', updated_at = CURRENT_TIMESTAMP" . ($table === 'community_posts' ? ', removed_at = CURRENT_TIMESTAMP' : '') . " WHERE id = ?")->execute([$tid]);
             else $db->prepare("DELETE FROM $table WHERE id = ?")->execute([$tid]);
             if ($type === 'answer') { try { $db->exec("UPDATE questions SET answers_count = (SELECT COUNT(*) FROM answers a WHERE a.question_id = questions.id)"); } catch (Throwable $e) {} }
@@ -182,7 +185,8 @@ function aw_moderation_restore(PDO $db, $archive_id) {
         if ($mode === 'soft') {
             $db->prepare("UPDATE $table SET deleted_at = NULL WHERE id = ?")->execute([(int)$a['target_id']]);
         } elseif ($mode === 'status') {
-            $db->prepare("UPDATE $table SET status = 'published', updated_at = CURRENT_TIMESTAMP" . ($table === 'community_posts' ? ', removed_at = NULL' : '') . " WHERE id = ?")->execute([(int)$a['target_id']]);
+            if ($table === 'messages') $db->prepare("UPDATE messages SET status = 'sent' WHERE id = ?")->execute([(int)$a['target_id']]);
+            else $db->prepare("UPDATE $table SET status = 'published', updated_at = CURRENT_TIMESTAMP" . ($table === 'community_posts' ? ', removed_at = NULL' : '') . " WHERE id = ?")->execute([(int)$a['target_id']]);
         } elseif (is_array($row) && $row) {
             $cols = array_keys($row);
             $db->prepare("INSERT OR IGNORE INTO $table (" . implode(',', array_map(function ($c) { return '"' . str_replace('"', '', $c) . '"'; }, $cols)) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")
