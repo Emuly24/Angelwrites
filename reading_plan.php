@@ -19,7 +19,8 @@ $out = ['ok' => true];
 if ($act === 'add') {
     $out = aw_plan_add($db, $uid, $book, (string)($_POST['date'] ?? ''), (int)($_POST['page'] ?? 0), (string)($_POST['label'] ?? ''), (string)($_POST['note'] ?? ''), !empty($_POST['email']));
 } elseif ($act === 'done' || $act === 'delete') {
-    $out = ['ok' => aw_plan_update($db, $uid, (int)($_POST['id'] ?? 0), $act), 'message' => $act === 'done' ? 'Marked as read.' : 'Removed.'];
+    $ok = aw_plan_update($db, $uid, (int)($_POST['id'] ?? 0), $act);
+    $out = ['ok' => $ok, 'message' => !$ok ? 'That plan was not found.' : ($act === 'done' ? 'Marked as read.' : 'Removed.')];
 }
 $out['plans'] = array_map(function ($p) {
     return ['id' => (int)$p['id'], 'when' => aw_plan_when($p['plan_date']), 'date' => $p['plan_date'], 'page' => (int)$p['page'], 'label' => (string)$p['label'], 'note' => (string)$p['note'], 'email' => (int)$p['email'] === 1];
