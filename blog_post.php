@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/views.php'; // one way to count views
 require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/mail_helper.php';
 require_once 'includes/csrf.php';
@@ -24,9 +25,8 @@ if (!$post) {
     exit;
 }
 
-// Increment view count
-$stmt = $db->prepare("UPDATE blog_posts SET views = views + 1 WHERE id = ?");
-$stmt->execute([$post['id']]);
+// Count the view (one counter and one log; robots, staff and quick repeat visits are not counted)
+if (aw_view_record($db, 'post', (int)$post['id'])) $post['views'] = (int)($post['views'] ?? 0) + 1;
 
 // ===== TRACKING: User read this blog post =====
 if (isLoggedIn()) {

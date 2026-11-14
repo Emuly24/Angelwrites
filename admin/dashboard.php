@@ -1,409 +1,339 @@
 <?php
+/**
+ * The team's dashboard: what needs doing, what is happening, and every tool, in one calm, lively page.
+ * All figures come from the site's own records and are read once on the server (no polling):
+ *  - views come from the one view log (includes/views.php), so they match the counters;
+ *  - community counts include both the old Community Q&A and Stories & Help;
+ *  - "unanswered" means no answer exists (not a stored counter that can drift).
+ * Each role sees what it can act on (K1). Every query fails soft.
+ */
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/dash.php';
+if (is_file(__DIR__ . '/../includes/community_posts.php')) require_once '../includes/community_posts.php';
 
 aw_require('staff_dashboard'); // K1
 
-// E2 (PROGRAM_PLAN.md Phase 1): the admin dashboard shows what needs doing and what happened
-// recently, read once on the server. No charts, no "Live" polling: the page makes no request after
-// it loads until the admin acts. Every query fails soft (logged, empty).
-function aw_adm_rows(PDO $db, $sql, array $params = []) {
-    try { $st = $db->prepare($sql); $st->execute($params); return $st->fetchAll(PDO::FETCH_ASSOC); }
-    catch (Throwable $e) { error_log('admin dashboard: ' . $e->getMessage()); return []; }
-}
-function aw_adm_count(PDO $db, $sql) {
-    try { return (int)$db->query($sql)->fetchColumn(); }
-    catch (Throwable $e) { error_log('admin dashboard: ' . $e->getMessage()); return 0; }
-}
-function aw_adm_short($text, $len) {
-    $t = trim(preg_replace('/\s+/u', ' ', strip_tags((string)$text)));
-    if (function_exists('mb_strlen')) return mb_strlen($t) > $len ? rtrim(mb_substr($t, 0, $len)) . '…' : $t;
-    return strlen($t) > $len ? rtrim(substr($t, 0, $len)) . '…' : $t;
-}
+$D = 14;
+// ----- daily series (last 14 days) -----
+$sViews   = aw_dsh_daily($db, [['view_logs', 'viewed_at']], $D);
+$sMembers = aw_dsh_daily($db, [['users', 'created_at']], $D);
+$sComments = aw_dsh_daily($db, [['reviews', 'created_at', 'deleted_at IS NULL'], ['reflection_comments', 'created_at'], ['video_comments', 'created_at']], $D);
+$sCommunity = aw_dsh_daily($db, [['questions', 'created_at'], ['answers', 'created_at'], ['community_posts', 'created_at', "status <> 'removed'"], ['community_replies', 'created_at', "status = 'published'"]], $D);
+$sReading = aw_dsh_daily($db, [['reading_sessions', 'start_time']], $D);
 
-$week = [
-    'New members'    => aw_adm_count($db, "SELECT COUNT(*) FROM users WHERE created_at >= datetime('now', '-7 days')"),
-    'Readers'        => aw_adm_count($db, "SELECT COUNT(DISTINCT user_id) FROM reading_sessions WHERE start_time >= datetime('now', '-7 days')"),
-    'Comments'       => aw_adm_count($db, "SELECT COUNT(*) FROM reviews WHERE deleted_at IS NULL AND created_at >= datetime('now', '-7 days')"),
-    'Questions'      => aw_adm_count($db, "SELECT COUNT(*) FROM questions WHERE created_at >= datetime('now', '-7 days')"),
-];
-$totals = [
-    'Members' => aw_adm_count($db, "SELECT COUNT(*) FROM users"),
-    'Books'   => aw_adm_count($db, "SELECT COUNT(*) FROM books"),
-    'Poems'   => aw_adm_count($db, "SELECT COUNT(*) FROM poems"),
-    'Posts'   => aw_adm_count($db, "SELECT COUNT(*) FROM blog_posts"),
-    'Videos'  => aw_adm_count($db, "SELECT COUNT(*) FROM videos"),
-];
-
-$recent_sessions = aw_adm_rows($db, "SELECT s.id, s.date, s.time, u.name, u.first_name, u.last_name, u.username FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date ASC, s.time ASC LIMIT 5");
-$recent_messages = aw_adm_rows($db, "SELECT id, name, message, created_at FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5");
-$aw_me = aw_adm_rows($db, "SELECT name, first_name, last_name, username FROM users WHERE id = ?", [(int)($_SESSION['user_id'] ?? 0)]);
-$aw_me_name = $aw_me ? awDisplayName($aw_me[0]) : 'Admin';
-$recent_members  = aw_adm_rows($db, "SELECT id, name, first_name, last_name, username, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 5");
-$recent_comments = aw_adm_rows($db, "SELECT r.id, r.target_type, r.target_id, r.comment, r.created_at, u.name, u.first_name, u.last_name, u.username
-    FROM reviews r JOIN users u ON u.id = r.user_id WHERE r.deleted_at IS NULL ORDER BY r.created_at DESC LIMIT 5");
-$open_questions  = aw_adm_rows($db, "SELECT q.id, q.title, q.created_at FROM questions q WHERE q.answers_count = 0 ORDER BY q.created_at DESC LIMIT 5");
-
-// Q42: the real to-do items were buried among totals and zero-filled charts. Count what is waiting
-// for the admin; each query is optional (a table may not exist before the DB repair).
-$aw_attention = [];
+$kpis = [];
 foreach ([
-    ['Orders to confirm', "SELECT COUNT(*) FROM payments WHERE status = 'pending'", 'manage_payments.php', 'fa-money-bill-wave', 'manage_payments'],
-    ['Session requests', "SELECT COUNT(*) FROM sessions WHERE status = 'pending'", 'manage_sessions.php?status=pending', 'fa-calendar-check', 'manage_members'],
-    ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'inbox.php', 'fa-envelope', 'team_inbox'],
-    ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'fa-hands-praying', 'moderate'],
-    ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'fa-quote-left', 'moderate'],
-    ['Community reports', "SELECT COUNT(*) FROM reports WHERE status = 'pending'", 'moderation.php', 'fa-flag', 'moderate'],
-    // D3: Stories & Help
-    ['Stories waiting for a first read', "SELECT COUNT(*) FROM community_posts WHERE status = 'held' AND visibility <> 'team'", 'community.php', 'fa-seedling', 'moderate'],
-    ['Private requests not yet answered', "SELECT COUNT(*) FROM community_posts p WHERE visibility = 'team' AND status = 'published' AND NOT EXISTS (SELECT 1 FROM community_replies r WHERE r.post_id = p.id AND r.as_team = 1)", 'community.php?view=private', 'fa-lock', 'see_identities'],
-] as [$aw_label, $aw_sql, $aw_link, $aw_icon, $aw_cap]) {
-    if (!aw_can($aw_cap)) continue; // K1: each role sees what it can act on
-    try {
-        $aw_n = (int)$db->query($aw_sql)->fetchColumn();
-        if ($aw_n > 0) $aw_attention[] = [$aw_label, $aw_n, $aw_link, $aw_icon];
-    } catch (Throwable $e) {
-        // table not there yet
+    ['Views', 'fa-eye', $sViews, '#9c5457', null],
+    ['New members', 'fa-user-plus', $sMembers, '#6d5bb0', aw_can('manage_members') ? 'manage_users.php' : null],
+    ['Community posts & replies', 'fa-seedling', $sCommunity, '#c25f6b', aw_can('moderate') ? 'community.php' : null],
+    ['Comments', 'fa-comment-dots', $sComments, '#3f8f86', aw_can('moderate') ? 'comments.php' : null],
+    ['Reading sessions', 'fa-book-open-reader', $sReading, '#b7853a', null],
+] as [$label, $icon, $series, $colour, $link]) {
+    [$now, $prev] = aw_dsh_weeks($series);
+    $kpis[] = compact('label', 'icon', 'series', 'colour', 'link', 'now', 'prev');
+}
+
+// ----- needs attention (only what this role can act on) -----
+$attention = [];
+foreach ([
+    ['Orders to confirm', "SELECT COUNT(*) FROM payments WHERE status = 'pending'", 'manage_payments.php', 'manage_payments'],
+    ['Session requests', "SELECT COUNT(*) FROM sessions WHERE status = 'pending'", 'manage_sessions.php?status=pending', 'manage_members'],
+    ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'inbox.php', 'team_inbox'],
+    ['Team conversations waiting', "SELECT COUNT(*) FROM msg_threads t WHERE t.kind = 'team' AND COALESCE(t.team_read_id, 0) < (SELECT COALESCE(MAX(id), 0) FROM messages m WHERE m.thread_id = t.id)", '../messages.php?view=team', 'team_inbox'],
+    ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'moderate'],
+    ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'moderate'],
+    ['Reports to review', "SELECT COUNT(DISTINCT target_type || ':' || target_id) FROM reports WHERE status = 'pending'", 'moderation.php', 'moderate'],
+    ['Stories waiting for a first read', "SELECT COUNT(*) FROM community_posts WHERE status = 'held' AND visibility <> 'team'", 'community.php', 'moderate'],
+    ['Private requests not yet answered', "SELECT COUNT(*) FROM community_posts p WHERE visibility = 'team' AND status = 'published' AND NOT EXISTS (SELECT 1 FROM community_replies r WHERE r.post_id = p.id AND r.as_team = 1)", 'community.php?view=private', 'see_identities'],
+    ['Questions with no answer', "SELECT COUNT(*) FROM questions q WHERE NOT EXISTS (SELECT 1 FROM answers a WHERE a.question_id = q.id)", 'manage_questions.php', 'moderate'],
+] as [$label, $sql, $link, $cap]) {
+    if (!aw_can($cap)) continue;
+    $n = aw_dsh_n($db, $sql);
+    if ($n > 0) $attention[] = [$label, $n, $link];
+}
+$lastBackup = (string)aw_setting('last_backup_at', '');
+$backupDays = $lastBackup !== '' ? (int)floor((time() - strtotime($lastBackup)) / 86400) : null;
+if (aw_can('backup') && ($backupDays === null || $backupDays >= 7)) $attention[] = [$backupDays === null ? 'No backup yet: download one' : 'days since the last backup', $backupDays === null ? '!' : $backupDays, 'backup.php'];
+
+// ----- most viewed this week (from the view log) -----
+$top = aw_dsh_q($db, "SELECT v.target_type, v.target_id, COUNT(*) AS n,
+        CASE v.target_type WHEN 'poem' THEN (SELECT title FROM poems WHERE id = v.target_id) WHEN 'book' THEN (SELECT title FROM books WHERE id = v.target_id)
+             WHEN 'post' THEN (SELECT title FROM blog_posts WHERE id = v.target_id) WHEN 'video' THEN (SELECT title FROM videos WHERE id = v.target_id)
+             WHEN 'question' THEN (SELECT title FROM questions WHERE id = v.target_id) END AS title,
+        (SELECT slug FROM blog_posts WHERE id = v.target_id AND v.target_type = 'post') AS slug
+    FROM view_logs v WHERE v.viewed_at >= datetime('now', '-7 days') AND v.target_type <> 'story' GROUP BY v.target_type, v.target_id ORDER BY n DESC LIMIT 6");
+$topMax = $top ? max(1, (int)$top[0]['n']) : 1;
+$kindLabel = ['poem' => 'Poem', 'book' => 'Book', 'post' => 'Reflection or blog post', 'video' => 'Video', 'question' => 'Community question'];
+$kindLink = function ($r) {
+    $u = rtrim(SITE_URL, '/');
+    switch ($r['target_type']) {
+        case 'poem': return $u . '/poem_view.php?id=' . (int)$r['target_id'];
+        case 'book': return $u . '/book.php?id=' . (int)$r['target_id'];
+        case 'post': return $u . '/blog_post.php?slug=' . urlencode((string)$r['slug']);
+        case 'video': return $u . '/video_watch.php?id=' . (int)$r['target_id'];
+        default: return $u . '/community.php?id=' . (int)$r['target_id'];
     }
+};
+
+// ----- community: questions still waiting, from both places -----
+$waiting = [];
+if (aw_can('moderate')) {
+    foreach (aw_dsh_q($db, "SELECT q.id, q.title, q.created_at FROM questions q WHERE NOT EXISTS (SELECT 1 FROM answers a WHERE a.question_id = q.id) ORDER BY q.created_at DESC LIMIT 6") as $q)
+        $waiting[] = ['title' => $q['title'], 'when' => $q['created_at'], 'where' => 'Community Q&A', 'link' => SITE_URL . '/community.php?id=' . (int)$q['id']];
+    foreach (aw_dsh_q($db, "SELECT p.id, p.title, p.type, p.created_at FROM community_posts p WHERE p.status = 'published' AND p.visibility <> 'team' AND p.type IN ('question', 'help')
+                             AND NOT EXISTS (SELECT 1 FROM community_replies r WHERE r.post_id = p.id AND r.status = 'published') ORDER BY p.created_at DESC LIMIT 6") as $q)
+        $waiting[] = ['title' => $q['title'], 'when' => $q['created_at'], 'where' => $q['type'] === 'help' ? 'Request for help' : 'Stories & Help question', 'link' => SITE_URL . '/story.php?id=' . (int)$q['id']];
+    usort($waiting, function ($a, $b) { return strcmp($b['when'], $a['when']); });
+    $waiting = array_slice($waiting, 0, 6);
 }
-// P0-1: there are no automatic backups on this host; remind the team when the last manual one is a week old
-$aw_last_backup = (string)aw_setting('last_backup_at', '');
-$aw_backup_days = $aw_last_backup !== '' ? (int)floor((time() - strtotime($aw_last_backup)) / 86400) : null;
-if (aw_can('backup') && ($aw_backup_days === null || $aw_backup_days >= 7)) {
-    $aw_attention[] = [$aw_backup_days === null ? 'backup taken yet: download one' : 'days since the last backup', $aw_backup_days === null ? 'No' : $aw_backup_days, 'backup.php', 'fa-database'];
-}
+
+$sessions = aw_can('manage_members') ? aw_dsh_q($db, "SELECT s.date, s.time, u.name, u.first_name, u.last_name, u.username FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date, s.time LIMIT 5") : [];
+$messages = aw_can('team_inbox') ? aw_dsh_q($db, "SELECT name, message, created_at FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5") : [];
+$newMembers = aw_can('manage_members') ? aw_dsh_q($db, "SELECT name, first_name, last_name, username, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 5") : [];
+$feed = aw_dsh_feed($db, 16);
+
+$totals = [
+    'members' => aw_dsh_n($db, "SELECT COUNT(*) FROM users"),
+    'books' => aw_dsh_n($db, "SELECT COUNT(*) FROM books"),
+    'poems' => aw_dsh_n($db, "SELECT COUNT(*) FROM poems"),
+    'reflections & posts' => aw_dsh_n($db, "SELECT COUNT(*) FROM blog_posts"),
+    'videos' => aw_dsh_n($db, "SELECT COUNT(*) FROM videos"),
+    'community posts' => aw_dsh_n($db, "SELECT COUNT(*) FROM questions") + aw_dsh_n($db, "SELECT COUNT(*) FROM community_posts WHERE status <> 'removed'"),
+];
+$me = aw_dsh_q($db, "SELECT name, first_name, last_name, username FROM users WHERE id = ?", [(int)($_SESSION['user_id'] ?? 0)]);
+$meName = $me ? explode(' ', awDisplayName($me[0]))[0] : 'there';
+$h = (int)date('G');
+$greet = $h < 12 ? 'Good morning' : ($h < 17 ? 'Good afternoon' : 'Good evening');
 
 $pageTitle = 'Admin Dashboard';
+require_once '../includes/header.php';
 ?>
-<?php require_once '../includes/header.php'; ?>
-
-<style>
-/* Hero */
-.admin-hero { background: linear-gradient(135deg, var(--card-bg), var(--vanilla)); border-radius: 20px; padding: 28px 32px; margin-bottom: 28px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
-.admin-hero h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; margin:0; letter-spacing: -0.5px; }
-.admin-hero .sub { color: var(--text-light); margin-top: 4px; font-size: 0.95rem; }
-
-/* E2 */
-.adm-h2 { font-family: 'Playfair Display', serif; font-size: 1.15rem; margin: 0 0 12px; color: var(--text); }
-.adm-week { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); }
-.adm-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 0 0 12px; }
-.adm-figures div { background: var(--bg); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--border); }
-.adm-figures dt { font-size: 0.8rem; color: var(--text-light); }
-.adm-figures dd { margin: 2px 0 0; font-size: 1.6rem; font-weight: 700; color: var(--text); }
-.adm-totals { margin: 0; font-size: 0.9rem; color: var(--text-light); }
-.adm-linkbtn { background: none; border: 0; padding: 0; color: var(--rose-dark, #a8676a); text-decoration: underline; cursor: pointer; font: inherit; }
-.adm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 28px; }
-.adm-list { list-style: none; margin: 0; padding: 0; }
-.adm-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-.adm-list li:last-child { border-bottom: 0; }
-.adm-list li span { color: var(--text-light); text-align: right; min-width: 0; overflow-wrap: anywhere; }
-.adm-list a { font-weight: 600; color: var(--text); }
-.adm-empty { margin: 0; color: var(--text-light); font-size: 0.9rem; line-height: 1.5; }
-
-/* Alerts */
-.alert-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
-.alert-card { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
-.alert-card h4 { font-size: 1rem; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; }
-.alert-list { display: flex; flex-direction: column; gap: 10px; }
-.alert-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-.alert-item:last-child { border-bottom: none; }
-
-/* Deep Dive Modal */
-#statsModal .modal-box { max-width: 850px; max-height: 90vh; display: flex; flex-direction: column; }
-#statsModal table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-#statsModal table th { background: var(--bg); padding:10px 12px; text-align:left; border-bottom:2px solid var(--border); position:sticky; top:0; z-index:1; }
-#statsModal table td { padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align: middle; }
-#statsModal table tr:hover { background: var(--rose-light); }
-#statsModalBody { max-height: 60vh; overflow-y: auto; }
-
-/* Admin Modules - FIX FOR SCROLLING */
-.admin-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
-.admin-module { background: var(--card-bg); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); }
-.admin-module h3 { font-family: 'Playfair Display', serif; color: var(--rose-dark); font-size: 1.1rem; margin: 0 0 16px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-.admin-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-.admin-module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); text-decoration: none; color: var(--text); transition: 0.2s; text-align: center; }
-.admin-module-btn:hover { transform: translateY(-3px); border-color: var(--rose); box-shadow: 0 4px 12px rgba(219,161,162,0.2); }
-.admin-module-btn i { font-size: 1.4rem; color: var(--rose); margin-bottom: 6px; }
-.admin-module-btn span { font-size: 0.75rem; font-weight: 500; }
-
-/* Modal */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 9999; display: none; justify-content: center; align-items: center; }
-.modal-overlay.active { display: flex; }
-.modal-box { background: var(--card-bg); border-radius: 20px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); border: 1px solid var(--rose-light); }
-.modal-box h2 { font-family: 'Playfair Display', serif; margin-top: 0; color: var(--rose-dark); }
-.modal-box .btn { width: 100%; justify-content: center; margin-bottom: 10px; }
-</style>
-
-<div class="container" style="max-width: 1400px; margin: 0 auto; padding: 20px;">
-    <!-- Hero -->
-    <div class="admin-hero">
-        <div>
-            <h1>Welcome back, <span style="color:var(--rose-dark, #a8676a);"><?php echo htmlspecialchars($aw_me_name); ?></span></h1>
-            <div class="sub"><?php echo $aw_attention ? 'A few things are waiting for you.' : 'Nothing is waiting for you right now.'; ?></div>
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=2">
+<main class="dsh" id="main">
+    <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
+        <div class="dsh-hero-top">
+            <div>
+                <p class="dsh-eyebrow"><?php echo htmlspecialchars(date('l, j F Y')); ?></p>
+                <h1 id="dshTitle"><?php echo $greet; ?>, <?php echo htmlspecialchars($meName); ?></h1>
+                <p class="dsh-sub"><?php echo $attention ? count($attention) . ' ' . (count($attention) === 1 ? 'thing is' : 'things are') . ' waiting for you below.' : 'Nothing is waiting for you. Here is what is happening on AngelWrites.'; ?></p>
+            </div>
+            <div class="dsh-hero-actions">
+                <?php if (aw_can('manage_content')): ?><button type="button" class="dsh-pill dsh-pill-solid" onclick="openQuickModal()"><i class="fas fa-plus" aria-hidden="true"></i> Create</button><?php endif; ?>
+                <?php if (aw_can('moderate')): ?><a class="dsh-pill" href="moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i> Moderation</a><?php endif; ?>
+                <a class="dsh-pill" href="<?php echo SITE_URL; ?>/index.php"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> View site</a>
+            </div>
         </div>
-        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-            <?php if (aw_can('manage_content')): ?><button type="button" onclick="openQuickModal()" class="btn btn-primary btn-sm"><i class="fas fa-plus" aria-hidden="true"></i> Quick add</button><?php endif; ?>
-        </div>
-    </div>
+        <p class="dsh-hero-strip"><?php foreach ($totals as $l => $n): ?><span><strong><?php echo number_format($n); ?></strong> <?php echo htmlspecialchars($l); ?></span><?php endforeach; ?></p>
+    </section>
 
-    <!-- Q42 / E2: needs attention -->
-    <section class="admin-module" style="margin-bottom:20px;" aria-labelledby="admAttention">
-        <h3 id="admAttention">Needs your attention</h3>
-        <?php if (!$aw_attention): ?>
-            <p style="margin:0;">All caught up. New orders, session requests, messages and reports will appear here.</p>
+    <section class="dsh-kpis" aria-label="The last 7 days">
+        <?php foreach ($kpis as $i => $k): [$dTxt, $dCls] = aw_dsh_delta($k['now'], $k['prev']); $tag = $k['link'] ? 'a' : 'div'; ?>
+            <<?php echo $tag; ?> class="dsh-card dsh-kpi dsh-reveal" style="--i:<?php echo $i; ?>;--kc:<?php echo $k['colour']; ?>"<?php echo $k['link'] ? ' href="' . htmlspecialchars($k['link']) . '"' : ''; ?>>
+                <span class="dsh-kpi-label"><i class="fas <?php echo $k['icon']; ?>" aria-hidden="true"></i><?php echo htmlspecialchars($k['label']); ?></span>
+                <span class="dsh-kpi-num" data-count="<?php echo (int)$k['now']; ?>"><?php echo number_format($k['now']); ?></span>
+                <?php echo aw_dsh_spark($k['series']); ?>
+                <span class="dsh-kpi-delta <?php echo $dCls; ?>"><?php echo htmlspecialchars($dTxt); ?><span class="sr-only"> (last 7 days: <?php echo (int)$k['now']; ?>, the 7 before: <?php echo (int)$k['prev']; ?>)</span></span>
+            </<?php echo $tag; ?>>
+        <?php endforeach; ?>
+    </section>
+
+    <section class="dsh-card dsh-reveal" style="--i:1;margin-bottom:18px" aria-labelledby="dshAttn">
+        <h2 id="dshAttn"><span class="dsh-ico"><i class="fas fa-bell" aria-hidden="true"></i></span> Needs your attention</h2>
+        <?php if (!$attention): ?>
+            <p class="dsh-calm"><i class="fas fa-circle-check" aria-hidden="true"></i> All caught up. Orders, session requests, messages, reports and waiting stories will appear here.</p>
         <?php else: ?>
-            <div class="admin-module-grid">
-                <?php foreach ($aw_attention as [$aw_label, $aw_n, $aw_link, $aw_icon]): ?>
-                    <a href="<?php echo htmlspecialchars($aw_link); ?>" class="admin-module-btn"><i class="fas <?php echo $aw_icon; ?>" aria-hidden="true"></i><span><strong><?php echo htmlspecialchars((string)$aw_n); ?></strong> <?php echo htmlspecialchars($aw_label); ?></span></a>
+            <div class="dsh-attn">
+                <?php foreach ($attention as [$label, $n, $link]): ?>
+                    <a href="<?php echo htmlspecialchars($link); ?>"><span class="dsh-attn-n"><?php echo htmlspecialchars((string)$n); ?></span><span class="dsh-attn-t"><?php echo htmlspecialchars($label); ?></span></a>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
     </section>
 
-    <!-- This week, at a glance (static numbers, read once) -->
-    <section class="adm-week" aria-labelledby="admWeek">
-        <h2 id="admWeek" class="adm-h2">This week</h2>
-        <dl class="adm-figures">
-            <?php foreach ($week as $label => $n): ?>
-                <div><dt><?php echo htmlspecialchars($label); ?></dt><dd><?php echo number_format($n); ?></dd></div>
-            <?php endforeach; ?>
-        </dl>
-        <p class="adm-totals"><?php $bits = []; foreach ($totals as $l => $n) { $bits[] = number_format($n) . ' ' . strtolower($l); } echo htmlspecialchars('On the site: ' . implode(' · ', $bits)); ?>.
-            <?php if (aw_can('see_identities')): ?>
-            <button type="button" class="adm-linkbtn" onclick="openStatsModal('views')">Who viewed what</button> ·
-            <button type="button" class="adm-linkbtn" onclick="openStatsModal('reading')">Reading sessions</button>
+    <div class="dsh-row dsh-row-2">
+        <section class="dsh-card dsh-reveal" style="--i:2" aria-labelledby="dshChart">
+            <h2 id="dshChart"><span class="dsh-ico"><i class="fas fa-chart-line" aria-hidden="true"></i></span> The last 14 days
+                <?php if (aw_can('see_identities')): ?><button type="button" class="dsh-more" style="background:none;border:0;cursor:pointer;font:inherit" onclick="openStatsModal('views')">Who viewed what</button><?php endif; ?></h2>
+            <?php echo aw_dsh_chart([
+                ['label' => 'Views', 'class' => 's1', 'data' => $sViews],
+                ['label' => 'Community', 'class' => 's2', 'data' => $sCommunity],
+                ['label' => 'Comments', 'class' => 's3', 'data' => $sComments],
+                ['label' => 'New members', 'class' => 's4', 'data' => $sMembers],
+            ], 'Views, community posts and replies, comments and new members each day for the last 14 days'); ?>
+        </section>
+        <section class="dsh-card dsh-reveal" style="--i:3" aria-labelledby="dshFeed">
+            <h2 id="dshFeed"><span class="dsh-ico"><i class="fas fa-bolt" aria-hidden="true"></i></span> Happening now</h2>
+            <?php if (!$feed): ?>
+                <p class="dsh-empty">When members join, comment, ask, share or write to the team, it appears here.</p>
+            <?php else: ?>
+                <ol class="dsh-feed">
+                <?php foreach ($feed as $i => [$when, $icon, $tone, $who, $what, $title, $link]): ?>
+                    <li style="--i:<?php echo $i; ?>"><span class="dsh-fico <?php echo $tone; ?>" aria-hidden="true"><i class="fas <?php echo $icon; ?>"></i></span>
+                        <span class="dsh-ftext"><a href="<?php echo htmlspecialchars($link); ?>"><strong><?php echo htmlspecialchars($who); ?></strong> <?php echo htmlspecialchars($what); ?><?php if ($title !== ''): ?> <strong class="dsh-ftitle">“<?php echo htmlspecialchars(aw_dsh_short($title, 60)); ?>”</strong><?php endif; ?></a>
+                        <time datetime="<?php echo htmlspecialchars(str_replace(' ', 'T', (string)$when)); ?>Z"><?php echo htmlspecialchars(aw_dsh_ago($when)); ?></time></span></li>
+                <?php endforeach; ?>
+                </ol>
             <?php endif; ?>
-        </p>
-    </section>
+        </section>
+    </div>
 
-    <div class="adm-grid">
+    <div class="dsh-row dsh-row-3">
+        <section class="dsh-card dsh-reveal" style="--i:4" aria-labelledby="dshTop">
+            <h2 id="dshTop"><span class="dsh-ico"><i class="fas fa-fire" aria-hidden="true"></i></span> Most viewed this week</h2>
+            <?php if (!$top): ?><p class="dsh-empty">Views are counted once per person every 30 minutes (robots and the team are left out). The most read pieces of the week will rise here.</p>
+            <?php else: ?><ol class="dsh-rank"><?php foreach ($top as $i => $r): ?>
+                <li style="--i:<?php echo $i; ?>"><a href="<?php echo htmlspecialchars($kindLink($r)); ?>"><?php echo htmlspecialchars($r['title'] ?: 'Removed item'); ?></a><span class="dsh-rn"><?php echo number_format((int)$r['n']); ?></span>
+                    <span class="dsh-kind"><?php echo htmlspecialchars($kindLabel[$r['target_type']] ?? ''); ?></span>
+                    <span class="dsh-bar" aria-hidden="true"><span style="--w:<?php echo round((int)$r['n'] * 100 / $topMax); ?>%"></span></span></li>
+            <?php endforeach; ?></ol><?php endif; ?>
+        </section>
+        <?php if (aw_can('moderate')): ?>
+        <section class="dsh-card dsh-reveal" style="--i:5" aria-labelledby="dshWait">
+            <h2 id="dshWait"><span class="dsh-ico"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i></span> Waiting for an answer <a class="dsh-more" href="manage_questions.php">All</a></h2>
+            <?php if (!$waiting): ?><p class="dsh-empty">Every question and request for help has at least one answer.</p>
+            <?php else: ?><ul class="dsh-list"><?php foreach ($waiting as $w): ?>
+                <li><a href="<?php echo htmlspecialchars($w['link']); ?>"><?php echo htmlspecialchars(aw_dsh_short($w['title'], 60)); ?><span class="dsh-sub"><?php echo htmlspecialchars($w['where']); ?></span></a><span class="dsh-meta"><?php echo htmlspecialchars(aw_dsh_ago($w['when'])); ?></span></li>
+            <?php endforeach; ?></ul><?php endif; ?>
+        </section>
+        <?php endif; ?>
         <?php if (aw_can('manage_members')): ?>
-        <section class="alert-card" aria-labelledby="admSessions">
-            <h4 id="admSessions"><i class="fas fa-calendar-check" aria-hidden="true" style="color:var(--rose);"></i> Session requests</h4>
-            <?php if ($recent_sessions): ?><ul class="adm-list"><?php foreach ($recent_sessions as $s): ?>
-                <li><a href="manage_sessions.php?status=pending"><?php echo htmlspecialchars(awDisplayName($s)); ?></a><span><?php echo htmlspecialchars(date('M j, g:i a', strtotime($s['date'] . ' ' . $s['time']))); ?></span></li>
-            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No requests waiting. When a member books a session it appears here to confirm.</p><?php endif; ?>
+        <section class="dsh-card dsh-reveal" style="--i:6" aria-labelledby="dshSess">
+            <h2 id="dshSess"><span class="dsh-ico"><i class="fas fa-calendar-check" aria-hidden="true"></i></span> Session requests <a class="dsh-more" href="manage_sessions.php">All</a></h2>
+            <?php if (!$sessions): ?><p class="dsh-empty">No requests waiting. When a member books a session it appears here to confirm.</p>
+            <?php else: ?><ul class="dsh-list"><?php foreach ($sessions as $s): ?>
+                <li><a href="manage_sessions.php?status=pending"><?php echo htmlspecialchars(awDisplayName($s)); ?></a><span class="dsh-meta"><?php echo htmlspecialchars(date('D j M, g:i a', strtotime($s['date'] . ' ' . $s['time']))); ?></span></li>
+            <?php endforeach; ?></ul><?php endif; ?>
         </section>
         <?php endif; ?>
         <?php if (aw_can('team_inbox')): ?>
-        <section class="alert-card" aria-labelledby="admMessages">
-            <h4 id="admMessages"><i class="fas fa-envelope" aria-hidden="true" style="color:var(--rose);"></i> Unread messages</h4>
-            <?php if ($recent_messages): ?><ul class="adm-list"><?php foreach ($recent_messages as $m): ?>
-                <li><a href="inbox.php"><?php echo htmlspecialchars($m['name']); ?></a><span><?php echo htmlspecialchars(aw_adm_short($m['message'], 40)); ?></span></li>
-            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No unread messages from the contact form.</p><?php endif; ?>
-        </section>
-        <?php endif; ?>
-        <?php if (aw_can('moderate')): ?>
-        <section class="alert-card" aria-labelledby="admComments">
-            <h4 id="admComments"><i class="fas fa-comment-dots" aria-hidden="true" style="color:var(--rose);"></i> Latest comments</h4>
-            <?php if ($recent_comments): ?><ul class="adm-list"><?php foreach ($recent_comments as $c): ?>
-                <li><a href="comments.php"><?php echo htmlspecialchars(awDisplayName($c)); ?></a><span><?php echo htmlspecialchars(aw_adm_short($c['comment'], 48)); ?> · <?php echo htmlspecialchars(date('M j', strtotime($c['created_at']))); ?></span></li>
-            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No comments yet. Comments on poems, books and videos will show here as they arrive.</p><?php endif; ?>
-        </section>
-        <?php endif; ?>
-        <?php if (aw_can('moderate')): ?>
-        <section class="alert-card" aria-labelledby="admQuestions">
-            <h4 id="admQuestions"><i class="fas fa-question-circle" aria-hidden="true" style="color:var(--rose);"></i> Questions with no answer</h4>
-            <?php if ($open_questions): ?><ul class="adm-list"><?php foreach ($open_questions as $q): ?>
-                <li><a href="<?php echo SITE_URL; ?>/community.php?id=<?php echo (int)$q['id']; ?>"><?php echo htmlspecialchars(aw_adm_short($q['title'], 60)); ?></a><span>asked <?php echo htmlspecialchars(date('M j', strtotime($q['created_at']))); ?></span></li>
-            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">Every question has at least one answer.</p><?php endif; ?>
+        <section class="dsh-card dsh-reveal" style="--i:7" aria-labelledby="dshMsg">
+            <h2 id="dshMsg"><span class="dsh-ico"><i class="fas fa-envelope-open-text" aria-hidden="true"></i></span> Unread messages <a class="dsh-more" href="inbox.php">Inbox</a></h2>
+            <?php if (!$messages): ?><p class="dsh-empty">No unread messages from the contact form.</p>
+            <?php else: ?><ul class="dsh-list"><?php foreach ($messages as $m): ?>
+                <li><a href="inbox.php"><?php echo htmlspecialchars($m['name'] ?: 'Someone'); ?><span class="dsh-sub"><?php echo htmlspecialchars(aw_dsh_short($m['message'], 70)); ?></span></a><span class="dsh-meta"><?php echo htmlspecialchars(aw_dsh_ago($m['created_at'])); ?></span></li>
+            <?php endforeach; ?></ul><?php endif; ?>
         </section>
         <?php endif; ?>
         <?php if (aw_can('manage_members')): ?>
-        <section class="alert-card" aria-labelledby="admMembers">
-            <h4 id="admMembers"><i class="fas fa-user-plus" aria-hidden="true" style="color:var(--rose);"></i> Newest members</h4>
-            <?php if ($recent_members): ?><ul class="adm-list"><?php foreach ($recent_members as $u): ?>
-                <li><a href="manage_users.php"><?php echo htmlspecialchars(awDisplayName($u)); ?></a><span>joined <?php echo htmlspecialchars(date('M j', strtotime($u['created_at']))); ?></span></li>
-            <?php endforeach; ?></ul><?php else: ?><p class="adm-empty">No members yet.</p><?php endif; ?>
+        <section class="dsh-card dsh-reveal" style="--i:8" aria-labelledby="dshNew">
+            <h2 id="dshNew"><span class="dsh-ico"><i class="fas fa-user-plus" aria-hidden="true"></i></span> Newest members <a class="dsh-more" href="manage_users.php">All</a></h2>
+            <?php if (!$newMembers): ?><p class="dsh-empty">No members yet.</p>
+            <?php else: ?><ul class="dsh-list"><?php foreach ($newMembers as $u): ?>
+                <li><a href="manage_users.php"><?php echo htmlspecialchars(awDisplayName($u)); ?></a><span class="dsh-meta">joined <?php echo htmlspecialchars(aw_dsh_ago($u['created_at'])); ?></span></li>
+            <?php endforeach; ?></ul><?php endif; ?>
         </section>
         <?php endif; ?>
     </div>
 
-    <!-- Deep Dive Stats Modal (opened only when the admin asks) -->
-<div id="statsModal" class="modal-overlay" style="z-index: 99999;" role="dialog" aria-modal="true" aria-labelledby="statsModalTitle">
-    <div class="modal-box">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
-            <h2 id="statsModalTitle" style="font-family:'Playfair Display'; color: var(--rose-dark); margin:0;">Loading...</h2>
-            <button type="button" onclick="closeStatsModal()" aria-label="Close" style="background:transparent; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
-        </div>
-        <div id="statsModalBody" style="max-height: 60vh; overflow-y: auto; font-size:0.9rem; padding-bottom:10px;">
-            <p style="color:var(--text-light); text-align:center;">Fetching data...</p>
-        </div>
-    </div>
-</div>
-
-        <!-- Admin Modules -->
-    <div class="admin-grid-container">
+    <h2 class="dsh-tools-h">Your tools</h2>
+    <div class="dsh-tools">
         <?php if (!aw_can('manage_content')): /* K1: a moderator's tools */ ?>
-        <div class="admin-module">
-            <h3>🛡️ Moderation</h3>
-            <div class="admin-module-grid">
-                <a href="moderation.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Moderation</span></a>
-                <a href="community.php" class="admin-module-btn"><i class="fas fa-seedling"></i><span>Stories &amp; Help</span></a><!-- D3 -->
-                <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Comments</span></a>
-                <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a>
-                <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a>
-                <a href="manage_prayer_requests.php" class="admin-module-btn"><i class="fas fa-hands-praying"></i><span>Prayer Requests</span></a>
-                <a href="inbox.php" class="admin-module-btn"><i class="fas fa-inbox"></i><span>Team Inbox</span></a>
-                <a href="../account_security.php" class="admin-module-btn"><i class="fas fa-lock"></i><span>Account Security</span></a><!-- K5 -->
-            </div>
-        </div>
+        <section class="dsh-card dsh-reveal" style="--i:1"><h3>Moderation</h3><div class="dsh-tiles">
+            <a class="dsh-tile" href="moderation.php"><i class="fas fa-flag" aria-hidden="true"></i>Moderation</a>
+            <a class="dsh-tile" href="community.php"><i class="fas fa-seedling" aria-hidden="true"></i>Stories &amp; Help</a>
+            <a class="dsh-tile" href="comments.php"><i class="fas fa-comments" aria-hidden="true"></i>Comments</a>
+            <a class="dsh-tile" href="manage_questions.php"><i class="fas fa-circle-question" aria-hidden="true"></i>Community Q&amp;A</a>
+            <a class="dsh-tile" href="manage_testimonials.php"><i class="fas fa-quote-left" aria-hidden="true"></i>Testimonials</a>
+            <a class="dsh-tile" href="manage_prayer_requests.php"><i class="fas fa-hands-praying" aria-hidden="true"></i>Prayer requests</a>
+            <a class="dsh-tile" href="inbox.php"><i class="fas fa-inbox" aria-hidden="true"></i>Team inbox</a>
+            <a class="dsh-tile" href="../messages.php?view=team"><i class="fas fa-heart" aria-hidden="true"></i>Team conversations</a>
+            <a class="dsh-tile" href="../account_security.php"><i class="fas fa-lock" aria-hidden="true"></i>Account security</a>
+        </div></section>
         <?php else: ?>
-        <!-- 1. Books & Poetry -->
-        <div class="admin-module">
-            <h3>📖 Books & Poetry <a href="manage_poems.php?action=new" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Poem</a></h3>
-            <div class="admin-module-grid">
-                <a href="manage_books.php" class="admin-module-btn"><i class="fas fa-book"></i><span>Manage Books</span></a>
-                <a href="process_book.php" class="admin-module-btn"><i class="fas fa-cog"></i><span>Process Book</span></a>
-                <a href="manage_poems.php" class="admin-module-btn"><i class="fas fa-feather-alt"></i><span>Manage Poems</span></a>
-                <a href="manage_poems.php?new=1" class="admin-module-btn"><i class="fas fa-edit"></i><span>New Poem</span></a>
-            </div>
-        </div>
-
-        <!-- 2. Blog & Reflections -->
-        <div class="admin-module">
-            <h3>✍️ Blog & Reflections <a href="reflection_editor.php" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Reflection</a></h3>
-            <div class="admin-module-grid">
-                <a href="manage_blog.php" class="admin-module-btn"><i class="fas fa-blog"></i><span>Manage Blog</span></a>
-                <a href="editor.php" class="admin-module-btn"><i class="fas fa-pen-fancy"></i><span>Blog Editor</span></a>
-                <a href="manage_reflections.php" class="admin-module-btn"><i class="fas fa-pray"></i><span>Reflections</span></a>
-                <a href="manage_prayer_requests.php" class="admin-module-btn"><i class="fas fa-hands-praying"></i><span>Prayer Requests</span></a><!-- F138 -->
-                <a href="manage_payments.php" class="admin-module-btn"><i class="fas fa-money-bill-wave"></i><span>Payments</span></a><!-- F78 -->
-                <a href="manage_testimonials.php" class="admin-module-btn"><i class="fas fa-quote-left"></i><span>Testimonials</span></a><!-- F202 -->
-            </div>
-        </div>
-
-        <!-- 3. Community & Users -->
-        <div class="admin-module">
-            <h3>👥 Community & Users</h3>
-            <div class="admin-module-grid">
-                <a href="manage_users.php" class="admin-module-btn"><i class="fas fa-users"></i><span>Manage Users</span></a>
-                <a href="manage_questions.php" class="admin-module-btn"><i class="fas fa-question-circle"></i><span>Community Q&amp;A</span></a><!-- Q35: was the reports screen -->
-                <a href="moderation.php" class="admin-module-btn"><i class="fas fa-flag"></i><span>Moderation</span></a>
-                <a href="manage_groups.php" class="admin-module-btn"><i class="fas fa-users-cog"></i><span>Reading Groups</span></a>
-                <a href="manage_sessions.php" class="admin-module-btn"><i class="fas fa-calendar-check"></i><span>Booked Sessions</span></a>
-            </div>
-        </div>
-
-        <!-- 4. Videos & Comments -->
-        <div class="admin-module">
-            <h3>🎥 Videos & Comments <a href="manage_videos.php?action=new" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Video</a></h3>
-            <div class="admin-module-grid">
-                <a href="manage_videos.php" class="admin-module-btn"><i class="fas fa-video"></i><span>Manage Videos</span></a>
-                <a href="comments.php" class="admin-module-btn"><i class="fas fa-comments"></i><span>Manage Comments</span></a>
-            </div>
-        </div>
-
-        <!-- 5. Newsletter -->
-        <div class="admin-module">
-            <h3>📧 Newsletter <a href="manage_newsletter.php?tab=send" style="background:var(--rose);color:#fff;padding:2px 10px;border-radius:12px;text-decoration:none;font-size:0.7rem;font-weight:600;"><i class="fas fa-plus"></i> New Campaign</a></h3>
-            <div class="admin-module-grid">
-                <a href="manage_newsletter.php" class="admin-module-btn"><i class="fas fa-list"></i><span>Subscribers</span></a>
-                <a href="manage_newsletter.php?tab=send" class="admin-module-btn"><i class="fas fa-paper-plane"></i><span>Send Campaign</span></a>
-                <a href="manage_newsletter.php?tab=queue" class="admin-module-btn"><i class="fas fa-clock"></i><span>Queue</span></a>
-                <a href="manage_newsletter.php?tab=archive" class="admin-module-btn"><i class="fas fa-archive"></i><span>Archive</span></a>
-            </div>
-        </div>
-
-        <!-- 6. System & Analytics -->
-        <div class="admin-module">
-            <h3>⚙️ System & Analytics</h3>
-            <div class="admin-module-grid">
-                <a href="settings.php" class="admin-module-btn"><i class="fas fa-sliders-h"></i><span>System Settings</span></a>
-                <a href="backup.php" class="admin-module-btn"><i class="fas fa-database"></i><span>Database Backup</span></a><!-- P0-1 -->
-                <?php if (aw_can('manage_settings')): ?><a href="db_setup.php" class="admin-module-btn"><i class="fas fa-screwdriver-wrench"></i><span>Database Setup</span></a><?php endif; ?><!-- DB: create missing tables -->
-                <a href="picks.php" class="admin-module-btn"><i class="fas fa-star"></i><span>Angella's Picks</span></a><!-- C2 -->
-                <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
-                <a href="../account_security.php" class="admin-module-btn"><i class="fas fa-lock"></i><span>Account Security</span></a><!-- K5 -->
-                <?php if (aw_can('manage_staff')): ?><a href="staff.php" class="admin-module-btn"><i class="fas fa-user-shield"></i><span>Staff &amp; Roles</span></a><?php endif; ?><!-- K2 -->
-                <?php if (aw_can('audit_log')): ?><a href="audit.php" class="admin-module-btn"><i class="fas fa-clipboard-list"></i><span>Audit Log</span></a><?php endif; ?><!-- K1 -->
-            </div>
-        </div>
+        <section class="dsh-card dsh-reveal" style="--i:1"><h3>Books &amp; poetry <a href="manage_poems.php?new=1">+ New poem</a></h3><div class="dsh-tiles">
+            <a class="dsh-tile" href="manage_books.php"><i class="fas fa-book" aria-hidden="true"></i>Books</a>
+            <a class="dsh-tile" href="process_book.php"><i class="fas fa-gear" aria-hidden="true"></i>Process a book</a>
+            <a class="dsh-tile" href="manage_poems.php"><i class="fas fa-feather" aria-hidden="true"></i>Poems</a>
+            <a class="dsh-tile" href="picks.php"><i class="fas fa-star" aria-hidden="true"></i>Angella's picks</a>
+        </div></section>
+        <section class="dsh-card dsh-reveal" style="--i:2"><h3>Reflections &amp; blog <a href="reflection_editor.php">+ New reflection</a></h3><div class="dsh-tiles">
+            <a class="dsh-tile" href="manage_reflections.php"><i class="fas fa-dove" aria-hidden="true"></i>Reflections</a>
+            <a class="dsh-tile" href="manage_blog.php"><i class="fas fa-blog" aria-hidden="true"></i>Blog</a>
+            <a class="dsh-tile" href="editor.php"><i class="fas fa-pen-fancy" aria-hidden="true"></i>Blog editor</a>
+            <a class="dsh-tile" href="manage_videos.php"><i class="fas fa-video" aria-hidden="true"></i>Videos</a>
+        </div></section>
+        <section class="dsh-card dsh-reveal" style="--i:3"><h3>Community &amp; care</h3><div class="dsh-tiles">
+            <a class="dsh-tile" href="community.php"><i class="fas fa-seedling" aria-hidden="true"></i>Stories &amp; Help</a>
+            <a class="dsh-tile" href="manage_questions.php"><i class="fas fa-circle-question" aria-hidden="true"></i>Community Q&amp;A</a>
+            <a class="dsh-tile" href="moderation.php"><i class="fas fa-flag" aria-hidden="true"></i>Moderation</a>
+            <a class="dsh-tile" href="comments.php"><i class="fas fa-comments" aria-hidden="true"></i>Comments</a>
+            <a class="dsh-tile" href="inbox.php"><i class="fas fa-inbox" aria-hidden="true"></i>Team inbox</a>
+            <a class="dsh-tile" href="../messages.php?view=team"><i class="fas fa-heart" aria-hidden="true"></i>Team conversations</a>
+            <a class="dsh-tile" href="manage_prayer_requests.php"><i class="fas fa-hands-praying" aria-hidden="true"></i>Prayer requests</a>
+            <a class="dsh-tile" href="manage_testimonials.php"><i class="fas fa-quote-left" aria-hidden="true"></i>Testimonials</a>
+            <a class="dsh-tile" href="manage_groups.php"><i class="fas fa-users-gear" aria-hidden="true"></i>Reading groups</a>
+            <a class="dsh-tile" href="manage_sessions.php"><i class="fas fa-calendar-check" aria-hidden="true"></i>Sessions</a>
+        </div></section>
+        <section class="dsh-card dsh-reveal" style="--i:4"><h3>Members &amp; money</h3><div class="dsh-tiles">
+            <a class="dsh-tile" href="manage_users.php"><i class="fas fa-users" aria-hidden="true"></i>Members</a>
+            <a class="dsh-tile" href="manage_payments.php"><i class="fas fa-money-bill-wave" aria-hidden="true"></i>Payments</a>
+            <a class="dsh-tile" href="manage_newsletter.php"><i class="fas fa-envelope" aria-hidden="true"></i>Newsletter</a>
+            <a class="dsh-tile" href="manage_newsletter.php?tab=send"><i class="fas fa-paper-plane" aria-hidden="true"></i>Send a campaign</a>
+        </div></section>
+        <section class="dsh-card dsh-reveal" style="--i:5"><h3>System</h3><div class="dsh-tiles">
+            <a class="dsh-tile" href="settings.php"><i class="fas fa-sliders" aria-hidden="true"></i>Settings</a>
+            <a class="dsh-tile" href="backup.php"><i class="fas fa-database" aria-hidden="true"></i>Backup</a>
+            <?php if (aw_can('manage_settings')): ?><a class="dsh-tile" href="db_setup.php"><i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>Database setup</a><?php endif; ?>
+            <a class="dsh-tile" href="../reader/admin/reader_analytics.php"><i class="fas fa-chart-line" aria-hidden="true"></i>Reader analytics</a>
+            <?php if (aw_can('see_identities')): ?><button type="button" class="dsh-tile" style="font:inherit;font-size:.78rem;font-weight:600;cursor:pointer" onclick="openStatsModal('reading')"><i class="fas fa-book-open-reader" aria-hidden="true"></i>Reading sessions</button><?php endif; ?>
+            <a class="dsh-tile" href="../account_security.php"><i class="fas fa-lock" aria-hidden="true"></i>Account security</a>
+            <?php if (aw_can('manage_staff')): ?><a class="dsh-tile" href="staff.php"><i class="fas fa-user-shield" aria-hidden="true"></i>Staff &amp; roles</a><?php endif; ?>
+            <?php if (aw_can('audit_log')): ?><a class="dsh-tile" href="audit.php"><i class="fas fa-clipboard-list" aria-hidden="true"></i>Audit log</a><?php endif; ?>
+        </div></section>
         <?php endif; ?>
     </div>
 
-    <!-- Quick Add Modal -->
-    <div class="modal-overlay" id="quickModal">
+    <div id="statsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="statsModalTitle">
         <div class="modal-box">
-                    <h2>Quick Create</h2>
-        <p style="color:#6b5a5a; margin-bottom: 16px;">Select what you want to add</p>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-            <a href="manage_books.php?action=new" class="btn btn-primary">+ New Book</a>
-            <a href="manage_poems.php?action=new" class="btn btn-primary">+ New Poem</a>
-            <a href="manage_blog.php?action=new" class="btn btn-primary">+ New Blog Post</a>
-            <a href="manage_videos.php?action=new" class="btn btn-primary">+ New Video</a>
-            <a href="reflection_editor.php" class="btn btn-primary">+ New Reflection</a>
-            <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New Newsletter</a>
-            
-            <button onclick="closeQuickModal()" class="btn btn-secondary" style="background: transparent; border: 1px solid #d4c8c8; color:#6b5a5a; margin-top: 8px;">Cancel</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:16px">
+                <h2 id="statsModalTitle" style="margin:0">Loading…</h2>
+                <button type="button" onclick="closeStatsModal()" aria-label="Close" style="background:transparent;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-light)">&times;</button>
+            </div>
+            <div id="statsModalBody" style="max-height:60vh;overflow-y:auto;font-size:.9rem"><p>Fetching…</p></div>
         </div>
     </div>
-</div>
-
+    <div class="modal-overlay" id="quickModal" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
+        <div class="modal-box">
+            <h2 id="quickTitle">Create something</h2>
+            <div style="display:flex;flex-direction:column;gap:6px">
+                <a href="manage_books.php?action=new" class="btn btn-primary">+ New book</a>
+                <a href="manage_poems.php?new=1" class="btn btn-primary">+ New poem</a>
+                <a href="reflection_editor.php" class="btn btn-primary">+ New reflection</a>
+                <a href="manage_blog.php?action=new" class="btn btn-primary">+ New blog post</a>
+                <a href="manage_videos.php?action=new" class="btn btn-primary">+ New video</a>
+                <a href="manage_newsletter.php?tab=send" class="btn btn-primary">+ New newsletter</a>
+                <button type="button" onclick="closeQuickModal()" class="btn btn-outline" style="margin-top:6px">Cancel</button>
+            </div>
+        </div>
+    </div>
+</main>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=1" defer></script>
 <script>
-
-// Modal Functions
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
 function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }
-document.getElementById('quickModal').addEventListener('click', function(e) { if(e.target===this) closeQuickModal(); });
-
-// ============================================================
-// DEEP DIVE MODAL (fetches only when the admin clicks)
-// ============================================================
-function openStatsModal(type) {
-    document.getElementById('statsModal').classList.add('active');
-    const body = document.getElementById('statsModalBody');
-    const title = document.getElementById('statsModalTitle');
-    body.innerHTML = '<p style="color:#a08a8a; text-align:center;">Fetching data...</p>';
-    const url = '<?php echo SITE_URL; ?>/ajax_admin.php?action=' + (type === 'views' ? 'get_view_details' : 'get_reading_details');
-    title.textContent = type === 'views' ? '📊 Detailed Content Views' : '📖 Detailed Reading Sessions';
-
-    fetch(url)
-        .then(res => res.json())
-        .then(data => {
-            if (!data.success || !data.logs || data.logs.length === 0) {
-                body.innerHTML = '<p style="color:#a08a8a; text-align:center;">No data available yet.</p>';
-                return;
-            }
-            let html = '<table><thead><tr><th>Viewer / User</th><th>Content</th><th>Date & Time</th></tr></thead><tbody>';
-            data.logs.forEach(row => {
-                if(type === 'views') {
-                    let titleCol = htmlspecialchars(row.content_title || 'Unknown');
-                    let subTitle = `<span style="color:#a08a8a;font-size:0.75rem;display:block;">${htmlspecialchars(row.target_type)}</span>`;
-                    let viewer = htmlspecialchars(row.viewer_name);
-                    if(viewer === 'Guest') {
-                        viewer = `<span style="color:#8a7878;">Guest</span> <span style="font-size:0.75rem; color:#a08a8a;">(IP: ${htmlspecialchars(row.ip_address || 'N/A')})</span>`;
-                    } else {
-                        viewer = `<strong>${htmlspecialchars(row.viewer_name)}</strong>`;
-                    }
-                    html += `<tr><td>${viewer}</td><td><strong>${titleCol}</strong> ${subTitle}</td><td style="color:#6b5a5a;">${new Date(row.viewed_at).toLocaleString()}</td></tr>`;
-                } else {
-                    let dur = Math.floor((row.duration_seconds || 0) / 60);
-                    let sec = (row.duration_seconds || 0) % 60;
-                    html += `<tr><td><strong>${htmlspecialchars(row.user_name)}</strong> <span style="font-size:0.75rem; color:#a08a8a;">(${htmlspecialchars(row.user_email)})</span></td><td>${htmlspecialchars(row.book_title || 'Unknown Book')}</td><td style="color:#6b5a5a;">${new Date(row.start_time).toLocaleString()} <br> <span style="font-size:0.75rem; background:#f0e8e8; padding:2px 6px; border-radius:10px;">${dur}m ${sec}s</span></td></tr>`;
-                }
+document.getElementById('quickModal').addEventListener('click', function (e) { if (e.target === this) closeQuickModal(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeQuickModal(); closeStatsModal(); } });
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function openStatsModal(type) { // fetched only when the admin asks
+    var m = document.getElementById('statsModal'), body = document.getElementById('statsModalBody'), title = document.getElementById('statsModalTitle');
+    m.classList.add('active'); body.innerHTML = '<p>Fetching…</p>';
+    title.textContent = type === 'views' ? 'Who viewed what (latest 50)' : 'Reading sessions (latest)';
+    fetch('<?php echo SITE_URL; ?>/ajax_admin.php?action=' + (type === 'views' ? 'get_view_details' : 'get_reading_details'), { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.success || !d.logs || !d.logs.length) { body.innerHTML = '<p>Nothing yet.</p>'; return; }
+            var h = '<table><thead><tr><th>Who</th><th>What</th><th>When</th></tr></thead><tbody>';
+            d.logs.forEach(function (r) {
+                if (type === 'views') h += '<tr><td>' + (r.viewer_name === 'Guest' ? 'Guest <small>(' + esc(r.ip_address || '') + ')</small>' : '<strong>' + esc(r.viewer_name) + '</strong>') + '</td><td><strong>' + esc(r.content_title) + '</strong><br><small>' + esc(r.target_type) + '</small></td><td>' + esc(new Date(String(r.viewed_at).replace(' ', 'T') + 'Z').toLocaleString()) + '</td></tr>';
+                else { var mm = Math.floor((r.duration_seconds || 0) / 60); h += '<tr><td><strong>' + esc(r.user_name) + '</strong></td><td>' + esc(r.book_title || 'A book') + '</td><td>' + esc(new Date(String(r.start_time).replace(' ', 'T') + 'Z').toLocaleString()) + '<br><small>' + mm + ' min</small></td></tr>'; }
             });
-            html += '</tbody></table>';
-            body.innerHTML = html;
+            body.innerHTML = h + '</tbody></table>';
         })
-        .catch(err => {
-            body.innerHTML = '<p style="color:red; text-align:center;">Error loading data. Check console.</p>';
-            console.error("Deep dive error:", err);
-        });
+        .catch(function () { body.innerHTML = '<p>That could not be loaded. Please try again.</p>'; });
 }
-
-function closeStatsModal() {
-    document.getElementById('statsModal').classList.remove('active');
-}
-document.getElementById('statsModal').addEventListener('click', function(e) {
-    if (e.target === this) closeStatsModal();
-});
-
-function htmlspecialchars(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"]/g, function(m) {
-        if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; if (m === '"') return '&quot;'; return m;
-    });
-}
+function closeStatsModal() { document.getElementById('statsModal').classList.remove('active'); }
+document.getElementById('statsModal').addEventListener('click', function (e) { if (e.target === this) closeStatsModal(); });
 </script>
+<?php require_once '../includes/footer.php'; ?>

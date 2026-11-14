@@ -61,11 +61,8 @@ if (isAdmin() && !empty($_GET['preview'])) {
     $preview_version = (int)$pv->fetchColumn();
 }
 
-// --- Increment view count ---
-if (!$preview_version) {
-    $stmt = $db->prepare("UPDATE books SET view_count = view_count + 1 WHERE id = ?");
-    $stmt->execute([$book_id]);
-}
+// Opening the reader is a reading session (reading_sessions), not another view of the book page;
+// it used to add to the book's view count a second time.
 
 // --- Fetch processed content ---
 $stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");

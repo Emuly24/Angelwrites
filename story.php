@@ -4,6 +4,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/views.php'; // one way to count views
 require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/csrf.php';
 require_once 'includes/components.php';
@@ -28,6 +29,7 @@ if (!$post || (!aw_cp_enabled() && !aw_cp_staff_mod()) || !aw_cp_can_view($post)
 $sensitive = aw_cp_is_sensitive($post['category']);
 if ($sensitive && !isLoggedIn()) { header('Location: ' . SITE_URL . '/login.php?redirect=' . urlencode('/story.php?id=' . $id)); exit; }
 $isAuthor = $me && (int)$post['author_id'] === $me;
+if (!$isAuthor && $post['status'] === 'published') aw_view_record($db, 'story', $id); // logged for the team's activity view
 $self = SITE_URL . '/story.php?id=' . $id;
 
 // Every look at a private (team-only) post by the team is written to the audit log (2b, staff conduct).

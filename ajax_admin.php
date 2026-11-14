@@ -58,15 +58,15 @@ if ($action === 'active_chart') {
 }
 
 if ($action === 'views_chart') {
-    $stmt = $db->prepare("SELECT SUM(view_count) FROM poems WHERE DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $poem_views = (int)$stmt->fetchColumn();
-    $stmt = $db->prepare("SELECT SUM(view_count) FROM books WHERE DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $book_views = (int)$stmt->fetchColumn();
-    $stmt = $db->prepare("SELECT COUNT(*) FROM reviews WHERE target_type='blog' AND DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $blog_views = (int)$stmt->fetchColumn();
-    $stmt = $db->prepare("SELECT SUM(view_count) FROM videos WHERE DATE(created_at) >= DATE('now', '-7 days')");
-    $stmt->execute(); $video_views = (int)$stmt->fetchColumn();
-    echo json_encode(['labels' => ['Poems', 'Books', 'Blog', 'Videos'], 'data' => [$poem_views, $book_views, $blog_views, $video_views]]);
+    // Views made in the last 7 days, from the one view log (it used to add up the all-time views of
+    // content created this week, which is a different thing).
+    $by = ['poem' => 0, 'book' => 0, 'post' => 0, 'video' => 0];
+    try {
+        foreach ($db->query("SELECT target_type, COUNT(*) AS n FROM view_logs WHERE viewed_at >= datetime('now', '-7 days') GROUP BY target_type") as $r) {
+            if (isset($by[$r['target_type']])) $by[$r['target_type']] = (int)$r['n'];
+        }
+    } catch (Throwable $e) { error_log('views_chart: ' . $e->getMessage()); }
+    echo json_encode(['labels' => ['Poems', 'Books', 'Blog & reflections', 'Videos'], 'data' => array_values($by)]);
     exit;
 }
 
@@ -80,13 +80,17 @@ if ($action === 'get_view_details') {
             SELECT 
                 COALESCE(u.name, 'Guest') as viewer_name,
                 vl.target_type,
-                COALESCE(p.title, b.title, 'Unknown') as content_title,
+                COALESCE(p.title, b.title, bp.title, v.title, q.title, cp.title, 'Unknown') as content_title,
                 vl.ip_address,
                 vl.viewed_at
             FROM view_logs vl
             LEFT JOIN users u ON vl.user_id = u.id
             LEFT JOIN poems p ON (vl.target_type = 'poem' AND vl.target_id = p.id)
             LEFT JOIN books b ON (vl.target_type = 'book' AND vl.target_id = b.id)
+            LEFT JOIN blog_posts bp ON (vl.target_type = 'post' AND vl.target_id = bp.id)
+            LEFT JOIN videos v ON (vl.target_type = 'video' AND vl.target_id = v.id)
+            LEFT JOIN questions q ON (vl.target_type = 'question' AND vl.target_id = q.id)
+            LEFT JOIN community_posts cp ON (vl.target_type = 'story' AND vl.target_id = cp.id AND cp.visibility <> 'team')
             ORDER BY vl.viewed_at DESC LIMIT 50
         ");
         $stmt->execute();

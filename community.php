@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/views.php'; // one way to count views
 require_once 'includes/mail_helper.php';
 
 $error = '';
@@ -288,8 +289,7 @@ if (isset($_GET['id'])) {
     $single_question = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($single_question) {
-        $stmt = $db->prepare("UPDATE questions SET views = views + 1 WHERE id = ?");
-        $stmt->execute([$qid]);
+        aw_view_record($db, 'question', (int)$qid); // one way to count views (includes/views.php)
         
         $stmt = $db->prepare("
             SELECT a.*, u.name AS author_name, u.avatar 
