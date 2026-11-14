@@ -47,7 +47,8 @@
             ta.remove();
         });
     }
-    function pageUrl(hash) { return location.href.split('#')[0].replace(/[?&]preview=1/, '') + (hash ? '#' + hash : ''); }
+    // the share link (through the preview relay when one is set up), else this page
+    function pageUrl(hash) { if (!hash && window.AW_SHARE_URL) return window.AW_SHARE_URL; return location.href.split('#')[0].replace(/[?&]preview=1/, '') + (hash ? '#' + hash : ''); }
 
     // ----- toolbar
     reader.addEventListener('click', function (ev) {

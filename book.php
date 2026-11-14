@@ -154,6 +154,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['react_to_review']) &&
 }
 
 $pageTitle = htmlspecialchars($book['title']);
+// Link previews: the book's cover (as a 1200x630 JPEG), its title, author and description.
+// Before this the preview always showed the site logo.
+require_once __DIR__ . '/includes/og.php';
+$og_title = $book['title'] . (trim((string)($book['author'] ?? '')) !== '' ? ' by ' . $book['author'] : '');
+$og_description = aw_og_text((string)($book['description'] ?? '') !== '' ? $book['description'] : 'A book on AngelWrites.', 180);
+$og_url = rtrim(SITE_URL, '/') . '/book.php?id=' . (int)$book_id;
+$og_image = aw_og_image_url($db, 'book', (int)$book_id);
+$og_image_width = 1200; $og_image_height = 630;
+$og_image_alt = 'Cover of the book “' . $book['title'] . '”';
+$aw_share_url = aw_share_url('book', (int)$book_id);
 ?>
 <?php require_once 'includes/header.php'; echo aw_save_assets(); ?>
 
@@ -381,13 +391,13 @@ $pageTitle = htmlspecialchars($book['title']);
                 <div class="share-section">
                     <span class="share-label">Share this book:</span>
                     <div class="share-icons">
-                        <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/book.php?id=' . $book_id); ?>" target="_blank" class="share-btn facebook">
+                        <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode($aw_share_url); ?>" target="_blank" class="share-btn facebook">
                             <i class="fab fa-facebook-f"></i>
                         </a>
-                        <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode('Check out this book: ' . $book['title']); ?>&url=<?php echo urlencode(SITE_URL . '/book.php?id=' . $book_id); ?>" target="_blank" class="share-btn twitter">
+                        <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode('Check out this book: ' . $book['title']); ?>&url=<?php echo urlencode($aw_share_url); ?>" target="_blank" class="share-btn twitter">
                             <i class="fab fa-twitter"></i>
                         </a>
-                        <a href="https://api.whatsapp.com/send?text=<?php echo urlencode('Check out this book: ' . SITE_URL . '/book.php?id=' . $book_id); ?>" target="_blank" class="share-btn whatsapp">
+                        <a href="https://api.whatsapp.com/send?text=<?php echo urlencode('Check out this book: ' . $aw_share_url); ?>" target="_blank" class="share-btn whatsapp">
                             <i class="fab fa-whatsapp"></i>
                         </a>
                     </div>
