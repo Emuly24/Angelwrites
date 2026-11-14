@@ -1159,10 +1159,10 @@ function generateReportHTML($diff_content, $title, $book_id) {
     return $html;
 }
 
-function sendEmailWithAttachment($to, $subject, $body, $file, $filename) {
-    // Use your existing mail_helper
-    return sendEmail($to, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites', true, $file, $filename);
-}
+// ET3 (F91): this page's own sendEmailWithAttachment() wrapper called sendEmail() with two extra
+// arguments for the file. It is replaced by the shared sendEmailWithAttachment() in
+// includes/mail_helper.php (same name and argument order, so the two callers below are unchanged),
+// which refuses to send at all if the file cannot be attached.
 
 function generateFullHistoryReport($history_content, $book_id) {
     $html = '<html><head><title>Full Version History</title></head><body>';

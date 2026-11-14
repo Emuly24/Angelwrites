@@ -120,9 +120,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user_body .= "Your message: {$message}\n\n";
                 }
                 $user_body .= "Angella will confirm your session within 24 hours. You will receive another email with the meeting link once confirmed.\n\n";
-                $user_body .= "If you need to reschedule or cancel, please contact us directly at angelwrites@zohomail.com.\n\n";
-                $user_body .= "Blessings,\nAngella Bottoman\nAngelWrites";
-                sendEmail($user['email'], $user_subject, $user_body, 'angelwrites@zohomail.com', 'AngelWrites');
+                // ET4: conversational. Changing or cancelling happens on the site (the email used to
+                // say "contact us directly" at the mailbox). The session is still pending, so
+                // /session_edit.php?id= opens it.
+                $user_body .= "If you need to change or cancel it, use the button below.";
+                sendConversationalEmail($user['email'], $user_subject, $user_body,
+                    SITE_URL . '/session_edit.php?id=' . (int)$session_id, 'Change or cancel my session', 'AngelWrites');
             } else {
                 $error = 'Something went wrong. Please try again.';
             }

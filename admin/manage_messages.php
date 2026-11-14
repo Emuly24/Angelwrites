@@ -81,7 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reply
         if (!empty($_POST['quote'])) {
             $text .= "\n\n— On " . date('F j, Y', strtotime($orig['created_at'])) . ', ' . $orig['name'] . " wrote:\n" . preg_replace('/^/m', '> ', trim($orig['message']));
         }
-        $ok = sendEmail($orig['email'], $reply_subject, $text, 'angelwrites@zohomail.com', 'Angella Bottoman', false, null, null, ['signature' => !empty($_POST['signature'])]);
+        // ET4: conversational. The member answers on the site, not by email. There is no in-app
+        // messaging yet (feat/messaging-system), so the button opens the contact form with the subject
+        // filled in; when messaging exists it should open the thread instead.
+        $ok = sendConversationalEmail($orig['email'], $reply_subject, $text,
+            SITE_URL . '/contact.php?subject=' . rawurlencode(mb_substr((stripos($reply_subject, 're:') === 0 ? '' : 'Re: ') . $reply_subject, 0, 150)),
+            'Reply in the app', 'Angella Bottoman', ['signature' => !empty($_POST['signature'])]);
         if ($ok) $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id = ?")->execute([$mid]);
         $_SESSION['aw_msg_flash'] = $ok ? ['success', 'Your reply was sent to ' . $orig['email'] . '.'] : ['error', 'The reply could not be sent. Please check the mail settings and try again.'];
     }

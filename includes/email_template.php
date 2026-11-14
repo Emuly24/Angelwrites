@@ -118,7 +118,14 @@ function aw_email_brand($subject, $message, $isHTML = true, array $opts = []) {
         $body = aw_email_text_to_html($signature ? aw_email_strip_signoff($message) : $message);
     }
     $text_src = $looks_html ? aw_email_html_to_text($body) : trim($signature ? aw_email_strip_signoff($message) : $message);
+    // ET2: the footer says what kind of email this is. 'footer_note' comes from mail_helper.php: the
+    // automated-message sentence for transactional mail, the "not monitored" sentence for conversational
+    // mail. (The old default footer told people to "just reply to this email", which nobody reads.)
+    $note = trim((string)($opts['footer_note'] ?? ''));
     $footer = $to_admin ? 'This notification was sent by your website, ' . aw_email_e(function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites') . '.' : null;
+    if ($note !== '') $footer = ($footer !== null ? $footer . ' ' : '') . aw_email_e($note);
+    // ET2: 'append_html' / 'append_text' add the conversational button and its note after the message.
+    $body .= (string)($opts['append_html'] ?? '');
     $html = aw_email_layout([
         'subject' => $subject,
         'body' => '<div class="aw-email-layout">' . $body . '</div>',
@@ -127,8 +134,10 @@ function aw_email_brand($subject, $message, $isHTML = true, array $opts = []) {
         'footer' => $footer,
         'kicker' => $to_admin ? 'Website notification' : null,
     ]);
+    $text_src .= (($opts['append_text'] ?? '') !== '' ? "\n\n" . $opts['append_text'] : '');
     $text = $subject . "\n\n" . $text_src
         . ($signature ? "\n\nWith love and blessings,\nAngella Bottoman\nFounder, " . (function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites') . ' · ' . preg_replace('#^https?://#', '', rtrim(defined('SITE_URL') ? SITE_URL : '', '/')) : '');
+    if ($note !== '' && empty($opts['append_text'])) $text .= "\n\n" . $note;
     return [$html, $text];
 }
 

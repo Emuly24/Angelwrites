@@ -120,9 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test_email'])) {
             : ['ok' => false, 'msg' => 'The test email could not be sent. Reason: ' . ($GLOBALS['aw_mail_last_error'] ?? 'unknown')];
     }
 }
-$aw_smtp_user = (string)getenv('GMAIL_USERNAME');
-$aw_smtp_ready = $aw_smtp_user !== '' && (string)getenv('GMAIL_APP_PASSWORD') !== '';
-$aw_smtp_shown = $aw_smtp_user !== '' ? preg_replace('/^(.).*(@.*)$/', '$1•••$2', $aw_smtp_user) : '';
+// ET1: the status follows whichever provider .env selects (Zoho, or the Gmail fallback)
+$aw_mail_cfg = aw_mail_config();
+$aw_smtp_ready = !empty($aw_mail_cfg['ok']);
+$aw_smtp_provider = ucfirst((string)($aw_mail_cfg['provider'] ?? 'gmail'));
+$aw_smtp_shown = $aw_smtp_ready ? preg_replace('/^(.).*(@.*)$/', '$1•••$2', (string)$aw_mail_cfg['from']) : '';
 $aw_mail_failures = aw_mail_recent_failures(10);
 
 $pageTitle = 'Site Settings';
@@ -359,9 +361,9 @@ $pageTitle = 'Site Settings';
                 </div>
                 <div class="card-body">
                     <?php if ($aw_smtp_ready): ?>
-                        <div class="alert alert-success">Email is set up. Messages are sent through Gmail as <strong><?php echo htmlspecialchars($aw_smtp_shown); ?></strong>.</div>
+                        <div class="alert alert-success">Email is set up. Messages are sent through <?php echo htmlspecialchars($aw_smtp_provider); ?> as <strong><?php echo htmlspecialchars($aw_smtp_shown); ?></strong>.<?php if (trim((string)getenv('MAIL_PROVIDER')) === ''): ?> (MAIL_PROVIDER is not set in <code>.env</code>, so the Gmail fallback is used. Set <code>MAIL_PROVIDER=zoho</code> to send through Zoho.)<?php endif; ?></div>
                     <?php else: ?>
-                        <div class="alert alert-error">Email is not set up on the server: <code>GMAIL_USERNAME</code> and/or <code>GMAIL_APP_PASSWORD</code> are missing from the <code>.env</code> file in the site folder. Until they are added, no verification codes or other emails can be sent.</div>
+                        <div class="alert alert-error"><?php echo htmlspecialchars((string)$aw_mail_cfg['error']); ?> Until this is fixed, no verification codes or other emails can be sent.</div>
                     <?php endif; ?>
 
                     <?php if ($aw_mail_test): ?>

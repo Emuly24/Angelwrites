@@ -157,8 +157,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                     $author = $stmt->fetch(PDO::FETCH_ASSOC);
                     if ($author) {
                         $user_subject = 'Your question got an answer!';
-                        $user_body = "Hello " . $author['name'] . ",\n\nYour question \"" . $question['title'] . "\" has received a new answer.\n\nAnswer: $body\n\nView answer: " . SITE_URL . "/community.php?id=" . $question_id;
-                        sendEmail($author['email'], $user_subject, $user_body, 'angelwrites@zohomail.com', SITE_NAME . ' Community');
+                        $user_body = "Hello " . $author['name'] . ",\n\nYour question \"" . $question['title'] . "\" has received a new answer.\n\nAnswer: $body";
+                        // ET4: conversational. The reply to an answer belongs under the question, so the
+                        // button opens the question's own page.
+                        sendConversationalEmail($author['email'], $user_subject, $user_body,
+                            SITE_URL . '/community.php?id=' . (int)$question_id, 'View and reply', SITE_NAME . ' Community');
                     }
                 }
             } else {
