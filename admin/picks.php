@@ -10,7 +10,7 @@ require_once '../includes/csrf.php';
 require_once '../includes/picks.php';
 require_once '../includes/components.php'; // A1
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $error = '';
 $notice = '';

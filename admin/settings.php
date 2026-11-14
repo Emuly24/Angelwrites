@@ -6,7 +6,7 @@ require_once '../includes/mail_helper.php';
 require_once '../includes/csrf.php'; // VF3
 require_once '../includes/upload.php'; // R13: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_settings'); // K1
 
 $error = '';
 $success = '';

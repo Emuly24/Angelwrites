@@ -6,7 +6,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 header('Location: ' . SITE_URL . '/admin/manage_poems.php?' . ($id > 0 ? 'edit=' . $id : 'new=1'));

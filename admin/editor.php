@@ -5,7 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R8: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $type = isset($_GET['type']) ? $_GET['type'] : 'blog';
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -48,7 +48,8 @@ if ($id > 0) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
-    $content = trim($_POST['content']);
+    require_once __DIR__ . '/../includes/sanitize.php';
+    $content = aw_clean_html(trim((string)($_POST['content'] ?? '')), 'rich'); // S1: cleaned before it is stored
     $category = trim($_POST['category'] ?? '');
     if ($category === '') {
         $category = ($type === 'reflection') ? 'Christian Reflections' : 'General'; // F73

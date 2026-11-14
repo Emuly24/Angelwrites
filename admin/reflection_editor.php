@@ -5,7 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R9: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 require_once __DIR__ . '/../includes/newsletter.php'; // RF3: CSRF helpers and "send to subscribers"
 
 // RF3: a readable, unique address for every reflection (two reflections with the same title used to
@@ -69,7 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CO
     aw_csrf_require(); // RF3
     $title = trim($_POST['title']);
     $intro = trim($_POST['intro']);
-    $content = trim($_POST['content']);
+    require_once __DIR__ . '/../includes/sanitize.php';
+    $content = aw_clean_html(trim((string)($_POST['content'] ?? '')), 'rich'); // S1: cleaned before it is stored
     $category = trim($_POST['category'] ?? 'Christian Reflections');
     $tags = trim($_POST['tags'] ?? '');
     $status = in_array($_POST['status'] ?? '', ['draft', 'published', 'archived'], true) ? $_POST['status'] : 'draft';

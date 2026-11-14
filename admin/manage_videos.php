@@ -5,7 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R6: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $error = '';
 $success = '';

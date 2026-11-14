@@ -6,7 +6,7 @@ require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R5: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $error = '';
 $success = '';

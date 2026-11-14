@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 // Now that the page runs, keep it admin-only like the rest of admin/ (it previews drafts).
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 

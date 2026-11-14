@@ -9,7 +9,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/reading_groups.php';
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 // F47: the POST actions below answer the page's fetch() calls with JSON; they used to run after
 // header.php had already printed the page, so the JSON was appended to ~21 KB of HTML and the

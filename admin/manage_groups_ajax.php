@@ -17,7 +17,8 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/reading_groups.php';
 
-if (!isAdmin()) {
+aw_staff_request_guard(); // K3
+if (!aw_can('manage_content')) { // K1
     http_response_code(403);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'error' => 'Admin access required.']);

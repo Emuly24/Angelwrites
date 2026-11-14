@@ -73,6 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
     if (!empty($comment)) {
         $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, photo_path) VALUES (?, ?, ?, ?)");
         $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment, $photo_path]);
+        // N2: mentions in the comment
+        require_once __DIR__ . '/includes/mentions.php';
+        aw_mentions_save($db, $comment, 'reflection_comment', (int)$db->lastInsertId(), '“' . mb_substr((string)($post['title'] ?? 'a reflection'), 0, 80) . '”',
+            SITE_URL . '/blog_post.php?slug=' . urlencode($slug) . '#comments', awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']));
         
         // Send email notification to admin
         $user_id = $_SESSION['user_id'];
@@ -259,7 +263,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
 
             <!-- Post Content -->
             <div class="post-content">
-                <?php echo $post['content']; ?>
+                <?php require_once __DIR__ . '/includes/sanitize.php'; echo aw_clean_html($post['content'], 'rich'); /* S1: also cleans posts saved before the sanitiser */ ?>
             </div>
 
             <!-- Reading Progress -->
@@ -335,7 +339,9 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
             
             <?php if ($comments_total > 0): ?>
                 <div class="comments-list">
-                    <?php foreach ($comments as $comment): ?>
+                    <?php require_once __DIR__ . '/includes/moderation.php'; $aw_blocked = aw_blocked_ids($db, (int)($_SESSION['user_id'] ?? 0)); ?>
+                    <?php foreach ($comments as $comment): $aw_fold = isset($aw_blocked[(int)($comment['user_id'] ?? 0)]); /* N4 */ ?>
+                        <?php if ($aw_fold): ?><details class="aw-blocked-fold"><summary>A comment from someone you blocked</summary><?php endif; ?>
                         <div class="comment-item <?php echo $comment['is_admin_reply'] ? 'admin-reply' : ''; ?>">
                             <div class="comment-author">
                                 <i class="fas fa-user-circle"></i>
@@ -351,7 +357,7 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                                         <source src="<?php echo SITE_URL . '/' . $comment['voice_path']; ?>" type="audio/webm">
                                     </audio>
                                 <?php else: ?>
-                                    <?php echo nl2br(htmlspecialchars($comment['comment'])); ?>
+                                    <?php require_once __DIR__ . '/includes/mentions.php'; echo aw_mentions_render($db, nl2br(htmlspecialchars($comment['comment'])), 'reflection_comment', (int)$comment['id']); /* N2 */ ?>
                                 <?php endif; ?>
                                 <?php if ($comment['photo_path']): ?>
                                     <div class="comment-photo">
@@ -371,8 +377,10 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                                         🙏 <span id="prays-<?php echo $comment['id']; ?>"><?php echo $comment['prays']; ?></span>
                                     </button>
                                 </div>
+                                <?php if (!$comment['is_admin_reply']) echo aw_report_controls('reflection_comment', (int)$comment['id'], (int)($comment['user_id'] ?? 0), (string)$comment['author_name']); /* N4 */ ?>
                             </div>
                         </div>
+                        <?php if ($aw_fold): ?></details><?php endif; ?>
                     <?php endforeach; ?>
                 </div>
                 <?php echo aw_pager($comments_total, $cpage, $cper, 'comments'); // P13 ?>
@@ -843,4 +851,5 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 </style>
 
 <?php aw_upload_script(); /* R3 */ ?>
+<?php require_once __DIR__ . '/includes/moderation.php'; echo aw_report_assets(); /* N4 */ ?>
 <?php require_once 'includes/footer.php'; ?>
