@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/views.php'; // one way to count views
 require_once 'includes/saves.php'; // F2: the Save control
 require_once __DIR__ . '/reader/reader_functions.php'; // time_ago()
 
@@ -15,8 +16,8 @@ if (!$video) {
     exit;
 }
 // F64: nothing ever counted views, so "Most viewed" and the view counts were meaningless.
-$db->prepare("UPDATE videos SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?")->execute([$id]);
-$video['view_count'] = (int)($video['view_count'] ?? 0) + 1;
+// One counter and one log, written together; robots, staff and quick repeat visits are not counted.
+if (aw_view_record($db, 'video', $id)) $video['view_count'] = (int)($video['view_count'] ?? 0) + 1;
 // F117: the dashboard's "Videos watched" tile counts video_watches, which nothing ever wrote.
 // Record the first watch of each video per member.
 if (isLoggedIn()) {

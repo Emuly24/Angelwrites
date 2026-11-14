@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/views.php'; // one way to count views
 require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/og.php'; // link previews: the cover as a 1200x630 JPEG, and the link to share
 
@@ -107,17 +108,9 @@ if (!$poem) {
 // ============================================================
 // 6. UPDATE VIEW COUNT & LOG DEEP DIVE STATS
 // ============================================================
-// 1. Update the aggregate counter
-$db->prepare("UPDATE poems SET view_count = view_count + 1 WHERE id = ?")->execute([$id]);
-
-// 2. Log the detailed record for the Modal
-try {
-    $user_id = isLoggedIn() ? $_SESSION['user_id'] : null;
-    $stmt = $db->prepare("INSERT INTO view_logs (target_type, target_id, user_id, ip_address) VALUES ('poem', ?, ?, ?)");
-    $stmt->execute([$id, $user_id, $_SERVER['REMOTE_ADDR']]);
-} catch (Exception $e) {
-    // Table might not exist yet, silently skip
-}
+// One counter and one log, written together; robots, staff and quick repeat visits are not counted.
+$user_id = isLoggedIn() ? $_SESSION['user_id'] : null;
+if (aw_view_record($db, 'poem', $id)) $poem['view_count'] = (int)($poem['view_count'] ?? 0) + 1;
 
 // ============================================================
 // 7. TRACK USER READ – Bulletproof Check-then-Insert
