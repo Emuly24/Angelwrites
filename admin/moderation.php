@@ -45,7 +45,7 @@ try {
 } catch (Throwable $e) {
     error_log('moderation list: ' . $e->getMessage());
 }
-$labels = ['question' => 'Question', 'answer' => 'Answer', 'review' => 'Comment', 'reflection_comment' => 'Reflection comment', 'video_comment' => 'Video comment', 'community_post' => 'Stories & Help post', 'community_reply' => 'Stories & Help reply'];
+$labels = ['question' => 'Question', 'answer' => 'Answer', 'review' => 'Comment', 'reflection_comment' => 'Reflection comment', 'video_comment' => 'Video comment', 'community_post' => 'Stories & Help post', 'community_reply' => 'Stories & Help reply', 'message' => 'Private message'];
 $open_count = 0;
 try { $open_count = (int)$db->query("SELECT COUNT(DISTINCT target_type || ':' || target_id) FROM reports WHERE status = 'pending'")->fetchColumn(); } catch (Throwable $e) {}
 

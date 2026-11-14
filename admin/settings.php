@@ -101,6 +101,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_upload_quota']))
 }
 if (!empty($_SESSION['aw_quota_flash'])) { $aw_quota_msg = ['ok' => true, 'msg' => $_SESSION['aw_quota_flash']]; unset($_SESSION['aw_quota_flash']); }
 
+// ===== Link previews: the address of the free preview relay (tools/share-relay/README.md) =====
+$aw_share_msg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_share_base'])) {
+    $aw_sb = rtrim(trim((string)($_POST['share_base_url'] ?? '')), '/');
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $aw_share_msg = ['ok' => false, 'msg' => 'Your session expired. Please reload the page and try again.'];
+    } elseif ($aw_sb !== '' && !preg_match('#^https://[a-z0-9.-]+(/[a-z0-9._/-]*)?$#i', $aw_sb)) {
+        $aw_share_msg = ['ok' => false, 'msg' => 'Please paste the relay address as it is shown, starting with https:// (or leave it empty to share plain links).'];
+    } else {
+        $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute(['share_base_url', $aw_sb]);
+        if (function_exists('aw_audit')) aw_audit('settings_changed', 'settings', null, 'share_base_url ' . ($aw_sb !== '' ? 'set' : 'cleared'));
+        $_SESSION['aw_share_flash'] = $aw_sb !== '' ? 'Saved. Shared links now go through the preview relay.' : 'Saved. Shared links go straight to the site.';
+        header('Location: ' . SITE_URL . '/admin/settings.php#link-previews');
+        exit;
+    }
+}
+if (!empty($_SESSION['aw_share_flash'])) { $aw_share_msg = ['ok' => true, 'msg' => $_SESSION['aw_share_flash']]; unset($_SESSION['aw_share_flash']); }
+
 // ===== VF3: EMAIL DELIVERY CHECK =====
 // Members reported verification codes not arriving. This sends a real test email and shows the
 // exact reason when it fails, plus the last failures the site recorded.
@@ -378,6 +396,18 @@ $pageTitle = 'Site Settings';
                         <div class="form-actions">
                             <button type="submit" name="send_test_email" value="1" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send test email</button>
                         </div>
+                    </form>
+
+                    <h3 id="link-previews" style="margin:28px 0 10px;">Link previews (WhatsApp, Telegram, X…)</h3>
+                    <?php if ($aw_share_msg): ?><div class="alert <?php echo $aw_share_msg['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_share_msg['msg']); ?></div><?php endif; ?>
+                    <p style="color:var(--text-light);margin:0 0 12px;">The free hosting plan shows a “browser check” page to WhatsApp, Telegram, X and most other apps, so shared links appear without a picture. Facebook is let through. A free relay fixes this; the steps are in <code>tools/share-relay/README.md</code>. Paste the relay’s address here once it is set up, or leave it empty.</p>
+                    <form method="POST" class="admin-form" action="<?php echo SITE_URL; ?>/admin/settings.php#link-previews">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <div class="form-group">
+                            <label for="share_base_url">Preview relay address</label>
+                            <input type="url" id="share_base_url" name="share_base_url" placeholder="https://angelwrites-share.yourname.workers.dev" value="<?php echo htmlspecialchars((string)aw_setting('share_base_url', '')); ?>">
+                        </div>
+                        <button type="submit" name="save_share_base" value="1" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
                     </form>
 
                     <h3 style="margin:28px 0 10px;">Recent failed emails</h3>

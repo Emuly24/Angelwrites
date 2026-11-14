@@ -312,6 +312,7 @@ $pageTitle = 'Admin Dashboard';
             <div class="admin-module-grid">
                 <a href="settings.php" class="admin-module-btn"><i class="fas fa-sliders-h"></i><span>System Settings</span></a>
                 <a href="backup.php" class="admin-module-btn"><i class="fas fa-database"></i><span>Database Backup</span></a><!-- P0-1 -->
+                <?php if (aw_can('manage_settings')): ?><a href="db_setup.php" class="admin-module-btn"><i class="fas fa-screwdriver-wrench"></i><span>Database Setup</span></a><?php endif; ?><!-- DB: create missing tables -->
                 <a href="picks.php" class="admin-module-btn"><i class="fas fa-star"></i><span>Angella's Picks</span></a><!-- C2 -->
                 <a href="../reader/admin/reader_analytics.php" class="admin-module-btn"><i class="fas fa-chart-line"></i><span>Reader Analytics</span></a>
                 <a href="../account_security.php" class="admin-module-btn"><i class="fas fa-lock"></i><span>Account Security</span></a><!-- K5 -->
