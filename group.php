@@ -8,6 +8,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/saves.php'; // F2: the Save control
+require_once 'includes/messaging.php'; // I2: Message buttons
 require_once 'includes/reading_groups.php';
 
 redirectIfNotLoggedIn();
@@ -101,6 +102,7 @@ $type_label = ucfirst($content_type);
 $pageTitle = htmlspecialchars($group['name']);
 ?>
 <?php require_once 'includes/header.php'; echo aw_save_assets(); ?>
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-messages.css?v=1">
 
 <div class="group-page">
     <div class="container">
@@ -319,6 +321,7 @@ $pageTitle = htmlspecialchars($group['name']);
                         <div class="member-info">
                             <h4><?php echo htmlspecialchars($member['display_name'] ?: $member['username']); ?></h4>
                             <span class="member-role"><?php echo ucfirst($member['role']); ?></span>
+                            <?php if (function_exists('aw_msg_button')) echo aw_msg_button((int)$member['id']); /* I2 */ ?>
                         </div>
                         <?php if ($is_admin && $member['id'] != $user_id): ?>
                             <div style="margin-top:8px;">

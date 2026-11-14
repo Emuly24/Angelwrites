@@ -9,6 +9,7 @@ require_once 'includes/csrf.php';
 require_once 'includes/components.php';
 require_once 'includes/community_posts.php';
 require_once 'includes/moderation.php';
+require_once 'includes/messaging.php'; // I2
 
 aw_cp_tables($db);
 $id = (int)($_GET['id'] ?? 0);
@@ -85,6 +86,7 @@ $aw_noindex = true;
 require_once 'includes/header.php';
 echo aw_cp_assets();
 echo aw_save_assets();
+echo '<link rel="stylesheet" href="' . SITE_URL . '/assets/css/aw-messages.css?v=1">';
 if ($canReply) echo aw_cp_editor_assets();
 ?>
 <main class="cp" id="main">
@@ -137,7 +139,7 @@ if ($canReply) echo aw_cp_editor_assets();
             <?php foreach ($warn as $w): ?><span class="cp-tag cp-tag-warn"><?php echo htmlspecialchars(AW_CP_WARNINGS[$w]); ?></span><?php endforeach; ?>
         </div>
         <h1><?php echo htmlspecialchars($post['title']); ?></h1>
-        <p class="cp-byline"><span><strong><?php echo htmlspecialchars(aw_cp_author_label($db, $post)); ?></strong></span><span><?php echo htmlspecialchars(date('j F Y', strtotime($post['published_at'] ?: $post['created_at']))); ?></span><?php if ($post['updated_at']): ?><span>edited</span><?php endif; ?></p>
+        <p class="cp-byline"><span><strong><?php echo htmlspecialchars(aw_cp_author_label($db, $post)); ?></strong></span><?php if ($post['visibility'] === 'named' && function_exists('aw_msg_button')) echo ' ' . aw_msg_button((int)$post['author_id']); /* I2: named authors only */ ?><span><?php echo htmlspecialchars(date('j F Y', strtotime($post['published_at'] ?: $post['created_at']))); ?></span><?php if ($post['updated_at']): ?><span>edited</span><?php endif; ?></p>
         <?php if ($warn && !$isAuthor): ?>
             <details class="cp-warnbox" id="cpGate">
                 <summary class="cp-btn cp-btn-soft cp-btn-sm">Show the post</summary>

@@ -345,7 +345,20 @@ if ($isLoggedIn) {
                     </a>
 
                     <!-- Notifications -->
-                    <?php if ($isLoggedIn): ?>
+                    <?php if ($isLoggedIn):
+                        // I2: unread conversations and requests, counted once on page load (nothing polls)
+                        $aw_msg_unread = 0;
+                        $aw_msg_on = (string)(function_exists('aw_setting') ? aw_setting('messaging_enabled', '1') : '1') !== '0';
+                        if ($aw_msg_on) { try { require_once __DIR__ . '/messaging.php'; $aw_msg_unread = aw_msg_unread_count($db, (int)$_SESSION['user_id']); } catch (Throwable $e) { error_log('header messages: ' . $e->getMessage()); } }
+                    ?>
+                        <?php if ($aw_msg_on): ?>
+                        <div class="notification-wrapper">
+                            <a class="nav-action-icon" href="<?php echo SITE_URL; ?>/messages.php" aria-label="Messages<?php echo $aw_msg_unread ? ', ' . (int)$aw_msg_unread . ' unread' : ''; ?>" style="position:relative;display:inline-flex;align-items:center;justify-content:center;color:inherit;text-decoration:none">
+                                <i class="fas fa-envelope" aria-hidden="true"></i>
+                                <?php if ($aw_msg_unread > 0): ?><span class="notification-badge" aria-hidden="true"><?php echo (int)$aw_msg_unread; ?></span><?php endif; ?>
+                            </a>
+                        </div>
+                        <?php endif; ?>
                         <div class="notification-wrapper">
                             <button type="button" class="nav-action-icon" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" aria-controls="notificationDropdown" onclick="awToggleMenu(this, 'notificationDropdown')">
                                 <i class="fas fa-bell"></i>
