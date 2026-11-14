@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/csrf.php';
 require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/commerce.php';
 require_once 'includes/mail_helper.php';
@@ -253,6 +254,8 @@ $pageTitle = htmlspecialchars($book['title']);
                         <form method="POST" action="<?php echo SITE_URL; ?>/library.php" class="library-add-form">
                             <input type="hidden" name="book_id" value="<?php echo (int)$book_id; ?>">
                             <input type="hidden" name="update_status" value="1">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                            <input type="hidden" name="return" value="/book.php?id=<?php echo (int)$book_id; ?>">
                             <label for="libraryStatus">My library</label>
                             <select id="libraryStatus" name="status" onchange="this.form.submit()">
                                 <option value=""<?php echo $my_status === '' ? ' selected' : ''; ?>>Add to my library…</option>
