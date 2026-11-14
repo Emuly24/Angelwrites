@@ -256,5 +256,5 @@ function aw_save_assets() {
     if ($done) return '';
     $done = true;
     $u = SITE_URL;
-    return '<link rel="stylesheet" href="' . $u . '/assets/css/aw-saves.css?v=1"><script src="' . $u . '/assets/js/aw-saves.js?v=1" defer></script>';
+    return '<link rel="stylesheet" href="' . $u . '/assets/css/aw-saves.css?v=1"><script src="' . $u . '/assets/js/aw-saves.js?v=2" defer></script>';
 }

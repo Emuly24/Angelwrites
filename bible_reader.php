@@ -75,7 +75,7 @@ function aw_br_verses($chapter) {
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/bible.css?v=2">
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-saves.css?v=1"><script src="<?php echo SITE_URL; ?>/assets/js/aw-saves.js?v=1" defer></script>
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-saves.css?v=1"><script src="<?php echo SITE_URL; ?>/assets/js/aw-saves.js?v=2" defer></script>
 <script>
 // apply the reader's settings before the first paint (no flash of the wrong theme or size)
 (function () { try { var s = JSON.parse(localStorage.getItem('awBible') || '{}'), r = document.documentElement;

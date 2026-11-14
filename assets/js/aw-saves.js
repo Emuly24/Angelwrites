@@ -7,7 +7,8 @@
   function send(form, extra) {
     var d = new FormData(form);
     Object.keys(extra).forEach(function (k) { d.set(k, extra[k]); });
-    return fetch(form.action, { method: 'POST', body: d, headers: { Accept: 'application/json' }, credentials: 'same-origin' }).then(function (r) { return r.json(); });
+    // form.action would be the field named "action", so read the attribute
+    return fetch(form.getAttribute('action'), { method: 'POST', body: d, headers: { Accept: 'application/json' }, credentials: 'same-origin' }).then(function (r) { return r.json(); });
   }
   function paint(form, saved) {
     var b = form.querySelector('.aw-save-btn');
