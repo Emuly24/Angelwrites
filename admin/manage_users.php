@@ -5,7 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/csrf.php'; // VF3
 
-redirectIfNotAdmin();
+aw_require('manage_members'); // K1
 
 $error = '';
 $success = '';

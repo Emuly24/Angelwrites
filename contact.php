@@ -40,8 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     } elseif (empty($message)) {
         $error = 'Please enter your message.';
     } else {
-        $stmt = $db->prepare("INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)");
-        if ($stmt->execute([$name, $email, $subject, $message])) {
+        // K4: a signed-in member's message is linked to their account, so team replies reach "My messages"
+        require_once __DIR__ . '/includes/team_inbox.php';
+        aw_inbox_tables($db);
+        $stmt = $db->prepare("INSERT INTO contact_messages (name, email, subject, message, user_id) VALUES (?, ?, ?, ?, ?)");
+        if ($stmt->execute([$name, $email, $subject, $message, isLoggedIn() ? (int)$_SESSION['user_id'] : null])) {
             // ===== ADMIN NOTIFICATION =====
             $admin_email = aw_admin_email();
             $admin_subject = '📩 New Contact Message: ' . ($subject ?: 'No Subject');

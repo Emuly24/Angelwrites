@@ -4,7 +4,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 
-redirectIfNotAdmin();
+aw_require('moderate'); // K1
 
 $error = '';
 $success = '';

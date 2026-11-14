@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-redirectIfNotAdmin();
+aw_require('manage_newsletter'); // K1
 // N4: shows exactly what subscribers receive (logo, colours, footer). POST previews the draft being
 // written on the Compose tab (with the admin's details for {{name}}); ?id= shows an archived issue.
 require_once __DIR__ . '/../includes/newsletter.php';

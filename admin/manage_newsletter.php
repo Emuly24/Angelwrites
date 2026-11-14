@@ -4,7 +4,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/mail_helper.php';
 
-redirectIfNotAdmin();
+aw_require('manage_newsletter'); // K1
 // S13 (F175): the newsletter_tabs/ partials refuse to render unless included from here.
 define('AW_NEWSLETTER_ADMIN', true);
 

@@ -231,7 +231,7 @@ $pageTitle = 'My Library';
                         <div class="book-card">
                             <div class="book-cover-wrapper">
                                 <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
+                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy" onerror="this.remove()">
                                 <?php else: ?>
                                     <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
                                 <?php endif; ?>
@@ -304,7 +304,7 @@ $pageTitle = 'My Library';
                         <div class="book-card">
                             <div class="book-cover-wrapper">
                                 <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
+                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy" onerror="this.remove()">
                                 <?php else: ?>
                                     <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
                                 <?php endif; ?>
@@ -371,12 +371,12 @@ $pageTitle = 'My Library';
                         <div class="book-card finished">
                             <div class="book-cover-wrapper">
                                 <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
+                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy" onerror="this.remove()">
                                 <?php else: ?>
                                     <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
                                 <?php endif; ?>
                                 <span class="badge status-finished">Finished</span>
-                                <span class="finished-check">✅</span>
+                                <span class="finished-check" title="Finished"><i class="fas fa-check" aria-hidden="true"></i><span class="sr-only">Finished</span></span>
                                 <?php if ($book['is_free']): ?>
                                     <span class="badge free">Free</span>
                                 <?php elseif ($book['is_sale']): ?>
@@ -439,7 +439,7 @@ $pageTitle = 'My Library';
                         <div class="book-card">
                             <div class="book-cover-wrapper">
                                 <?php if ($book['cover_path']): ?>
-                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy">
+                                    <img src="<?php echo SITE_URL . '/' . $book['cover_path']; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy" onerror="this.remove()">
                                 <?php else: ?>
                                     <div class="book-cover-placeholder"><i class="fas fa-book"></i></div>
                                 <?php endif; ?>
@@ -600,66 +600,49 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 .section-count { font-size:0.9rem; color:var(--text-light); font-weight:400; }
 .section-subtitle { font-size:0.95rem; color:var(--text-light); margin:2px 0 0 0; }
 
-/* ===== BOOK CARDS ===== */
-.book-grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
-    gap:24px;
-}
+/* ===== BOOK CARDS: a bookshelf, cover first (matches assets/css/aw-books.css) ===== */
+.book-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(176px, 1fr)); gap:36px 24px; align-items:start; }
+.book-grid .book-card { background:none; border:0; border-radius:0; box-shadow:none; overflow:visible; position:relative; display:flex; flex-direction:column; gap:12px; min-width:0; }
+html.aw-ui .book-grid .book-card:hover, .book-grid .book-card:hover { transform:none; box-shadow:none; border-color:transparent; }
+.book-grid .book-card.finished .book-cover-wrapper { filter:saturate(.85); }
 
-.book-card {
-    background:var(--card-bg); border-radius:20px; overflow:hidden;
-    border:1px solid var(--border); box-shadow:var(--shadow);
-    transition:all var(--transition); position:relative;
-}
-.book-card:hover { transform:translateY(-6px); box-shadow:var(--shadow-hover); border-color:var(--rose-light); }
-.book-card.finished { opacity:0.85; }
+.book-cover-wrapper { position:relative; aspect-ratio:2 / 3; height:auto; border-radius:4px 10px 10px 4px; overflow:hidden; background:linear-gradient(160deg, #e9c9c9, #c48f91); display:flex; align-items:center; justify-content:center; box-shadow:0 1px 2px rgba(44,30,30,.10), 0 10px 26px rgba(44,30,30,.16); transition:transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease; }
+.book-cover-wrapper::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg, rgba(0,0,0,.16) 0, rgba(255,255,255,.16) 2.5%, rgba(0,0,0,0) 6%); }
+.book-grid .book-card:hover .book-cover-wrapper, .book-grid .book-card:focus-within .book-cover-wrapper { transform:translateY(-4px); box-shadow:0 2px 4px rgba(44,30,30,.10), 0 18px 38px rgba(44,30,30,.22); }
+.book-cover-wrapper img { width:100%; height:100%; object-fit:cover; }
+html.aw-ui .book-grid .book-card:hover .book-cover-wrapper > img { transform:none; }
+.book-cover-placeholder { font-size:2.6rem; color:rgba(255,255,255,.85); }
+html[data-theme="dark"] .book-cover-wrapper { box-shadow:0 10px 28px rgba(0,0,0,.55); }
 
-.book-cover-wrapper {
-    position:relative; height:220px; background:var(--vanilla);
-    display:flex; align-items:center; justify-content:center; overflow:hidden;
-}
-.book-cover-wrapper img { width:100%; height:100%; object-fit:cover; transition:transform 0.4s; }
-.book-card:hover .book-cover-wrapper img { transform:scale(1.05); }
-.book-cover-placeholder { font-size:3.5rem; color:var(--rose-light); }
+.badge { position:absolute; z-index:2; top:10px; right:10px; padding:3px 9px; border-radius:999px; font-size:.68rem; font-weight:700; letter-spacing:.02em; text-transform:none; color:#fff; background:rgba(30,20,20,.72); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); box-shadow:none; }
+.badge.status-reading, .badge.status-want, .badge.status-finished { background:rgba(30,20,20,.72); }
+.badge.free { background:#2f6b45; top:10px; left:12px; right:auto; }
+.badge.sale { background:#9e3c46; top:10px; left:12px; right:auto; }
+.finished-check { position:absolute; z-index:2; bottom:10px; right:10px; top:auto; left:auto; transform:none; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#2f6b45; color:#fff; font-size:.8rem; opacity:1; pointer-events:none; }
+.finished-check .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 
-.badge {
-    position:absolute; top:12px; right:12px; padding:4px 14px; border-radius:20px;
-    font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:white;
-    box-shadow:0 2px 8px rgba(0,0,0,0.15);
-}
-.badge.status-reading { background:var(--rose); }
-.badge.status-want { background:#8a6f86; }
-.badge.status-finished { background:#4f8a63; }
-.badge.free { background:#4f8a63; top:12px; left:12px; right:auto; }
-.badge.sale { background:#b4505a; top:12px; left:12px; right:auto; }
+.book-info { padding:0; display:flex; flex-direction:column; gap:3px; }
+.book-info h3 { font-family:inherit; font-size:1rem; line-height:1.3; margin:0; font-weight:600; color:var(--text); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.book-author { font-size:.86rem; color:var(--text-light); margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-.finished-check {
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    font-size:3rem; opacity:0.2; pointer-events:none;
-}
+/* reading progress: where you are in the book, nothing to chase */
+.book-progress { margin:8px 0 4px; }
+.progress-bar { height:3px; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:5px; }
+.progress-fill { height:100%; background:var(--text-light); border-radius:3px; transition:width .4s ease; }
+.progress-text { font-size:.75rem; color:var(--text-light); font-weight:500; font-variant-numeric:tabular-nums; }
 
-.book-info { padding:20px; }
-.book-info h3 { font-size:1.05rem; margin:0 0 2px; font-weight:600; color:var(--text); }
-.book-author { font-size:0.85rem; color:var(--text-light); margin:0 0 8px; }
-
-.book-progress { margin:8px 0 12px; }
-.progress-bar {
-    height:6px; background:var(--border); border-radius:4px; overflow:hidden; margin-bottom:4px;
-}
-.progress-fill { height:100%; background:var(--rose); border-radius:4px; transition:width 0.4s ease; }
-.progress-text { font-size:0.75rem; color:var(--text-light); font-weight:500; }
-
-.book-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
-.book-actions .btn-sm { padding:4px 14px; font-size:0.75rem; border-radius:50px; font-weight:600; }
+.book-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }
+.book-actions .btn-sm { min-height:34px; padding:0 14px; font-size:.8rem; border-radius:999px; font-weight:700; display:inline-flex; align-items:center; gap:6px; box-shadow:none; }
+.book-actions .btn-primary { background:#9c5457; border-color:#9c5457; color:#fff; }
+.book-actions .btn-success { background:rgba(47,107,69,.12); border:0; color:#2f6b45; }
+.book-actions .btn-outline { background:rgba(219,161,162,.18); border:0; color:#9c5457; min-width:34px; justify-content:center; }
+html[data-theme="dark"] .book-actions .btn-primary { background:#f0c4c5; border-color:#f0c4c5; color:#2c1e1e; }
+html[data-theme="dark"] .book-actions .btn-success { color:#8fd1a5; background:rgba(143,209,165,.14); }
+html[data-theme="dark"] .book-actions .btn-outline { color:#f0c4c5; }
 .action-group { display:flex; gap:4px; }
 
 .status-form { display:inline; }
-.status-select {
-    padding:4px 10px; border-radius:50px; border:1px solid var(--border);
-    font-size:0.8rem; background:var(--card-bg); color:var(--text); cursor:pointer;
-    transition:all 0.2s ease;
-}
+.status-select { min-height:34px; padding:0 12px; border-radius:999px; border:1px solid var(--border); font-size:.8rem; background:var(--card-bg); color:var(--text); cursor:pointer; }
 .status-select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
 
 /* ===== EMPTY STATE ===== */
@@ -683,7 +666,7 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
 
 /* ===== RESPONSIVE ===== */
 @media (max-width:1024px) {
-    .book-grid { grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); }
+    .book-grid { grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:30px 18px; }
 }
 @media (max-width:768px) {
     .library-header { flex-direction:column; align-items:flex-start; }
@@ -693,13 +676,10 @@ h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark)
     .search-form { flex-direction:column; align-items:stretch; }
     .search-input-group { min-width:auto; }
     .filter-select, .sort-select { width:100%; }
-    .book-grid { grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
-    .book-cover-wrapper { height:160px; }
     .book-info h3 { font-size:0.95rem; }
 }
 @media (max-width:480px) {
-    .book-grid { grid-template-columns:1fr 1fr; gap:10px; }
-    .book-cover-wrapper { height:140px; }
+    .book-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:26px 14px; }
     .section-title { font-size:1.2rem; }
 }
 </style>

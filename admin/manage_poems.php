@@ -21,7 +21,7 @@ require_once '../includes/csrf.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R10: shared upload limits
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 const AW_POEM_DEFAULT_AUTHOR = 'Angella Bottoman';
 define('AW_POEMS_ADMIN', true); // the view partials refuse to run on their own

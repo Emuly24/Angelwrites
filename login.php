@@ -91,46 +91,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
                     unlink($attempts_file);
                 }
 
-                // Set session
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['name'] = awDisplayName($user); // F100: NULL name for self-registered members
-                $_SESSION['role'] = $user['role'];
-
-                // ===== REMEMBER ME LOGIC =====
-                if ($remember_me) {
-                    // Create remember_tokens table if not exists
-                    try {
-                        $db->exec("
-                            CREATE TABLE IF NOT EXISTS remember_tokens (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                user_id INTEGER NOT NULL,
-                                token TEXT NOT NULL UNIQUE,
-                                expires_at DATETIME NOT NULL,
-                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                            )
-                        ");
-                    } catch (Exception $e) {
-                        // Table already exists – continue
-                    }
-
-                    // Generate secure token
-                    $token = bin2hex(random_bytes(32));
-                    $expires = time() + (30 * 24 * 60 * 60); // 30 days
-                    $expiry_date = date('Y-m-d H:i:s', $expires);
-
-                    $stmt = $db->prepare("INSERT INTO remember_tokens (user_id, token, expires_at) VALUES (?, ?, ?)");
-                    $stmt->execute([$user['id'], $token, $expiry_date]);
-
-                    // Set secure HTTP-only cookie
-                    // F101: secure flag (the site is HTTPS-only), HttpOnly as before
-                    setcookie('remember_token', $token, ['expires' => $expires, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+                // K5: staff with two-step sign-in give their code first (login_2fa.php finishes the sign-in)
+                require_once __DIR__ . '/includes/twofactor.php';
+                if (aw_is_staff_role($user['role']) && aw_2fa_enabled($db, (int)$user['id'])) {
+                    session_regenerate_id(true);
+                    $_SESSION['pending_2fa'] = ['uid' => (int)$user['id'], 'remember' => (bool)$remember_me, 'redirect' => $redirect_target, 'at' => time(), 'tries' => 0];
+                    header('Location: ' . SITE_URL . '/login_2fa.php');
+                    exit;
                 }
-
-                // Update last login timestamp
-                $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
-                $stmt->execute([$user['id']]);
+                aw_finish_login($db, $user, (bool)$remember_me); // session, "remember me", last login
 
                 // ===== 🚀 REDIRECT LOGIC =====
                 // If a valid redirect URL was passed, send them there; otherwise go to dashboard

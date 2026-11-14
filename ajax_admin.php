@@ -5,7 +5,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 // Item 2 (F190): admin only. Guests could read stats, visitor IPs and reader names/emails.
-if (!isAdmin()) {
+if (!aw_can('see_identities')) { // K1: returns viewers' emails and IP addresses, so owner and admins only
     http_response_code(403);
     echo json_encode(['error' => 'Admin access required.']);
     exit;

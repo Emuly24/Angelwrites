@@ -19,7 +19,7 @@ require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
 require_once '../includes/components.php'; // A1
 
-redirectIfNotAdmin();
+aw_require('backup'); // K1
 
 $error = '';
 $dbFile = defined('DB_PATH') ? DB_PATH : __DIR__ . '/../data/site.db';

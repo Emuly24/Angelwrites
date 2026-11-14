@@ -35,10 +35,13 @@ function aw_poem_clean_html($html) {
     foreach ($xp->query('//*[contains(@class,"wordads")] | //script | //style | //iframe | //ins | //noscript') as $n) $junk[] = $n;
     foreach ($junk as $n) { if ($n->parentNode) $n->parentNode->removeChild($n); }
     $root = $doc->getElementById('aw-root');
-    if (!$root) return $html;
+    if (!$root) { require_once __DIR__ . '/sanitize.php'; return aw_clean_html($html, 'rich'); }
     $out = '';
     foreach ($root->childNodes as $c) $out .= $doc->saveHTML($c);
-    return $out;
+    // S1: then the shared sanitiser (scripts, handlers, unsafe links). After the tidy-up above, which
+    // needs the WordPress class names to find leftover ad blocks.
+    require_once __DIR__ . '/sanitize.php';
+    return aw_clean_html($out, 'rich');
 }
 
 function aw_poem_parse($html) {

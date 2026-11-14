@@ -24,7 +24,13 @@ if (!isset($_SESSION['user_id']) && !empty($_COOKIE['remember_token']) && isset(
         $aw_ru = $aw_rm->fetch(PDO::FETCH_ASSOC);
         $aw_rm->closeCursor();
         // AV1: admins are not required to verify their email (same rule as login.php)
-        if ($aw_ru && ((int)$aw_ru['is_verified'] === 1 || $aw_ru['role'] === 'admin')) {
+        // K5: staff with two-step sign-in must sign in fully; a remembered cookie never skips the code
+        $aw_needs_code = false;
+        if ($aw_ru && in_array($aw_ru['role'], ['admin', 'moderator'], true)) {
+            try { $aw_tf = $GLOBALS['db']->prepare("SELECT 1 FROM staff_2fa WHERE user_id = ? AND enabled_at IS NOT NULL"); $aw_tf->execute([$aw_ru['id']]); $aw_needs_code = (bool)$aw_tf->fetchColumn(); }
+            catch (Throwable $e) { /* no 2FA table yet */ }
+        }
+        if ($aw_ru && !$aw_needs_code && ((int)$aw_ru['is_verified'] === 1 || $aw_ru['role'] === 'admin')) {
             session_regenerate_id(true);
             $_SESSION['user_id'] = $aw_ru['id'];
             $_SESSION['username'] = $aw_ru['username'];
@@ -72,6 +78,7 @@ function redirectIfNotAdmin() {
         header('Location: ' . SITE_URL . '/index.php');
         exit;
     }
+    aw_staff_request_guard(); // K3: CSRF on every admin POST, no cross-site acting GETs (includes/roles.php)
 }
 
 /**
@@ -107,4 +114,6 @@ function getUserName() {
 function getUserRole() {
     return $_SESSION['role'] ?? 'guest';
 }
-?>
+
+// K1: roles, capabilities, the staff request guard and the audit log
+require_once __DIR__ . '/roles.php';

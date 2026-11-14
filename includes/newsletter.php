@@ -133,6 +133,9 @@ function aw_nl_render(PDO $db, $subject, $content, array $sub, array $opts = [])
     $logo = $base . '/' . ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/');
     $qid = $opts['queue_id'] ?? null;
     $track = $qid && ($opts['track'] ?? true) && empty($opts['preview']);
+    // S1: the written part of every newsletter is cleaned (the branded frame around it is ours)
+    require_once __DIR__ . '/sanitize.php';
+    $content = aw_clean_html($content, 'rich');
     $body = aw_nl_personalize($content, $sub);
     if ($track) $body = aw_nl_track_links($body, $db, $qid, $sub['email'] ?? '');
     $text_body = aw_nl_html_to_text($body);

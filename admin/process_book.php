@@ -23,7 +23,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 }
 
-redirectIfNotAdmin();
+aw_require('manage_content'); // K1
 
 $book_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $error = '';
