@@ -13,6 +13,16 @@ $isAdmin = isAdmin();
 $isReader = $isLoggedIn && !$isAdmin;
 $currentPage = basename($_SERVER['PHP_SELF']);
 
+// G1: planned reads remind the member the first time they use the site on the day (no cron on this host)
+if ($isLoggedIn && ($_SESSION['aw_plans_day'] ?? '') !== date('Y-m-d') && isset($db) && $db instanceof PDO) {
+    $_SESSION['aw_plans_day'] = date('Y-m-d');
+    try {
+        require_once __DIR__ . '/reading_plans.php';
+        if (!function_exists('sendEmail') && is_file(__DIR__ . '/mail_helper.php')) require_once __DIR__ . '/mail_helper.php';
+        aw_plans_remind($db, (int)$_SESSION['user_id']);
+    } catch (Throwable $e) { error_log('plans hook: ' . $e->getMessage()); }
+}
+
 // ===== FETCH UNREAD NOTIFICATIONS =====
 $unreadNotifications = 0;
 $latestNotifications = [];

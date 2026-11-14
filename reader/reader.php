@@ -14,6 +14,8 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/saves.php'; // F2/G1: save the book to a collection
 require_once __DIR__ . '/../includes/mail_helper.php';
 
 // --- Load book data using the enhanced book_data.php ---
@@ -87,6 +89,8 @@ if (isLoggedIn()) {
 }
 
 $last_page = $last_chapter > 0 && $last_chapter <= $total_pages ? $last_chapter : 1;
+// G1: a planned read (or any link) can open a given page: reader.php?id=N&page=P
+if (isset($_GET['page']) && (int)$_GET['page'] >= 1 && (int)$_GET['page'] <= $total_pages) $last_page = (int)$_GET['page'];
 $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 ?>
 <!DOCTYPE html>
@@ -99,7 +103,8 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/book-reader.css?v=1" /><!-- the reader's look: a quiet, page-first design -->
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/book-reader.css?v=2" />
+<?php echo aw_save_assets(); ?><!-- the reader's look: a quiet, page-first design -->
 <?php if (!empty($processed['reader_css'])): // F90: the per-book CSS saved in admin/process_book.php was never applied ?>
 <style id="book-reader-css"><?php echo str_ireplace('</style', '', (string)$processed['reader_css']); ?></style>
 <?php endif; ?>
@@ -160,6 +165,8 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
             <button type="button" class="sidebar-btn" id="rbBookmarkMenu" aria-label="Bookmark this page"><i class="far fa-bookmark" aria-hidden="true"></i><span>Bookmark this page</span></button>
             <button type="button" class="sidebar-btn" id="resumeBtn" aria-label="Go to my last place"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i><span>Go to my last place</span></button>
             <button type="button" class="sidebar-btn" id="focusBtn" aria-label="Focus mode"><i class="fas fa-expand" aria-hidden="true"></i><span>Focus mode</span></button>
+            <button type="button" class="sidebar-btn" id="planBtn" aria-label="Plan a read"><i class="far fa-calendar-plus" aria-hidden="true"></i><span>Plan a read</span></button><!-- G1 -->
+            <?php if (empty($preview_version)) echo aw_save_button('book', (int)$book_id, ['class' => 'rb-save', 'back' => '/reader/reader.php?id=' . (int)$book_id]); ?>
         </div>
         <div class="rb-menu-group">
             <button type="button" class="sidebar-btn" id="myNotesBtn" aria-label="My notes and highlights"><i class="fas fa-pen" aria-hidden="true"></i><span>My notes &amp; highlights</span></button>
@@ -348,6 +355,29 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
             <textarea id="errorText" rows="3" placeholder="Describe the error..." style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);"></textarea>
         </div>
         <button onclick="submitError()" style="background:var(--rose);color:var(--white);border:none;padding:10px 24px;border-radius:30px;cursor:pointer;font-weight:600;width:100%;">Submit Error Report</button>
+    </div>
+
+    <!-- G1: planned reads -->
+    <div id="planModal" class="modal-wrapper" role="dialog" aria-labelledby="planTitle">
+        <button class="modal-close" onclick="closeModal('planModal')" aria-label="Close">&times;</button>
+        <h3 id="planTitle"><i class="far fa-calendar-plus"></i> Plan a read</h3>
+        <p class="plan-intro">Choose a day. When you next open AngelWrites on or after it, we will remind you, and email you if you like.</p>
+        <form id="planForm" class="plan-form">
+            <label for="planDate">Day</label>
+            <input type="date" id="planDate" name="date" required min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d', strtotime('+1 day')); ?>">
+            <label for="planPage">Where to start</label>
+            <select id="planPage" name="page">
+                <option value="">Where I left off</option>
+                <?php foreach ($tocEntries as $entry): ?><option value="<?php echo (int)($entry['page'] ?? 1); ?>" data-label="<?php echo htmlspecialchars($entry['title']); ?>"><?php echo htmlspecialchars($entry['title']); ?> (p. <?php echo (int)($entry['page'] ?? 1); ?>)</option><?php endforeach; ?>
+            </select>
+            <label for="planNote">Note <span>(optional)</span></label>
+            <input type="text" id="planNote" name="note" maxlength="300" placeholder="e.g. with my group, before Sunday">
+            <label class="plan-check"><input type="checkbox" name="email" value="1"> Email me a reminder too</label>
+            <p class="plan-msg" role="status" aria-live="polite"></p>
+            <button type="submit" class="note-submit">Plan it</button>
+        </form>
+        <h4 class="plan-h">Planned for this book</h4>
+        <ul id="planList" class="plan-list"><li class="plan-empty">Nothing planned yet.</li></ul>
     </div>
 
     <!-- Prayer Request Modal -->
@@ -1465,7 +1495,7 @@ require_once __DIR__ . '/reader_share.php';
         sidebar.classList.remove('open');
         [sidebarToggle, settingsBtn, tocBtn].forEach(b => b.setAttribute('aria-expanded', 'false'));
         overlay.classList.remove('rb-clear');
-        closeModal('share-modal'); closeModal('commentsModal'); closeModal('errorModal'); closeModal('prayerModal');
+        closeModal('share-modal'); closeModal('commentsModal'); closeModal('errorModal'); closeModal('prayerModal'); closeModal('planModal');
         document.getElementById('notes-panel').classList.remove('visible');
         document.getElementById('search-bar').classList.remove('visible');
         document.getElementById('reaction-picker').style.display = 'none';
@@ -1672,6 +1702,39 @@ require_once __DIR__ . '/reader_share.php';
         // The bars step aside a moment after the book opens; a tap brings them back.
         setTimeout(function () { rbChrome(false); }, 2500);
     })();
+
+    // ----- G1: planned reads -----
+    const planToken = <?php echo json_encode(isLoggedIn() ? generate_csrf_token() : ''); ?>;
+    function planPost(action, extra) {
+        const fd = new FormData(); fd.append('action', action); fd.append('book_id', bookId); fd.append('csrf_token', planToken);
+        Object.keys(extra || {}).forEach(k => fd.append(k, extra[k]));
+        return fetch('<?php echo SITE_URL; ?>/reading_plan.php', { method: 'POST', body: fd, headers: { Accept: 'application/json' }, credentials: 'same-origin' }).then(r => r.json());
+    }
+    function planEsc(t) { return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function planRender(list) {
+        const ul = document.getElementById('planList');
+        if (!list || !list.length) { ul.innerHTML = '<li class="plan-empty">Nothing planned yet.</li>'; return; }
+        ul.innerHTML = list.map(p => '<li><span><strong>' + planEsc(p.when) + '</strong>' + (p.label ? ' · ' + planEsc(p.label) : '') + (p.note ? '<br><small>' + planEsc(p.note) + '</small>' : '') + (p.email ? '<br><small>Email reminder on</small>' : '') + '</span>'
+            + '<span class="plan-acts"><button type="button" data-plan="done" data-id="' + p.id + '">Read it</button><button type="button" data-plan="delete" data-id="' + p.id + '">Remove</button></span></li>').join('');
+    }
+    document.getElementById('planBtn').addEventListener('click', function () {
+        if (userId === 0) { awNeedLogin('plan a read.'); return; }
+        openModal('planModal'); document.getElementById('planDate').focus();
+        planPost('list').then(r => planRender(r.plans)).catch(() => {});
+    });
+    document.getElementById('planForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const f = this, msg = f.querySelector('.plan-msg'), opt = f.page.selectedOptions[0];
+        msg.textContent = 'Saving…';
+        planPost('add', { date: f.date.value, page: f.page.value, label: opt && opt.value ? opt.dataset.label : '', note: f.note.value, email: f.email.checked ? '1' : '' })
+            .then(r => { msg.textContent = r.message || ''; if (r.ok) { f.note.value = ''; planRender(r.plans); } })
+            .catch(() => { msg.textContent = 'That was not saved. Check your connection.'; });
+    });
+    document.getElementById('planList').addEventListener('click', function (e) {
+        const b = e.target.closest('[data-plan]'); if (!b) return;
+        planPost(b.dataset.plan, { id: b.dataset.id }).then(r => planRender(r.plans)).catch(() => {});
+    });
+    window.closeModal = window.closeModal || closeModal;
 
     // ----- Initialization -----
     totalPagesEl.textContent = totalPages;
