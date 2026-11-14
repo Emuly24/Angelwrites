@@ -362,6 +362,17 @@ try {
         $db->exec('PRAGMA user_version = 7');
     }
 
+    // VX1: members who registered before email verification worked could never receive a code. The
+    // site owner knows them and asked for them to be verified. Schema version 8 does this once: every
+    // account still waiting when it runs is marked verified. Accounts created afterwards are untouched
+    // and must verify as normal. Recorded once version 7 has been.
+    if ($aw_schema_version < 8 && (int)$db->query('PRAGMA user_version')->fetchColumn() >= 7) {
+        $aw_n = $db->exec("UPDATE users SET is_verified = 1, verification_code = NULL, verification_code_expiry = NULL
+                           WHERE is_verified = 0 OR is_verified IS NULL");
+        $db->exec('PRAGMA user_version = 8');
+        error_log('VX1: ' . (int)$aw_n . ' existing account(s) marked verified (one-time).');
+    }
+
     // Q50: daily clean-up of tables that only grow (see includes/housekeeping.php).
     if (mt_rand(1, 100) === 1) {
         require_once __DIR__ . '/housekeeping.php';
