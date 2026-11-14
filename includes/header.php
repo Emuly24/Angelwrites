@@ -33,7 +33,7 @@ if ($isLoggedIn) {
         $stmt->execute([$user_id]);
         $unreadNotifications = $stmt->fetchColumn();
         
-        $stmt = $db->prepare("SELECT id, title, message, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
+        $stmt = $db->prepare("SELECT id, title, message, link, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY is_read ASC, created_at DESC LIMIT 5");
         $stmt->execute([$user_id]);
         $latestNotifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
@@ -118,325 +118,221 @@ if ($isLoggedIn) {
             --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
             --input-bg: #fff; --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
         }
-
-        /* ===== SKIP LINK ===== */
-        .skip-link {
-            position: absolute; top: -40px; left: 0;
-            background: var(--rose); color: white; padding: 8px 16px;
-            z-index: 9999; border-radius: 0 0 8px 0;
-            transition: top 0.2s ease; text-decoration: none; font-weight: 600;
-        }
+        .skip-link { position: absolute; top: -60px; left: 12px; background: #9c5457; color: #fff; padding: 10px 16px; z-index: 9999; border-radius: 0 0 12px 12px; transition: top .2s ease; text-decoration: none; font-weight: 700; }
         .skip-link:focus { top: 0; }
-
-        /* ===== HEADER LAYOUT ===== */
-        header .container.nav-container {
-            max-width: 100% !important; padding-left: 0 !important; padding-right: 10px !important;
-        }
-        .logo { margin-left: 0 !important; padding-left: 0 !important; flex-shrink: 0; }
-        .logo-img {
-            height: 155px !important; width: auto !important; max-width: 100%;
-            display: block; object-fit: contain;
-        }
-        @media (max-width: 480px) { .logo-img { height: 120px !important; max-width: 90% !important; } }
-        /* Item 6 (F198): on phones the logo may shrink so the action icons and the menu button stay on screen */
-        @media (max-width: 480px) { .logo { flex-shrink: 1 !important; min-width: 0; } .logo-img { height: auto !important; max-height: 120px; } }
-
-        /* ===== HAMBURGER ===== */
-        .hamburger {
-            display: none !important;
-            flex-direction: column; justify-content: space-between;
-            width: 28px; height: 20px; background: none; border: none;
-            cursor: pointer; padding: 0; z-index: 1001; flex-shrink: 0;
-        }
-        .hamburger span {
-            display: block; width: 100%; height: 2px; background: var(--text);
-            transition: all 0.3s ease; border-radius: 2px;
-        }
-        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(6px,6px); }
-        .hamburger.active span:nth-child(2) { opacity: 0; }
-        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(6px,-6px); }
-
-        /* ===== NAV LINKS (DESKTOP) ===== */
-        .nav-links {
-            display: flex !important; align-items: center; gap: 8px;
-            list-style: none; margin: 0; padding: 0; flex: 1; justify-content: center;
-            position: static; width: auto; height: auto; background: transparent;
-            box-shadow: none; border: none; z-index: auto; overflow: visible;
-            right: auto; transition: none;
-        }
-        .nav-links li { margin: 0; padding: 0; border-bottom: none; }
-        .nav-links a {
-            padding: 6px 12px; font-size: 0.95rem; color: var(--text);
-            text-decoration: none; transition: color 0.2s; border-radius: 6px;
-        }
-        .nav-links a:hover { color: var(--rose); background: rgba(219,161,162,0.08); }
-        .nav-links a.active { color: var(--rose); font-weight: 600; }
-        .nav-links .nav-separator { display: inline; color: var(--border); padding: 0 4px; }
-
-        /* ===== MOBILE NAVIGATION (≤992px) ===== */
-        @media (max-width: 992px) {
-            .hamburger { display: flex !important; }
-
-            .nav-links {
-                position: fixed !important; top: 0 !important; right: -320px !important;
-                width: 320px !important; max-width: 85vw !important; height: 100vh !important;
-                background: var(--card-bg) !important; border-left: 1px solid var(--border) !important;
-                padding: 80px 24px 24px !important; box-shadow: -4px 0 20px rgba(0,0,0,0.1) !important;
-                z-index: 1000 !important; overflow-y: auto !important;
-                transition: right 0.3s ease !important; display: flex !important;
-                flex-direction: column !important; gap: 4px !important; margin: 0 !important;
-            }
-            .nav-links.open { right: 0 !important; }
-
-            .nav-links li {
-                width: 100% !important; padding: 6px 0 !important;
-                border-bottom: 1px solid var(--border) !important;
-            }
-            .nav-links li:last-child { border-bottom: none !important; }
-            .nav-links a {
-                display: block !important; width: 100% !important; padding: 4px 0 !important;
-                font-size: 1rem !important; color: var(--text) !important;
-                text-decoration: none !important; transition: color 0.2s !important;
-            }
-            .nav-links a:hover { color: var(--rose) !important; }
-            .nav-links .nav-separator { display: none !important; }
-
-            /* Overlay */
-            .menu-overlay {
-                position: fixed !important; top: 0 !important; left: 0 !important;
-                width: 100% !important; height: 100% !important;
-                background: rgba(0,0,0,0.5) !important; z-index: 999 !important;
-                display: none !important; pointer-events: auto !important;
-            }
-            .menu-overlay.open { display: block !important; }
-        }
-
-        /* ===== NAV ACTIONS ===== */
-        .nav-actions {
-            display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-            justify-content: flex-end; flex-shrink: 0; margin-left: auto;
-        }
-        .nav-action-icon {
-            position: relative; color: var(--text); transition: color var(--transition);
-            text-decoration: none; display: inline-flex; align-items: center;
-            justify-content: center; width: 36px; height: 36px; border-radius: 50%;
-            cursor: pointer; background: none; border: none; flex-shrink: 0;
-        }
-        .nav-action-icon:hover { color: var(--rose); background: rgba(219,161,162,0.1); }
-
-        .notification-badge {
-            position: absolute; top: -2px; right: -2px;
-            background: var(--rose); color: #fff; font-size: 0.6rem; font-weight: 700;
-            padding: 2px 6px; border-radius: 10px; min-width: 16px; text-align: center;
-            line-height: 1.4;
-        }
-
-        /* ===== DROPDOWNS ===== */
-        .notification-wrapper, .search-wrapper, .user-wrapper { position: relative; }
-        .notification-dropdown, .user-dropdown {
-            position: absolute; top: 130%; right: 0; background: var(--card-bg);
-            border: 1px solid var(--border); border-radius: 12px; padding: 12px;
-            box-shadow: var(--shadow-hover); display: none; z-index: 1002;
-        }
-        .notification-dropdown.open, .user-dropdown.open { display: block; }
-        .notification-dropdown { width: 280px; }
-        .user-dropdown { width: 160px; padding: 8px 0; }
-        .notification-dropdown .notif-item { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-        .notification-dropdown .notif-title { font-weight: 600; }
-        .notification-dropdown .notif-date { color: var(--text-light); font-size: 0.75rem; }
-        .notification-dropdown .view-all { display: block; text-align: center; margin-top: 8px; color: var(--rose); font-weight: 500; }
-        .user-dropdown a { display: block; padding: 8px 16px; color: var(--text); text-decoration: none; transition: background 0.2s; font-size: 0.9rem; }
-        .user-dropdown a:hover { background: rgba(219,161,162,0.1); }
-        .user-dropdown hr { margin: 4px 0; border: 0; border-top: 1px solid var(--border); }
-        .user-wrapper {
-            display: flex; align-items: center; gap: 4px; cursor: pointer;
-            padding: 4px 8px; border-radius: 8px; transition: background 0.2s; flex-shrink: 0;
-        }
-        .user-wrapper:hover { background: rgba(219,161,162,0.1); }
-        .user-toggle { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; min-height: 44px; }
-        .user-toggle:focus-visible { outline: 2px solid var(--rose-dark, #a8676a); outline-offset: 2px; border-radius: 6px; }
-
-        /* ===== GLOBAL NOTIFICATION & BREADCRUMBS ===== */
-        .global-notification {
-            background: var(--rose); color: #fff; text-align: center; padding: 8px 16px;
-            font-size: 0.9rem; position: sticky; top: 0; z-index: 1001;
-        }
+        .global-notification { background: #9c5457; color: #fff; text-align: center; padding: 10px 16px; font-size: .92rem; }
         .global-notification a { color: #fff; text-decoration: underline; }
-        .breadcrumbs { background: var(--vanilla); padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        .breadcrumbs { background: var(--vanilla); padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .85rem; }
         .breadcrumbs a { color: var(--text); text-decoration: none; }
         .breadcrumbs a:hover { color: var(--rose); }
         .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
-
-        /* ===== STICKY HEADER SHADOW ===== */
-        .site-header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-
-        /* ===== MOBILE FIXES (extra) ===== */
-        @media (max-width: 768px) {
-            .nav-actions { gap: 4px; }
-            .nav-action-icon { width: 44px; height: 44px; font-size: 0.9rem; } /* Q52: was 32 px */
-            .notification-dropdown { width: 240px; }
-        }
-        @media (max-width: 480px) {
-            .nav-actions { gap: 4px; }
-            .nav-action-icon { width: 36px; height: 36px; font-size: 0.85rem; } /* Q52: was 28 px (36 keeps room for the logo) */
-            .hamburger { width: 24px; height: 18px; }
-            .user-wrapper span { display: none; } /* hide username on tiny screens to prevent overflow */
-        }
     </style>
-    <!-- D1: site-wide design layer, after the header styles so it applies on every page -->
+    <!-- D1: site-wide design layer, after the base styles so it applies on every page -->
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=1">
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-header.css?v=1"><!-- the header -->
     <script src="<?php echo SITE_URL; ?>/assets/js/aw-motion.js?v=1" defer></script><!-- D2 -->
 <?php echo function_exists('aw_staff_csrf_script') ? aw_staff_csrf_script() : ''; /* K3: staff forms and fetches carry the CSRF token */ ?>
 </head>
 <body>
     <a href="#mainContent" class="skip-link">Skip to main content</a>
+<?php
+// ===== What the header needs to know (read once) =====
+$aw_u = rtrim(SITE_URL, '/');
+$aw_script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+$aw_in_admin = strpos($aw_script, '/admin/') !== false;
+$aw_is = function ($pages) use ($currentPage, $aw_in_admin) { // is this the current page?
+    foreach ((array)$pages as $pg) {
+        $adm = strpos($pg, 'admin/') === 0;
+        if ($adm === $aw_in_admin && basename($pg) === $currentPage) return true;
+    }
+    return false;
+};
+$aw_cur = function ($pages) use ($aw_is) { return $aw_is($pages) ? ' aria-current="page"' : ''; };
+$aw_stories_on = (string)(function_exists('aw_setting') ? aw_setting('community_posts_enabled', '1') : '1') !== '0';
+$aw_is_staff = function_exists('aw_is_staff') && aw_is_staff();
+$aw_me = ['name' => 'Friend', 'initial' => 'A', 'avatar' => '', 'email' => ''];
+$aw_msg_unread = 0;
+$aw_msg_on = (string)(function_exists('aw_setting') ? aw_setting('messaging_enabled', '1') : '1') !== '0';
+if ($isLoggedIn) {
+    try {
+        $st = $db->prepare("SELECT name, first_name, last_name, username, email, avatar, profile_pic FROM users WHERE id = ?");
+        $st->execute([(int)$_SESSION['user_id']]);
+        if ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $aw_me['name'] = awDisplayName($row);
+            $aw_me['email'] = (string)$row['email'];
+            $pic = trim((string)($row['avatar'] ?: $row['profile_pic']));
+            if ($pic !== '' && strpos($pic, '..') === false) $aw_me['avatar'] = preg_match('#^https?://#i', $pic) ? $pic : $aw_u . '/' . ltrim($pic, '/');
+        }
+    } catch (Throwable $e) { error_log('header me: ' . $e->getMessage()); }
+    $aw_me['initial'] = mb_strtoupper(mb_substr($aw_me['name'], 0, 1)) ?: 'A';
+    // I2: unread conversations and requests, counted once on page load (nothing polls)
+    if ($aw_msg_on) { try { require_once __DIR__ . '/messaging.php'; $aw_msg_unread = aw_msg_unread_count($db, (int)$_SESSION['user_id']); } catch (Throwable $e) { error_log('header messages: ' . $e->getMessage()); } }
+}
+$aw_first = explode(' ', $aw_me['name'])[0];
+$aw_logo = aw_logo_path(); // F191
+$aw_logo_default = $aw_logo === 'assets/images/logo.png';
+$aw_note_link = function ($l) use ($aw_u) {
+    $l = trim((string)$l);
+    if ($l === '') return $aw_u . '/notifications.php';
+    if (strpos($l, $aw_u . '/') === 0) return $l;
+    if ($l[0] === '/' && (strlen($l) < 2 || $l[1] !== '/')) return $aw_u . $l;
+    return $aw_u . '/notifications.php';
+};
+$aw_ago = function ($when) {
+    $t = strtotime((string)$when . ' UTC'); if (!$t) return '';
+    $d = time() - $t;
+    if ($d < 60) return 'just now'; if ($d < 3600) return floor($d / 60) . ' min ago'; if ($d < 86400) return floor($d / 3600) . ' h ago';
+    if ($d < 172800) return 'yesterday'; return date('j M', $t);
+};
+// drawer links: [group => [[label, icon, href, pages-for-current, count]]]
+$aw_groups = [];
+if (!$isLoggedIn) {
+    $aw_groups['Explore'] = [['Search', 'fa-magnifying-glass', $aw_u . '/search_results.php', ['search_results.php']], ['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
+        ['Reflections', 'fa-dove', $aw_u . '/reflections.php', ['reflections.php']], ['Blog', 'fa-pen-nib', $aw_u . '/blog.php', ['blog.php', 'blog_post.php']], ['Videos', 'fa-circle-play', $aw_u . '/videos.php', ['videos.php', 'video_watch.php']], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
+    $aw_groups['AngelWrites'] = [['About Angella', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Contact', 'fa-envelope', $aw_u . '/contact.php', ['contact.php']]];
+} elseif ($isAdmin) {
+    $aw_groups['Admin'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']], ['Books', 'fa-book', $aw_u . '/admin/manage_books.php', ['admin/manage_books.php']], ['Poems', 'fa-feather', $aw_u . '/admin/manage_poems.php', ['admin/manage_poems.php']],
+        ['Sessions', 'fa-calendar-check', $aw_u . '/admin/manage_sessions.php', ['admin/manage_sessions.php']], ['Members', 'fa-users', $aw_u . '/admin/manage_users.php', ['admin/manage_users.php']], ['Moderation', 'fa-shield-heart', $aw_u . '/admin/moderation.php', ['admin/moderation.php']],
+        ['Stories & Help', 'fa-seedling', $aw_u . '/admin/community.php', ['admin/community.php']], ['Settings', 'fa-sliders', $aw_u . '/admin/settings.php', ['admin/settings.php']]];
+    $aw_groups['Site'] = [['View the site', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_unread], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
+} else {
+    $aw_groups['You'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/dashboard.php', ['dashboard.php']], ['My library', 'fa-bookmark', $aw_u . '/library.php', ['library.php']],
+        ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_on ? $aw_msg_unread : null], ['Notifications', 'fa-bell', $aw_u . '/notifications.php', ['notifications.php'], $unreadNotifications], ['Profile', 'fa-user', $aw_u . '/profile.php', ['profile.php']]];
+    $aw_groups['Read'] = [['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
+        ['Reflections', 'fa-dove', $aw_u . '/reflections.php', ['reflections.php']], ['Blog', 'fa-pen-nib', $aw_u . '/blog.php', ['blog.php', 'blog_post.php']], ['Videos', 'fa-circle-play', $aw_u . '/videos.php', ['videos.php', 'video_watch.php']], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
+    $aw_groups['Community'] = array_values(array_filter([
+        $aw_stories_on ? ['Stories & Help', 'fa-seedling', $aw_u . '/stories.php', ['stories.php', 'story.php', 'story_write.php']] : null,
+        $aw_stories_on ? ['My Stories & Help', 'fa-pen', $aw_u . '/my_stories.php', ['my_stories.php']] : null,
+        ['Community Q&A', 'fa-circle-question', $aw_u . '/community.php', ['community.php']], ['Reading groups', 'fa-user-group', $aw_u . '/groups.php', ['groups.php', 'group.php']], ['Book a session', 'fa-calendar-check', $aw_u . '/book_session.php', ['book_session.php']]]));
+    if ($aw_is_staff) $aw_groups['Team'] = [['Staff dashboard', 'fa-shield-heart', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']]];
+}
+$aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_stories.php', 'community.php', 'groups.php', 'group.php', 'book_session.php'];
+?>
+    <header class="awh site-header" id="siteHeader">
+        <div class="awh-bar">
+            <a href="<?php echo $aw_u; ?>/<?php echo $isAdmin ? 'admin/dashboard.php' : 'index.php'; ?>" class="awh-logo" aria-label="AngelWrites – home">
+                <?php if ($aw_logo_default): ?><span class="awh-logo-crop"><img src="<?php echo $aw_u . '/' . htmlspecialchars($aw_logo); ?>" alt="AngelWrites"></span>
+                <?php else: ?><span class="awh-logo-plain"><img src="<?php echo $aw_u . '/' . htmlspecialchars($aw_logo); ?>" alt="AngelWrites"></span><?php endif; ?>
+            </a>
 
-    <header class="site-header" id="siteHeader">
-        <nav class="navbar" role="navigation" aria-label="Main navigation">
-            <div class="container nav-container">
-                <a href="<?php echo SITE_URL; ?>/index.php" class="logo" aria-label="AngelWrites – Home">
-                    <img src="<?php echo SITE_URL . '/' . htmlspecialchars(aw_logo_path()); /* F191 */ ?>" alt="AngelWrites – Christian writing and community" class="logo-img">
-                </a>
-
-                <!-- ===== NAVIGATION LINKS ===== -->
-                <ul class="nav-links" id="navLinks" role="menubar">
+            <nav class="awh-nav" aria-label="Main">
+                <span class="awh-ink" aria-hidden="true"></span>
+                <ul class="awh-links" id="navLinks">
                     <?php if (!$isLoggedIn): ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>" role="menuitem">Books</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>" role="menuitem">Poems</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/blog.php" class="<?php echo $currentPage === 'blog.php' ? 'active' : ''; ?>" role="menuitem">Blog</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/reflections.php" class="<?php echo $currentPage === 'reflections.php' ? 'active' : ''; ?>" role="menuitem">Reflections</a></li><!-- F74 -->
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/about.php" class="<?php echo $currentPage === 'about.php' ? 'active' : ''; ?>" role="menuitem">About</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/contact.php" class="<?php echo $currentPage === 'contact.php' ? 'active' : ''; ?>" role="menuitem">Contact</a></li>
-                        <li class="nav-separator" role="separator">|</li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/login.php" class="btn-login" role="menuitem"><i class="fas fa-sign-in-alt"></i> Login</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/register.php" class="btn-signup" role="menuitem">Sign Up</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/index.php"<?php echo $aw_cur('index.php'); ?>>Home</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>>Books</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>>Poems</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>>Reflections</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/blog.php"<?php echo $aw_cur(['blog.php', 'blog_post.php']); ?>>Blog</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/about.php"<?php echo $aw_cur('about.php'); ?>>About</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/contact.php"<?php echo $aw_cur('contact.php'); ?>>Contact</a></li>
                     <?php elseif ($isAdmin): ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_books.php" role="menuitem"><i class="fas fa-book"></i> Books</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_poems.php" role="menuitem"><i class="fas fa-feather-pointed"></i> Poems</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_sessions.php" role="menuitem"><i class="fas fa-calendar-check"></i> Sessions</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/manage_users.php" role="menuitem"><i class="fas fa-users"></i> Users</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/settings.php" role="menuitem"><i class="fas fa-gear"></i> Settings</a></li>
-                        <li class="nav-separator" role="separator">|</li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/dashboard.php"<?php echo $aw_cur('admin/dashboard.php'); ?>>Dashboard</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_books.php"<?php echo $aw_cur('admin/manage_books.php'); ?>>Books</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_poems.php"<?php echo $aw_cur('admin/manage_poems.php'); ?>>Poems</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_sessions.php"<?php echo $aw_cur('admin/manage_sessions.php'); ?>>Sessions</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_users.php"<?php echo $aw_cur('admin/manage_users.php'); ?>>Members</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/settings.php"<?php echo $aw_cur('admin/settings.php'); ?>>Settings</a></li>
                     <?php else: ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/index.php" class="<?php echo $currentPage === 'index.php' ? 'active' : ''; ?>" role="menuitem">Home</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/dashboard.php" class="<?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/library.php" class="<?php echo $currentPage === 'library.php' ? 'active' : ''; ?>" role="menuitem"><i class="fas fa-book-reader"></i> My Library</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/books.php" class="<?php echo $currentPage === 'books.php' ? 'active' : ''; ?>" role="menuitem">Books</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/poetry.php" class="<?php echo $currentPage === 'poetry.php' ? 'active' : ''; ?>" role="menuitem">Poems</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/reflections.php" class="<?php echo $currentPage === 'reflections.php' ? 'active' : ''; ?>" role="menuitem">Reflections</a></li><!-- F74 -->
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/community.php" class="<?php echo $currentPage === 'community.php' ? 'active' : ''; ?>" role="menuitem">Community</a></li>
-                        <?php if ((string)(function_exists('aw_setting') ? aw_setting('community_posts_enabled', '1') : '1') !== '0'): /* D2 */ ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/stories.php" class="<?php echo in_array($currentPage, ['stories.php', 'story.php', 'story_write.php', 'my_stories.php'], true) ? 'active' : ''; ?>" role="menuitem">Get help · Offer help</a></li>
-                        <?php endif; ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/book_session.php" class="<?php echo $currentPage === 'book_session.php' ? 'active' : ''; ?>" role="menuitem">Book Session</a></li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/profile.php" class="<?php echo $currentPage === 'profile.php' ? 'active' : ''; ?>" role="menuitem">Profile</a></li>
-                        <?php if (function_exists('aw_is_staff') && aw_is_staff()): /* K1: moderators */ ?>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/admin/dashboard.php" role="menuitem"><i class="fas fa-shield-heart" aria-hidden="true"></i> Staff</a></li>
-                        <?php endif; ?>
-                        <li class="nav-separator" role="separator">|</li>
-                        <li role="none"><a href="<?php echo SITE_URL; ?>/logout.php" class="btn-logout" role="menuitem"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/index.php"<?php echo $aw_cur('index.php'); ?>>Home</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/library.php"<?php echo $aw_cur('library.php'); ?>>My library</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>>Books</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>>Poems</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>>Reflections</a></li>
+                        <li>
+                            <button type="button" class="awh-link<?php echo $aw_is($aw_community_pages) ? ' is-active' : ''; ?>" aria-haspopup="true" aria-expanded="false" aria-controls="awhCommunity" onclick="awToggleMenu(this, 'awhCommunity')">Community <i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                            <div class="awh-menu" id="awhCommunity">
+                                <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/stories.php"><i class="fas fa-seedling" aria-hidden="true"></i><span>Stories &amp; Help<small>Get help · Offer help</small></span></a><?php endif; ?>
+                                <a href="<?php echo $aw_u; ?>/community.php"><i class="fas fa-circle-question" aria-hidden="true"></i><span>Community Q&amp;A<small>Ask and answer</small></span></a>
+                                <a href="<?php echo $aw_u; ?>/groups.php"><i class="fas fa-user-group" aria-hidden="true"></i><span>Reading groups<small>Read a book together</small></span></a>
+                                <a href="<?php echo $aw_u; ?>/book_session.php"><i class="fas fa-calendar-check" aria-hidden="true"></i><span>Book a session<small>Talk with Angella</small></span></a>
+                            </div>
+                        </li>
                     <?php endif; ?>
                 </ul>
+            </nav>
 
-                <!-- ===== NAV ACTIONS ===== -->
-                <div class="nav-actions">
-                    <!-- Search (Direct link, no dropdown) -->
-                    <a href="<?php echo SITE_URL; ?>/search_results.php" class="nav-action-icon" aria-label="Search">
-                        <i class="fas fa-search"></i>
-                    </a>
-
-                    <!-- Bible Reader -->
-                    <a href="<?php echo SITE_URL; ?>/bible_reader.php" class="nav-action-icon" aria-label="Open Bible reader">
-                        <i class="fas fa-book-bible"></i>
-                    </a>
-
-                    <!-- Notifications -->
-                    <?php if ($isLoggedIn):
-                        // I2: unread conversations and requests, counted once on page load (nothing polls)
-                        $aw_msg_unread = 0;
-                        $aw_msg_on = (string)(function_exists('aw_setting') ? aw_setting('messaging_enabled', '1') : '1') !== '0';
-                        if ($aw_msg_on) { try { require_once __DIR__ . '/messaging.php'; $aw_msg_unread = aw_msg_unread_count($db, (int)$_SESSION['user_id']); } catch (Throwable $e) { error_log('header messages: ' . $e->getMessage()); } }
-                    ?>
-                        <?php if ($aw_msg_on): ?>
-                        <div class="notification-wrapper">
-                            <a class="nav-action-icon" href="<?php echo SITE_URL; ?>/messages.php" aria-label="Messages<?php echo $aw_msg_unread ? ', ' . (int)$aw_msg_unread . ' unread' : ''; ?>" style="position:relative;display:inline-flex;align-items:center;justify-content:center;color:inherit;text-decoration:none">
-                                <i class="fas fa-envelope" aria-hidden="true"></i>
-                                <?php if ($aw_msg_unread > 0): ?><span class="notification-badge" aria-hidden="true"><?php echo (int)$aw_msg_unread; ?></span><?php endif; ?>
-                            </a>
-                        </div>
-                        <?php endif; ?>
-                        <div class="notification-wrapper">
-                            <button type="button" class="nav-action-icon" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" aria-controls="notificationDropdown" onclick="awToggleMenu(this, 'notificationDropdown')">
-                                <i class="fas fa-bell"></i>
-                                <?php if ($unreadNotifications > 0): ?>
-                                    <span class="notification-badge"><?php echo $unreadNotifications; ?></span>
-                                <?php endif; ?>
-                            </button>
-                            <div class="notification-dropdown" id="notificationDropdown">
-                                <?php if (count($latestNotifications) > 0): ?>
-                                    <?php foreach ($latestNotifications as $notif): ?>
-                                        <div class="notif-item">
-                                            <div class="notif-title"><?php echo htmlspecialchars($notif['title']); ?></div>
-                                            <div class="notif-message"><?php echo htmlspecialchars(substr($notif['message'], 0, 60)); ?></div>
-                                            <div class="notif-date"><?php echo date('M j, Y', strtotime($notif['created_at'])); ?></div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                    <a href="<?php echo SITE_URL; ?>/notifications.php" class="view-all">View All →</a>
-                                <?php else: ?>
-                                    <div class="notif-item">No notifications yet.</div>
-                                <?php endif; ?>
-                            </div>
-                        </div>
+            <div class="awh-actions">
+                <a href="<?php echo $aw_u; ?>/search_results.php" class="awh-icon awh-hide-sm" aria-label="Search" title="Search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></a>
+                <a href="<?php echo $aw_u; ?>/bible_reader.php" class="awh-icon awh-hide-sm" aria-label="Bible" title="Bible"><i class="fas fa-book-bible" aria-hidden="true"></i></a>
+                <?php if ($isLoggedIn): ?>
+                    <?php if ($aw_msg_on): ?>
+                    <a class="awh-icon" href="<?php echo $aw_u; ?>/messages.php" aria-label="Messages<?php echo $aw_msg_unread ? ', ' . (int)$aw_msg_unread . ' unread' : ''; ?>" title="Messages"><i class="fas fa-envelope" aria-hidden="true"></i><?php if ($aw_msg_unread > 0): ?><span class="awh-badge" aria-hidden="true"><?php echo (int)$aw_msg_unread; ?></span><?php endif; ?></a>
                     <?php endif; ?>
-
-                    <!-- Theme Toggle -->
-                    <button class="nav-action-icon theme-toggle" id="themeToggle" aria-label="Toggle theme">
-                        <i class="fas fa-moon"></i>
-                    </button>
-
-                    <!-- User Dropdown (Logged in only) -->
-                    <?php if ($isLoggedIn): ?>
-                        <div class="user-wrapper">
-                            <!-- A1: the account menu opens from a real button (keyboard and screen readers), not a clickable div -->
-                            <button type="button" class="user-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" onclick="awToggleMenu(this, 'userDropdown')">
-                                <i class="fas fa-user-circle" aria-hidden="true" style="font-size: 1.2rem; color: var(--text);"></i>
-                                <span style="font-size: 0.9rem; color: var(--text);"><?php echo htmlspecialchars($_SESSION['name'] ?? 'User'); ?></span>
-                                <span class="sr-only">account menu</span>
-                            </button>
-                            <div class="user-dropdown" id="userDropdown">
-                                <a href="<?php echo SITE_URL; ?>/dashboard.php">Dashboard</a>
-                                <a href="<?php echo SITE_URL; ?>/library.php">My Library</a>
-                                <a href="<?php echo SITE_URL; ?>/profile.php">Profile</a>
-                                <hr>
-                                <a href="<?php echo SITE_URL; ?>/logout.php" style="color: #b4505a;">Logout</a>
-                            </div>
+                    <div class="awh-wrap">
+                        <button type="button" class="awh-icon" aria-label="Notifications<?php echo $unreadNotifications ? ', ' . (int)$unreadNotifications . ' new' : ''; ?>" title="Notifications" aria-haspopup="true" aria-expanded="false" aria-controls="notificationDropdown" onclick="awToggleMenu(this, 'notificationDropdown')">
+                            <i class="fas fa-bell" aria-hidden="true"></i><?php if ($unreadNotifications > 0): ?><span class="awh-badge" aria-hidden="true"><?php echo (int)$unreadNotifications; ?></span><?php endif; ?>
+                        </button>
+                        <div class="awh-menu awh-notes" id="notificationDropdown">
+                            <div class="awh-notes-head"><strong>Notifications</strong><a href="<?php echo $aw_u; ?>/notifications.php">See all</a></div>
+                            <?php if (!$latestNotifications): ?><p class="awh-empty">Nothing yet. Replies, answers and messages will appear here.</p>
+                            <?php else: foreach ($latestNotifications as $notif): ?>
+                                <a class="awh-note<?php echo empty($notif['is_read']) ? ' is-new' : ''; ?>" href="<?php echo htmlspecialchars($aw_note_link($notif['link'] ?? '')); ?>"><span class="awh-dot" aria-hidden="true"></span><span><b><?php echo htmlspecialchars($notif['title']); ?></b><span><?php echo htmlspecialchars(mb_strimwidth((string)$notif['message'], 0, 90, '…')); ?></span><time><?php echo htmlspecialchars($aw_ago($notif['created_at'])); ?></time></span></a>
+                            <?php endforeach; endif; ?>
                         </div>
-                    <?php else: ?>
-                        <!-- Guest: login/signup icons -->
-                        <a href="<?php echo SITE_URL; ?>/login.php" class="nav-action-icon" aria-label="Login">
-                            <i class="fas fa-sign-in-alt"></i>
-                        </a>
-                        <a href="<?php echo SITE_URL; ?>/register.php" class="nav-action-icon" aria-label="Sign up">
-                            <i class="fas fa-user-plus"></i>
-                        </a>
-                    <?php endif; ?>
-
-                    <!-- ===== HAMBURGER (Only visible on mobile) ===== -->
-                    <button class="hamburger" id="hamburger" aria-label="Toggle navigation menu" onclick="toggleMobileMenu()">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </button>
-                </div>
+                    </div>
+                <?php endif; ?>
+                <button type="button" class="awh-icon theme-toggle" id="themeToggle" aria-label="Change theme (light, dark or your device's setting)" title="Theme"><i class="fas fa-moon"></i></button>
+                <?php if ($isLoggedIn): ?>
+                    <div class="awh-wrap awh-hide-md">
+                        <button type="button" class="awh-me" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" onclick="awToggleMenu(this, 'userDropdown')">
+                            <span class="awh-avatar" aria-hidden="true"><?php if ($aw_me['avatar']): ?><img src="<?php echo htmlspecialchars($aw_me['avatar']); ?>" alt="" onerror="this.remove()"><?php endif; ?><?php echo htmlspecialchars($aw_me['initial']); ?></span>
+                            <span class="awh-me-name"><?php echo htmlspecialchars($aw_first); ?></span><i class="fas fa-chevron-down" aria-hidden="true"></i><span class="sr-only">, account menu</span>
+                        </button>
+                        <div class="awh-menu" id="userDropdown">
+                            <div class="awh-menu-head"><strong><?php echo htmlspecialchars($aw_me['name']); ?></strong><span><?php echo htmlspecialchars($aw_me['email']); ?></span></div>
+                            <?php if ($isAdmin): ?>
+                                <a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i>Admin dashboard</a>
+                                <a href="<?php echo $aw_u; ?>/admin/moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Moderation</a>
+                                <a href="<?php echo $aw_u; ?>/index.php"><i class="fas fa-house" aria-hidden="true"></i>View the site</a>
+                                <a href="<?php echo $aw_u; ?>/account_security.php"><i class="fas fa-lock" aria-hidden="true"></i>Account security</a>
+                            <?php else: ?>
+                                <a href="<?php echo $aw_u; ?>/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i>Dashboard</a>
+                                <a href="<?php echo $aw_u; ?>/library.php"><i class="fas fa-bookmark" aria-hidden="true"></i>My library</a>
+                                <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i>My Stories &amp; Help</a><?php endif; ?>
+                                <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i>Profile</a>
+                                <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Staff dashboard</a><?php endif; ?>
+                            <?php endif; ?>
+                            <hr>
+                            <a class="awh-out" href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i>Log out</a>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <a class="awh-login awh-hide-md" href="<?php echo $aw_u; ?>/login.php">Log in</a>
+                    <a class="awh-join" href="<?php echo $aw_u; ?>/register.php">Join free</a>
+                <?php endif; ?>
+                <button type="button" class="awh-icon awh-burger" id="hamburger" aria-label="Menu" aria-expanded="false" aria-controls="awhDrawer" onclick="toggleMobileMenu()"><span></span><span></span><span></span></button>
             </div>
-        </nav>
-
-        <!-- Overlay -->
-        <div class="menu-overlay" id="menuOverlay" onclick="closeMobileMenu()"></div>
+        </div>
     </header>
+
+    <div class="awh-scrim" id="menuOverlay" onclick="closeMobileMenu()"></div>
+    <div class="awh-drawer" id="awhDrawer" role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1">
+        <div class="awh-drawer-head">
+            <?php if ($aw_logo_default): ?><span class="awh-logo-crop" style="height:34px;width:122px"><img src="<?php echo $aw_u . '/' . htmlspecialchars($aw_logo); ?>" alt="AngelWrites" style="height:122.2px;margin:-40.5px 0 0 -27.9px"></span><?php else: ?><span class="awh-logo-plain"><img src="<?php echo $aw_u . '/' . htmlspecialchars($aw_logo); ?>" alt="AngelWrites" style="max-height:38px"></span><?php endif; ?>
+            <button type="button" class="awh-icon" onclick="closeMobileMenu()" aria-label="Close the menu"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+        </div>
+        <div class="awh-drawer-body">
+            <?php if ($isLoggedIn): ?>
+                <div class="awh-drawer-me"><span class="awh-avatar" aria-hidden="true"><?php if ($aw_me['avatar']): ?><img src="<?php echo htmlspecialchars($aw_me['avatar']); ?>" alt="" onerror="this.remove()"><?php endif; ?><?php echo htmlspecialchars($aw_me['initial']); ?></span><span><strong><?php echo htmlspecialchars($aw_me['name']); ?></strong><span><?php echo htmlspecialchars($aw_me['email']); ?></span></span></div>
+            <?php endif; ?>
+            <?php $aw_i = 0; foreach ($aw_groups as $aw_g => $aw_items): ?>
+                <p class="awh-group"><?php echo htmlspecialchars($aw_g); ?></p>
+                <?php foreach ($aw_items as $it): ?>
+                    <a class="awh-dlink" style="--i:<?php echo $aw_i++; ?>" href="<?php echo htmlspecialchars($it[2]); ?>"<?php echo $aw_cur($it[3]); ?>><i class="fas <?php echo $it[1]; ?>" aria-hidden="true"></i><?php echo htmlspecialchars($it[0]); ?><?php if (!empty($it[4])): ?><span class="awh-count"><?php echo (int)$it[4]; ?><span class="sr-only"> new</span></span><?php endif; ?></a>
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+        </div>
+        <div class="awh-drawer-foot">
+            <?php if ($isLoggedIn): ?>
+                <a href="<?php echo $aw_u; ?>/search_results.php"><i class="fas fa-magnifying-glass" aria-hidden="true"></i> Search</a>
+                <a href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i> Log out</a>
+            <?php else: ?>
+                <a href="<?php echo $aw_u; ?>/login.php">Log in</a>
+                <a class="awh-join" href="<?php echo $aw_u; ?>/register.php">Join free</a>
+            <?php endif; ?>
+        </div>
+    </div>
 
     <main class="site-main" id="mainContent">
         <?php if (isset($_SESSION['notification'])): ?>
@@ -445,7 +341,7 @@ if ($isLoggedIn) {
                 <?php unset($_SESSION['notification']); ?>
             </div>
         <?php endif; ?>
-        
+
         <?php if (isset($breadcrumbs) && is_array($breadcrumbs)): ?>
             <div class="breadcrumbs">
                 <div class="container">
@@ -460,141 +356,102 @@ if ($isLoggedIn) {
             </div>
         <?php endif; ?>
 
-    <!-- ===== JAVASCRIPT – ENHANCED & BUG-FREE ===== -->
     <script>
-        // ===== MOBILE MENU – TOGGLE & CLOSE =====
-        function toggleMobileMenu() {
-            const navLinks = document.getElementById('navLinks');
-            const overlay = document.getElementById('menuOverlay');
-            const hamburger = document.getElementById('hamburger');
-            const body = document.body;
+    (function () {
+        var header = document.getElementById('siteHeader'), drawer = document.getElementById('awhDrawer'), scrim = document.getElementById('menuOverlay'), burger = document.getElementById('hamburger');
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-            if (!navLinks) return;
-
-            const isOpen = navLinks.classList.contains('open');
-
-            if (isOpen) {
-                closeMobileMenu();
-            } else {
-                navLinks.classList.add('open');
-                if (overlay) overlay.classList.add('open');
-                if (hamburger) hamburger.classList.add('active');
-                body.style.overflow = 'hidden';
-            }
+        // ----- the drawer (phones and narrow windows) -----
+        function focusables() { return drawer.querySelectorAll('a[href], button:not([disabled])'); }
+        window.toggleMobileMenu = function () { drawer.classList.contains('open') ? window.closeMobileMenu() : openDrawer(); };
+        function openDrawer() {
+            drawer.classList.add('open'); scrim.classList.add('open'); burger.setAttribute('aria-expanded', 'true');
+            document.body.style.overflow = 'hidden'; header.classList.remove('is-away');
+            setTimeout(function () { drawer.focus({ preventScroll: true }); }, 60); // Tab then moves into the links
         }
-
-        function closeMobileMenu() {
-            const navLinks = document.getElementById('navLinks');
-            const overlay = document.getElementById('menuOverlay');
-            const hamburger = document.getElementById('hamburger');
-            const body = document.body;
-
-            if (!navLinks) return;
-
-            navLinks.classList.remove('open');
-            if (overlay) overlay.classList.remove('open');
-            if (hamburger) hamburger.classList.remove('active');
-            body.style.overflow = '';
-        }
-
-        // ===== DOM READY =====
-        document.addEventListener('DOMContentLoaded', function() {
-            // Scroll shadow
-            const header = document.getElementById('siteHeader');
-            if (header) {
-                window.addEventListener('scroll', function() {
-                    header.classList.toggle('scrolled', window.scrollY > 10);
-                });
-            }
-
-            // Theme toggle
-            const themeToggle = document.getElementById('themeToggle');
-            const html = document.documentElement;
-            const themes = ['light', 'dark', 'system'];
-            let currentThemeIndex = 0;
-            const storedTheme = localStorage.getItem('angelwrites_theme');
-            if (storedTheme && themes.includes(storedTheme)) {
-                currentThemeIndex = themes.indexOf(storedTheme);
-            }
-
-            function applyTheme(theme) {
-                if (theme === 'system') {
-                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-                } else {
-                    html.setAttribute('data-theme', theme);
-                }
-                document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
-                updateIcon(theme);
-                localStorage.setItem('angelwrites_theme', theme);
-            }
-
-            function updateIcon(theme) {
-                if (themeToggle) {
-                    const icon = themeToggle.querySelector('i');
-                    if (theme === 'dark') icon.className = 'fas fa-sun';
-                    else if (theme === 'light') icon.className = 'fas fa-moon';
-                    else icon.className = 'fas fa-circle-half-stroke';
-                }
-            }
-
-            applyTheme(themes[currentThemeIndex]);
-
-            if (themeToggle) {
-                themeToggle.addEventListener('click', function() {
-                    currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-                    applyTheme(themes[currentThemeIndex]);
-                });
-            }
-
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                if (localStorage.getItem('angelwrites_theme') === 'system') {
-                    html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-                }
-            });
-
-            // Close mobile menu when a link is clicked
-            document.querySelectorAll('#navLinks a').forEach(function(link) {
-                link.addEventListener('click', function() {
-                    closeMobileMenu();
-                });
-            });
-
-            // Close mobile menu on Escape
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') closeMobileMenu();
-            });
-
-            // A1: menu buttons report their state (aria-expanded); Escape closes an open menu
-            window.awToggleMenu = function (btn, id) {
-                const dd = document.getElementById(id);
-                if (!dd) return;
-                const open = !dd.classList.contains('open');
-                dd.classList.toggle('open', open);
-                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            };
-            function awCloseMenu(id) {
-                const dd = document.getElementById(id);
-                if (!dd || !dd.classList.contains('open')) return false;
-                dd.classList.remove('open');
-                const b = document.querySelector('[aria-controls="' + id + '"]');
-                if (b) b.setAttribute('aria-expanded', 'false');
-                return b;
-            }
-            document.addEventListener('keydown', function (e) {
-                if (e.key !== 'Escape') return;
-                ['userDropdown', 'notificationDropdown'].forEach(function (id) { const b = awCloseMenu(id); if (b) b.focus(); });
-            });
-
-            // Close all dropdowns on outside click
-            document.addEventListener('click', function(e) {
-                // Item 6 (F198): guests have neither dropdown; the null access threw on every click.
-                const notifDd = document.getElementById('notificationDropdown');
-                const userDd = document.getElementById('userDropdown');
-                if (notifDd && !e.target.closest('.notification-wrapper')) awCloseMenu('notificationDropdown');
-                if (userDd && !e.target.closest('.user-wrapper')) awCloseMenu('userDropdown');
-            });
+        window.closeMobileMenu = function () {
+            if (!drawer.classList.contains('open')) return;
+            drawer.classList.remove('open'); scrim.classList.remove('open'); burger.setAttribute('aria-expanded', 'false');
+            document.body.style.overflow = ''; burger.focus();
+        };
+        drawer.addEventListener('keydown', function (e) { // keep Tab inside the open drawer
+            if (e.key !== 'Tab') return;
+            var f = focusables(); if (!f.length) return;
+            var a = f[0], z = f[f.length - 1];
+            if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
         });
+
+        // ----- small menus -----
+        window.awToggleMenu = function (btn, id) {
+            var dd = document.getElementById(id); if (!dd) return;
+            var open = !dd.classList.contains('open');
+            document.querySelectorAll('.awh-menu.open').forEach(function (m) { if (m !== dd) awCloseMenu(m.id); });
+            dd.classList.toggle('open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) header.classList.remove('is-away');
+        };
+        function awCloseMenu(id) {
+            var dd = document.getElementById(id); if (!dd || !dd.classList.contains('open')) return null;
+            dd.classList.remove('open');
+            var b = document.querySelector('[aria-controls="' + id + '"]'); if (b) b.setAttribute('aria-expanded', 'false');
+            return b;
+        }
+        document.addEventListener('click', function (e) {
+            document.querySelectorAll('.awh-menu.open').forEach(function (m) { if (!m.parentNode.contains(e.target)) awCloseMenu(m.id); });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            window.closeMobileMenu();
+            document.querySelectorAll('.awh-menu.open').forEach(function (m) { var b = awCloseMenu(m.id); if (b) b.focus(); });
+        });
+
+        // ----- the pill that glides to the link you point at -----
+        var links = document.getElementById('navLinks'), ink = document.querySelector('.awh-nav .awh-ink');
+        function inkTo(el) {
+            if (!ink) return;
+            if (!el) { ink.style.opacity = '0'; return; }
+            var nr = ink.parentNode.getBoundingClientRect(), r = el.getBoundingClientRect();
+            ink.style.width = r.width + 'px'; ink.style.top = (r.top - nr.top) + 'px'; ink.style.height = r.height + 'px';
+            ink.style.transform = 'translateX(' + (r.left - nr.left) + 'px)'; ink.style.opacity = '1';
+        }
+        function home() { return links ? links.querySelector('.awh-link[aria-current="page"], .awh-link.is-active') : null; }
+        if (links) {
+            links.addEventListener('mouseover', function (e) { var a = e.target.closest('.awh-link'); if (a) inkTo(a); });
+            links.addEventListener('focusin', function (e) { var a = e.target.closest('.awh-link'); if (a) inkTo(a); });
+            links.addEventListener('mouseleave', function () { inkTo(home()); });
+            window.addEventListener('load', function () { inkTo(home()); });
+            window.addEventListener('resize', function () { inkTo(home()); }, { passive: true });
+        }
+
+        // ----- slimmer when scrolled; steps aside while you read down, comes back when you scroll up -----
+        var lastY = window.scrollY, ticking = false;
+        window.addEventListener('scroll', function () {
+            if (ticking) return; ticking = true;
+            requestAnimationFrame(function () {
+                ticking = false;
+                var y = window.scrollY, busy = document.querySelector('.awh-menu.open') || drawer.classList.contains('open') || header.contains(document.activeElement);
+                header.classList.toggle('is-scrolled', y > 8);
+                header.classList.toggle('scrolled', y > 8);
+                if (!calm && !busy && y > 260 && y - lastY > 6) header.classList.add('is-away');
+                else if (lastY - y > 6 || y < 120) header.classList.remove('is-away');
+                lastY = y;
+            });
+        }, { passive: true });
+        header.addEventListener('focusin', function () { header.classList.remove('is-away'); });
+
+        // ----- theme: light, dark, or the device's setting -----
+        var themeToggle = document.getElementById('themeToggle'), html = document.documentElement, themes = ['light', 'dark', 'system'], idx = 0;
+        try { var st = localStorage.getItem('angelwrites_theme'); if (st && themes.indexOf(st) > -1) idx = themes.indexOf(st); } catch (e) {}
+        function applyTheme(theme) {
+            html.setAttribute('data-theme', theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme);
+            document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
+            try { localStorage.setItem('angelwrites_theme', theme); } catch (e) {}
+            var i = themeToggle && themeToggle.querySelector('i');
+            if (i) i.className = theme === 'dark' ? 'fas fa-sun' : (theme === 'light' ? 'fas fa-moon' : 'fas fa-circle-half-stroke');
+        }
+        applyTheme(themes[idx]);
+        if (themeToggle) themeToggle.addEventListener('click', function () { idx = (idx + 1) % themes.length; applyTheme(themes[idx]); });
+        if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            try { if (localStorage.getItem('angelwrites_theme') === 'system') html.setAttribute('data-theme', e.matches ? 'dark' : 'light'); } catch (er) {}
+        });
+    })();
     </script>
-</body>
-</html>
