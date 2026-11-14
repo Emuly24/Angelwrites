@@ -302,7 +302,7 @@ function aw_poem_reader(array $poem, $db = null, array $opts = []) {
         }
     }
     $h .= '</div>';
-    $h .= '<script src="' . SITE_URL . '/assets/js/aw-poem.js?v=1" defer></script>';
+    $h .= '<script src="' . SITE_URL . '/assets/js/aw-poem.js?v=2" defer></script>';
     return $h;
 }
 

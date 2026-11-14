@@ -78,14 +78,21 @@ if ($isLoggedIn) {
     // 1. Strictly ENSURE these variables are defined, even if they are empty.
     $og_title       = isset($og_title)       ? htmlspecialchars($og_title)       : (isset($pageTitle) ? htmlspecialchars($pageTitle) : htmlspecialchars(aw_site_name())); // F191
     $og_description = isset($og_description) ? htmlspecialchars($og_description) : 'AngelWrites — Christian writing and community platform.';
-    $og_url         = isset($og_url)         ? htmlspecialchars($og_url)         : SITE_URL . $_SERVER['REQUEST_URI'];
+    $og_url         = isset($og_url)         ? htmlspecialchars($og_url)         : htmlspecialchars(SITE_URL . strtok((string)($_SERVER['REQUEST_URI'] ?? '/'), '#'));
     $og_image       = isset($og_image)       ? htmlspecialchars($og_image)       : SITE_URL . '/assets/images/og-logo.jpg'; // Q43: angelwrites-logo.png never existed
+    if (!isset($og_image_width) && strpos($og_image, '/og-logo.jpg') !== false) { $og_image_width = 1200; $og_image_height = 800; }
+    $og_image_alt   = htmlspecialchars($og_image_alt ?? (html_entity_decode($og_title, ENT_QUOTES, 'UTF-8') . ' · AngelWrites'));
+    $og_image_type  = strpos($og_image, '/og_image.php') !== false || preg_match('/\.jpe?g($|\?)/i', $og_image) ? 'image/jpeg' : (preg_match('/\.png($|\?)/i', $og_image) ? 'image/png' : '');
 ?>
+<meta property="og:site_name" content="<?php echo htmlspecialchars(aw_site_name()); ?>" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="<?php echo $og_title; ?>" />
 <meta property="og:description" content="<?php echo $og_description; ?>" />
 <meta property="og:url" content="<?php echo $og_url; ?>" />
 <meta property="og:image" content="<?php echo $og_image; ?>" />
+<meta property="og:image:secure_url" content="<?php echo $og_image; ?>" />
+<?php if ($og_image_type !== ''): ?><meta property="og:image:type" content="<?php echo $og_image_type; ?>" /><?php endif; ?>
+<meta property="og:image:alt" content="<?php echo $og_image_alt; ?>" />
 <?php if (isset($og_image_width)): ?>
     <meta property="og:image:width" content="<?php echo $og_image_width; ?>" />
     <meta property="og:image:height" content="<?php echo $og_image_height; ?>" />
@@ -95,6 +102,8 @@ if ($isLoggedIn) {
 <meta name="twitter:title" content="<?php echo $og_title; ?>" />
 <meta name="twitter:description" content="<?php echo $og_description; ?>" />
 <meta name="twitter:image" content="<?php echo $og_image; ?>" />
+<meta name="twitter:image:alt" content="<?php echo $og_image_alt; ?>" />
+<?php if (!empty($aw_share_url)): /* the share buttons and the reader's Share use the relay link when one is set up */ ?><script>window.AW_SHARE_URL = <?php echo json_encode((string)$aw_share_url, JSON_HEX_TAG | JSON_UNESCAPED_SLASHES); ?>;</script><?php endif; ?>
     
     <style>
         /* ===== RESET & BASE ===== */
