@@ -1,0 +1,28 @@
+/* AngelWrites icons (loaded on every page).
+   The site's own symbols replace a few Font Awesome ones, everywhere at once (including icons that
+   scripts add later), without changing any page:
+     - every pen: the fountain pen from the logo (was a quill, a pen nib, a fancy pen, an edit pen);
+     - reflections: a speech bubble with quotation marks and a spark, for shared experiences,
+       insights, lessons and quotes (was a dove);
+     - community: a group of people (was a seedling);
+     - sharing or uploading a book: a book (was a book with a cross, which looked like a Bible).
+   The drawn icons are masks filled with the text colour, so they follow every theme. */
+.fa-feather, .fa-feather-pointed, .fa-feather-alt, .fa-pen, .fa-pen-nib, .fa-pen-fancy, .fa-pen-alt,
+.fa-pen-to-square, .fa-edit, .fa-pencil, .fa-pencil-alt, .fa-pen-clip, .fa-pen-square,
+.fa-dove {
+    display: inline-block; width: 1em; height: 1em; vertical-align: -.125em;
+    background-color: currentColor;
+    -webkit-mask: var(--aw-ico) center / contain no-repeat; mask: var(--aw-ico) center / contain no-repeat;
+}
+.fa-feather::before, .fa-feather-pointed::before, .fa-feather-alt::before, .fa-pen::before, .fa-pen-nib::before, .fa-pen-fancy::before, .fa-pen-alt::before,
+.fa-pen-to-square::before, .fa-edit::before, .fa-pencil::before, .fa-pencil-alt::before, .fa-pen-clip::before, .fa-pen-square::before,
+.fa-dove::before { content: "" !important; }
+.fa-feather, .fa-feather-pointed, .fa-feather-alt, .fa-pen, .fa-pen-nib, .fa-pen-fancy, .fa-pen-alt,
+.fa-pen-to-square, .fa-edit, .fa-pencil, .fa-pencil-alt, .fa-pen-clip, .fa-pen-square { --aw-ico: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGcgdHJhbnNmb3JtPSJyb3RhdGUoNDIgMTIgMTIpIj48cGF0aCBkPSJNOS43NSAxLjhjMC0xIDEtMS44IDIuMjUtMS44czIuMjUuOCAyLjI1IDEuOHY5LjloLTQuNXoiLz48cmVjdCB4PSI5LjI1IiB5PSIxMi4zNSIgd2lkdGg9IjUuNSIgaGVpZ2h0PSIxLjc1IiByeD0iLjUiLz48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik05LjkgMTQuNzVoNC4ybC0uODUgNC4wNUwxMiAyMy42bC0xLjI1LTQuOHpNMTEuNzggMTcuMWguNDR2NC4xaC0uNDR6TTEyIDE1LjU1YS43Mi43MiAwIDEgMCAwIDEuNDQuNzIuNzIgMCAwIDAgMC0xLjQ0eiIvPjwvZz48L3N2Zz4=); }
+.fa-dove { --aw-ico: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNNC42IDIuNWgxNC44QTMuMSAzLjEgMCAwIDEgMjIuNSA1LjZ2OS4zYTMuMSAzLjEgMCAwIDEtMy4xIDMuMWgtNy4xbC01LjEgNC4yYy0uNi41LTEuNC4xLTEuNC0uN1YxOEg0LjZhMy4xIDMuMSAwIDAgMS0zLjEtMy4xVjUuNmEzLjEgMy4xIDAgMCAxIDMuMS0zLjF6TTguMiA2LjdjLTEuNS40LTIuNiAxLjgtMi42IDMuNnYzLjFoMy4ydi0zLjFINy41YzAtLjkuNS0xLjYgMS4zLTEuOXptNiAwYy0xLjUuNC0yLjYgMS44LTIuNiAzLjZ2My4xaDMuMnYtMy4xaC0xLjNjMC0uOS41LTEuNiAxLjMtMS45ek0xOC4zIDUuMmwuNDUgMS4xIDEuMS40NS0xLjEuNDUtLjQ1IDEuMS0uNDUtMS4xLTEuMS0uNDUgMS4xLS40NXoiLz48L3N2Zz4=); }
+.fa-fw.fa-pen, .fa-fw.fa-feather, .fa-fw.fa-dove, .fa-fw.fa-edit, .fa-fw.fa-pen-nib, .fa-fw.fa-pen-fancy { width: 1.25em; }
+.fa-seedling::before { content: "\e533" !important; }   /* people-group */
+.fa-book-medical::before { content: "\f02d" !important; } /* book */
+/* the pen is drawn on a slant, so it gets a little more room to look the same size as its neighbours */
+.fa-feather, .fa-feather-pointed, .fa-feather-alt, .fa-pen, .fa-pen-nib, .fa-pen-fancy, .fa-pen-alt,
+.fa-pen-to-square, .fa-edit, .fa-pencil, .fa-pencil-alt, .fa-pen-clip, .fa-pen-square { width: 1.2em; height: 1.2em; vertical-align: -.22em; }
