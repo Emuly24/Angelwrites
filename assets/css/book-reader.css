@@ -306,3 +306,26 @@ html, body { height: 100%; width: 100%; overflow: hidden; }
 .plan-acts { display: inline-flex; gap: 6px; }
 .plan-acts button { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font: inherit; font-size: .82rem; }
 .plan-empty { color: var(--text-light); }
+
+/* ===== Screen-fitted pages (page-turn mode) =====
+   reader.php pours each book page into pages the size of the screen, so nothing is cut off. */
+.flip-page-custom { position: relative; }
+.flip-body { flex: 0 0 auto; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+.flip-body > :first-child { margin-top: 0; }
+.flip-body p { margin: 0 0 1em; }
+.flip-body h1, .flip-body h2 { text-align: center; margin: .4em 0 1.2em; font-size: 1.45em; line-height: 1.3; font-weight: 600; color: var(--dark); font-family: inherit; }
+.flip-body h3 { margin: 1.2em 0 .6em; font-size: 1.15em; line-height: 1.3; }
+.flip-body img { max-width: 100%; height: auto; border-radius: 6px; }
+.flip-body table, .flip-body pre { display: block; max-width: 100%; overflow: auto; }
+.flip-body blockquote { margin: 1.2em 0; padding-left: 1em; border-left: 3px solid var(--border); color: var(--text-light); }
+.flip-cont { text-indent: 0 !important; }
+.flip-folio { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-family: var(--ui-font, Inter, sans-serif); font-size: .7rem; letter-spacing: .08em; color: var(--text-light); opacity: .75; pointer-events: none; }
+.flip-blank { background: var(--surface); }
+@media (max-width: 768px) { .flip-folio { bottom: 5px; font-size: .62rem; } }
+.page-content-inner table, .page-content-inner pre { display: block; max-width: 100%; overflow: auto; }
+
+/* ===== Books are read on AngelWrites only: they do not print ===== */
+@media print {
+    #reader-app { display: none !important; }
+    body::before { content: "This book can be read on AngelWrites (angelwrites.gt.tc). Printing is not available."; display: block; padding: 3em 2em; font: 14pt Georgia, serif; text-align: center; color: #000; }
+}
