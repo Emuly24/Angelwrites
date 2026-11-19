@@ -234,6 +234,19 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                                 <i class="fas fa-shopping-cart"></i> Buy this book (<?php echo aw_mwk(aw_book_price($book)); ?>)
                             </a>
                         <?php endif; ?>
+                        <?php
+                        // A book a member shared (includes/member_books.php): who shared it, a way to raise
+                        // a concern (the team can take it down), and for the member, a way to remove it.
+                        require_once __DIR__ . '/includes/member_books.php';
+                        $aw_sharer = aw_mb_sharer($db, $book);
+                        if ($aw_sharer): ?>
+                            <p class="book-owned book-shared"><i class="fas fa-people-group" aria-hidden="true"></i> Shared by a member of the AngelWrites family<?php /* the account stays private: many write under a pen name; the team sees who in admin/member_books.php */ ?><?php if (function_exists('aw_can') && aw_can('manage_content')): ?> (<a href="<?php echo SITE_URL; ?>/admin/member_books.php?id=<?php echo (int)$aw_sharer['mb_id']; ?>">team view</a>)<?php endif; ?> ·
+                            <?php if (isLoggedIn() && (int)$_SESSION['user_id'] === (int)$aw_sharer['user_id']): ?>
+                                <a href="<?php echo SITE_URL; ?>/share_book.php#mine">Manage or remove your book</a>
+                            <?php else: ?>
+                                <a href="<?php echo SITE_URL; ?>/contact.php?subject=<?php echo rawurlencode('Concern about a community book: ' . $book['title'] . ' (#' . (int)$book_id . ')'); ?>">Report a concern</a>
+                            <?php endif; ?></p>
+                        <?php endif; ?>
                         <?php if ($owns_book && !$is_free_book && !isAdmin()): ?>
                             <p class="book-owned"><i class="fas fa-circle-check" aria-hidden="true"></i> You own this book · <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a></p>
                         <?php endif; ?>
@@ -549,6 +562,7 @@ html[data-theme="dark"] .sale-price { color:#f2a7b0; }
 html[data-theme="dark"] .action-buttons .btn-primary.btn-lg { background:#f0c4c5; border-color:#f0c4c5; color:#2c1e1e; }
 .book-owned { margin:0; font-size:.88rem; color:var(--text-light); }
 .book-owned i { color:#2f6b45; }
+.book-shared i { color:#3f6f68; }
 .book-groups { margin:0; font-size:.9rem; }
 .book-groups a { color:var(--text); text-decoration:none; display:inline-flex; align-items:center; gap:8px; min-height:36px; }
 .book-groups a:hover { color:#9c5457; text-decoration:underline; }

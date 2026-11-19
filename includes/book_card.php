@@ -16,7 +16,7 @@
 require_once __DIR__ . '/commerce.php';
 
 function aw_book_assets() {
-    return '<link rel="stylesheet" href="' . SITE_URL . '/assets/css/aw-books.css?v=1">';
+    return '<link rel="stylesheet" href="' . SITE_URL . '/assets/css/aw-books.css?v=2">';
 }
 
 function aw_book_cover_url(array $book) {
@@ -41,7 +41,7 @@ function aw_book_card(array $book, array $opts = []) {
         $sale = !$free && aw_book_on_sale($book);
         $blurb = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($book['description'] ?? ''))));
 
-        $flag = $owned ? 'Owned' : ($sale ? 'Sale' : ''); // "Free" already shows as the price
+        $flag = $owned ? 'Owned' : ($sale ? 'Sale' : (!empty($book['submitted_by']) ? 'Community' : '')); // "Free" already shows as the price
 
         $html = '<article class="bk-card" id="book-' . $id . '">';
         // The cover repeats the title link, so it is hidden from screen readers and the tab order.

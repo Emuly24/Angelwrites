@@ -203,6 +203,7 @@ if (!$isLoggedIn) {
     $aw_groups['Community'] = array_values(array_filter([
         $aw_stories_on ? ['Stories & Help', 'fa-seedling', $aw_u . '/stories.php', ['stories.php', 'story.php', 'story_write.php']] : null,
         $aw_stories_on ? ['My Stories & Help', 'fa-pen', $aw_u . '/my_stories.php', ['my_stories.php']] : null,
+        isLoggedIn() ? ['Share your book', 'fa-book-medical', $aw_u . '/share_book.php', ['share_book.php']] : null,
         ['Community Q&A', 'fa-circle-question', $aw_u . '/community.php', ['community.php']], ['Reading groups', 'fa-user-group', $aw_u . '/groups.php', ['groups.php', 'group.php']], ['Book a session', 'fa-calendar-check', $aw_u . '/book_session.php', ['book_session.php']]]));
     if ($aw_is_staff) $aw_groups['Team'] = [['Staff dashboard', 'fa-shield-heart', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']]];
 }
@@ -290,6 +291,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                                 <a href="<?php echo $aw_u; ?>/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i>Dashboard</a>
                                 <a href="<?php echo $aw_u; ?>/library.php"><i class="fas fa-bookmark" aria-hidden="true"></i>My library</a>
                                 <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i>My Stories &amp; Help</a><?php endif; ?>
+                                <a href="<?php echo $aw_u; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i>My shared books</a>
                                 <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i>Profile</a>
                                 <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Staff dashboard</a><?php endif; ?>
                             <?php endif; ?>

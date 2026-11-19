@@ -6,6 +6,7 @@ require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R5: shared upload limits
 require_once '../includes/book_extract.php'; // books are prepared for the reader automatically
+require_once '../includes/member_books.php';  // books members share wait in admin/member_books.php
 
 aw_require('manage_content'); // K1
 
@@ -33,6 +34,11 @@ if (isset($_GET['delete'])) {
         }
         $stmt = $db->prepare("DELETE FROM books WHERE id = ?");
         $stmt->execute([$id]);
+        // a book a member shared: their own list now says it was taken down
+        try {
+            aw_mb_tables($db);
+            $db->prepare("UPDATE member_books SET status = 'removed', review_note = COALESCE(NULLIF(review_note, ''), 'Removed by the team.'), file_path = '', cover_path = '', updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'published'")->execute([$id]);
+        } catch (Throwable $e) { error_log('manage books member book: ' . $e->getMessage()); }
         $success = 'Book deleted successfully.';
     } else {
         $error = 'Book not found.';
@@ -241,6 +247,11 @@ $pageTitle = 'Manage Books';
             </div>
         </div>
 
+        <?php $aw_mb_waiting = aw_mb_waiting_count($db); if ($aw_mb_waiting > 0): ?>
+            <div class="alert alert-info" role="status"><i class="fas fa-book-medical" aria-hidden="true"></i> <?php echo $aw_mb_waiting; ?> book<?php echo $aw_mb_waiting === 1 ? '' : 's'; ?> shared by members <?php echo $aw_mb_waiting === 1 ? 'is' : 'are'; ?> waiting for review. <a href="<?php echo SITE_URL; ?>/admin/member_books.php">Review member books</a></div>
+        <?php else: ?>
+            <p style="margin:0 0 12px;"><a href="<?php echo SITE_URL; ?>/admin/member_books.php"><i class="fas fa-book-medical" aria-hidden="true"></i> Member books</a></p>
+        <?php endif; ?>
         <!-- ===== ALERT MESSAGES ===== -->
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
