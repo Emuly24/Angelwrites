@@ -10,7 +10,7 @@
  *   $opts  'author'   => author name to show (default $book['author'])
  *          'readable' => true when the reader has pages for this book (shows "Read")
  *          'owned'    => true when the member owns it
- *          'buy'      => true to show the Download / Buy button (books.php has the order form)
+ *          'buy'      => true to show the Read / Buy button (books.php has the order form)
  *          'heading'  => 'h3' (default) or 'h2'
  */
 require_once __DIR__ . '/commerce.php';
@@ -70,15 +70,16 @@ function aw_book_card(array $book, array $opts = []) {
             $html .= '<a class="bk-btn" href="' . $url . '" aria-label="View ' . $title . '">View</a>';
         }
         if (!empty($opts['buy'])) {
-            if (function_exists('isLoggedIn') && isLoggedIn()) {
-                if ($free || $owned) {
-                    $html .= '<button type="button" class="bk-btn bk-btn-icon download-btn" data-id="' . $id . '" data-free="1" data-price="0" aria-label="Download ' . $title . '" title="Download"><i class="fas fa-arrow-down" aria-hidden="true"></i></button>';
-                } elseif ($price > 0) {
+            // Books are read on the site only; there is no download (includes/book_extract.php).
+            if (($free || $owned) && empty($opts['readable'])) {
+                $html .= '<a class="bk-btn bk-btn-primary" href="' . htmlspecialchars(SITE_URL . '/reader/reader.php?id=' . $id) . '" aria-label="Read ' . $title . '">Read</a>';
+            } elseif (function_exists('isLoggedIn') && isLoggedIn()) {
+                if ($price > 0 && !$free && !$owned) {
                     $html .= '<button type="button" class="bk-btn bk-btn-buy download-btn" data-id="' . $id . '" data-free="0" data-price="' . htmlspecialchars((string)aw_book_price($book)) . '">Buy</button>';
                 }
-            } elseif ($free || $price > 0) {
+            } elseif ($price > 0 && !$free) {
                 $back = urlencode('/books.php#book-' . $id);
-                $html .= '<a class="bk-btn bk-btn-icon" href="' . htmlspecialchars(SITE_URL . '/login.php?redirect=' . $back) . '" aria-label="Log in to ' . ($free ? 'download' : 'buy') . ' ' . $title . '" title="Log in to ' . ($free ? 'download' : 'buy') . '"><i class="fas fa-arrow-' . ($free ? 'down' : 'right-to-bracket') . '" aria-hidden="true"></i></a>';
+                $html .= '<a class="bk-btn bk-btn-icon" href="' . htmlspecialchars(SITE_URL . '/login.php?redirect=' . $back) . '" aria-label="Log in to buy ' . $title . '" title="Log in to buy"><i class="fas fa-right-to-bracket" aria-hidden="true"></i></a>';
             }
         }
         $html .= '</span></div></div></article>';

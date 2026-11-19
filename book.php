@@ -209,26 +209,20 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
 
                     <div class="action-buttons">
                         <?php
-                        // Q14: one rule for what this visitor can do. Item 3 (F32) still applies: the raw file
-                        // is never linked, downloads go through download.php. A paid book with reader content
+                        // Q14: one rule for what this visitor can do. Books are read on the site only: the file is
+                        // never linked or downloaded; a book with a file is prepared for the reader when opened. A paid book with reader content
                         // used to show "Read Book" to non-buyers (the reader then sent them back here), and
                         // there was no way to buy from this page or any hint for guests.
                         $is_free_book = !empty($book['is_free']);
                         $owns_book = $is_free_book || isAdmin() || (isLoggedIn() && aw_has_purchased($db, $_SESSION['user_id'], $book_id));
                         $back_here = urlencode('/book.php?id=' . (int)$book_id);
                         ?>
-                        <?php if ($owns_book && $has_processed): ?>
+                        <?php if ($owns_book && ($has_processed || !empty($book['file_path']))): ?>
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
-                        <?php elseif ($owns_book && isLoggedIn()): ?>
-                            <a href="<?php echo SITE_URL; ?>/download.php?book_id=<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
-                                <i class="fas fa-download"></i> Download (<?php echo strtoupper(htmlspecialchars((string)$book['file_type'])); ?>)
-                            </a>
                         <?php elseif ($owns_book): ?>
-                            <a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo $back_here; ?>" class="btn btn-primary btn-lg">
-                                <i class="fas fa-sign-in-alt"></i> Log in to download (free)
-                            </a>
+                            <span class="btn btn-outline btn-lg" aria-disabled="true">Coming soon to read online</span>
                         <?php elseif ((float)$book['price'] <= 0): ?>
                             <span class="btn btn-outline btn-lg" aria-disabled="true">Not yet on sale</span>
                         <?php elseif (!isLoggedIn()): ?>
@@ -629,7 +623,7 @@ html[data-theme="dark"] .action-buttons .btn-primary.btn-lg { background:#f0c4c5
     /* phones: the cover, then the title and the main button, then the rest */
     .book-content-wrapper { grid-template-columns:minmax(0, 1fr); grid-template-areas: "cover" "head" "details"; row-gap:22px; }
     .book-cover-section { position:relative; top:0; display:flex; justify-content:center; }
-    /* Q22: the cover is capped so the price and the Read/Download button show without scrolling. */
+    /* Q22: the cover is capped so the price and the Read button show without scrolling. */
     .book-cover-card { width:min(40vw, 190px); }
     .book-head { align-items:center; text-align:center; }
     .book-meta, .book-action-row, .action-buttons { justify-content:center; align-items:center; }

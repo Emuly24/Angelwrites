@@ -79,7 +79,7 @@ $pageTitle = 'Books';
     <div class="container">
         <?php if (($_GET['error'] ?? '') === 'not_purchased'): // F37 ?>
             <div class="books-notice" role="alert" style="border:1px solid var(--rose, #DBA1A2);border-radius:10px;padding:12px 16px;margin:16px 0;">
-                🔒 That book has to be bought before it can be downloaded. Press <strong>Download</strong> on it below to order it; it unlocks once your payment is confirmed. Already ordered? See <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a>.
+                🔒 That book has to be bought before it can be read. Press <strong>Buy</strong> on it below to order it; it opens in the reader once your payment is confirmed. Already ordered? See <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a>.
             </div>
         <?php endif; ?>
         <!-- ===== PAGE HEADER ===== -->
@@ -209,8 +209,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const bookTitle = this.closest('.bk-card, .book-card').querySelector('h3').textContent.trim();
 
             if (isFree) {
-                // Free book – download directly
-                window.location.href = '<?php echo SITE_URL; ?>/download.php?book_id=' + bookId;
+                // books are read on the site only
+                window.location.href = '<?php echo SITE_URL; ?>/reader/reader.php?id=' + bookId;
             } else {
                 // Paid book – open payment modal
                 const price = parseFloat(this.dataset.price);

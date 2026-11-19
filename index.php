@@ -670,7 +670,7 @@ if ('serviceWorker' in navigator) {
             </div>
             <div class="stat-item">
                 <div class="stat-number" data-target="<?php echo $free_books; ?>">0</div>
-                <div class="stat-label">Free Books Downloaded</div>
+                <div class="stat-label">Free Books to Read</div>
             </div>
             <div class="stat-item">
                 <div class="stat-number" data-target="<?php echo $total_prayers; ?>">0</div>
