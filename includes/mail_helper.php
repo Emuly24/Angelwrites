@@ -6,58 +6,38 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/load_env.php';
 
 /**
- * ET1: which SMTP service sends the site's mail.
+ * ET1: the site's mail goes through Zoho Mail, and only Zoho (the old Gmail route is removed).
  *
- * MAIL_PROVIDER=zoho   Zoho SMTP: ZOHO_SMTP_HOST, port 587, STARTTLS, signing in with ZOHO_USERNAME /
- *                      ZOHO_APP_PASSWORD and sending From ZOHO_FROM_ADDRESS / ZOHO_FROM_NAME.
- * MAIL_PROVIDER=gmail  the previous Gmail path (GMAIL_USERNAME / GMAIL_APP_PASSWORD), kept as a fallback
- *                      for a Zoho outage.
- * Not set              gmail, so a missing variable cannot break email that works today.
+ * The one value that must be in the .env file on the server is the Zoho app password:
+ *     ZOHO_APP_PASSWORD=xxxxxxxxxxxx
+ * Everything else has a working default and only needs a line in .env to change it:
+ *     ZOHO_USERNAME      angelwrites@zohomail.com   (the Zoho mailbox that signs in and sends)
+ *     ZOHO_FROM_ADDRESS  the same as ZOHO_USERNAME (Zoho only sends From the signed-in mailbox)
+ *     ZOHO_FROM_NAME     AngelWrites
+ *     ZOHO_SMTP_HOST     smtp.zoho.com              (smtp.zoho.eu / smtp.zoho.in for those regions)
+ *     ZOHO_SMTP_PORT     587 (STARTTLS); if the host cannot reach it, 465 (SSL) is tried once
+ * In Zoho Mail: Settings > Mail Accounts > IMAP/POP/SMTP access must be on, and with two-step sign-in
+ * the password is an app-specific password (Security > App Passwords), not the account password.
  *
- * Every value comes from .env; nothing is hard-coded here. Returns
- * ['ok' => true, provider, host, port, username, password, from, from_name] or ['ok' => false, 'error' => why].
+ * Returns ['ok' => true, provider, host, port, username, password, from, from_name] or ['ok' => false, 'error' => why].
  */
 function aw_mail_config(): array
 {
-    $provider = strtolower(trim((string)getenv('MAIL_PROVIDER')));
-    if ($provider === '') $provider = 'gmail';
-
-    if ($provider === 'zoho') {
-        $need = ['ZOHO_SMTP_HOST', 'ZOHO_USERNAME', 'ZOHO_APP_PASSWORD', 'ZOHO_FROM_ADDRESS', 'ZOHO_FROM_NAME'];
-        $missing = [];
-        $v = [];
-        foreach ($need as $k) {
-            $v[$k] = trim((string)getenv($k));
-            if ($v[$k] === '') $missing[] = $k;
-        }
-        if ($missing) {
-            return ['ok' => false, 'provider' => 'zoho',
-                    'error' => 'Email is set to Zoho (MAIL_PROVIDER=zoho) but ' . implode(', ', $missing) . ' '
-                             . (count($missing) === 1 ? 'is' : 'are') . ' missing from the .env file. Nothing was sent.'];
-        }
-        if (!filter_var($v['ZOHO_FROM_ADDRESS'], FILTER_VALIDATE_EMAIL)) {
-            return ['ok' => false, 'provider' => 'zoho', 'error' => 'ZOHO_FROM_ADDRESS in the .env file is not a valid email address. Nothing was sent.'];
-        }
-        return ['ok' => true, 'provider' => 'zoho', 'host' => $v['ZOHO_SMTP_HOST'], 'port' => 587,
-                'username' => $v['ZOHO_USERNAME'], 'password' => $v['ZOHO_APP_PASSWORD'],
-                'from' => $v['ZOHO_FROM_ADDRESS'], 'from_name' => $v['ZOHO_FROM_NAME']];
+    $env = function ($k, $default = '') { $v = trim((string)getenv($k)); return $v !== '' ? $v : $default; };
+    $user = $env('ZOHO_USERNAME', 'angelwrites@zohomail.com');
+    $pass = (string)getenv('ZOHO_APP_PASSWORD');
+    $from = $env('ZOHO_FROM_ADDRESS', $user);
+    if ($pass === '' || trim($pass) === '') {
+        return ['ok' => false, 'provider' => 'zoho',
+                'error' => 'Email is not switched on yet: add ZOHO_APP_PASSWORD=<your Zoho app password> to the .env file on the server. Nothing was sent.'];
     }
-
-    if ($provider === 'gmail') {
-        $user = trim((string)getenv('GMAIL_USERNAME'));
-        $pass = (string)getenv('GMAIL_APP_PASSWORD');
-        if ($user === '' || $pass === '') {
-            return ['ok' => false, 'provider' => 'gmail',
-                    'error' => 'Email is not set up on the server: GMAIL_USERNAME and/or GMAIL_APP_PASSWORD are missing from the .env file'
-                             . (trim((string)getenv('MAIL_PROVIDER')) === '' ? ' (MAIL_PROVIDER is not set, so Gmail is used; set MAIL_PROVIDER=zoho to send through Zoho).' : '.')];
-        }
-        // F217 still applies on this path: through Gmail's SMTP the From must be the Gmail account.
-        return ['ok' => true, 'provider' => 'gmail', 'host' => 'smtp.gmail.com', 'port' => 587,
-                'username' => $user, 'password' => $pass, 'from' => $user, 'from_name' => ''];
+    if (!filter_var($user, FILTER_VALIDATE_EMAIL) || !filter_var($from, FILTER_VALIDATE_EMAIL)) {
+        return ['ok' => false, 'provider' => 'zoho', 'error' => 'ZOHO_USERNAME or ZOHO_FROM_ADDRESS in the .env file is not a valid email address. Nothing was sent.'];
     }
-
-    return ['ok' => false, 'provider' => $provider,
-            'error' => 'MAIL_PROVIDER in the .env file must be "zoho" or "gmail" (it is "' . $provider . '"). Nothing was sent.'];
+    $port = (int)$env('ZOHO_SMTP_PORT', '587');
+    if (!in_array($port, [587, 465], true)) $port = 587;
+    return ['ok' => true, 'provider' => 'zoho', 'host' => $env('ZOHO_SMTP_HOST', 'smtp.zoho.com'), 'port' => $port,
+            'username' => $user, 'password' => $pass, 'from' => $from, 'from_name' => $env('ZOHO_FROM_NAME', 'AngelWrites')];
 }
 
 /** ET1: applies the SMTP settings to a PHPMailer object. Shared by sendEmail() and the newsletter. */
@@ -68,10 +48,31 @@ function aw_mail_transport(PHPMailer $mail, array $cfg): void
     $mail->SMTPAuth   = true;
     $mail->Username   = $cfg['username'];
     $mail->Password   = $cfg['password'];
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->SMTPSecure = (int)$cfg['port'] === 465 ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
     $mail->Port       = (int)$cfg['port'];
-    $mail->Timeout    = 10; // PHPMailer's default is 300 s, longer than the host allows a request to run
+    $mail->Timeout    = 12; // PHPMailer's default is 300 s, longer than the host allows a request to run
     $mail->CharSet    = 'UTF-8';
+}
+
+/**
+ * Send, and if the server could not even be reached on the configured port, try Zoho's other
+ * port once (587 STARTTLS <-> 465 SSL): some hosts block one of them. A wrong password or a
+ * refused address is not retried. Throws like PHPMailer::send() when both fail.
+ */
+function aw_mail_send(PHPMailer $mail, array $cfg): bool
+{
+    try {
+        return $mail->send();
+    } catch (\Throwable $e) {
+        $msg = $e->getMessage() . ' ' . $mail->ErrorInfo;
+        if (!preg_match('/could not connect|connect\(\) failed|connection (refused|timed out)|timed out|network is unreachable|failed to connect/i', $msg)) throw $e;
+        $alt = $cfg;
+        $alt['port'] = (int)$cfg['port'] === 465 ? 587 : 465;
+        aw_mail_transport($mail, $alt);
+        $mail->smtpClose();
+        error_log('mail: port ' . (int)$cfg['port'] . ' unreachable, trying ' . $alt['port']);
+        return $mail->send();
+    }
 }
 
 /**
@@ -180,7 +181,7 @@ function aw_mail_deliver(array $m, string $fn): bool
             return (bool)aw_mail_test_sink(['fn' => $fn, 'to' => $m['to'], 'subject' => $m['subject'], 'mime' => $mail->getSentMIMEMessage(), 'host' => $mail->Host, 'port' => $mail->Port, 'user' => $mail->Username]);
         }
         $mail = aw_mail_prepare($m);
-        $mail->send();
+        aw_mail_send($mail, aw_mail_config());
         return true;
     } catch (\Throwable $e) {
         error_log($fn . ' failed (to: ' . ($m['to'] ?? '') . ', subject: ' . ($m['subject'] ?? '') . '): ' . $e->getMessage());
