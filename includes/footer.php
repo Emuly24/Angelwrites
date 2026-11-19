@@ -32,7 +32,7 @@ FOOTER – Brand, Links, Social
                 <a href="<?php echo SITE_URL; ?>/index.php" class="logo">
                     <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="AngelWrites Logo" class="logo-img">
                 </a>
-                <p class="footer-tagline">Writing with purpose, faith, and passion.</p>
+                <p class="footer-tagline"><?php require_once __DIR__ . '/site_texts.php'; echo aw_text('footer.tagline', 'Writing with purpose, faith, and passion.', 'line'); ?></p>
             </div>
 
             <div class="footer-links">
@@ -425,5 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php // owners and admins: the "Edit page text" button and editor (includes/site_texts.php)
+if (function_exists('aw_text_editor_ui')) echo aw_text_editor_ui(); ?>
 </body>
 </html>

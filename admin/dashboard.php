@@ -253,6 +253,7 @@ require_once '../includes/header.php';
             <a class="dsh-tile" href="manage_blog.php"><i class="fas fa-blog" aria-hidden="true"></i>Blog</a>
             <a class="dsh-tile" href="editor.php"><i class="fas fa-pen-fancy" aria-hidden="true"></i>Blog editor</a>
             <a class="dsh-tile" href="manage_videos.php"><i class="fas fa-video" aria-hidden="true"></i>Videos</a>
+            <a class="dsh-tile" href="site_texts.php"><i class="fas fa-font" aria-hidden="true"></i>Page text</a>
         </div></section>
         <section class="dsh-card dsh-reveal" style="--i:3"><h3>Community &amp; care</h3><div class="dsh-tiles">
             <a class="dsh-tile" href="community.php"><i class="fas fa-seedling" aria-hidden="true"></i>Stories &amp; Help</a>

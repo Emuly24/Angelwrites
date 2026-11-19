@@ -35,6 +35,7 @@ function aw_setup_features() {
         ['Stories & Help', 'community_posts.php', 'aw_cp_tables', ['community_posts', 'community_replies', 'community_thanks', 'community_members']],
         ['Saves and collections', 'saves.php', 'aw_save_tables', ['saves', 'collections']],
         ['Planned reads', 'reading_plans.php', 'aw_plans_table', ['reading_plans']],
+        ['Page text', 'site_texts.php', 'aw_text_tables', ['site_texts', 'site_text_keys']],
         ['Messages', 'messaging.php', 'aw_msg_tables', ['msg_threads', 'msg_participants', 'messages', 'msg_settings']],
         ['Member books', 'member_books.php', 'aw_mb_tables', ['member_books']],
     ];
