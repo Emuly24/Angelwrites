@@ -30,6 +30,7 @@
  */
 
 require_once __DIR__ . '/book_extract.php';
+require_once __DIR__ . '/book_cover.php'; // covers are made automatically
 
 const AW_MB_MAX_WAITING = 3;     // books waiting for review at once, per member
 const AW_MB_MAX_PER_30D = 5;     // books submitted in 30 days, per member
@@ -168,7 +169,7 @@ function aw_mb_notify_team(PDO $db, $mb_id, $title) {
 
 /**
  * A member shares a book. $in: title, author_name, description, attest (array of keys).
- * $files: the book file and an optional cover from $_FILES.
+ * $file: the book file from $_FILES. ($cover is no longer sent: covers are made automatically.)
  * Returns ['ok' => true, 'id' => n] or ['ok' => false, 'errors' => [field => message]].
  */
 function aw_mb_submit(PDO $db, $uid, array $in, $file, $cover = null) {
@@ -316,6 +317,7 @@ function aw_mb_decide(PDO $db, $id, $action, $reason, $staff_id) {
                ->execute([$book_id, $reason, (int)$staff_id, (int)$id]);
             $db->commit();
             $prep = $is_file ? aw_book_prepare($db, $book_id, true) : ['ok' => true];
+            aw_book_auto_cover($db, $book_id); // the file's own cover, or a designed one
             if (function_exists('awNotify')) awNotify($db, (int)$mb['user_id'], 'member_book', 'Your book is on AngelWrites', '"' . $mb['title'] . '" is now on the Community books shelf.' . ($reason !== '' ? ' Note from the team: ' . $reason : ''), SITE_URL . '/book.php?id=' . $book_id);
             if (function_exists('aw_audit')) aw_audit('member_book_approve', 'member_book', (int)$id, 'book ' . $book_id);
             return ['ok' => true, 'message' => 'Approved. "' . $mb['title'] . '" is on the Community books shelf' . (!$is_file ? ' as a suggested book (members bring their own copy).' : (!empty($prep['ok']) ? ' and ready in the reader.' : ', but the reader could not prepare it: ' . ($prep['error'] ?? '') . '.')), 'book_id' => $book_id];

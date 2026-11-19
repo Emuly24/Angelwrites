@@ -6,6 +6,7 @@ require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R5: shared upload limits
 require_once '../includes/book_extract.php'; // books are prepared for the reader automatically
+require_once '../includes/book_cover.php';   // covers are made automatically
 require_once '../includes/member_books.php';  // books members share wait in admin/member_books.php
 
 aw_require('manage_content'); // K1
@@ -72,11 +73,27 @@ $aw_upload_error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
     $aw_upload_error = 'The upload was larger than this host accepts (' . round(aw_ini_bytes(ini_get('post_max_size')) / 1048576, 1) . ' MB in total), so nothing was saved. Please use smaller files.';
 }
-foreach (['cover', 'book_file'] as $aw_f) {
+foreach (['book_file'] as $aw_f) {
     if (!empty($_FILES[$aw_f]['name']) && in_array($_FILES[$aw_f]['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
         $aw_upload_error = 'The file "' . $_FILES[$aw_f]['name'] . '" is larger than this host accepts (' . $aw_upload_limit_mb . ' MB). Nothing was saved.';
     }
 }
+
+// ===== MISSING COVERS (books saved before covers were made automatically) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['make_covers'])) {
+    @set_time_limit(120);
+    $aw_made = aw_book_auto_cover_missing($db, 40);
+    $_SESSION['aw_books_flash'] = ['ok', $aw_made . ' cover' . ($aw_made === 1 ? ' was' : 's were') . ' made.'];
+    header('Location: ' . SITE_URL . '/admin/manage_books.php');
+    exit;
+}
+$aw_missing_covers = 0;
+try {
+    foreach ($db->query("SELECT cover_path FROM books")->fetchAll(PDO::FETCH_COLUMN) as $aw_c) {
+        $aw_c = trim((string)$aw_c);
+        if ($aw_c === '' || (!preg_match('#^https?://#', $aw_c) && !is_file(__DIR__ . '/../' . ltrim($aw_c, '/')))) $aw_missing_covers++;
+    }
+} catch (Throwable $e) { error_log('missing covers: ' . $e->getMessage()); }
 
 // ===== HANDLE FORM SUBMISSION (ADD / UPDATE) =====
 if ($aw_upload_error !== '') {
@@ -102,16 +119,7 @@ if ($aw_upload_error !== '') {
         $file_author = $edit_book['file_author'] ?? '';
         $release_date = $edit_book['release_date'] ?? '';
 
-        // ===== COVER (captured with the camera, or chosen) =====
-        // R5: both go through the shared helper as an 'image' (real image by content, resized to
-        // 1600 px, re-encoded, EXIF stripped, 2 MB stored; was 5 MB, stored as sent).
         $aw_new_files = []; // stored in this request; removed again if the save is refused
-        foreach (['live_cover', 'cover'] as $aw_f) {
-            if (!empty($error)) break;
-            $aw_up = aw_upload_store($_FILES[$aw_f] ?? null, 'image', 'assets/uploads/books', ['prefix' => 'cover_']);
-            if (!empty($aw_up['ok'])) { $cover_path = $aw_up['path']; $aw_new_files[] = $aw_up['path']; }
-            elseif (empty($aw_up['empty'])) { $error = 'Cover: ' . $aw_up['error']; }
-        }
 
         // ===== BOOK FILE UPLOAD =====
         // R5: PDF, EPUB, DOCX, ODT, RTF or TXT, decided by the file's content (old .doc is refused: it
@@ -173,6 +181,14 @@ if ($aw_upload_error !== '') {
                 $body .= "<p><strong>Author:</strong> " . $author . "</p>";
                 $body .= "<p><a href='" . SITE_URL . "/admin/manage_books.php'>View all books</a></p>";
                 sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+            }
+            // The automatic cover: made when there is none, and renewed (only when it is an automatic
+            // one) after the title, author or file changed, or when "Make a fresh cover" was ticked.
+            if (!empty($aw_book_id)) {
+                $aw_cur_cover = (string)($edit_book['cover_path'] ?? '');
+                $aw_is_auto = $aw_cur_cover === '' || strpos(basename($aw_cur_cover), 'cover_auto_') === 0;
+                $aw_changed = !$edit_book || !empty($aw_up['ok']) || $title !== (string)$edit_book['title'] || $author !== (string)($edit_book['author'] ?? '');
+                aw_book_auto_cover($db, $aw_book_id, !empty($_POST['new_cover']) || ($aw_is_auto && $aw_changed));
             }
             // A new book file is prepared for the reader straight away (includes/book_extract.php):
             // nobody has to correct or publish it by hand. The result is shown after the redirect.
@@ -241,6 +257,9 @@ $pageTitle = 'Manage Books';
                 <button id="showAddForm" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Add New Book
                 </button>
+                <?php if ($aw_missing_covers > 0): ?>
+                <form method="post" style="display:inline;"><button type="submit" name="make_covers" value="1" class="btn btn-outline"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Make <?php echo (int)$aw_missing_covers; ?> missing cover<?php echo $aw_missing_covers === 1 ? '' : 's'; ?></button></form>
+                <?php endif; ?>
                 <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
@@ -321,57 +340,23 @@ $pageTitle = 'Manage Books';
                             </div>
                         </div>
 
-                        <!-- ===== LIVE PHOTO CAPTURE ===== -->
-                        <div class="form-group">
-                            <label>Live Cover Photo (capture with camera)</label>
-                            <div class="camera-section">
-                                <div class="camera-preview-container">
-                                    <video id="cameraPreview" autoplay muted playsinline></video>
-                                    <div class="camera-placeholder" id="cameraPlaceholder">
-                                        <i class="fas fa-camera"></i>
-                                        <p>Camera preview will appear here.</p>
-                                    </div>
-                                </div>
-                                <div class="camera-controls">
-                                    <button type="button" id="startCameraBtn" class="btn btn-secondary btn-sm">
-                                        <i class="fas fa-camera"></i> Start Camera
-                                    </button>
-                                    <button type="button" id="capturePhotoBtn" class="btn btn-primary btn-sm" disabled>
-                                        <i class="fas fa-camera-retro"></i> Capture
-                                    </button>
-                                    <button type="button" id="retakePhotoBtn" class="btn btn-warning btn-sm" disabled>
-                                        <i class="fas fa-redo"></i> Retake
-                                    </button>
-                                    <button type="button" id="confirmPhotoBtn" class="btn btn-success btn-sm" disabled>
-                                        <i class="fas fa-check"></i> Use This Photo
-                                    </button>
-                                    <span id="cameraStatus" class="status-indicator">Camera ready</span>
-                                </div>
-                                <div class="captured-photo-container" id="capturedPhotoContainer" style="display:none;">
-                                    <img id="capturedPhotoPreview" style="max-width:200px; max-height:200px; border-radius:8px;">
-                                </div>
-                                <input type="file" id="liveCoverInput" name="live_cover" accept="image/*" style="display:none;">
+                        <!-- Covers are made automatically (includes/book_cover.php): nobody adds them by hand. -->
+                        <div class="form-group aw-autocover">
+                            <span class="aw-autocover-label">Cover</span>
+                            <div class="aw-autocover-box">
+                                <?php if ($edit_book && !empty($edit_book['cover_path'])): ?>
+                                    <img src="<?php echo htmlspecialchars(SITE_URL . '/' . $edit_book['cover_path']); ?>" alt="Current cover of <?php echo htmlspecialchars($edit_book['title']); ?>">
+                                <?php endif; ?>
+                                <p>The cover is made automatically. When the book file has its own cover (most EPUB books do), that cover is used; otherwise AngelWrites designs one from the title and author. It is renewed when the title, author or file changes.</p>
+                                <?php if ($edit_book): ?><label class="aw-autocover-new"><input type="checkbox" name="new_cover" value="1"> Make a fresh cover when saving</label><?php endif; ?>
                             </div>
-                        </div>
-
-                        <!-- Standard Cover Upload (Fallback) -->
-                        <div class="form-group">
-                            <label for="cover">Or Upload Cover Image</label>
-                            <input type="file" id="cover" name="cover"<?php echo aw_upload_attrs('image'); ?> data-max="<?php echo (int)aw_upload_effective('image')['accept_bytes']; ?>">
-                            <small><?php echo htmlspecialchars(aw_upload_hint('image')); ?>.</small><!-- R5 -->
-                            <?php if ($edit_book && $edit_book['cover_path']): ?>
-                                <div class="current-file">
-                                    <img src="<?php echo SITE_URL . '/' . $edit_book['cover_path']; ?>" alt="Current cover" style="max-width:100px; border-radius:8px;">
-                                    <small>Current cover. Upload new to replace.</small>
-                                </div>
-                            <?php endif; ?>
                         </div>
 
                         <!-- Book File Upload -->
                         <div class="form-group">
                             <label for="book_file">Book file (PDF, EPUB, DOCX, ODT, RTF or TXT)</label>
                             <input type="file" id="book_file" name="book_file"<?php echo aw_upload_attrs('book'); ?> data-max="<?php echo (int)aw_upload_effective('book')['accept_bytes']; ?>">
-                            <small><?php echo htmlspecialchars(aw_upload_hint('book')); ?> (cover and book file together must also fit in <?php echo $aw_upload_limit_mb; ?> MB per save).</small><!-- R5 -->
+                            <small><?php echo htmlspecialchars(aw_upload_hint('book')); ?> (it must also fit in <?php echo $aw_upload_limit_mb; ?> MB per save).</small><!-- R5 -->
                             <script>
                             // Q15: check sizes before sending, so a too-large file is caught here instead of being dropped.
                             document.getElementById('bookForm').addEventListener('submit', function (e) {
@@ -571,121 +556,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('input[name="is_free"]').checked = false;
         document.querySelector('input[name="is_sale"]').checked = false;
         document.getElementById('sale_price').value = '';
-        document.getElementById('cover').value = '';
         document.getElementById('book_file').value = '';
         formTitle.textContent = 'Add New Book';
-        resetCamera();
     }
 
     if (window.location.search.includes('edit')) {
         toggleForm(true);
-    }
-
-    // ===== CAMERA =====
-    const cameraPreview = document.getElementById('cameraPreview');
-    const cameraPlaceholder = document.getElementById('cameraPlaceholder');
-    const startCameraBtn = document.getElementById('startCameraBtn');
-    const capturePhotoBtn = document.getElementById('capturePhotoBtn');
-    const retakePhotoBtn = document.getElementById('retakePhotoBtn');
-    const confirmPhotoBtn = document.getElementById('confirmPhotoBtn');
-    const cameraStatus = document.getElementById('cameraStatus');
-    const capturedPhotoContainer = document.getElementById('capturedPhotoContainer');
-    const capturedPhotoPreview = document.getElementById('capturedPhotoPreview');
-    const liveCoverInput = document.getElementById('liveCoverInput');
-
-    let cameraStream = null;
-    let capturedBlob = null;
-
-    async function startCamera() {
-        try {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Your browser does not support camera access.');
-                return;
-            }
-            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            cameraPreview.srcObject = cameraStream;
-            cameraPreview.style.display = 'block';
-            cameraPlaceholder.style.display = 'none';
-            startCameraBtn.disabled = true;
-            capturePhotoBtn.disabled = false;
-            cameraStatus.textContent = 'Camera active';
-            cameraStatus.style.color = '#4f8a63';
-        } catch (error) {
-            alert('Camera access denied: ' + error.message);
-        }
-    }
-
-    function capturePhoto() {
-        if (!cameraStream) return;
-        const canvas = document.createElement('canvas');
-        canvas.width = cameraPreview.videoWidth;
-        canvas.height = cameraPreview.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => {
-            capturedBlob = blob;
-            const url = URL.createObjectURL(blob);
-            capturedPhotoPreview.src = url;
-            capturedPhotoContainer.style.display = 'block';
-            capturePhotoBtn.disabled = true;
-            retakePhotoBtn.disabled = false;
-            confirmPhotoBtn.disabled = false;
-            cameraStatus.textContent = 'Photo captured';
-            cameraStatus.style.color = '#8a6f86';
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraPreview.srcObject = null;
-            cameraPreview.style.display = 'none';
-            cameraPlaceholder.style.display = 'flex';
-            startCameraBtn.disabled = false;
-        }, 'image/jpeg');
-    }
-
-    function retakePhoto() {
-        capturedBlob = null;
-        capturedPhotoContainer.style.display = 'none';
-        capturedPhotoPreview.src = '';
-        capturePhotoBtn.disabled = true;
-        retakePhotoBtn.disabled = true;
-        confirmPhotoBtn.disabled = true;
-        cameraStatus.textContent = 'Camera ready';
-        cameraStatus.style.color = 'var(--text-light)';
-        startCameraBtn.disabled = false;
-    }
-
-    function confirmPhoto() {
-        if (!capturedBlob) return;
-        const file = new File([capturedBlob], 'live_cover.jpg', { type: 'image/jpeg' });
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        liveCoverInput.files = dt.files;
-        confirmPhotoBtn.disabled = true;
-        retakePhotoBtn.disabled = true;
-        cameraStatus.textContent = '✅ Photo confirmed!';
-        cameraStatus.style.color = '#4f8a63';
-    }
-
-    startCameraBtn.addEventListener('click', startCamera);
-    capturePhotoBtn.addEventListener('click', capturePhoto);
-    retakePhotoBtn.addEventListener('click', retakePhoto);
-    confirmPhotoBtn.addEventListener('click', confirmPhoto);
-
-    function resetCamera() {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraStream = null;
-        }
-        cameraPreview.srcObject = null;
-        cameraPreview.style.display = 'none';
-        cameraPlaceholder.style.display = 'flex';
-        startCameraBtn.disabled = false;
-        capturePhotoBtn.disabled = true;
-        retakePhotoBtn.disabled = true;
-        confirmPhotoBtn.disabled = true;
-        capturedPhotoContainer.style.display = 'none';
-        capturedPhotoPreview.src = '';
-        liveCoverInput.value = '';
-        cameraStatus.textContent = 'Camera ready';
-        cameraStatus.style.color = 'var(--text-light)';
     }
 
     // ===== BULK ACTIONS =====
@@ -831,14 +707,6 @@ document.addEventListener('DOMContentLoaded', function() {
 .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--rose); }
 
 /* ===== CAMERA ===== */
-.camera-section { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: var(--fantasy); margin-top: 8px; }
-.camera-preview-container { width: 100%; max-width: 400px; height: 220px; background: var(--vanilla); border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto; }
-.camera-preview-container video { width: 100%; height: 100%; object-fit: cover; display: none; }
-.camera-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-light); text-align: center; padding: 24px; }
-.camera-placeholder i { font-size: 2.5rem; color: var(--rose); margin-bottom: 8px; }
-.camera-placeholder p { margin: 0; font-size: 0.9rem; }
-.camera-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; margin-top: 12px; }
-.camera-controls .btn { padding: 6px 16px; font-size: 0.85rem; border-radius: 50px; }
 .captured-photo-container { text-align: center; margin-top: 12px; }
 .captured-photo-container img { border: 3px solid var(--rose); border-radius: 12px; }
 .status-indicator { font-size: 0.85rem; color: var(--text-light); margin-left: 8px; font-weight: 500; }
@@ -850,6 +718,11 @@ document.addEventListener('DOMContentLoaded', function() {
 .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.9rem; }
 .admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
 .admin-table .check-col { width: 40px; }
+.aw-autocover-label { display: block; font-weight: 600; margin-bottom: 6px; }
+.aw-autocover-box { display: flex; gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--fantasy); }
+.aw-autocover-box img { width: 72px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 12px rgba(44,30,30,.18); flex: none; }
+.aw-autocover-box p { margin: 0 0 6px; color: var(--text); line-height: 1.55; font-size: .92rem; }
+.aw-autocover-new { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; font-size: .9rem; cursor: pointer; min-height: 32px; }
 .admin-table .cover-col { width: 60px; }
 .admin-table .actions-col { width: 180px; }
 

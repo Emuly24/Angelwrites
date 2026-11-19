@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $v = ['attest' => (array)($_POST['attest'] ?? [])];
         foreach (['title', 'author_name', 'description', 'why', 'kind', 'rights', 'rights_detail', 'link'] as $f) $v[$f] = (string)($_POST[$f] ?? '');
-        $r = aw_mb_submit($db, $uid, $v, $v['kind'] === 'suggestion' ? null : ($_FILES['book_file'] ?? null), $_FILES['cover'] ?? null);
+        $r = aw_mb_submit($db, $uid, $v, $v['kind'] === 'suggestion' ? null : ($_FILES['book_file'] ?? null));
         if (!empty($r['ok'])) {
             $_SESSION['aw_mb_flash'] = 'Thank you! "' . trim($v['title']) . '" is with the team for review. We will let you know here and in your notifications.';
             header('Location: ' . SITE_URL . '/share_book.php#mine');
@@ -159,11 +159,7 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
             <input type="url" id="mbLink" name="link" maxlength="300" placeholder="https://" value="<?php echo htmlspecialchars($v['link']); ?>"<?php echo $desc('link', 'mbLinkHint'); ?>>
             <?php echo $err('link'); ?>
         </div>
-        <div class="cp-field mb-file<?php echo $cls('cover'); ?>">
-            <label for="mbCover">Cover picture <span class="cp-hint" style="display:inline">(optional)</span></label>
-            <input type="file" id="mbCover" name="cover"<?php echo aw_upload_attrs('image'); ?><?php echo $desc('cover'); ?>>
-            <?php echo $err('cover'); ?>
-        </div>
+        <p class="cp-hint mb-cover-note"><i class="fas fa-image" aria-hidden="true"></i> No cover needed: the book's own cover is used when its file has one, otherwise AngelWrites designs one from the title.</p>
         <fieldset class="cp-field<?php echo $cls('attest'); ?>">
             <legend class="cp-label">Before you send it</legend>
             <div class="mb-attest">
