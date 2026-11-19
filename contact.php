@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/site_texts.php'; // page text Angella can change on the site
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -84,8 +85,8 @@ $pageTitle = 'Contact';
 
         <!-- ===== HERO / PAGE HEADER ===== -->
         <div class="contact-hero">
-            <h1>Get in Touch</h1>
-            <p>Have a question, a prayer request, or just want to say hello? Reach out — Angella would love to hear from you.</p>
+            <h1><?php echo aw_text('contact.title', 'Get in Touch', 'line'); ?></h1>
+            <p><?php echo aw_text('contact.intro', 'Have a question, a prayer request, or just want to say hello? Reach out — Angella would love to hear from you.'); ?></p>
             <div class="hero-divider"></div>
         </div>
 

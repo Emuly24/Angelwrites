@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/site_texts.php'; // page text Angella can change on the site
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 
@@ -75,9 +76,9 @@ $og_description = "Poems by Angella Bottoman – words of faith, healing and hop
 <div class="poetry-page">
     <div class="container">
         <header class="aw-cat-hero">
-            <div class="aw-hero-kicker">The poetry of Angella Bottoman</div>
-            <h1>Poetry</h1>
-            <p>Words that speak to the soul — of faith, healing and the beauty of being known by God.</p>
+            <div class="aw-hero-kicker"><?php echo aw_text('poetry.kicker', 'The poetry of Angella Bottoman', 'line'); ?></div>
+            <h1><?php echo aw_text('poetry.title', 'Poetry', 'line'); ?></h1>
+            <p><?php echo aw_text('poetry.intro', 'Words that speak to the soul — of faith, healing and the beauty of being known by God.'); ?></p>
         </header>
 
         <div class="aw-cat-tools">

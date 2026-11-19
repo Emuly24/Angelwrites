@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/site_texts.php'; // page text Angella can change on the site
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -92,8 +93,8 @@ $pageTitle = htmlspecialchars($search !== '' ? 'Search: ' . $search : ($tag !== 
     <div class="container">
         <!-- Page Header -->
         <div class="reflections-header">
-            <h1>Christian Reflections</h1>
-            <p>Faith, hope, and encouragement for everyday life — written by Angella.</p>
+            <h1><?php echo aw_text('reflections.title', 'Christian Reflections', 'line'); ?></h1>
+            <p><?php echo aw_text('reflections.intro', 'Faith, hope, and encouragement for everyday life — written by Angella.'); ?></p>
         </div>
 
         <!-- Search Bar -->

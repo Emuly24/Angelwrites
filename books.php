@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/site_texts.php'; // page text Angella can change on the site
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -90,7 +91,7 @@ $pageTitle = 'Books';
         <div class="books-header">
             <div class="books-header-content">
                 <h1><?php echo $filter === 'community' ? 'Community books' : 'All Books'; ?></h1>
-                <p><?php echo $filter === 'community' ? 'Books written and shared by members of the AngelWrites family, read here on the site.' : "Explore Angella's writings and books shared by members, to read here on the site."; ?></p>
+                <p><?php echo $filter === 'community' ? aw_text('books.community_intro', 'Books written and shared by members of the AngelWrites family, read here on the site.') : aw_text('books.intro', "Explore Angella's writings and books shared by members, to read here on the site."); ?></p>
                 <p style="margin-top:10px;"><a class="btn btn-outline btn-sm" href="<?php echo SITE_URL; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i> Share your book</a></p>
             </div>
             <div class="books-header-stats">

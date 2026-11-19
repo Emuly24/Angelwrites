@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/site_texts.php'; // every text on this page can be changed on the page itself
 
 // ===== ABOUT CONTENT (settings.about_content, JSON; the defaults below when it is not set) =====
 $about_defaults = [
@@ -69,12 +70,12 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
         <div class="ab-aurora" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="ab-hero-in">
             <div class="ab-hero-text">
-                <p class="ab-eyebrow ab-rise" style="--d:0">About</p>
+                <p class="ab-eyebrow ab-rise" style="--d:0"><?php echo aw_text('about.eyebrow', 'About', 'line'); ?></p>
                 <h1 id="abTitle" class="ab-rise" style="--d:1">Angella <span class="ab-script">Bottoman</span></h1>
                 <p class="ab-roles ab-rise" style="--d:2">
                     <span>Writer</span><span aria-hidden="true">·</span><span>Speaker</span><span aria-hidden="true">·</span><span>Encourager</span>
                 </p>
-                <p class="ab-lead ab-rise" style="--d:3">Words that heal, inspire and transform, written from Malawi for every woman who needs to hear that her story still matters.</p>
+                <p class="ab-lead ab-rise" style="--d:3"><?php echo aw_text('about.lead', 'Words that heal, inspire and transform, written from Malawi for every woman who needs to hear that her story still matters.', 'text'); ?></p>
                 <div class="ab-actions ab-rise" style="--d:4">
                     <a class="ab-btn ab-btn-solid" href="#abStory">Read her story <i class="fas fa-arrow-down" aria-hidden="true"></i></a>
                     <a class="ab-btn ab-btn-ghost" href="<?php echo SITE_URL; ?>/contact.php"><i class="fas fa-envelope" aria-hidden="true"></i> Send a message</a>
@@ -86,7 +87,7 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
                 <div class="ab-frame">
                     <img src="<?php echo htmlspecialchars($photo_url); ?>" alt="Portrait of Angella Bottoman" width="480" height="600" decoding="async" fetchpriority="high">
                 </div>
-                <figcaption class="ab-chip"><i class="fas fa-dove" aria-hidden="true"></i> <span>Writing for God's glory</span></figcaption>
+                <figcaption class="ab-chip"><i class="fas fa-dove" aria-hidden="true"></i> <span><?php echo aw_text('about.chip', "Writing for God's glory", 'line'); ?></span></figcaption>
             </figure>
         </div>
     </section>
@@ -95,12 +96,12 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
     <section class="ab-section ab-story" id="abStory" aria-labelledby="abStoryTitle">
         <div class="ab-wrap ab-story-grid">
             <header class="ab-head ab-reveal">
-                <p class="ab-kicker">Her story</p>
-                <h2 id="abStoryTitle">Treasures stored in every person</h2>
+                <p class="ab-kicker"><?php echo aw_text('about.story_kicker', 'Her story', 'line'); ?></p>
+                <h2 id="abStoryTitle"><?php echo aw_text('about.story_title', 'Treasures stored in every person', 'line'); ?></h2>
             </header>
             <div class="ab-story-body ab-reveal">
-                <p class="ab-big"><?php echo nl2br(htmlspecialchars((string)($about_content['bio'] ?? ''))); ?></p>
-                <p><strong>The Beautiful Broken Vessel</strong> was born from a desire to show God's transforming power over the body, soul, and spirit.</p>
+                <p class="ab-big"><?php echo aw_text('about.bio', (string)($about_content['bio'] ?? ''), 'para'); ?></p>
+                <p><?php echo aw_text('about.story_book', '*The Beautiful Broken Vessel* was born from a desire to show God\'s transforming power over the body, soul, and spirit.', 'text'); ?></p>
             </div>
         </div>
     </section>
@@ -110,7 +111,7 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
     <section class="ab-quote-band" aria-label="In Angella's words">
         <figure class="ab-wrap ab-quote ab-reveal">
             <span class="ab-qmark" aria-hidden="true">&ldquo;</span>
-            <blockquote><p><?php echo htmlspecialchars($quote); ?></p></blockquote>
+            <blockquote><p><?php echo aw_text('about.quote', $quote, 'text'); ?></p></blockquote>
             <figcaption>— Angella Bottoman</figcaption>
         </figure>
     </section>
@@ -122,8 +123,8 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
             <div class="ab-mission ab-reveal">
                 <div class="ab-mission-icon" aria-hidden="true"><i class="fas fa-hand-holding-heart"></i></div>
                 <div>
-                    <p class="ab-kicker">Her mission</p>
-                    <h2 id="abMissionTitle" class="ab-mission-text"><?php echo htmlspecialchars((string)($about_content['mission'] ?? '')); ?></h2>
+                    <p class="ab-kicker"><?php echo aw_text('about.mission_kicker', 'Her mission', 'line'); ?></p>
+                    <h2 id="abMissionTitle" class="ab-mission-text"><?php echo aw_text('about.mission', (string)($about_content['mission'] ?? ''), 'text'); ?></h2>
                 </div>
             </div>
         </div>
@@ -133,29 +134,29 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
     <section class="ab-section" aria-labelledby="abOffersTitle">
         <div class="ab-wrap">
             <header class="ab-head ab-head-center ab-reveal">
-                <p class="ab-kicker">What she offers</p>
-                <h2 id="abOffersTitle">The gifts behind the work</h2>
+                <p class="ab-kicker"><?php echo aw_text('about.offers_kicker', 'What she offers', 'line'); ?></p>
+                <h2 id="abOffersTitle"><?php echo aw_text('about.offers_title', 'The gifts behind the work', 'line'); ?></h2>
             </header>
             <ul class="ab-cards" role="list">
                 <li class="ab-card ab-reveal" style="--d:0">
                     <span class="ab-card-icon" aria-hidden="true"><i class="fas fa-pen-fancy"></i></span>
-                    <h3>Writing</h3>
-                    <p>Creative writing, poetry, Christian reflections, and personal narratives.</p>
+                    <h3><?php echo aw_text('about.offer_writing_title', 'Writing', 'line'); ?></h3>
+                    <p><?php echo aw_text('about.offer_writing', 'Creative writing, poetry, Christian reflections, and personal narratives.', 'text'); ?></p>
                 </li>
                 <li class="ab-card ab-reveal" style="--d:1">
                     <span class="ab-card-icon" aria-hidden="true"><i class="fas fa-hands-praying"></i></span>
-                    <h3>Encouragement</h3>
-                    <p>Speaking, mentoring, and one-on-one sessions to help women find their purpose.</p>
+                    <h3><?php echo aw_text('about.offer_encouragement_title', 'Encouragement', 'line'); ?></h3>
+                    <p><?php echo aw_text('about.offer_encouragement', 'Speaking, mentoring, and one-on-one sessions to help women find their purpose.', 'text'); ?></p>
                 </li>
                 <li class="ab-card ab-reveal" style="--d:2">
                     <span class="ab-card-icon" aria-hidden="true"><i class="fas fa-book-open"></i></span>
-                    <h3>Author</h3>
-                    <p>Author of &ldquo;The Beautiful Broken Vessel&rdquo; and several published poems.</p>
+                    <h3><?php echo aw_text('about.offer_author_title', 'Author', 'line'); ?></h3>
+                    <p><?php echo aw_text('about.offer_author', 'Author of “The Beautiful Broken Vessel” and several published poems.', 'text'); ?></p>
                 </li>
                 <li class="ab-card ab-reveal" style="--d:3">
                     <span class="ab-card-icon" aria-hidden="true"><i class="fas fa-users"></i></span>
-                    <h3>Community</h3>
-                    <p>Building a supportive community through Q&amp;A, reflections, and shared stories.</p>
+                    <h3><?php echo aw_text('about.offer_community_title', 'Community', 'line'); ?></h3>
+                    <p><?php echo aw_text('about.offer_community', 'Building a supportive community through Q&A, reflections, and shared stories.', 'text'); ?></p>
                 </li>
             </ul>
         </div>
@@ -166,8 +167,8 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
     <section class="ab-section ab-works-section" aria-labelledby="abWorksTitle">
         <div class="ab-wrap">
             <header class="ab-head ab-head-center ab-reveal">
-                <p class="ab-kicker">On AngelWrites</p>
-                <h2 id="abWorksTitle">Something to read today</h2>
+                <p class="ab-kicker"><?php echo aw_text('about.works_kicker', 'On AngelWrites', 'line'); ?></p>
+                <h2 id="abWorksTitle"><?php echo aw_text('about.works_title', 'Something to read today', 'line'); ?></h2>
             </header>
             <ul class="ab-works" role="list">
                 <?php foreach ($ab_works as $i => $w): ?>
@@ -201,8 +202,8 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
         <div class="ab-wrap">
             <div class="ab-connect ab-reveal">
                 <div class="ab-aurora ab-aurora-soft" aria-hidden="true"><span></span><span></span></div>
-                <h2 id="abConnectTitle">Let's connect</h2>
-                <p>Read her words, or write to her. Angella would love to hear from you.</p>
+                <h2 id="abConnectTitle"><?php echo aw_text('about.connect_title', 'Let\'s connect', 'line'); ?></h2>
+                <p><?php echo aw_text('about.connect_text', 'Read her words, or write to her. Angella would love to hear from you.', 'text'); ?></p>
                 <div class="ab-actions ab-actions-center">
                     <a class="ab-btn ab-btn-solid" href="<?php echo SITE_URL; ?>/books.php"><i class="fas fa-book" aria-hidden="true"></i> Read books</a>
                     <a class="ab-btn ab-btn-ghost" href="<?php echo SITE_URL; ?>/poetry.php"><i class="fas fa-feather-pointed" aria-hidden="true"></i> Read poetry</a>

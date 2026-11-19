@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/site_texts.php'; // page text Angella can change on the site
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 
@@ -120,7 +121,7 @@ $pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog'
         <!-- Page Header -->
         <div class="blog-header">
             <h1><?php echo $category_filter ? htmlspecialchars($category_filter) : 'Blog'; ?></h1>
-            <p>Faith, hope, and encouragement for everyday life — written by Angella.<?php if ($category_filter === 'Christian Reflections'): ?> Reflections also have <a href="<?php echo SITE_URL; ?>/reflections.php">their own page</a>.<?php endif; ?></p>
+            <p><?php echo aw_text('blog.intro', 'Faith, hope, and encouragement for everyday life — written by Angella.'); ?><?php if ($category_filter === 'Christian Reflections'): ?> Reflections also have <a href="<?php echo SITE_URL; ?>/reflections.php">their own page</a>.<?php endif; ?></p>
         </div>
 
         <!-- Search Bar -->
