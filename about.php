@@ -86,7 +86,7 @@ $ab_sub_html = aw_subscribe_control($db, 'section');
                 <div class="ab-frame">
                     <img src="<?php echo htmlspecialchars($photo_url); ?>" alt="Portrait of Angella Bottoman" width="480" height="600" decoding="async" fetchpriority="high">
                 </div>
-                <figcaption class="ab-chip"><i class="fas fa-location-dot" aria-hidden="true"></i> <span>Writing from Malawi</span></figcaption>
+                <figcaption class="ab-chip"><i class="fas fa-dove" aria-hidden="true"></i> <span>Writing for God's glory</span></figcaption>
             </figure>
         </div>
     </section>
