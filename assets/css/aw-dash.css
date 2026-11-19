@@ -251,3 +251,6 @@ html[data-theme="dark"] .dsh {
 .dsh-pill { border-color: rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .2); }
 html[data-theme="dark"] .dsh-feed .dsh-fico { color: #1d1314; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not([data-theme="dark"]) .dsh-feed .dsh-fico { color: #1d1314; } }
+.dsh-pill { background: rgba(40, 12, 20, .26); }
+.dsh-card h2 .dsh-ico { color: #8a4448; }
+html[data-theme="dark"] .dsh-card h2 .dsh-ico { color: #f0c4c5; }

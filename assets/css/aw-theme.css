@@ -166,3 +166,7 @@ html.aw-ui body .awh-theme button:hover { background: var(--h-soft); color: var(
 html.aw-ui body .awh-theme button[aria-pressed="true"] { background: var(--h-soft); color: var(--h-accent); }
 html.aw-ui body .awh-theme button[aria-pressed="true"]::after { content: "\2713"; margin-left: auto; font-weight: 800; }
 html.aw-ui body .awh-theme button:focus-visible { outline: 3px solid var(--h-accent); outline-offset: 1px; }
+
+/* green "Published" and "Free" labels: a deeper green so their white text reads */
+html.aw-ui body :is(.status-badge.published, .badge.free, .badge-success) { background: #2f6b45; color: #fff; }
+html.aw-ui body .badge.badge-primary { background: #9c5457; color: #fff; }
