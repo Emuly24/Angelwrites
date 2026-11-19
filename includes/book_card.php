@@ -41,7 +41,7 @@ function aw_book_card(array $book, array $opts = []) {
         $sale = !$free && aw_book_on_sale($book);
         $blurb = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($book['description'] ?? ''))));
 
-        $flag = $owned ? 'Owned' : ($sale ? 'Sale' : (!empty($book['submitted_by']) ? 'Community' : '')); // "Free" already shows as the price
+        $flag = $owned ? 'Owned' : ($sale ? 'Sale' : (!empty($book['submitted_by']) ? (empty($book['file_path']) ? 'Suggested' : 'Community') : '')); // "Free" already shows as the price
 
         $html = '<article class="bk-card" id="book-' . $id . '">';
         // The cover repeats the title link, so it is hidden from screen readers and the tab order.
@@ -58,6 +58,7 @@ function aw_book_card(array $book, array $opts = []) {
 
         // Price
         if ($owned) $p = '<span class="bk-price-own">In your library</span>';
+        elseif (!empty($book['submitted_by']) && empty($book['file_path'])) $p = '<span class="bk-price-soon">Suggested read</span>';
         elseif ($free) $p = '<span class="bk-price-free">Free</span>';
         elseif ($price <= 0) $p = '<span class="bk-price-soon">Not yet on sale</span>';
         elseif ($sale) $p = '<s>' . aw_mwk($book['price']) . '</s> <span class="bk-price-sale">' . aw_mwk($book['sale_price']) . '</span>';
@@ -71,7 +72,7 @@ function aw_book_card(array $book, array $opts = []) {
         }
         if (!empty($opts['buy'])) {
             // Books are read on the site only; there is no download (includes/book_extract.php).
-            if (($free || $owned) && empty($opts['readable'])) {
+            if (($free || $owned) && empty($opts['readable']) && !empty($book['file_path'])) { // a suggested book has no file to read
                 $html .= '<a class="bk-btn bk-btn-primary" href="' . htmlspecialchars(SITE_URL . '/reader/reader.php?id=' . $id) . '" aria-label="Read ' . $title . '">Read</a>';
             } elseif (function_exists('isLoggedIn') && isLoggedIn()) {
                 if ($price > 0 && !$free && !$owned) {

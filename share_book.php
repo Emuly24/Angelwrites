@@ -18,13 +18,7 @@ $uid = (int)$_SESSION['user_id'];
 aw_mb_tables($db);
 
 $errors = [];
-$v = ['title' => '', 'author_name' => '', 'description' => '', 'attest' => []];
-try {
-    $st = $db->prepare("SELECT display_name, username FROM users WHERE id = ?");
-    $st->execute([$uid]);
-    $me = $st->fetch(PDO::FETCH_ASSOC) ?: [];
-    $v['author_name'] = trim((string)($me['display_name'] ?? '')) ?: (string)($me['username'] ?? '');
-} catch (Throwable $e) { error_log('share book me: ' . $e->getMessage()); }
+$v = ['title' => '', 'author_name' => '', 'description' => '', 'why' => '', 'kind' => 'file', 'rights' => '', 'rights_detail' => '', 'link' => '', 'attest' => []];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -35,8 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . SITE_URL . '/share_book.php#mine');
         exit;
     } else {
-        $v = ['title' => (string)($_POST['title'] ?? ''), 'author_name' => (string)($_POST['author_name'] ?? ''), 'description' => (string)($_POST['description'] ?? ''), 'attest' => (array)($_POST['attest'] ?? [])];
-        $r = aw_mb_submit($db, $uid, $v, $_FILES['book_file'] ?? null, $_FILES['cover'] ?? null);
+        $v = ['attest' => (array)($_POST['attest'] ?? [])];
+        foreach (['title', 'author_name', 'description', 'why', 'kind', 'rights', 'rights_detail', 'link'] as $f) $v[$f] = (string)($_POST[$f] ?? '');
+        $r = aw_mb_submit($db, $uid, $v, $v['kind'] === 'suggestion' ? null : ($_FILES['book_file'] ?? null), $_FILES['cover'] ?? null);
         if (!empty($r['ok'])) {
             $_SESSION['aw_mb_flash'] = 'Thank you! "' . trim($v['title']) . '" is with the team for review. We will let you know here and in your notifications.';
             header('Location: ' . SITE_URL . '/share_book.php#mine');
@@ -54,7 +49,7 @@ $err = function ($k) use ($errors) { return isset($errors[$k]) ? '<span class="c
 $cls = function ($k) use ($errors) { return isset($errors[$k]) ? ' has-err' : ''; };
 $desc = function ($k, $hint = '') use ($errors) { $ids = trim(($hint ? $hint . ' ' : '') . (isset($errors[$k]) ? 'err_' . $k : '')); return $ids ? ' aria-describedby="' . $ids . '"' : ''; };
 
-$pageTitle = 'Share your book';
+$pageTitle = 'Share a book';
 $aw_noindex = true;
 require_once 'includes/header.php';
 echo aw_cp_assets();
@@ -64,6 +59,7 @@ echo aw_cp_assets();
 .mb-steps li { background: var(--cp-card); border: 1px solid var(--cp-line); border-radius: 16px; padding: 14px; font-size: .9rem; line-height: 1.5; }
 .mb-steps strong { display: block; margin-bottom: 2px; }
 .mb-steps i { color: var(--cp-accent); margin-right: 6px; }
+.cp-field input[type=url] { width: 100%; min-height: 46px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--cp-line); background: var(--cp-card); color: var(--text); font: inherit; }
 .mb-file input[type=file] { display: block; width: 100%; padding: 12px; border: 1px dashed var(--cp-line); border-radius: 12px; background: var(--cp-card); font: inherit; }
 .mb-attest { display: grid; gap: 8px; }
 .mb-attest .cp-check { border-radius: 14px; align-items: flex-start; padding: 10px 14px; min-height: 44px; line-height: 1.45; }
@@ -83,17 +79,17 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
 <div class="container cp-narrow">
     <p><a href="<?php echo SITE_URL; ?>/books.php?filter=community"><i class="fas fa-arrow-left" aria-hidden="true"></i> Community books</a></p>
     <header class="cp-head"><div>
-        <h1>Share your book</h1>
-        <p>Have you written a book? Share it with the AngelWrites family. Members read it here, on the site.</p>
+        <h1>Share a book</h1>
+        <p>Has a book helped you, or would you love to read it together with others? Share it with the AngelWrites family: one you wrote, or one by another author.</p>
     </div></header>
 
     <?php if ($flash): ?><div class="cp-banner cp-banner-calm" role="status"><?php echo htmlspecialchars($flash); ?></div><?php endif; ?>
 
     <ol class="mb-steps">
-        <li><strong><i class="fas fa-upload" aria-hidden="true"></i>1. Upload</strong>Your book as PDF, EPUB, Word, ODT, RTF or text.</li>
-        <li><strong><i class="fas fa-user-check" aria-hidden="true"></i>2. The team reads it</strong>Nobody else sees it until it is approved.</li>
-        <li><strong><i class="fas fa-book-open" aria-hidden="true"></i>3. Members read it</strong>On the Community books shelf, free, on the site only.</li>
-        <li><strong><i class="fas fa-trash-can" aria-hidden="true"></i>4. Your choice</strong>Remove it at any time; its file is deleted.</li>
+        <li><strong><i class="fas fa-book" aria-hidden="true"></i>1. Share it</strong>Upload the file when it may be shared, or suggest the book without one.</li>
+        <li><strong><i class="fas fa-user-check" aria-hidden="true"></i>2. The team looks at it</strong>Nobody else sees it until it is approved.</li>
+        <li><strong><i class="fas fa-people-group" aria-hidden="true"></i>3. Read together</strong>On the Community books shelf, and in reading groups.</li>
+        <li><strong><i class="fas fa-trash-can" aria-hidden="true"></i>4. Your choice</strong>Remove it at any time; any file is deleted.</li>
     </ol>
 
     <?php if ($blocked !== '' && empty($errors)): ?>
@@ -105,13 +101,13 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
     <form method="post" enctype="multipart/form-data" class="cp-form" novalidate>
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
         <div class="cp-field<?php echo $cls('title'); ?>">
-            <label for="mbTitle">Title</label>
+            <label for="mbTitle">Book title</label>
             <input type="text" id="mbTitle" name="title" maxlength="160" required value="<?php echo htmlspecialchars($v['title']); ?>"<?php echo $desc('title'); ?>>
             <?php echo $err('title'); ?>
         </div>
         <div class="cp-field<?php echo $cls('author_name'); ?>">
-            <label for="mbAuthor">Author name to show</label>
-            <span class="cp-hint" id="mbAuthorHint">Your name or the pen name you write under.</span>
+            <label for="mbAuthor">Who wrote it</label>
+            <span class="cp-hint" id="mbAuthorHint">The author's name (yours or a pen name, if you wrote it).</span>
             <input type="text" id="mbAuthor" name="author_name" maxlength="100" required value="<?php echo htmlspecialchars($v['author_name']); ?>"<?php echo $desc('author_name', 'mbAuthorHint'); ?>>
             <?php echo $err('author_name'); ?>
         </div>
@@ -120,11 +116,48 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
             <textarea id="mbDesc" name="description" maxlength="2000" rows="5"<?php echo $desc('description'); ?>><?php echo htmlspecialchars($v['description']); ?></textarea>
             <?php echo $err('description'); ?>
         </div>
-        <div class="cp-field mb-file<?php echo $cls('book_file'); ?>">
-            <label for="mbFile">The book file</label>
-            <span class="cp-hint" id="mbFileHint"><?php echo htmlspecialchars(aw_upload_hint('book')); ?>. It must have real text (a scanned PDF of page pictures cannot be read).</span>
-            <input type="file" id="mbFile" name="book_file" required<?php echo aw_upload_attrs('book'); ?><?php echo $desc('book_file', 'mbFileHint'); ?>>
-            <?php echo $err('book_file'); ?>
+        <div class="cp-field<?php echo $cls('why'); ?>">
+            <label for="mbWhy">How will it help others here?</label>
+            <span class="cp-hint" id="mbWhyHint">A sentence or two: what it gave you, or why you would like to read it together. The team looks for books that fit the community's goals.</span>
+            <textarea id="mbWhy" name="why" maxlength="1000" rows="3" required<?php echo $desc('why', 'mbWhyHint'); ?>><?php echo htmlspecialchars($v['why']); ?></textarea>
+            <?php echo $err('why'); ?>
+        </div>
+        <fieldset class="cp-field">
+            <legend class="cp-label">How would you like to share it?</legend>
+            <div class="cp-options">
+                <label class="cp-option"><input type="radio" name="kind" value="file"<?php echo $v['kind'] !== 'suggestion' ? ' checked' : ''; ?>><span><strong>Upload the book</strong><small>Members read it here. Only when sharing the file is allowed: see below.</small></span></label>
+                <label class="cp-option"><input type="radio" name="kind" value="suggestion"<?php echo $v['kind'] === 'suggestion' ? ' checked' : ''; ?>><span><strong>Suggest it without a file</strong><small>For any other book, such as one you bought. Members get their own copy and read it together.</small></span></label>
+            </div>
+        </fieldset>
+        <div id="mbFilePart">
+            <fieldset class="cp-field<?php echo $cls('rights'); ?>">
+                <legend class="cp-label">Why may this book be shared here?</legend>
+                <span class="cp-hint" id="mbRightsHint">A book someone else wrote can only be uploaded when its author or publisher allows sharing; otherwise it would be copyright infringement. If none of these fit, choose "Suggest it without a file" above.</span>
+                <div class="cp-options">
+                    <?php foreach (AW_MB_RIGHTS as $k => $r): ?>
+                    <label class="cp-option"><input type="radio" name="rights" value="<?php echo $k; ?>"<?php echo $v['rights'] === $k ? ' checked' : ''; ?> data-detail="<?php echo $r[2] ? '1' : '0'; ?>"><span><strong><?php echo htmlspecialchars($r[0]); ?></strong><small><?php echo htmlspecialchars($r[1]); ?></small></span></label>
+                    <?php endforeach; ?>
+                </div>
+                <?php echo $err('rights'); ?>
+            </fieldset>
+            <div class="cp-field<?php echo $cls('rights_detail'); ?>" id="mbDetailPart">
+                <label for="mbDetail">Tell the team more</label>
+                <span class="cp-hint" id="mbDetailHint">The licence, where the free copy is offered (a web address is best), when the author died, or who gave permission and how.</span>
+                <textarea id="mbDetail" name="rights_detail" maxlength="500" rows="2"<?php echo $desc('rights_detail', 'mbDetailHint'); ?>><?php echo htmlspecialchars($v['rights_detail']); ?></textarea>
+                <?php echo $err('rights_detail'); ?>
+            </div>
+            <div class="cp-field mb-file<?php echo $cls('book_file'); ?>">
+                <label for="mbFile">The book file</label>
+                <span class="cp-hint" id="mbFileHint"><?php echo htmlspecialchars(aw_upload_hint('book')); ?>. It must have real text (a scanned PDF of page pictures cannot be read).</span>
+                <input type="file" id="mbFile" name="book_file"<?php echo aw_upload_attrs('book'); ?><?php echo $desc('book_file', 'mbFileHint'); ?>>
+                <?php echo $err('book_file'); ?>
+            </div>
+        </div>
+        <div class="cp-field<?php echo $cls('link'); ?>">
+            <label for="mbLink">Where can members get it? <span class="cp-hint" style="display:inline">(optional)</span></label>
+            <span class="cp-hint" id="mbLinkHint">A web address for the book: a shop, the publisher, or a free copy.</span>
+            <input type="url" id="mbLink" name="link" maxlength="300" placeholder="https://" value="<?php echo htmlspecialchars($v['link']); ?>"<?php echo $desc('link', 'mbLinkHint'); ?>>
+            <?php echo $err('link'); ?>
         </div>
         <div class="cp-field mb-file<?php echo $cls('cover'); ?>">
             <label for="mbCover">Cover picture <span class="cp-hint" style="display:inline">(optional)</span></label>
@@ -145,6 +178,20 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
             <span class="cp-hint">Up to <?php echo AW_MB_MAX_WAITING; ?> books can wait for review at once.</span>
         </div>
     </form>
+    <script>
+    (function () {
+        // show the parts that apply: the file and its rights for an upload, the details when needed
+        var form = document.querySelector('.cp-form'); if (!form) return;
+        function sync() {
+            var sug = form.querySelector('input[name="kind"]:checked');
+            var isFile = !sug || sug.value !== 'suggestion';
+            document.getElementById('mbFilePart').hidden = !isFile;
+            var r = form.querySelector('input[name="rights"]:checked');
+            document.getElementById('mbDetailPart').hidden = !(isFile && r && r.dataset.detail === '1');
+        }
+        form.addEventListener('change', sync); sync();
+    })();
+    </script>
     <?php endif; ?>
 
     <section id="mine" style="margin-top:36px;" aria-labelledby="mbMineTitle">
@@ -157,7 +204,7 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
             <li class="mb-item">
                 <span class="mb-state <?php echo htmlspecialchars($m['status']); ?>"><?php echo htmlspecialchars(aw_mb_status_label($m['status'])); ?></span>
                 <h3><?php if ($m['status'] === 'published' && $m['book_id']): ?><a href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$m['book_id']; ?>"><?php echo htmlspecialchars($m['title']); ?></a><?php else: echo htmlspecialchars($m['title']); endif; ?></h3>
-                <span class="mb-meta">by <?php echo htmlspecialchars($m['author_name']); ?> · shared <?php echo htmlspecialchars(date('j M Y', strtotime($m['created_at']))); ?><?php if ($m['words']): ?> · <?php echo number_format((int)$m['words']); ?> words<?php endif; ?></span>
+                <span class="mb-meta">by <?php echo htmlspecialchars($m['author_name']); ?> · <?php echo htmlspecialchars(aw_mb_rights_label((string)($m['rights'] ?? '')) ?: 'Shared'); ?> · <?php echo htmlspecialchars(date('j M Y', strtotime($m['created_at']))); ?><?php if ($m['words']): ?> · <?php echo number_format((int)$m['words']); ?> words<?php endif; ?></span>
                 <?php if (trim((string)$m['review_note']) !== ''): ?><div class="mb-note"><strong>From the team:</strong> <?php echo htmlspecialchars($m['review_note']); ?></div>
                 <?php elseif ($m['status'] === 'removed'): ?><div class="mb-meta">You removed this book; its file was deleted.</div><?php endif; ?>
                 <?php if (in_array($m['status'], ['waiting', 'published'], true)): ?>

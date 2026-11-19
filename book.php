@@ -196,7 +196,9 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                 <!-- Price & Actions -->
                 <div class="book-action-row">
                     <div class="price-display">
-                        <?php if ($book['is_free']): ?>
+                        <?php if (!empty($book['submitted_by']) && empty($book['file_path'])): // a member's suggestion: not hosted here ?>
+                            <span class="regular-price">Suggested read</span>
+                        <?php elseif ($book['is_free']): ?>
                             <span class="free-badge">Free</span>
                         <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
                             <span class="regular-price">Not yet on sale</span>
@@ -216,11 +218,20 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                         $is_free_book = !empty($book['is_free']);
                         $owns_book = $is_free_book || isAdmin() || (isLoggedIn() && aw_has_purchased($db, $_SESSION['user_id'], $book_id));
                         $back_here = urlencode('/book.php?id=' . (int)$book_id);
+                        require_once __DIR__ . '/includes/member_books.php';
+                        $aw_sharer = aw_mb_sharer($db, $book); // a book a member shared (or suggested)
+                        $aw_suggested = $aw_sharer && ($aw_sharer['kind'] ?? '') === 'suggestion';
                         ?>
                         <?php if ($owns_book && ($has_processed || !empty($book['file_path']))): ?>
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
+                        <?php elseif ($aw_suggested): // suggested without a file: members bring their own copy ?>
+                            <?php if (trim((string)$aw_sharer['link']) !== ''): ?>
+                            <a href="<?php echo htmlspecialchars($aw_sharer['link']); ?>" class="btn btn-primary btn-lg" target="_blank" rel="noopener nofollow"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> Get a copy</a>
+                            <?php endif; ?>
+                            <a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>" class="btn btn-outline btn-lg"><i class="fas fa-people-group" aria-hidden="true"></i> Read it together in a group</a>
+                            <p class="book-owned">This book is suggested by a member; it is not hosted here. Get your own copy, then read it with others.</p>
                         <?php elseif ($owns_book): ?>
                             <span class="btn btn-outline btn-lg" aria-disabled="true">Coming soon to read online</span>
                         <?php elseif ((float)$book['price'] <= 0): ?>
@@ -237,10 +248,9 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                         <?php
                         // A book a member shared (includes/member_books.php): who shared it, a way to raise
                         // a concern (the team can take it down), and for the member, a way to remove it.
-                        require_once __DIR__ . '/includes/member_books.php';
-                        $aw_sharer = aw_mb_sharer($db, $book);
                         if ($aw_sharer): ?>
-                            <p class="book-owned book-shared"><i class="fas fa-people-group" aria-hidden="true"></i> Shared by a member of the AngelWrites family<?php /* the account stays private: many write under a pen name; the team sees who in admin/member_books.php */ ?><?php if (function_exists('aw_can') && aw_can('manage_content')): ?> (<a href="<?php echo SITE_URL; ?>/admin/member_books.php?id=<?php echo (int)$aw_sharer['mb_id']; ?>">team view</a>)<?php endif; ?> ·
+                            <?php if (trim((string)$aw_sharer['why']) !== ''): ?><p class="book-owned book-why">“<?php echo htmlspecialchars($aw_sharer['why']); ?>”</p><?php endif; ?>
+                            <p class="book-owned book-shared"><i class="fas fa-people-group" aria-hidden="true"></i> <?php echo $aw_suggested ? 'Suggested' : 'Shared'; ?> by a member of the AngelWrites family<?php $aw_basis = $aw_suggested ? '' : aw_mb_rights_label((string)$aw_sharer['rights']); echo $aw_basis !== '' ? ' · ' . htmlspecialchars($aw_basis) : ''; ?><?php /* the account stays private: many write under a pen name; the team sees who in admin/member_books.php */ ?><?php if (function_exists('aw_can') && aw_can('manage_content')): ?> (<a href="<?php echo SITE_URL; ?>/admin/member_books.php?id=<?php echo (int)$aw_sharer['mb_id']; ?>">team view</a>)<?php endif; ?> ·
                             <?php if (isLoggedIn() && (int)$_SESSION['user_id'] === (int)$aw_sharer['user_id']): ?>
                                 <a href="<?php echo SITE_URL; ?>/share_book.php#mine">Manage or remove your book</a>
                             <?php else: ?>
@@ -563,6 +573,7 @@ html[data-theme="dark"] .action-buttons .btn-primary.btn-lg { background:#f0c4c5
 .book-owned { margin:0; font-size:.88rem; color:var(--text-light); }
 .book-owned i { color:#2f6b45; }
 .book-shared i { color:#3f6f68; }
+.book-why { font-style:italic; max-width:36em; }
 .book-groups { margin:0; font-size:.9rem; }
 .book-groups a { color:var(--text); text-decoration:none; display:inline-flex; align-items:center; gap:8px; min-height:36px; }
 .book-groups a:hover { color:#9c5457; text-decoration:underline; }

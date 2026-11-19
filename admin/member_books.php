@@ -43,7 +43,7 @@ try {
 // read the book before deciding: the text exactly as the reader will show it
 $mb_preview = '';
 $mb_preview_note = '';
-if ($mb_one && $mb_one['status'] === 'waiting') {
+if ($mb_one && $mb_one['status'] === 'waiting' && ($mb_one['kind'] ?? 'file') !== 'suggestion') {
     $ex = aw_book_extract(aw_book_file_abs($mb_one['file_path']));
     if (!empty($ex['ok'])) {
         $all = count($ex['pages']);
@@ -95,7 +95,17 @@ $who = function ($r) { return trim((string)($r['display_name'] ?? '')) ?: (strin
     <p class="mbq-lead">by <?php echo htmlspecialchars($mb_one['author_name']); ?> · shared by <strong><?php echo htmlspecialchars($who($mb_one)); ?></strong> on <?php echo htmlspecialchars(date('j M Y, g:i a', strtotime($mb_one['created_at']))); ?> · <?php echo htmlspecialchars(aw_mb_status_label($mb_one['status'])); ?></p>
     <div class="mbq-grid">
         <div>
-            <?php if ($mb_one['status'] === 'waiting'): ?>
+            <div class="mbq-card">
+                <h2 style="font-size:1.1rem;margin:0 0 8px;">Why the member is sharing it</h2>
+                <p style="white-space:pre-line;margin:0 0 10px;"><?php echo htmlspecialchars((string)($mb_one['why'] ?? '')); ?></p>
+                <p class="mbq-meta" style="margin:0;"><strong><?php echo ($mb_one['kind'] ?? 'file') === 'suggestion' ? 'Suggested without a file' : 'Book file: ' . htmlspecialchars(AW_MB_RIGHTS[$mb_one['rights'] ?? ''][0] ?? 'basis not given'); ?></strong>
+                <?php if (trim((string)($mb_one['rights_detail'] ?? '')) !== ''): ?><br>Details: <?php echo htmlspecialchars($mb_one['rights_detail']); ?><?php endif; ?>
+                <?php if (trim((string)($mb_one['link'] ?? '')) !== ''): ?><br>Where to get it: <a href="<?php echo htmlspecialchars($mb_one['link']); ?>" target="_blank" rel="noopener nofollow"><?php echo htmlspecialchars($mb_one['link']); ?></a><?php endif; ?></p>
+                <?php if (($mb_one['kind'] ?? 'file') !== 'suggestion' && ($mb_one['rights'] ?? '') !== 'own'): ?>
+                <p class="mbq-meta" style="margin:10px 0 0;">Someone else wrote this book. Approve the file only if the details show it may be shared (public domain, a free-to-share licence, or permission). Otherwise decline and suggest the member shares it without a file.</p>
+                <?php endif; ?>
+            </div>
+            <?php if ($mb_one['status'] === 'waiting' && ($mb_one['kind'] ?? 'file') !== 'suggestion'): ?>
             <div class="mbq-card">
                 <h2 style="font-size:1.1rem;margin:0 0 10px;">Read it first</h2>
                 <?php if ($mb_preview_note): ?><p class="mbq-meta"><?php echo htmlspecialchars($mb_preview_note); ?></p><?php endif; ?>
@@ -108,7 +118,7 @@ $who = function ($r) { return trim((string)($r['display_name'] ?? '')) ?: (strin
         </div>
         <aside>
             <div class="mbq-card">
-                <p class="mbq-meta" style="margin-top:0;"><?php echo number_format((int)$mb_one['words']); ?> words · <?php echo (int)$mb_one['pages']; ?> pages · <?php echo htmlspecialchars(strtoupper((string)$mb_one['file_type'])); ?></p>
+                <?php if (($mb_one['kind'] ?? 'file') !== 'suggestion'): ?><p class="mbq-meta" style="margin-top:0;"><?php echo number_format((int)$mb_one['words']); ?> words · <?php echo (int)$mb_one['pages']; ?> pages · <?php echo htmlspecialchars(strtoupper((string)$mb_one['file_type'])); ?></p><?php endif; ?>
                 <p style="font-weight:700;margin:0 0 6px;">The member confirmed</p>
                 <div class="mbq-attest"><?php echo htmlspecialchars((string)$mb_one['attest_text']); ?></div>
                 <?php if (trim((string)$mb_one['review_note']) !== ''): ?><p class="mbq-meta"><strong>Note sent:</strong> <?php echo htmlspecialchars($mb_one['review_note']); ?></p>
@@ -125,7 +135,7 @@ $who = function ($r) { return trim((string)($r['display_name'] ?? '')) ?: (strin
                 <form method="post" onsubmit="return this.reason.value.trim() !== '' || (alert('Please give the member a reason.'), false);">
                     <input type="hidden" name="action" value="decline">
                     <label for="mbqNoteNo">Reason for not adding it</label>
-                    <textarea id="mbqNoteNo" name="reason" maxlength="1000" required placeholder="e.g. It looks like someone else's published book; we can only add books you wrote."></textarea>
+                    <textarea id="mbqNoteNo" name="reason" maxlength="1000" required placeholder="e.g. This book is still under copyright, so we cannot host the file. Please share it again as a suggestion without a file."></textarea>
                     <button type="submit" class="btn btn-outline" style="margin-top:8px;width:100%;">Decline and tell the member</button>
                 </form>
             </div>
@@ -160,7 +170,7 @@ $who = function ($r) { return trim((string)($r['display_name'] ?? '')) ?: (strin
                 <?php if (!empty($r['cover_path']) && aw_book_file_abs($r['cover_path']) !== ''): ?><img class="mbq-cover" src="<?php echo htmlspecialchars(SITE_URL . '/' . $r['cover_path']); ?>" alt=""><?php else: ?><span class="mbq-cover" aria-hidden="true"><i class="fas fa-book"></i></span><?php endif; ?>
                 <div>
                     <a href="<?php echo SITE_URL; ?>/admin/member_books.php?id=<?php echo (int)$r['id']; ?>"><?php echo htmlspecialchars($r['title']); ?></a>
-                    <div class="mbq-meta">by <?php echo htmlspecialchars($r['author_name']); ?> · shared by <?php echo htmlspecialchars($who($r)); ?> · <?php echo htmlspecialchars(date('j M Y', strtotime($r['created_at']))); ?> · <?php echo number_format((int)$r['words']); ?> words</div>
+                    <div class="mbq-meta">by <?php echo htmlspecialchars($r['author_name']); ?> · shared by <?php echo htmlspecialchars($who($r)); ?> · <?php echo htmlspecialchars(date('j M Y', strtotime($r['created_at']))); ?> · <?php echo ($r['kind'] ?? 'file') === 'suggestion' ? 'suggestion, no file' : htmlspecialchars(aw_mb_rights_label((string)($r['rights'] ?? ''))) . ' · ' . number_format((int)$r['words']) . ' words'; ?></div>
                 </div>
             </li>
             <?php endforeach; ?>

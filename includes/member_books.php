@@ -1,10 +1,19 @@
 <?php
 /**
- * Member books (PROGRAM_PLAN.md wish H, section 5.2 step 3).
+ * Member books (PROGRAM_PLAN.md wish H, section 5.2).
  *
- * A member can share a book they wrote, or hold the rights to share:
+ * A member can share any book that will help others on the site and fits the community's goals,
+ * whoever wrote it, in one of two ways:
+ *   - Upload the book file, when it may be shared: they wrote it, it is in the public domain, it was
+ *     released free to share (for example Creative Commons, or a free ministry e-book), or its author
+ *     or publisher gave permission. The member says which, with the licence or permission;
+ *   - Suggest the book without a file (any other book, such as one they bought): it goes on the
+ *     shelf with why it helps and where to get it, so members read their own copies together, in a
+ *     reading group for example. A book by someone else is never published here without the right
+ *     to share it: that would be copyright infringement, and the host suspends sites for it.
+ *
  *   1. they upload the file (PDF, EPUB, DOCX, ODT, RTF or TXT, through the shared upload helper,
- *      with its size limit and the member's quota) and confirm that it is theirs to share;
+ *      with its size limit and the member's quota), or suggest the book, and say why it helps;
  *   2. it waits in a review queue; nobody else can read it, and it is in no list, until an admin
  *      approves it (admin/member_books.php). The admin can read it first and must give a reason
  *      when declining;
@@ -24,10 +33,17 @@ require_once __DIR__ . '/book_extract.php';
 
 const AW_MB_MAX_WAITING = 3;     // books waiting for review at once, per member
 const AW_MB_MAX_PER_30D = 5;     // books submitted in 30 days, per member
+/** Why a book file may be shared: [label, help, needs details]. */
+const AW_MB_RIGHTS = [
+    'own'           => ['I wrote it', 'You are the author, or you hold its rights.', false],
+    'public_domain' => ['It is in the public domain', 'Its copyright has ended, as for classics whose authors died long ago (for example older hymn books, or Spurgeon and Bunyan).', true],
+    'free_licence'  => ['It was released free to share', 'The author or publisher lets anyone share it: a Creative Commons licence, or a free e-book given away to share.', true],
+    'permission'    => ['The author or publisher gave permission', 'You have their permission to share it on AngelWrites.', true],
+];
 const AW_MB_ATTEST = [
-    'own'    => 'I wrote this book, or I hold the rights to share it on AngelWrites.',
-    'rules'  => 'It follows the community guidelines.',
-    'online' => 'I understand it is read on AngelWrites only (members cannot download it) and that the team reviews it first.',
+    'rights' => 'I may share this book in the way I chose: I upload a file only when sharing it is allowed, as I explained.',
+    'rules'  => 'It fits the community guidelines and will help others here.',
+    'online' => 'I understand the team reviews it first, and that shared books are read on AngelWrites only (members cannot download them).',
 ];
 
 function aw_mb_tables(PDO $db) {
@@ -58,6 +74,11 @@ function aw_mb_tables(PDO $db) {
         )");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_member_books_status ON member_books(status, created_at)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_member_books_user ON member_books(user_id, created_at)");
+        $mcols = [];
+        foreach ($db->query("PRAGMA table_info(member_books)") as $c) $mcols[$c['name']] = true;
+        foreach (['kind' => "TEXT NOT NULL DEFAULT 'file'", 'rights' => 'TEXT', 'rights_detail' => 'TEXT', 'why' => 'TEXT', 'link' => 'TEXT'] as $col => $def) {
+            if (!isset($mcols[$col])) $db->exec("ALTER TABLE member_books ADD COLUMN $col $def");
+        }
         $cols = [];
         foreach ($db->query("PRAGMA table_info(books)") as $c) $cols[$c['name']] = true;
         if ($cols && !isset($cols['submitted_by'])) $db->exec("ALTER TABLE books ADD COLUMN submitted_by INTEGER");
@@ -159,13 +180,50 @@ function aw_mb_submit(PDO $db, $uid, array $in, $file, $cover = null) {
     $title = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($in['title'] ?? ''))));
     $author = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($in['author_name'] ?? ''))));
     $desc = trim(strip_tags((string)($in['description'] ?? '')));
-    if ($title === '' || mb_strlen($title) > 160) $errors['title'] = 'Give the book a title (up to 160 characters).';
-    if ($author === '' || mb_strlen($author) > 100) $errors['author_name'] = 'Add the author name to show (up to 100 characters).';
+    $why = trim(strip_tags((string)($in['why'] ?? '')));
+    $kind = ($in['kind'] ?? '') === 'suggestion' ? 'suggestion' : 'file';
+    $rights = (string)($in['rights'] ?? '');
+    $detail = trim(strip_tags((string)($in['rights_detail'] ?? '')));
+    $link = trim((string)($in['link'] ?? ''));
+    if ($title === '' || mb_strlen($title) > 160) $errors['title'] = 'Give the book\'s title (up to 160 characters).';
+    if ($author === '' || mb_strlen($author) > 100) $errors['author_name'] = 'Add who wrote the book (up to 100 characters).';
     if (mb_strlen($desc) > 2000) $errors['description'] = 'Keep the description to 2,000 characters.';
+    if (mb_strlen($why) < 20 || mb_strlen($why) > 1000) $errors['why'] = 'In a sentence or two (20 to 1,000 characters), say how this book will help others here.';
+    if ($link !== '' && (!preg_match('#^https?://[^\s<>"]+$#i', $link) || mb_strlen($link) > 300)) $errors['link'] = 'Use a full web address starting with https://, or leave it empty.';
+    if ($kind === 'file') {
+        if (!isset(AW_MB_RIGHTS[$rights])) $errors['rights'] = 'Choose why this book may be shared, or suggest it without a file.';
+        elseif (AW_MB_RIGHTS[$rights][2] && (mb_strlen($detail) < 5 || mb_strlen($detail) > 500)) $errors['rights_detail'] = $rights === 'public_domain' ? 'Say why it is in the public domain (for example when the author died, or where you found it).' : ($rights === 'free_licence' ? 'Name the licence or where the free copy is offered (a web address is best).' : 'Say who gave permission and how (for example an email from the publisher).');
+        if (empty($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) $errors['book_file'] = 'Choose the book file, or suggest the book without a file.';
+    } else {
+        $rights = 'suggest';
+        $detail = '';
+    }
     $attest = (array)($in['attest'] ?? []);
     foreach (array_keys(AW_MB_ATTEST) as $k) if (!in_array($k, $attest, true)) { $errors['attest'] = 'Please tick each of the three statements.'; break; }
-    if (empty($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) $errors['book_file'] = 'Choose the book file.';
     if ($errors) return ['ok' => false, 'errors' => $errors];
+
+    if ($kind === 'suggestion') {
+        $cover_path = '';
+        if (!empty($cover) && ($cover['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            require_once __DIR__ . '/upload.php';
+            $cu = aw_upload_store($cover, 'image', 'assets/uploads/books', ['prefix' => 'mcover_', 'user_id' => (int)$uid, 'role' => 'member', 'db' => $db]);
+            if (empty($cu['ok'])) return ['ok' => false, 'errors' => ['cover' => $cu['error'] ?? 'The cover could not be saved.']];
+            $cover_path = $cu['path'];
+        }
+        try {
+            $db->prepare("INSERT INTO member_books (user_id, title, author_name, description, cover_path, kind, rights, why, link, attest_text, attest_at, status)
+                          VALUES (?, ?, ?, ?, ?, 'suggestion', 'suggest', ?, ?, ?, CURRENT_TIMESTAMP, 'waiting')")
+               ->execute([(int)$uid, $title, $author, $desc, $cover_path, $why, $link, implode("\n", AW_MB_ATTEST)]);
+            $id = (int)$db->lastInsertId();
+        } catch (Throwable $e) {
+            error_log('member book suggest: ' . $e->getMessage());
+            aw_mb_unlink($cover_path);
+            return ['ok' => false, 'errors' => ['form' => 'Your suggestion could not be saved just now. Please try again.']];
+        }
+        aw_mb_notify_team($db, $id, $title);
+        if (function_exists('aw_audit')) aw_audit('member_book_suggest', 'member_book', $id, $title);
+        return ['ok' => true, 'id' => $id];
+    }
 
     require_once __DIR__ . '/upload.php';
     $up = aw_upload_store($file, 'book', 'assets/uploads/books', ['prefix' => 'member_', 'user_id' => (int)$uid, 'role' => 'member', 'db' => $db]);
@@ -187,9 +245,9 @@ function aw_mb_submit(PDO $db, $uid, array $in, $file, $cover = null) {
 
     $attest_text = implode("\n", AW_MB_ATTEST);
     try {
-        $db->prepare("INSERT INTO member_books (user_id, title, author_name, description, cover_path, file_path, file_type, file_size, words, pages, attest_text, attest_at, status)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'waiting')")
-           ->execute([(int)$uid, $title, $author, $desc, $cover_path, $up['path'], $ex['type'] ?? '', (int)($up['bytes'] ?? 0), (int)$ex['words'], count($ex['pages']), $attest_text]);
+        $db->prepare("INSERT INTO member_books (user_id, title, author_name, description, cover_path, file_path, file_type, file_size, words, pages, kind, rights, rights_detail, why, link, attest_text, attest_at, status)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'file', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'waiting')")
+           ->execute([(int)$uid, $title, $author, $desc, $cover_path, $up['path'], $ex['type'] ?? '', (int)($up['bytes'] ?? 0), (int)$ex['words'], count($ex['pages']), $rights, $detail, $why, $link, $attest_text]);
         $id = (int)$db->lastInsertId();
     } catch (Throwable $e) {
         error_log('member book submit: ' . $e->getMessage());
@@ -247,19 +305,20 @@ function aw_mb_decide(PDO $db, $id, $action, $reason, $staff_id) {
     try {
         if ($action === 'approve') {
             if ($mb['status'] !== 'waiting') return ['ok' => false, 'message' => 'Only a book waiting for review can be approved.'];
-            if (aw_book_file_abs($mb['file_path']) === '') return ['ok' => false, 'message' => 'The book file is missing; ask the member to share it again.'];
+            $is_file = ($mb['kind'] ?? 'file') !== 'suggestion';
+            if ($is_file && aw_book_file_abs($mb['file_path']) === '') return ['ok' => false, 'message' => 'The book file is missing; ask the member to share it again.'];
             $db->beginTransaction();
             $db->prepare("INSERT INTO books (title, author, description, price, is_free, is_sale, cover_path, file_path, file_type, file_size, file_author, release_date) VALUES (?, ?, ?, 0, 1, 0, ?, ?, ?, ?, ?, ?)")
-               ->execute([$mb['title'], $mb['author_name'], $mb['description'], $mb['cover_path'], $mb['file_path'], $mb['file_type'], (int)$mb['file_size'], $mb['author_name'], date('Y-m-d')]);
+               ->execute([$mb['title'], $mb['author_name'], $mb['description'], $mb['cover_path'], $is_file ? $mb['file_path'] : '', $is_file ? $mb['file_type'] : '', $is_file ? (int)$mb['file_size'] : 0, $mb['author_name'], date('Y-m-d')]);
             $book_id = (int)$db->lastInsertId();
             $db->prepare("UPDATE books SET submitted_by = ? WHERE id = ?")->execute([(int)$mb['user_id'], $book_id]);
             $db->prepare("UPDATE member_books SET status = 'published', book_id = ?, review_note = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                ->execute([$book_id, $reason, (int)$staff_id, (int)$id]);
             $db->commit();
-            $prep = aw_book_prepare($db, $book_id, true);
+            $prep = $is_file ? aw_book_prepare($db, $book_id, true) : ['ok' => true];
             if (function_exists('awNotify')) awNotify($db, (int)$mb['user_id'], 'member_book', 'Your book is on AngelWrites', '"' . $mb['title'] . '" is now on the Community books shelf.' . ($reason !== '' ? ' Note from the team: ' . $reason : ''), SITE_URL . '/book.php?id=' . $book_id);
             if (function_exists('aw_audit')) aw_audit('member_book_approve', 'member_book', (int)$id, 'book ' . $book_id);
-            return ['ok' => true, 'message' => 'Approved. "' . $mb['title'] . '" is on the Community books shelf' . (!empty($prep['ok']) ? ' and ready in the reader.' : ', but the reader could not prepare it: ' . ($prep['error'] ?? '') . '.'), 'book_id' => $book_id];
+            return ['ok' => true, 'message' => 'Approved. "' . $mb['title'] . '" is on the Community books shelf' . (!$is_file ? ' as a suggested book (members bring their own copy).' : (!empty($prep['ok']) ? ' and ready in the reader.' : ', but the reader could not prepare it: ' . ($prep['error'] ?? '') . '.')), 'book_id' => $book_id];
         }
         if ($action === 'decline') {
             if ($mb['status'] !== 'waiting') return ['ok' => false, 'message' => 'Only a book waiting for review can be declined.'];
@@ -292,11 +351,17 @@ function aw_mb_decide(PDO $db, $id, $action, $reason, $staff_id) {
 function aw_mb_sharer(PDO $db, array $book) {
     if (empty($book['submitted_by'])) return null;
     try {
-        $st = $db->prepare("SELECT m.id AS mb_id, m.user_id, u.display_name, u.username FROM member_books m LEFT JOIN users u ON u.id = m.user_id WHERE m.book_id = ? AND m.status = 'published'");
+        $st = $db->prepare("SELECT m.id AS mb_id, m.user_id, m.kind, m.rights, m.rights_detail, m.why, m.link, u.display_name, u.username FROM member_books m LEFT JOIN users u ON u.id = m.user_id WHERE m.book_id = ? AND m.status = 'published'");
         $st->execute([(int)$book['id']]);
         return $st->fetch(PDO::FETCH_ASSOC) ?: null;
     } catch (Throwable $e) {
         error_log('member book sharer: ' . $e->getMessage());
         return null;
     }
+}
+
+/** How a book was shared, in a few words for readers. */
+function aw_mb_rights_label($rights) {
+    if ($rights === 'suggest') return 'Suggested by a member';
+    return isset(AW_MB_RIGHTS[$rights]) ? ['own' => 'Shared by its author', 'public_domain' => 'Public domain', 'free_licence' => 'Free to share', 'permission' => 'Shared with permission'][$rights] : '';
 }
