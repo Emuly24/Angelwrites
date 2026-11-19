@@ -156,3 +156,13 @@ html.aw-ui[data-theme="dark"] body .aw-cat-hero {
     border-color: rgba(240, 196, 197, .18);
 }
 html.aw-ui[data-theme="dark"] body .aw-cat-hero :is(h1, p, .aw-hero-kicker) { color: #f6ecec; }
+
+/* theme menu: Light, Dark, Follow my device */
+html.aw-ui body .awh-theme { right: 0; min-width: 236px; }
+html.aw-ui body .awh-theme button span { white-space: nowrap; }
+html.aw-ui body .awh-theme button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: var(--h-ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+html.aw-ui body .awh-theme button i { width: 18px; text-align: center; color: var(--h-muted, inherit); }
+html.aw-ui body .awh-theme button:hover { background: var(--h-soft); color: var(--h-accent); }
+html.aw-ui body .awh-theme button[aria-pressed="true"] { background: var(--h-soft); color: var(--h-accent); }
+html.aw-ui body .awh-theme button[aria-pressed="true"]::after { content: "\2713"; margin-left: auto; font-weight: 800; }
+html.aw-ui body .awh-theme button:focus-visible { outline: 3px solid var(--h-accent); outline-offset: 1px; }
