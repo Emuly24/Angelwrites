@@ -196,7 +196,9 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                 <!-- Price & Actions -->
                 <div class="book-action-row">
                     <div class="price-display">
-                        <?php if ($book['is_free']): ?>
+                        <?php if (!empty($book['submitted_by']) && empty($book['file_path'])): // a member's suggestion: not hosted here ?>
+                            <span class="regular-price">Suggested read</span>
+                        <?php elseif ($book['is_free']): ?>
                             <span class="free-badge">Free</span>
                         <?php elseif ((float)$book['price'] <= 0): // F80: not free, no price yet ?>
                             <span class="regular-price">Not yet on sale</span>
@@ -209,26 +211,29 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
 
                     <div class="action-buttons">
                         <?php
-                        // Q14: one rule for what this visitor can do. Item 3 (F32) still applies: the raw file
-                        // is never linked, downloads go through download.php. A paid book with reader content
+                        // Q14: one rule for what this visitor can do. Books are read on the site only: the file is
+                        // never linked or downloaded; a book with a file is prepared for the reader when opened. A paid book with reader content
                         // used to show "Read Book" to non-buyers (the reader then sent them back here), and
                         // there was no way to buy from this page or any hint for guests.
                         $is_free_book = !empty($book['is_free']);
                         $owns_book = $is_free_book || isAdmin() || (isLoggedIn() && aw_has_purchased($db, $_SESSION['user_id'], $book_id));
                         $back_here = urlencode('/book.php?id=' . (int)$book_id);
+                        require_once __DIR__ . '/includes/member_books.php';
+                        $aw_sharer = aw_mb_sharer($db, $book); // a book a member shared (or suggested)
+                        $aw_suggested = $aw_sharer && ($aw_sharer['kind'] ?? '') === 'suggestion';
                         ?>
-                        <?php if ($owns_book && $has_processed): ?>
+                        <?php if ($owns_book && ($has_processed || !empty($book['file_path']))): ?>
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
-                        <?php elseif ($owns_book && isLoggedIn()): ?>
-                            <a href="<?php echo SITE_URL; ?>/download.php?book_id=<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
-                                <i class="fas fa-download"></i> Download (<?php echo strtoupper(htmlspecialchars((string)$book['file_type'])); ?>)
-                            </a>
+                        <?php elseif ($aw_suggested): // suggested without a file: members bring their own copy ?>
+                            <?php if (trim((string)$aw_sharer['link']) !== ''): ?>
+                            <a href="<?php echo htmlspecialchars($aw_sharer['link']); ?>" class="btn btn-primary btn-lg" target="_blank" rel="noopener nofollow"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> Get a copy</a>
+                            <?php endif; ?>
+                            <a href="<?php echo SITE_URL; ?>/groups.php?book=<?php echo (int)$book_id; ?>" class="btn btn-outline btn-lg"><i class="fas fa-people-group" aria-hidden="true"></i> Read it together in a group</a>
+                            <p class="book-owned">This book is suggested by a member; it is not hosted here. Get your own copy, then read it with others.</p>
                         <?php elseif ($owns_book): ?>
-                            <a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo $back_here; ?>" class="btn btn-primary btn-lg">
-                                <i class="fas fa-sign-in-alt"></i> Log in to download (free)
-                            </a>
+                            <span class="btn btn-outline btn-lg" aria-disabled="true">Coming soon to read online</span>
                         <?php elseif ((float)$book['price'] <= 0): ?>
                             <span class="btn btn-outline btn-lg" aria-disabled="true">Not yet on sale</span>
                         <?php elseif (!isLoggedIn()): ?>
@@ -239,6 +244,18 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                             <a href="<?php echo SITE_URL; ?>/books.php?buy=<?php echo (int)$book_id; ?>#book-<?php echo (int)$book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-shopping-cart"></i> Buy this book (<?php echo aw_mwk(aw_book_price($book)); ?>)
                             </a>
+                        <?php endif; ?>
+                        <?php
+                        // A book a member shared (includes/member_books.php): who shared it, a way to raise
+                        // a concern (the team can take it down), and for the member, a way to remove it.
+                        if ($aw_sharer): ?>
+                            <?php if (trim((string)$aw_sharer['why']) !== ''): ?><p class="book-owned book-why">“<?php echo htmlspecialchars($aw_sharer['why']); ?>”</p><?php endif; ?>
+                            <p class="book-owned book-shared"><i class="fas fa-people-group" aria-hidden="true"></i> <?php echo $aw_suggested ? 'Suggested' : 'Shared'; ?> by a member of the AngelWrites family<?php $aw_basis = $aw_suggested ? '' : aw_mb_rights_label((string)$aw_sharer['rights']); echo $aw_basis !== '' ? ' · ' . htmlspecialchars($aw_basis) : ''; ?><?php /* the account stays private: many write under a pen name; the team sees who in admin/member_books.php */ ?><?php if (function_exists('aw_can') && aw_can('manage_content')): ?> (<a href="<?php echo SITE_URL; ?>/admin/member_books.php?id=<?php echo (int)$aw_sharer['mb_id']; ?>">team view</a>)<?php endif; ?> ·
+                            <?php if (isLoggedIn() && (int)$_SESSION['user_id'] === (int)$aw_sharer['user_id']): ?>
+                                <a href="<?php echo SITE_URL; ?>/share_book.php#mine">Manage or remove your book</a>
+                            <?php else: ?>
+                                <a href="<?php echo SITE_URL; ?>/contact.php?subject=<?php echo rawurlencode('Concern about a community book: ' . $book['title'] . ' (#' . (int)$book_id . ')'); ?>">Report a concern</a>
+                            <?php endif; ?></p>
                         <?php endif; ?>
                         <?php if ($owns_book && !$is_free_book && !isAdmin()): ?>
                             <p class="book-owned"><i class="fas fa-circle-check" aria-hidden="true"></i> You own this book · <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a></p>
@@ -555,6 +572,8 @@ html[data-theme="dark"] .sale-price { color:#f2a7b0; }
 html[data-theme="dark"] .action-buttons .btn-primary.btn-lg { background:#f0c4c5; border-color:#f0c4c5; color:#2c1e1e; }
 .book-owned { margin:0; font-size:.88rem; color:var(--text-light); }
 .book-owned i { color:#2f6b45; }
+.book-shared i { color:#3f6f68; }
+.book-why { font-style:italic; max-width:36em; }
 .book-groups { margin:0; font-size:.9rem; }
 .book-groups a { color:var(--text); text-decoration:none; display:inline-flex; align-items:center; gap:8px; min-height:36px; }
 .book-groups a:hover { color:#9c5457; text-decoration:underline; }
@@ -629,7 +648,7 @@ html[data-theme="dark"] .action-buttons .btn-primary.btn-lg { background:#f0c4c5
     /* phones: the cover, then the title and the main button, then the rest */
     .book-content-wrapper { grid-template-columns:minmax(0, 1fr); grid-template-areas: "cover" "head" "details"; row-gap:22px; }
     .book-cover-section { position:relative; top:0; display:flex; justify-content:center; }
-    /* Q22: the cover is capped so the price and the Read/Download button show without scrolling. */
+    /* Q22: the cover is capped so the price and the Read button show without scrolling. */
     .book-cover-card { width:min(40vw, 190px); }
     .book-head { align-items:center; text-align:center; }
     .book-meta, .book-action-row, .action-buttons { justify-content:center; align-items:center; }

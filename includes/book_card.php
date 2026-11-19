@@ -10,13 +10,13 @@
  *   $opts  'author'   => author name to show (default $book['author'])
  *          'readable' => true when the reader has pages for this book (shows "Read")
  *          'owned'    => true when the member owns it
- *          'buy'      => true to show the Download / Buy button (books.php has the order form)
+ *          'buy'      => true to show the Read / Buy button (books.php has the order form)
  *          'heading'  => 'h3' (default) or 'h2'
  */
 require_once __DIR__ . '/commerce.php';
 
 function aw_book_assets() {
-    return '<link rel="stylesheet" href="' . SITE_URL . '/assets/css/aw-books.css?v=1">';
+    return '<link rel="stylesheet" href="' . SITE_URL . '/assets/css/aw-books.css?v=2">';
 }
 
 function aw_book_cover_url(array $book) {
@@ -41,7 +41,7 @@ function aw_book_card(array $book, array $opts = []) {
         $sale = !$free && aw_book_on_sale($book);
         $blurb = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($book['description'] ?? ''))));
 
-        $flag = $owned ? 'Owned' : ($sale ? 'Sale' : ''); // "Free" already shows as the price
+        $flag = $owned ? 'Owned' : ($sale ? 'Sale' : (!empty($book['submitted_by']) ? (empty($book['file_path']) ? 'Suggested' : 'Community') : '')); // "Free" already shows as the price
 
         $html = '<article class="bk-card" id="book-' . $id . '">';
         // The cover repeats the title link, so it is hidden from screen readers and the tab order.
@@ -58,6 +58,7 @@ function aw_book_card(array $book, array $opts = []) {
 
         // Price
         if ($owned) $p = '<span class="bk-price-own">In your library</span>';
+        elseif (!empty($book['submitted_by']) && empty($book['file_path'])) $p = '<span class="bk-price-soon">Suggested read</span>';
         elseif ($free) $p = '<span class="bk-price-free">Free</span>';
         elseif ($price <= 0) $p = '<span class="bk-price-soon">Not yet on sale</span>';
         elseif ($sale) $p = '<s>' . aw_mwk($book['price']) . '</s> <span class="bk-price-sale">' . aw_mwk($book['sale_price']) . '</span>';
@@ -70,15 +71,16 @@ function aw_book_card(array $book, array $opts = []) {
             $html .= '<a class="bk-btn" href="' . $url . '" aria-label="View ' . $title . '">View</a>';
         }
         if (!empty($opts['buy'])) {
-            if (function_exists('isLoggedIn') && isLoggedIn()) {
-                if ($free || $owned) {
-                    $html .= '<button type="button" class="bk-btn bk-btn-icon download-btn" data-id="' . $id . '" data-free="1" data-price="0" aria-label="Download ' . $title . '" title="Download"><i class="fas fa-arrow-down" aria-hidden="true"></i></button>';
-                } elseif ($price > 0) {
+            // Books are read on the site only; there is no download (includes/book_extract.php).
+            if (($free || $owned) && empty($opts['readable']) && !empty($book['file_path'])) { // a suggested book has no file to read
+                $html .= '<a class="bk-btn bk-btn-primary" href="' . htmlspecialchars(SITE_URL . '/reader/reader.php?id=' . $id) . '" aria-label="Read ' . $title . '">Read</a>';
+            } elseif (function_exists('isLoggedIn') && isLoggedIn()) {
+                if ($price > 0 && !$free && !$owned) {
                     $html .= '<button type="button" class="bk-btn bk-btn-buy download-btn" data-id="' . $id . '" data-free="0" data-price="' . htmlspecialchars((string)aw_book_price($book)) . '">Buy</button>';
                 }
-            } elseif ($free || $price > 0) {
+            } elseif ($price > 0 && !$free) {
                 $back = urlencode('/books.php#book-' . $id);
-                $html .= '<a class="bk-btn bk-btn-icon" href="' . htmlspecialchars(SITE_URL . '/login.php?redirect=' . $back) . '" aria-label="Log in to ' . ($free ? 'download' : 'buy') . ' ' . $title . '" title="Log in to ' . ($free ? 'download' : 'buy') . '"><i class="fas fa-arrow-' . ($free ? 'down' : 'right-to-bracket') . '" aria-hidden="true"></i></a>';
+                $html .= '<a class="bk-btn bk-btn-icon" href="' . htmlspecialchars(SITE_URL . '/login.php?redirect=' . $back) . '" aria-label="Log in to buy ' . $title . '" title="Log in to buy"><i class="fas fa-right-to-bracket" aria-hidden="true"></i></a>';
             }
         }
         $html .= '</span></div></div></article>';

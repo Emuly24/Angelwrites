@@ -79,7 +79,7 @@ require_once __DIR__ . '/includes/header.php';
             <?php if ($owned): ?>
                 <p style="display:flex;gap:8px;flex-wrap:wrap;">
                     <a class="btn btn-sm btn-primary" href="<?php echo SITE_URL; ?>/book.php?id=<?php echo (int)$o['book_id']; ?>">Open book</a>
-                    <a class="btn btn-sm btn-outline" href="<?php echo SITE_URL; ?>/download.php?book_id=<?php echo (int)$o['book_id']; ?>">Download</a>
+                    <a class="btn btn-sm btn-outline" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$o['book_id']; ?>">Read</a>
                 </p>
             <?php endif; ?>
         </div>

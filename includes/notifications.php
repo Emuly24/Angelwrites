@@ -17,7 +17,7 @@ function aw_notify_kind($type) {
     if ($type === 'mention') return 'mentions';
     if (in_array($type, ['answer', 'reply', 'admin_reply', 'comment_reply', 'answer_accepted', 'thanks'], true)) return 'replies';
     if ($type === 'team_reply') return 'team';
-    if (in_array($type, ['report_outcome', 'approved', 'testimonial_approved', 'question_approved', 'post_approved', 'post_held', 'community_review'], true)) return 'moderation';
+    if (in_array($type, ['report_outcome', 'approved', 'testimonial_approved', 'question_approved', 'post_approved', 'post_held', 'community_review', 'member_book'], true)) return 'moderation';
     if ($type === 'message' || $type === 'message_request') return 'messages';
     return 'account'; // sessions, payments and anything else: bell only from here
 }

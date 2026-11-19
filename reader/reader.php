@@ -39,7 +39,8 @@ if (empty($pages)) {
     require_once __DIR__ . '/../includes/header.php';
     echo '<div class="container" style="max-width:640px;margin:40px auto;padding:0 16px;text-align:center;">'
        . '<h1 style="font-size:1.6rem;">' . htmlspecialchars($book['title']) . '</h1>'
-       . '<p>This book is not ready to read online yet. Please check back soon.</p>'
+       . '<p>This book cannot be shown in the reader yet. Please check back soon.</p>'
+       . ((function_exists('aw_is_staff') && aw_is_staff() && !empty($prepare_error)) ? '<p style="color:#6e2a31;"><strong>For the team:</strong> ' . htmlspecialchars($prepare_error) . ' <a href="' . SITE_URL . '/admin/process_book.php?id=' . (int)$book_id . '">Reader copy</a></p>' : '')
        . '<p><a class="btn btn-primary" href="' . SITE_URL . '/book.php?id=' . (int)$book_id . '">Go to the book page</a></p>'
        . '</div>';
     require_once __DIR__ . '/../includes/footer.php';
@@ -103,7 +104,7 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/book-reader.css?v=2" />
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/book-reader.css?v=3" />
 <?php echo aw_save_assets(); ?><!-- the reader's look: a quiet, page-first design -->
 <?php if (!empty($processed['reader_css'])): // F90: the per-book CSS saved in admin/process_book.php was never applied ?>
 <style id="book-reader-css"><?php echo str_ireplace('</style', '', (string)$processed['reader_css']); ?></style>
@@ -112,25 +113,6 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <body>
 <div id="reader-app">
     <div id="awPageAnnounce" class="aw-sr-only" aria-live="polite" aria-atomic="true"></div><!-- R12 -->
-<?php if (!empty($preview_version)): ?>
-    <!-- R5: draft preview banner (admin only) -->
-    <div id="previewBanner" role="status" style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:#f7ecdc;color:#5c4400;border-top:2px solid #e0b100;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:0.9rem;">
-        <strong>Preview of draft version <?php echo (int)$preview_version; ?></strong>
-        <span><?php echo $live_version ? 'Members currently read version ' . (int)$live_version . '.' : 'Members cannot read this book yet.'; ?> Nothing is saved while previewing.</span>
-        <span style="flex:1"></span>
-        <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo (int)$book_id; ?>" style="color:#5c4400;min-height:40px;display:inline-flex;align-items:center;">Back to processing</a>
-        <button type="button" id="previewPublish" style="background:#2e7d32;color:#fff;border:0;border-radius:8px;padding:8px 14px;min-height:40px;cursor:pointer;">Publish this version</button>
-    </div>
-    <script>
-    document.getElementById('previewPublish').addEventListener('click', function () {
-        if (!confirm('Publish version <?php echo (int)$preview_version; ?>? Members will read it from now on.')) return;
-        const fd = new FormData(); fd.append('action', 'publish_version'); fd.append('version', '<?php echo (int)$preview_version; ?>');
-        fetch('<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo (int)$book_id; ?>', { method: 'POST', body: fd })
-            .then(r => r.json()).then(d => { alert(d.success ? d.message : (d.error || 'Could not publish.')); if (d.success) location.href = '<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$book_id; ?>'; })
-            .catch(() => alert('Could not publish. Please try again from the processing page.'));
-    });
-    </script>
-<?php endif; ?>
     <!-- Top bar: back, contents, title, then Aa (themes & settings), search, bookmark and the "…" menu.
          It fades away while you read; tap the page to bring it back. -->
     <div id="toolbar">
@@ -218,7 +200,7 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
             <input type="range" id="rbScrub" min="1" max="<?php echo max(1, (int)$total_pages); ?>" value="1" step="1" aria-label="Page" aria-valuetext="">
             <div class="rb-foot-meta">
                 <span id="chapterInfo"></span>
-                <span class="rb-pages">Page <span id="pageNum">1</span> of <span id="totalPages"><?php echo $total_pages; ?></span></span>
+                <span class="rb-pages"><span id="pageWord">Page</span> <span id="pageNum">1</span> of <span id="totalPages"><?php echo $total_pages; ?></span></span>
                 <span id="remainingInfo"></span>
             </div>
         </div>
@@ -277,7 +259,6 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
             <?php if (count($tocEntries) > 0): ?>
             <p class="toc-summary" id="tocSummary"></p>
             <div class="toc-group" id="tocGroup" hidden></div>
-            <p class="toc-tools"><button type="button" id="tocPrint"><i class="fas fa-print" aria-hidden="true"></i> Print or save this chapter</button></p><!-- R14 -->
             <ul class="toc-list">
                 <?php foreach ($tocEntries as $entry): ?>
                 <li><a href="#" class="toc-link" data-chapter="<?php echo (int)($entry['page'] ?? 1); ?>"><span class="toc-mark" aria-hidden="true"></span><span class="toc-title"><?php echo htmlspecialchars($entry['title']); ?></span><span class="toc-page">p. <?php echo (int)($entry['page'] ?? 1); ?></span></a></li>
@@ -461,6 +442,8 @@ require_once __DIR__ . '/reader_share.php';
     ?>;
     const toc = <?php echo json_encode($toc); ?>;
     const lastPage = <?php echo $last_page; ?>;
+    // how far into that page the reader was (0-1); a link to a given page opens at its top
+    const startFrac = <?php echo (isset($_GET['page']) ? 0 : max(0, min(999, (int)$last_offset))) / 1000; ?>;
     // R9: settings saved with the account are applied before the reader reads its settings, so they
     // follow the member to every device; later changes are saved back (only when they differ).
     const awServerPrefs = <?php
@@ -509,7 +492,8 @@ require_once __DIR__ . '/reader_share.php';
 
     const scrollContainer = document.getElementById('scroll-container');
     const flipContainer = document.getElementById('flip-container');
-    const flipWrapper = document.getElementById('flip-book-wrapper');
+    let flipWrapper = document.getElementById('flip-book-wrapper');
+    const bookTitleText = <?php echo json_encode((string)$book['title'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     const pageNumEl = document.getElementById('pageNum');
     const totalPagesEl = document.getElementById('totalPages');
     const progressFill = document.getElementById('progressFill');
@@ -596,120 +580,355 @@ require_once __DIR__ . '/reader_share.php';
     }
 
     // ----- Highlight application -----
+    // In page-turn mode one book page can be spread over several screen pages, so every piece of the
+    // current book page is searched.
     function applyHighlights(container) {
-        if (!highlights || !container) return;
-        const pageWrapper = container.querySelector(`.page-content-inner[data-page="${currentPage}"]`) || container;
-        if (!pageWrapper) return;
-        const walker = document.createTreeWalker(pageWrapper, NodeFilter.SHOW_TEXT, null, false);
-        let node;
-        while (node = walker.nextNode()) {
-            const text = node.textContent;
-            for (let h of highlights) {
-                if (h.chapter_index != currentPage) continue;
-                const idx = text.indexOf(h.text);
-                if (idx !== -1 && node.parentElement && !node.parentElement.closest('.highlight-yellow, .highlight-green, .highlight-blue, .highlight-pink, .highlight-purple, .highlight-underline')) {
+        if (!highlights || !highlights.length || !container) return;
+        if (container === scrollContainer) {
+            const t = container.querySelector(`.page-content-inner[data-page="${currentPage}"]`);
+            if (t) highlightIn(t, currentPage);
+            return;
+        }
+        container.querySelectorAll('.flip-body [data-p]').forEach(el => highlightIn(el, parseInt(el.dataset.p, 10)));
+    }
+    // The book page a selection is on (in page-turn mode a screen page can hold the end of one book
+    // page and the start of the next).
+    function selectionPage() {
+        const r = savedRange, n = r && (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement);
+        const el = n && n.closest && n.closest('[data-p], .page-content-inner[data-page]');
+        return el ? parseInt(el.dataset.p || el.dataset.page, 10) || currentPage : currentPage;
+    }
+    function highlightIn(el, page) {
+        const done = '.highlight-yellow, .highlight-green, .highlight-blue, .highlight-pink, .highlight-purple, .highlight-underline';
+        for (let guard = 0; guard < 300; guard++) {
+            let applied = false;
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            outer: while ((node = walker.nextNode())) {
+                if (!node.parentElement || node.parentElement.closest(done)) continue;
+                const text = node.textContent;
+                for (const h of highlights) {
+                    if (h.chapter_index != page || !h.text) continue;
+                    const idx = text.indexOf(h.text);
+                    if (idx === -1) continue;
                     const range = document.createRange();
                     range.setStart(node, idx);
                     range.setEnd(node, idx + h.text.length);
                     const span = document.createElement('span');
-                    if (h.color === 'underline') {
-                        span.className = 'highlight-underline';
-                    } else {
-                        span.className = 'highlight-' + h.color;
-                    }
+                    span.className = h.color === 'underline' ? 'highlight-underline' : 'highlight-' + h.color;
                     span.textContent = h.text;
                     range.deleteContents();
                     range.insertNode(span);
-                    applyHighlights(container);
-                    return;
+                    applied = true;
+                    break outer;
                 }
             }
+            if (!applied) return;
         }
     }
 
-    // ----- StPageFlip initialization -----
-    function initFlip() {
-        if (pageFlip) {
-            pageFlip.destroy();
-            pageFlip = null;
-        }
-        let flipPagesHTML = [];
-        if (cover_path) {
-            flipPagesHTML.push(`<div class="flip-page-custom special-page"><div class="cover-image-wrapper-flip"><img src="${cover_path}" alt="Cover" /></div></div>`);
-        } else {
-            flipPagesHTML.push(`<div class="flip-page-custom special-page"><div class="cover-placeholder-flip"><i class="fas fa-book-open"></i><p>Cover</p></div></div>`);
-        }
-        pages.forEach((html, idx) => {
-            flipPagesHTML.push(`<div class="flip-page-custom" data-page="${idx+1}">${html}</div>`);
-        });
+    // ----- Pages that fit the screen (page-turn mode) -----
+    // The book's pages are poured into screen-sized pages here, with the reader's own text size, font
+    // and spacing, so nothing is ever cut off. They are poured again whenever the window or a text
+    // setting changes. Bookmarks, notes, highlights and the saved place still refer to the book's own
+    // pages, so they work the same in both layouts.
+    let screens = [];          // [{page, html, words}] in reading order
+    let firstScreenOf = {};    // book page -> index of its first screen page (0-based)
+    let screenCount = {};      // book page -> how many screen pages it fills
+    let flipIndex = 0;         // StPageFlip index: 0 = cover, n = screens[n - 1]
+    let flipSpread = false;    // two pages side by side
+    let currentPercent = 0;    // the exact share of the book read, 0-100
+    let currentFrac = 0;       // how far into the current book page, 0-1
+    const pageWords = pages.map(h => (h.replace(/<[^>]+>/g, ' ').match(/\S+/g) || []).length);
+    const escHtml = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-        flipWrapper.innerHTML = flipPagesHTML.join('');
+    function textSettingsTo(el) {
+        el.style.fontSize = document.getElementById('fontSizeSlider').value + '%';
+        el.style.lineHeight = (parseInt(document.getElementById('lineHeightSlider').value, 10) / 100).toFixed(1);
+        el.style.fontFamily = document.getElementById('fontTypeSelect').value || 'Georgia, serif';
+    }
 
-        pageFlip = new St.PageFlip(flipWrapper, {
-            width: 450,
-            height: 600,
-            size: 'stretch',
-            minWidth: 300,
-            maxWidth: 900,
-            minHeight: 400,
-            maxHeight: 1200,
-            showCover: true,
-            maxShadowOpacity: 0.5,
-            usePortrait: true,
-            mobileScrollSupport: true,
-        });
-        pageFlip.loadFromHTML(document.querySelectorAll('.flip-page-custom'));
-        pageFlip.on('turn', function(e) {
-            const pageIndex = e.data; // 0 = cover, 1 = first content page
-            if (pageIndex === 0) {
-                currentPage = 0;
-                updateUI(0);
-            } else {
-                currentPage = pageIndex;
-                updateUI(currentPage);
-                applyHighlights(flipWrapper);
-                savePosition();
+    function flipGeometry() {
+        const cs = getComputedStyle(flipContainer);
+        const W = flipContainer.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const H = flipContainer.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+        const spread = W >= 900 && W > H * 1.25;
+        const ph = Math.max(300, Math.floor(H));
+        let pw = spread ? Math.floor(W / 2) : Math.floor(W);
+        pw = Math.max(240, Math.min(pw, spread ? Math.round(ph * 0.78) : 760));
+        return { pw, ph, spread };
+    }
+
+    // Split a text block at the last word that still fits: [part that fits, the rest] or null.
+    function fitPart(el, body, fits, minWords) {
+        const pts = [];
+        const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) { const t = n.nodeValue; for (let i = 0; i < t.length; i++) if (t[i] === ' ' || t[i] === '\n') pts.push([n, i + 1]); }
+        if (pts.length < 2) return null;
+        const part = (pt, head) => {
+            const r = document.createRange();
+            if (head) { r.setStart(el, 0); r.setEnd(pt[0], pt[1]); } else { r.setStart(pt[0], pt[1]); r.setEnd(el, el.childNodes.length); }
+            const shell = el.cloneNode(false);
+            shell.appendChild(r.cloneContents());
+            return shell;
+        };
+        let lo = 0, hi = pts.length - 2, best = -1; // the rest always keeps at least one word
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1, c = part(pts[mid], true);
+            body.appendChild(c);
+            const ok = fits();
+            body.removeChild(c);
+            if (ok) { best = mid; lo = mid + 1; } else hi = mid - 1;
+        }
+        if (best + 1 < minWords) return null;
+        const head = part(pts[best], true), rest = part(pts[best], false);
+        rest.classList.add('flip-cont'); // carries on from the page before
+        rest.removeAttribute('id');
+        return [head, rest];
+    }
+
+    // Text runs on from one book page to the next, as in a printed book; each chapter starts on a
+    // new page. Every piece keeps the number of the book page it came from (data-p).
+    const chapterStarts = new Set(Object.values(chapterMap).map(a => a && a[0]).filter(Boolean));
+    function paginate(g) {
+        const host = document.createElement('div');
+        host.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;font-size:' + getComputedStyle(flipWrapper).fontSize;
+        const m = document.createElement('div');
+        m.className = 'flip-page-custom flip-measure';
+        m.style.width = g.pw + 'px'; m.style.height = g.ph + 'px';
+        const body = document.createElement('div');
+        body.className = 'flip-body';
+        textSettingsTo(body); // on the text box: StPageFlip rewrites the page element's own style
+        m.appendChild(body); host.appendChild(m); flipContainer.appendChild(host);
+        const fits = () => m.scrollHeight <= m.clientHeight + 1;
+        const cs = getComputedStyle(m), room = m.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+        const out = [], first = {}, count = {}, src = document.createElement('div');
+        const finish = (keepHeading) => {
+            if (!body.childNodes.length) return;
+            const carry = []; // a heading is never left alone at the foot of a page
+            while (keepHeading && body.children.length > 1 && /^H[1-6]$/.test(body.lastElementChild.tagName)) carry.unshift(body.removeChild(body.lastElementChild));
+            const inThis = new Set(Array.from(body.children).map(c => parseInt(c.dataset.p, 10)));
+            out.push({ page: parseInt(body.firstElementChild.dataset.p, 10), html: body.innerHTML, words: (body.textContent.match(/\S+/g) || []).length });
+            inThis.forEach(pn => { count[pn] = (count[pn] || 0) + 1; });
+            body.innerHTML = '';
+            carry.forEach(c => body.appendChild(c));
+        };
+        pages.forEach((html, i) => {
+            const pageNum = i + 1;
+            if (chapterStarts.has(pageNum)) finish(false);
+            first[pageNum] = out.length; // the page begins on the screen page being filled
+            src.innerHTML = html;
+            const queue = [];
+            Array.from(src.childNodes).forEach(nd => {
+                let el = nd;
+                if (nd.nodeType === 3) { if (!nd.nodeValue.trim()) return; el = document.createElement('p'); el.textContent = nd.nodeValue; }
+                else if (nd.nodeType !== 1) return;
+                el.dataset.p = pageNum;
+                queue.push(el);
+            });
+            let guard = 0;
+            while (queue.length && guard++ < 20000) {
+                const b = queue.shift(), nodeEl = b.cloneNode(true);
+                body.appendChild(nodeEl);
+                if (fits()) continue;
+                body.removeChild(nodeEl);
+                const alone = body.childNodes.length === 0;
+                const splittable = !/^(H[1-6]|IMG|TABLE|FIGURE|SVG|PICTURE|VIDEO|IFRAME)$/i.test(b.tagName) && !b.querySelector('img, table, svg');
+                if (splittable) {
+                    const cut = fitPart(b, body, fits, alone ? 1 : 4);
+                    if (cut) { body.appendChild(cut[0]); finish(true); queue.unshift(cut[1]); continue; }
+                }
+                if (!alone) { finish(true); queue.unshift(b); continue; }
+                // one piece taller than a whole page (a large picture or table): it is fitted inside the page
+                nodeEl.style.maxHeight = Math.max(80, room) + 'px';
+                nodeEl.style.overflow = 'auto';
+                nodeEl.querySelectorAll('img').forEach(im => { im.style.maxHeight = Math.max(80, room - 8) + 'px'; im.style.objectFit = 'contain'; });
+                if (nodeEl.tagName === 'IMG') nodeEl.style.objectFit = 'contain';
+                body.appendChild(nodeEl);
+                finish(false);
             }
         });
-        // Initial page
-        if (currentPage > 0) {
-            pageFlip.turnToPage(currentPage);
-        } else {
-            pageFlip.turnToPage(0);
+        finish(false);
+        flipContainer.removeChild(host);
+        if (!out.length) out.push({ page: 1, html: '', words: 0 });
+        for (let pn = 1; pn <= pages.length; pn++) { // a page with no text keeps a place to land on
+            if (first[pn] > out.length - 1) first[pn] = out.length - 1;
+            if (!count[pn]) count[pn] = 1;
         }
+        return { out, first, count };
+    }
+
+    // ----- StPageFlip -----
+    function initFlip(keep) {
+        if (pageFlip) {
+            try { pageFlip.destroy(); } catch (e) {}
+            pageFlip = null;
+        }
+        // destroy() removes the book element, so a fresh one is made each time
+        if (!document.getElementById('flip-book-wrapper')) {
+            flipWrapper = document.createElement('div');
+            flipWrapper.id = 'flip-book-wrapper';
+            flipContainer.insertBefore(flipWrapper, flipContainer.firstChild);
+        } else {
+            flipWrapper = document.getElementById('flip-book-wrapper');
+        }
+        flipWrapper.style.cssText = '';
+        const g = flipGeometry();
+        flipSpread = g.spread;
+        const res = paginate(g);
+        screens = res.out; firstScreenOf = res.first; screenCount = res.count;
+
+        const parts = [cover_path
+            ? `<div class="flip-page-custom special-page"><div class="cover-image-wrapper-flip"><img src="${escHtml(cover_path)}" alt="Cover" /></div></div>`
+            : `<div class="flip-page-custom special-page"><div class="cover-placeholder-flip"><i class="fas fa-book-open" aria-hidden="true"></i><p>${escHtml(bookTitleText)}</p></div></div>`];
+        screens.forEach((sc, i) => {
+            parts.push(`<div class="flip-page-custom" data-page="${sc.page}"><div class="flip-body" data-page="${sc.page}">${sc.html}</div><span class="flip-folio" aria-hidden="true">${i + 1}</span></div>`);
+        });
+        if (g.spread && parts.length % 2 === 1) parts.push('<div class="flip-page-custom flip-blank" aria-hidden="true"></div>'); // closes the last spread
+        flipWrapper.style.width = (g.spread ? g.pw * 2 : g.pw) + 'px';
+        flipWrapper.style.height = g.ph + 'px';
+        flipWrapper.style.maxWidth = 'none';
+        flipWrapper.innerHTML = parts.join('');
+        flipWrapper.querySelectorAll('.flip-body').forEach(textSettingsTo);
+
+        let start = 0;
+        if (keep && keep.page >= 1 && keep.page in firstScreenOf) {
+            start = firstScreenOf[keep.page] + Math.min(screenCount[keep.page] - 1, Math.floor((keep.frac || 0) * screenCount[keep.page])) + 1;
+        }
+        pageFlip = new St.PageFlip(flipWrapper, {
+            width: g.pw, height: g.ph, size: 'fixed',
+            showCover: true, usePortrait: true, startPage: start,
+            maxShadowOpacity: 0.45, flippingTime: 650,
+            mobileScrollSupport: false, disableFlipByClick: true, // taps are handled below (edges turn, middle shows the bars)
+        });
+        pageFlip.loadFromHTML(flipWrapper.querySelectorAll('.flip-page-custom'));
+        pageFlip.on('flip', e => onFlipTo(e.data));
+        if (start) pageFlip.turnToPage(start);
+        onFlipTo(start);
+        relabelToc();
+    }
+
+    function onFlipTo(idx) {
+        flipIndex = Math.max(0, Math.min(idx, screens.length));
+        if (flipIndex === 0) { updateUI(); return; }
+        const sc = screens[flipVisible()[0] - 1];
+        if (!sc) return;
+        const changed = sc.page !== currentPage;
+        currentPage = sc.page;
+        updateUI();
+        applyHighlights(flipWrapper);
+        savePosition();
+        if (changed) { clearTimeout(window.awBmTimer); window.awBmTimer = setTimeout(() => { loadBookmarkStatus(); loadNotes(); }, 900); }
+    }
+    // The screen pages in view (1-based): [left, right]; one page in portrait.
+    function flipVisible() {
+        let a = flipIndex, b = flipIndex;
+        if (flipSpread && a > 0) { if (a % 2 === 0) a -= 1; b = Math.min(a + 1, screens.length); }
+        return [Math.max(1, a), Math.max(1, b)];
+    }
+    function goToScreen(n) {
+        if (!pageFlip) return;
+        n = Math.max(0, Math.min(n, screens.length));
+        pageFlip.turnToPage(n);
+        onFlipTo(n);
+    }
+
+    // Re-pour the pages when the window or the text settings change, keeping the place.
+    let repaginateTimer = null;
+    function repaginateSoon() {
+        if (readingMode !== 'flip' || !pageFlip) return;
+        clearTimeout(repaginateTimer);
+        const keep = { page: currentPage || 1, frac: currentFrac };
+        repaginateTimer = setTimeout(() => initFlip(keep), 300);
+    }
+    window.addEventListener('resize', repaginateSoon);
+    window.addEventListener('orientationchange', repaginateSoon);
+
+    // Contents: page numbers in the layout being read.
+    function relabelToc() {
+        document.querySelectorAll('.toc-link').forEach(l => {
+            const p = parseInt(l.dataset.chapter, 10), sp = l.querySelector('.toc-page');
+            if (!sp) return;
+            sp.textContent = 'p. ' + (readingMode === 'flip' && p in firstScreenOf ? firstScreenOf[p] + 1 : p);
+        });
+    }
+
+    // ----- Where the reader is: page, exact share of the book, and what is left of the chapter -----
+    function scrollMetrics() {
+        if (!rbPagesCache) rbPagesCache = Array.from(document.querySelectorAll('#scroll-container .page-content-inner'));
+        const list = rbPagesCache;
+        if (!list.length) return { percent: 0, frac: 0 };
+        const top0 = scrollContainer.getBoundingClientRect().top, st = scrollContainer.scrollTop;
+        const begin = list[0].getBoundingClientRect().top - top0 + st;
+        const end = list[list.length - 1].getBoundingClientRect().bottom - top0 + st;
+        const seen = st + scrollContainer.clientHeight; // everything above the bottom of the screen is read
+        const percent = end > begin ? Math.max(0, Math.min(1, (seen - begin) / (end - begin))) : 0;
+        let frac = 0;
+        const el = list[(currentPage || 1) - 1];
+        if (el) {
+            const r = el.getBoundingClientRect(), line = top0 + scrollContainer.clientHeight * 0.35;
+            frac = r.height > 0 ? Math.max(0, Math.min(0.999, (line - r.top) / r.height)) : 0;
+        }
+        return { percent, frac };
+    }
+    function position() {
+        if (readingMode === 'flip' && screens.length) {
+            if (flipIndex <= 0) return { cover: true };
+            const [a, b] = flipVisible(), page = screens[a - 1].page, ch = getChapterForPage(page);
+            const inCh = getPagesInChapter(ch).indexOf(page) !== -1;
+            let left = 0, words = 0;
+            if (inCh) {
+                const chPages = getPagesInChapter(ch);
+                for (let i = b; i < screens.length && chPages.indexOf(screens[i].page) !== -1; i++) { left++; words += screens[i].words; }
+            }
+            return { a, b, total: screens.length, page, ch, inCh, left, words,
+                     percent: b / screens.length, frac: (a - 1 - firstScreenOf[page]) / (screenCount[page] || 1) };
+        }
+        const page = currentPage || 1, ch = getChapterForPage(page), chPages = getPagesInChapter(ch);
+        const inCh = chPages.indexOf(page) !== -1, m = scrollMetrics();
+        let left = 0, words = Math.round((pageWords[page - 1] || 0) * (1 - m.frac));
+        if (inCh) chPages.forEach(p => { if (p > page) { left++; words += pageWords[p - 1] || 0; } });
+        return { a: page, b: page, total: totalPages, page, ch, inCh, left, words, percent: m.percent, frac: m.frac };
     }
 
     // ----- UI updates -----
-    function updateUI(page) {
-        if (page === 0) {
+    function updateUI() {
+        const p = position();
+        const circumference = 2 * Math.PI * 16;
+        if (p.cover) {
+            document.getElementById('pageWord').textContent = '';
             pageNumEl.textContent = 'Cover';
-            progressFill.setAttribute('stroke-dashoffset', '100.53');
+            totalPagesEl.textContent = screens.length;
+            progressFill.setAttribute('stroke-dashoffset', String(circumference));
             progressPercent.textContent = '0%';
-            chapterInfoEl.textContent = 'Cover';
+            chapterInfoEl.textContent = '';
             remainingInfoEl.textContent = '';
-            rbSync(0, '');
+            currentPercent = 0; currentFrac = 0;
+            rbSync(null, '');
             return;
         }
-        if (readingMode === 'flip') {
-            pageNumEl.textContent = page;
-        } else {
-            pageNumEl.textContent = page;
-        }
-        const percent = Math.round((page/totalPages)*100);
-        const circumference = 2 * Math.PI * 16;
-        const offset = circumference - (percent/100)*circumference;
-        progressFill.setAttribute('stroke-dashoffset', offset);
-        progressPercent.textContent = percent + '%';
-        const ch = getChapterForPage(page);
-        chapterInfoEl.textContent = getChapterTitle(ch);
+        currentPercent = Math.max(0, Math.min(100, Math.round(p.percent * 100)));
+        currentFrac = p.frac;
+        document.getElementById('pageWord').textContent = p.a === p.b ? 'Page' : 'Pages';
+        pageNumEl.textContent = p.a === p.b ? p.a : p.a + '–' + p.b;
+        totalPagesEl.textContent = p.total;
+        progressFill.setAttribute('stroke-dashoffset', String(circumference - (currentPercent / 100) * circumference));
+        progressPercent.textContent = currentPercent + '%';
+        const title = getChapterTitle(p.ch);
+        chapterInfoEl.textContent = p.inCh ? title : '';
         // Calm wording, as in a printed book's running footer: no counters to beat.
-        const inCh = getPagesInChapter(ch).indexOf(page) !== -1, left = getRemainingPagesInChapter(page), mins = estimateTimeRemaining(page);
-        remainingInfoEl.textContent = !inCh ? '' : left > 0 ? `${left} ${left === 1 ? 'page' : 'pages'} left in chapter${mins > 0 ? ' · about ' + mins + ' min' : ''}` : 'Last page of chapter';
-        rbSync(page, getChapterTitle(ch));
-        markToc(page);
+        const wpm = parseInt(document.getElementById('readingSpeedSlider').value, 10) || readingSpeedWPM;
+        const mins = p.words > 0 ? Math.max(1, Math.ceil(p.words / wpm)) : 0;
+        remainingInfoEl.textContent = !p.inCh ? '' : p.left > 0
+            ? `${p.left} ${p.left === 1 ? 'page' : 'pages'} left in chapter${mins > 0 ? ' · about ' + mins + ' min' : ''}`
+            : 'Last page of chapter';
+        rbSync(p, p.inCh ? title : '');
+        markToc(p.page);
         // R12: tell screen-reader users where they are after a page turn (not on start-up).
         const ann = document.getElementById('awPageAnnounce');
-        if (ann && awAnnounceReady && page !== awAnnounced) { awAnnounced = page; ann.textContent = `Page ${page} of ${totalPages}. ${getChapterTitle(ch)}.`; }
+        const key = p.a + '/' + p.total;
+        if (ann && awAnnounceReady && key !== awAnnounced) { awAnnounced = key; ann.textContent = `Page ${pageNumEl.textContent} of ${p.total}, ${currentPercent}% read. ${p.inCh ? title + '.' : ''}`; }
     }
     var awAnnounceReady = false, awAnnounced = 0; // announce a page once, when it changes
     window.addEventListener('load', () => setTimeout(() => { awAnnounceReady = true; }, 1000));
@@ -741,30 +960,7 @@ require_once __DIR__ . '/reader_share.php';
     }
     document.addEventListener('DOMContentLoaded', renderGroupPlan);
 
-    // R14: print (or "Save as PDF") the chapter being read, as clean pages without the reader controls.
-    document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('tocPrint');
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-            const ch = getChapterForPage(currentPage || 1);
-            const nums = (chapterMap[ch] && chapterMap[ch].length) ? chapterMap[ch] : [currentPage || 1];
-            const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-            const body = nums.map(n => { const el = document.querySelector('.page-content-inner[data-page="' + n + '"]'); return el ? '<section>' + el.innerHTML + '</section>' : ''; }).join('');
-            const w = window.open('', '_blank');
-            if (!w) { alert('Please allow pop-ups for this site to print the chapter.'); return; }
-            const bookTitle = <?php echo json_encode((string)$book['title'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-            w.document.write('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(bookTitle + ' – ' + getChapterTitle(ch)) + '</title>'
-                + '<style>body{font-family:Georgia,"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#000;max-width:42em;margin:2em auto;padding:0 1em}'
-                + 'header{border-bottom:1px solid #a08a8a;margin-bottom:1.5em;font-size:10pt;color:#4a3a3a}section{margin-bottom:1em}'
-                + 'img{max-width:100%}[class^="highlight-"],mark{background:none!important;text-decoration:underline}'
-                + '@media print{body{margin:0}a{color:#000;text-decoration:none}}</style></head><body>'
-                + '<header>' + esc(bookTitle) + ' · ' + esc(getChapterTitle(ch)) + ' · pages ' + nums[0] + '–' + nums[nums.length - 1] + '</header>'
-                + body + '</body></html>');
-            w.document.close();
-            w.focus();
-            setTimeout(() => w.print(), 300);
-        });
-    });
+    // R14's "Print or save this chapter" is retired: books are read on AngelWrites only.
 
     // R7: mark the current chapter and the chapters already read in the contents.
     var furthestPage = 0; // var: markToc can run before this line during start-up
@@ -781,19 +977,26 @@ require_once __DIR__ . '/reader_share.php';
             if (l === current) l.setAttribute('aria-current', 'true'); else l.removeAttribute('aria-current');
         });
         const sum = document.getElementById('tocSummary');
-        if (sum) sum.textContent = `Page ${page} of ${totalPages} · ${Math.round(page / totalPages * 100)}% read`;
+        if (sum) sum.textContent = `${currentPercent}% read`;
     }
 
-    function goToPage(pageNum) {
+    // Go to a book page; frac (0-1) is how far into that page, so a saved place is found exactly.
+    function goToPage(pageNum, frac) {
         if (pageNum < 1 || pageNum > totalPages) return;
-        const near = Math.abs(pageNum - currentPage) <= 2; // long jumps land at once instead of scrolling past every page
+        frac = Math.max(0, Math.min(0.999, frac || 0));
+        const near = Math.abs(pageNum - currentPage) <= 2 && !frac; // long jumps land at once instead of scrolling past every page
         currentPage = pageNum;
         if (readingMode === 'flip' && pageFlip) {
-            pageFlip.turnToPage(pageNum);
+            const n = (firstScreenOf[pageNum] || 0) + Math.min((screenCount[pageNum] || 1) - 1, Math.floor(frac * (screenCount[pageNum] || 1))) + 1;
+            goToScreen(n);
         } else {
             const target = document.querySelector(`.page-content-inner[data-page="${pageNum}"]`);
-            if (target) { rbLockScroll(); target.scrollIntoView({ behavior: near ? 'smooth' : 'auto', block:'start' }); }
-            updateUI(pageNum);
+            if (target) {
+                rbLockScroll();
+                if (frac) scrollContainer.scrollTop = target.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop + target.offsetHeight * frac - scrollContainer.clientHeight * 0.35;
+                else target.scrollIntoView({ behavior: near ? 'smooth' : 'auto', block: 'start' });
+            }
+            updateUI();
             applyHighlights(scrollContainer);
         }
         savePosition();
@@ -821,28 +1024,25 @@ require_once __DIR__ . '/reader_share.php';
         data.append('action','save_position');
         data.append('book_id',bookId);
         data.append('chapter',currentPage);
-        data.append('percent',Math.round((currentPage/totalPages)*100));
+        data.append('percent',currentPercent); // the exact share read, the same number the reader shows
+        data.append('offset',Math.round(currentFrac * 1000)); // how far into the page, to come back to the same line
         navigator.sendBeacon('/reader/reader_ajax.php',data);
     }
 
     function switchMode(mode) {
+        const keep = { page: currentPage || 1, frac: currentFrac };
         readingMode = mode;
         localStorage.setItem('reader_mode',mode); awPrefsChanged();
         if (mode === 'flip') {
             scrollContainer.style.display = 'none';
             flipContainer.style.display = 'flex';
-            if (!pageFlip) initFlip();
-            if (currentPage > 0) pageFlip.turnToPage(currentPage);
-            else pageFlip.turnToPage(0);
-            updateUI(currentPage);
-            setTimeout(() => applyHighlights(flipWrapper), 100);
+            initFlip(keep); // poured afresh for this screen and these text settings
         } else {
             flipContainer.style.display = 'none';
             scrollContainer.style.display = 'block';
-            const target = document.querySelector(`.page-content-inner[data-page="${currentPage}"]`);
-            if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
-            updateUI(currentPage);
-            applyHighlights(scrollContainer);
+            rbPagesCache = null;
+            relabelToc();
+            goToPage(keep.page, keep.frac);
         }
     }
 
@@ -884,16 +1084,7 @@ require_once __DIR__ . '/reader_share.php';
         rbChrome(document.getElementById('reader-app').classList.contains('rb-quiet'));
     });
 
-    document.addEventListener('touchstart',function(e) { touchStartX = e.changedTouches[0].screenX; });
-    document.addEventListener('touchend',function(e) {
-        if (readingMode === 'flip' && pageFlip) {
-            const diff = touchStartX - e.changedTouches[0].screenX;
-            if (Math.abs(diff) > 30) {
-                if (diff > 0) pageFlip.turnToNextPage();
-                else pageFlip.turnToPrevPage();
-            }
-        }
-    });
+    // Swipes are turned by StPageFlip itself (a second handler here turned two pages at once).
 
     // ----- Bookmarks -----
     bookmarkBtn.addEventListener('click',function() {
@@ -975,9 +1166,9 @@ require_once __DIR__ . '/reader_share.php';
     // ----- Font size -----
     document.getElementById('fontSizeSlider').addEventListener('input',function() {
         const val = parseInt(this.value);
-        document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontSize = val+'%');
+        document.querySelectorAll('.page-content-inner,.flip-body').forEach(el => el.style.fontSize = val+'%');
         document.getElementById('fontSizeLabel').textContent = val+'%';
-        localStorage.setItem('reader_font_size',val); awPrefsChanged();
+        localStorage.setItem('reader_font_size',val); awPrefsChanged(); repaginateSoon();
     });
     window.adjustFontSize = function(amount) {
         const slider = document.getElementById('fontSizeSlider');
@@ -988,15 +1179,15 @@ require_once __DIR__ . '/reader_share.php';
     };
     const savedSize = localStorage.getItem('reader_font_size') || 100;
     document.getElementById('fontSizeSlider').value = savedSize;
-    document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontSize = savedSize+'%');
+    document.querySelectorAll('.page-content-inner,.flip-body').forEach(el => el.style.fontSize = savedSize+'%');
     document.getElementById('fontSizeLabel').textContent = savedSize+'%';
 
     // ----- Line height -----
     document.getElementById('lineHeightSlider').addEventListener('input',function() {
         const val = parseInt(this.value);
-        document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.lineHeight = (val/100).toFixed(1));
+        document.querySelectorAll('.page-content-inner,.flip-body').forEach(el => el.style.lineHeight = (val/100).toFixed(1));
         document.getElementById('lineHeightLabel').textContent = (val/100).toFixed(1);
-        localStorage.setItem('reader_line_height',val); awPrefsChanged();
+        localStorage.setItem('reader_line_height',val); awPrefsChanged(); repaginateSoon();
     });
     window.adjustLineHeight = function(amount) {
         const slider = document.getElementById('lineHeightSlider');
@@ -1007,21 +1198,21 @@ require_once __DIR__ . '/reader_share.php';
     };
     const savedLine = localStorage.getItem('reader_line_height') || 180;
     document.getElementById('lineHeightSlider').value = savedLine;
-    document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.lineHeight = (savedLine/100).toFixed(1));
+    document.querySelectorAll('.page-content-inner,.flip-body').forEach(el => el.style.lineHeight = (savedLine/100).toFixed(1));
     document.getElementById('lineHeightLabel').textContent = (savedLine/100).toFixed(1);
 
     // ----- Font type -----
     const fontTypeSelect = document.getElementById('fontTypeSelect');
     const savedFont = localStorage.getItem('reader_font_family') || 'Georgia, serif'; // a book face by default
     if (savedFont) { fontTypeSelect.value = savedFont; if (!fontTypeSelect.value) fontTypeSelect.selectedIndex = 0; applyFontType(savedFont); }
-    fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); awPrefsChanged(); });
-    function applyFontType(font) { document.querySelectorAll('.page-content-inner,.flip-page-custom').forEach(el => el.style.fontFamily = font); }
+    fontTypeSelect.addEventListener('change',function() { const font = this.value; applyFontType(font); localStorage.setItem('reader_font_family',font); awPrefsChanged(); repaginateSoon(); });
+    function applyFontType(font) { document.querySelectorAll('.page-content-inner,.flip-body').forEach(el => el.style.fontFamily = font); }
 
     // ----- Reading speed -----
     document.getElementById('readingSpeedSlider').addEventListener('input',function() {
         const val = parseInt(this.value);
         document.getElementById('readingSpeedLabel').textContent = val + ' wpm';
-        updateUI(currentPage);
+        updateUI();
     });
     // Q5: saved once when the slider is released ('change'), not on every step of the drag ('input').
     document.getElementById('readingSpeedSlider').addEventListener('change',function() {
@@ -1127,6 +1318,24 @@ require_once __DIR__ . '/reader_share.php';
     });
 
 
+    // ----- The book stays on AngelWrites -----
+    // A short passage can be copied to quote or share; whole pages cannot, and the book does not print.
+    const AW_COPY_MAX = 400;
+    function awCopyRefused() {
+        let t = document.getElementById('awCopyNote');
+        if (!t) {
+            t = document.createElement('div'); t.id = 'awCopyNote'; t.setAttribute('role', 'status');
+            t.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:100003;max-width:92vw;background:#3d2e2e;color:#fff;padding:10px 16px;border-radius:14px;font:500 .9rem/1.4 Inter,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:center;';
+            document.body.appendChild(t);
+        }
+        t.textContent = 'You can copy a short passage (up to about 60 words) to quote or share. The book itself is read here on AngelWrites.';
+        clearTimeout(t._h); t._h = setTimeout(() => t.remove(), 4500);
+    }
+    document.getElementById('page-viewport').addEventListener('copy', function (e) {
+        if (String(window.getSelection ? window.getSelection() : '').length > AW_COPY_MAX) { e.preventDefault(); awCopyRefused(); }
+    });
+    document.getElementById('page-viewport').addEventListener('dragstart', function (e) { if (e.target.closest && e.target.closest('.page-content-inner, .flip-body')) e.preventDefault(); });
+
     // ----- Selection tooltip -----
     function getSelectedText() { const sel = window.getSelection(); return sel.toString().trim(); }
     function getSelectionRange() { const sel = window.getSelection(); return sel.rangeCount > 0 ? sel.getRangeAt(0) : null; }
@@ -1194,7 +1403,7 @@ require_once __DIR__ . '/reader_share.php';
                     const data = new FormData();
                     data.append('action','add_highlight');
                     data.append('book_id',bookId);
-                    data.append('chapter',currentPage);
+                    data.append('chapter',selectionPage());
                     data.append('text',text);
                     data.append('color',color);
                     fetch('/reader/reader_ajax.php',{method:'POST',body:data});
@@ -1209,6 +1418,7 @@ require_once __DIR__ . '/reader_share.php';
                 const text = document.getElementById('highlight-tooltip').dataset.text;
                 switch(action) {
                     case 'copy':
+                        if (text.length > AW_COPY_MAX) { awCopyRefused(); break; }
                         navigator.clipboard.writeText(text).then(()=>{alert('✅ Copied!');}).catch(()=>{document.execCommand('copy');});
                         break;
                     case 'underline':
@@ -1222,7 +1432,7 @@ require_once __DIR__ . '/reader_share.php';
                             const data = new FormData();
                             data.append('action','add_highlight');
                             data.append('book_id',bookId);
-                            data.append('chapter',currentPage);
+                            data.append('chapter',selectionPage());
                             data.append('text',text);
                             data.append('color','underline');
                             fetch('/reader/reader_ajax.php',{method:'POST',body:data});
@@ -1233,7 +1443,7 @@ require_once __DIR__ . '/reader_share.php';
                             const highlightData = new FormData();
                             highlightData.append('action','add_highlight');
                             highlightData.append('book_id',bookId);
-                            highlightData.append('chapter',currentPage);
+                            highlightData.append('chapter',selectionPage());
                             highlightData.append('text',text);
                             highlightData.append('color','yellow');
                             fetch('/reader/reader_ajax.php',{method:'POST',body:highlightData})
@@ -1253,10 +1463,10 @@ require_once __DIR__ . '/reader_share.php';
                         } else { alert('You need to be in a reading group to add notes.'); }
                         break;
                     case 'share':
-                        window.currentQuote = text;
+                        window.currentQuote = text.length > AW_COPY_MAX ? text.slice(0, AW_COPY_MAX).replace(/\s+\S*$/, '') + '…' : text;
                         const preview = document.getElementById('shareQuotePreview');
                         const quoteSpan = document.getElementById('shareQuoteText');
-                        quoteSpan.textContent = text;
+                        quoteSpan.textContent = window.currentQuote;
                         preview.style.display = 'block';
                         document.getElementById('share-modal').classList.add('visible');
                         overlay.classList.add('active');
@@ -1328,15 +1538,7 @@ require_once __DIR__ . '/reader_share.php';
 
     resumeBtn.addEventListener('click',function() { resumePosition(); });
     function resumePosition() {
-        if (lastPage >= 1 && lastPage <= totalPages) {
-            goToPage(lastPage);
-            if (readingMode === 'scroll') {
-                setTimeout(() => {
-                    const target = document.querySelector(`.page-content-inner[data-page="${lastPage}"]`);
-                    if (target) target.scrollIntoView({ block:'start' });
-                }, 100);
-            }
-        }
+        if (lastPage >= 1 && lastPage <= totalPages) goToPage(lastPage, startFrac);
     }
 
     function share(platform) {
@@ -1643,26 +1845,33 @@ require_once __DIR__ . '/reader_share.php';
         app.classList.toggle('rb-quiet', !show);
     }
     // Called by updateUI: the footer, the scrubber and the chapter under the title.
-    function rbSync(page, chapterTitle) {
+    function rbSync(p, chapterTitle) {
         const scrub = document.getElementById('rbScrub'), sub = document.getElementById('rbChapter');
         if (sub) sub.textContent = chapterTitle || '';
         if (!scrub || scrub.dataset.dragging === '1') return;
-        scrub.value = Math.max(1, page);
-        const pct = totalPages > 1 ? ((Math.max(1, page) - 1) / (totalPages - 1)) * 100 : 100;
-        scrub.style.setProperty('--fill', pct + '%');
-        scrub.setAttribute('aria-valuetext', page ? `Page ${page} of ${totalPages}${chapterTitle ? ', ' + chapterTitle : ''}` : 'Cover');
+        const total = readingMode === 'flip' && screens.length ? screens.length : totalPages;
+        scrub.max = Math.max(1, total);
+        scrub.value = p ? p.a : 1;
+        scrub.style.setProperty('--fill', (p ? currentPercent : 0) + '%');
+        scrub.setAttribute('aria-valuetext', p ? `Page ${p.a} of ${total}, ${currentPercent}% read${chapterTitle ? ', ' + chapterTitle : ''}` : 'Cover');
     }
     (function () {
         const scrub = document.getElementById('rbScrub');
         scrub.addEventListener('input', function () {
-            const p = parseInt(this.value, 10);
+            const n = parseInt(this.value, 10), flip = readingMode === 'flip' && screens.length;
+            const total = flip ? screens.length : totalPages, page = flip ? screens[n - 1].page : n;
             this.dataset.dragging = '1';
-            pageNumEl.textContent = p;
-            chapterInfoEl.textContent = getChapterTitle(getChapterForPage(p));
-            this.style.setProperty('--fill', (totalPages > 1 ? (p - 1) / (totalPages - 1) * 100 : 100) + '%');
-            this.setAttribute('aria-valuetext', `Page ${p} of ${totalPages}`);
+            document.getElementById('pageWord').textContent = 'Page';
+            pageNumEl.textContent = n;
+            chapterInfoEl.textContent = getChapterTitle(getChapterForPage(page));
+            this.style.setProperty('--fill', (total > 1 ? (n - 1) / (total - 1) * 100 : 100) + '%');
+            this.setAttribute('aria-valuetext', `Page ${n} of ${total}`);
         });
-        scrub.addEventListener('change', function () { this.dataset.dragging = ''; goToPage(parseInt(this.value, 10)); });
+        scrub.addEventListener('change', function () {
+            this.dataset.dragging = '';
+            const n = parseInt(this.value, 10);
+            if (readingMode === 'flip' && screens.length) goToScreen(n); else goToPage(n);
+        });
 
         // Scroll mode: follow the page in view, so the page number, progress and saved place keep up.
         function pageInView() {
@@ -1684,8 +1893,12 @@ require_once __DIR__ . '/reader_share.php';
             requestAnimationFrame(function () {
                 rbTicking = false;
                 const p = pageInView();
-                if (p && p !== currentPage) {
-                    currentPage = p; updateUI(p); applyHighlights(scrollContainer); savePosition();
+                const changed = p && p !== currentPage;
+                if (p) currentPage = p;
+                updateUI(); // the share read follows every scroll, not only page changes
+                savePosition();
+                if (changed) {
+                    applyHighlights(scrollContainer);
                     clearTimeout(rbBookmarkTimer); rbBookmarkTimer = setTimeout(loadBookmarkStatus, 1200);
                 }
             });
@@ -1738,6 +1951,7 @@ require_once __DIR__ . '/reader_share.php';
 
     // ----- Initialization -----
     totalPagesEl.textContent = totalPages;
+    currentFrac = startFrac;
     const savedMode = localStorage.getItem('reader_mode');
     if (savedMode === 'flip') {
         readingMode = 'flip';
@@ -1757,7 +1971,7 @@ require_once __DIR__ . '/reader_share.php';
         document.querySelector('#modeGroup [data-mode="scroll"]').classList.add('active');
         switchMode('scroll');
     }
-    goToPage(currentPage);
+    if (readingMode !== 'flip') goToPage(currentPage, startFrac); // page-turn mode opened at the saved place already
     loadBookmarkStatus();
     if (userId > 0) {
         const data = new FormData();

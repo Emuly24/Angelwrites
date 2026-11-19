@@ -116,7 +116,7 @@ function aw_upload_attrs(string $kind): string
     if (!$c) return '';
     $exts = array_values(array_unique(array_merge(array_values($c['mimes']), $c['extra_exts'] ?? [])));
     if (in_array('jpg', $exts, true)) $exts[] = 'jpeg';
-    if ($kind === 'book') $exts = ['pdf', 'epub', 'docx'];
+    if ($kind === 'book') $exts = ['pdf', 'epub', 'docx', 'odt', 'rtf', 'txt'];
     if (($kind === 'video') || ($kind === 'video_recording')) $exts = array_merge($exts, ['m4v', 'mov']);
     $accept = $c['is_image'] ? 'image/jpeg,image/png,image/webp,image/gif'
             : implode(',', array_map(function ($e) { return '.' . $e; }, array_unique($exts)));
@@ -222,6 +222,7 @@ function aw_upload_zip_kind(string $path): string
             $kind = '';
             if ($z->locateName('META-INF/container.xml') !== false) $kind = 'epub';
             elseif ($z->locateName('word/document.xml') !== false) $kind = 'docx';
+            elseif (strpos((string)$z->getFromName('mimetype'), 'opendocument.text') !== false) $kind = 'odt';
             $z->close();
             return $kind;
         }
@@ -578,10 +579,11 @@ function aw_upload_ingest(string $tmp, string $name, int $size, int $err, bool $
     // 3. type: by content, then the name's extension must be one this kind allows
     $mime = aw_upload_detect_mime($tmp);
     if ($kind === 'book' && ($mime === 'application/zip' || $mime === 'application/octet-stream' || $mime === 'application/epub+zip'
-            || strpos($mime, 'officedocument') !== false)) {
+            || strpos($mime, 'officedocument') !== false || strpos($mime, 'opendocument') !== false)) {
         $zk = aw_upload_zip_kind($tmp);
         $mime = $zk === 'epub' ? 'application/epub+zip'
-              : ($zk === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/x-unknown-zip');
+              : ($zk === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              : ($zk === 'odt' ? 'application/vnd.oasis.opendocument.text' : 'application/x-unknown-zip'));
     }
     if (!isset($c['mimes'][$mime]) || $c['mimes'][$mime] === 'zip') {
         return $fail('That file cannot be used here. Allowed: ' . $c['hint_types'] . '.', 'type refused: ' . ($mime ?: 'unknown'));

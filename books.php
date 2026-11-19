@@ -4,6 +4,8 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/commerce.php';
 require_once 'includes/book_card.php';
+require_once 'includes/member_books.php';
+aw_mb_tables($db); // books.submitted_by marks the books members shared (Community books)
 
 // ===== SEARCH & FILTER =====
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -22,6 +24,8 @@ if ($search) {
 
 if ($filter === 'free') {
     $sql .= " AND is_free = 1";
+} elseif ($filter === 'community') {
+    $sql .= " AND submitted_by IS NOT NULL";
 } elseif ($filter === 'sale') {
     $sql .= " AND is_sale = 1 AND sale_price > 0 AND sale_price < price"; // F79
 }
@@ -79,14 +83,15 @@ $pageTitle = 'Books';
     <div class="container">
         <?php if (($_GET['error'] ?? '') === 'not_purchased'): // F37 ?>
             <div class="books-notice" role="alert" style="border:1px solid var(--rose, #DBA1A2);border-radius:10px;padding:12px 16px;margin:16px 0;">
-                🔒 That book has to be bought before it can be downloaded. Press <strong>Download</strong> on it below to order it; it unlocks once your payment is confirmed. Already ordered? See <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a>.
+                🔒 That book has to be bought before it can be read. Press <strong>Buy</strong> on it below to order it; it opens in the reader once your payment is confirmed. Already ordered? See <a href="<?php echo SITE_URL; ?>/my_purchases.php">My purchases</a>.
             </div>
         <?php endif; ?>
         <!-- ===== PAGE HEADER ===== -->
         <div class="books-header">
             <div class="books-header-content">
-                <h1>All Books</h1>
-                <p>Explore Angella's writings — available for reading, download, or purchase.</p>
+                <h1><?php echo $filter === 'community' ? 'Community books' : 'All Books'; ?></h1>
+                <p><?php echo $filter === 'community' ? 'Books written and shared by members of the AngelWrites family, read here on the site.' : "Explore Angella's writings and books shared by members, to read here on the site."; ?></p>
+                <p style="margin-top:10px;"><a class="btn btn-outline btn-sm" href="<?php echo SITE_URL; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i> Share your book</a></p>
             </div>
             <div class="books-header-stats">
                 <span class="stat-badge">
@@ -108,6 +113,7 @@ $pageTitle = 'Books';
                         <option value="">All Books</option>
                         <option value="free" <?php echo $filter === 'free' ? 'selected' : ''; ?>>Free</option>
                         <option value="sale" <?php echo $filter === 'sale' ? 'selected' : ''; ?>>On Sale</option>
+                        <option value="community" <?php echo $filter === 'community' ? 'selected' : ''; ?>>Community books</option>
                     </select>
                 </div>
                 <div class="action-group">
@@ -209,8 +215,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const bookTitle = this.closest('.bk-card, .book-card').querySelector('h3').textContent.trim();
 
             if (isFree) {
-                // Free book – download directly
-                window.location.href = '<?php echo SITE_URL; ?>/download.php?book_id=' + bookId;
+                // books are read on the site only
+                window.location.href = '<?php echo SITE_URL; ?>/reader/reader.php?id=' + bookId;
             } else {
                 // Paid book – open payment modal
                 const price = parseFloat(this.dataset.price);
