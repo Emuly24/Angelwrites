@@ -3,6 +3,9 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/human_check.php'; // a built-in human check instead of an email code
+require_once 'includes/social_auth.php';
+require_once 'includes/twofactor.php';    // aw_finish_login()
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
@@ -17,13 +20,10 @@ if (isLoggedIn()) {
 $error = '';
 $success = false;
 
-// ===== RATE LIMITING =====
-$ip = $_SERVER['REMOTE_ADDR'];
-$limit_key = 'register_attempts_' . $ip;
-$attempts_file = aw_ratelimit_file($limit_key) /* Q49 */;
-if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
-    $error = 'Please wait 5 minutes before trying to register again.';
-}
+// Coming back from "Continue with Google/Facebook/...": only what the provider did not tell us is asked.
+$social = (isset($_GET['social']) || isset($_POST['social'])) && !empty($_SESSION['aw_social_new']) && time() - (int)$_SESSION['aw_social_new']['at'] < 1800
+    ? $_SESSION['aw_social_new'] : null;
+if (isset($_GET['social']) && !$social) { header('Location: ' . SITE_URL . '/login.php?social=expired'); exit; }
 
 // ===== LIST OF COUNTRIES WITH PHONE CODES =====
 $countries = [
@@ -79,46 +79,58 @@ $referral_sources = [
     'Instagram',
     'Twitter/X',
     'Angella (direct referral)',
+    'Telegram',
+    'YouTube',
     'Event/Conference',
     'Other'
 ];
 
 // ===== HANDLE REGISTRATION FORM SUBMISSION =====
+// No email code any more: a built-in human check (includes/human_check.php) and per-address limits keep
+// bots out, and the new member is signed in straight away. Accounts made through a provider skip the
+// check (the provider has already confirmed a real person) and need no password.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
-    $first_name = trim($_POST['first_name']);
-    $last_name = trim($_POST['last_name']);
-    $username = trim($_POST['username']);
-    $email = strtolower(trim($_POST['email'])); // VF1: stored in lower case; every lookup ignores case
-    $password = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
+    $first_name = trim((string)($_POST['first_name'] ?? ''));
+    $last_name = trim((string)($_POST['last_name'] ?? ''));
+    $username = trim((string)($_POST['username'] ?? ''));
+    $email = strtolower(trim((string)($_POST['email'] ?? ''))); // VF1: stored in lower case; every lookup ignores case
+    if ($social && !empty($social['email_verified'])) $email = $social['email']; // confirmed by the provider: not editable
+    $password = (string)($_POST['password'] ?? '');
+    $confirm_password = (string)($_POST['confirm_password'] ?? '');
     $gender = $_POST['gender'] ?? '';
     $country = $_POST['country'] ?? '';
-    $contact = trim($_POST['contact']);
-    $dob = trim($_POST['dob']);
+    $contact = trim((string)($_POST['contact'] ?? ''));
+    $dob = trim((string)($_POST['dob'] ?? ''));
     $referral_source = trim($_POST['referral_source'] ?? '');
 
-    if ($referral_source === 'Other' && !empty(trim($_POST['other_referral']))) {
+    if ($referral_source === 'Other' && !empty(trim($_POST['other_referral'] ?? ''))) {
         $referral_source = trim($_POST['other_referral']);
     }
 
     // Validation
-    // Q24 (decision D-Q2): only name, username, email and password are required to join. Gender, date
-    // of birth, country, phone and referral source used to be required too (13 fields before reading
-    // anything); they are optional now and can be added later on the profile. Empty ones are stored as NULL.
+    // Q24 (decision D-Q2): only name, username, email and password are required to join; the rest is
+    // optional and can be added later on the profile. Empty ones are stored as NULL.
     foreach (['gender', 'country', 'contact', 'dob', 'referral_source'] as $aw_opt) {
         if ($$aw_opt === '') $$aw_opt = null;
     }
-    if (empty($first_name) || empty($last_name) || empty($username) || empty($email) || empty($password) || empty($confirm_password)) {
-        $error = 'Please fill in your first and last name, username, email and password.';
+    $aw_hc_error = $social ? '' : aw_hc_verify('register', $_POST);
+    if ($aw_hc_error !== '') {
+        $error = $aw_hc_error;
+    } elseif (!aw_hc_limit('register', 5, 3600, false)) {
+        $error = 'Several accounts were just created from your network. Please try again in an hour, or sign in with an account you already have.';
+    } elseif (empty($first_name) || empty($last_name) || empty($username) || empty($email) || (!$social && (empty($password) || empty($confirm_password)))) {
+        $error = $social ? 'Please fill in your name, a username and your email.' : 'Please fill in your first and last name, username, email and password.';
+    } elseif (empty($_POST['terms'])) {
+        $error = 'Please agree to the Terms of Service and Privacy Policy.';
     } elseif ($dob !== null && (!($aw_d = DateTime::createFromFormat('Y-m-d', $dob)) || $aw_d->format('Y-m-d') !== $dob || $dob > date('Y-m-d'))) {
         $error = 'Please enter a valid date of birth, or leave it empty.';
     } elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
         $error = 'Username must be 3-20 characters (letters, numbers, underscore only).';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
-    } elseif (strlen($password) < 8) {
+    } elseif (!$social && strlen($password) < 8) {
         $error = 'Password must be at least 8 characters long.';
-    } elseif ($password !== $confirm_password) {
+    } elseif (!$social && $password !== $confirm_password) {
         $error = 'Passwords do not match.';
     } else {
         // Check if email already exists
@@ -128,58 +140,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $error = 'This email is already registered. You already have an account. Please <a href="login.php">go to login</a>.';
         } else {
             // Check if username already exists
-            $stmt = $db->prepare("SELECT id FROM users WHERE username = ?");
+            $stmt = $db->prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE");
             $stmt->execute([$username]);
             if ($stmt->fetch()) {
                 $error = 'This username is already taken. Please choose another.';
             } else {
-                // Create new user
-                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $db->prepare("INSERT INTO users (first_name, last_name, username, email, password, gender, country, contact_number, date_of_birth, referral_source, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reader', CURRENT_TIMESTAMP)");
+                // Create new user (is_verified = 1: there is no email code step any more)
+                $hashed_password = password_hash($social ? bin2hex(random_bytes(24)) : $password, PASSWORD_DEFAULT);
+                $stmt = $db->prepare("INSERT INTO users (first_name, last_name, username, email, password, gender, country, contact_number, date_of_birth, referral_source, role, is_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reader', 1, CURRENT_TIMESTAMP)");
                 if ($stmt->execute([$first_name, $last_name, $username, $email, $hashed_password, $gender, $country, $contact, $dob, $referral_source])) {
-                    $user_id = $db->lastInsertId();
-                    
-                    // Generate 6-digit verification code
-                    $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-                    $expiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // F232: was 15 minutes
-                    $stmt = $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?");
-                    $stmt->execute([$code, $expiry, $user_id]);
+                    $user_id = (int)$db->lastInsertId();
+                    aw_hc_limit('register', 5, 3600, true);
 
                     // Generate referral code
                     $ref_code = strtoupper(substr(md5($username . time()), 0, 8));
-                    $stmt = $db->prepare("UPDATE users SET referral_code = ? WHERE id = ?");
-                    $stmt->execute([$ref_code, $user_id]);
+                    $db->prepare("UPDATE users SET referral_code = ? WHERE id = ?")->execute([$ref_code, $user_id]);
+                    if ($social) {
+                        aw_social_link($db, $user_id, $social['provider'], $social['uid'], $email);
+                        unset($_SESSION['aw_social_new']);
+                    }
 
-                    // ===== SEND VERIFICATION EMAIL WITH 6-DIGIT CODE (via Zoho SMTP) =====
-                    $subject = "Verify your AngelWrites account";
-                    $body = "Hello $first_name,\n\nYour verification code is: $code\n\nThis code will expire in 24 hours.\n\nIf you did not create an account, please ignore this email.\n\n— AngelWrites Team";
-                    
-                    // The account exists from this point on, so registration has succeeded even if
-                    // the email can't be sent; the success screen then points to "Request a new code".
-                    $mail_sent = sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
-                    $success = true;
-                    if (!$mail_sent) {
-                        // VF4: nothing was emailed, so "Resend Code" must work straight away
-                        $db->prepare("UPDATE users SET verification_code_expiry = ? WHERE id = ?")
-                           ->execute([date('Y-m-d H:i:s', strtotime('+24 hours') - 120), $user_id]);
-                    }
-                    if ($mail_sent) {
-                        
-                        // ===== SEND ADMIN NOTIFICATION =====
-                        $admin_email = aw_admin_email();
-                        $admin_subject = '📝 New User Registration';
-                        $admin_body = "A new user has registered on AngelWrites.\n\n";
-                        $admin_body .= "Name: $first_name $last_name\n";
-                        $admin_body .= "Username: $username\n";
-                        $admin_body .= "Email: $email\n";
-                        $admin_body .= "Country: $country\n";
-                        $admin_body .= "Referred by: $referral_source\n\n";
-                        $admin_body .= "View user in admin panel: " . SITE_URL . "/admin/manage_users.php";
-                        sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
-                        
-                        // Set rate limit
-                        file_put_contents($attempts_file, time());
-                    }
+                    // the team hears about new members (a failed email never stops the sign-up)
+                    $admin_body = "A new member joined AngelWrites.\n\nName: $first_name $last_name\nUsername: $username\nEmail: $email\nCountry: " . ($country ?: 'not given')
+                        . "\nJoined with: " . ($social ? $social['label'] : 'email and password') . "\nHeard about us: " . ($referral_source ?: 'not given')
+                        . "\n\nMembers: " . SITE_URL . "/admin/manage_users.php";
+                    @sendEmail(aw_admin_email(), 'New member: ' . $first_name . ' ' . $last_name, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
+
+                    // signed in straight away, with a welcome on the dashboard
+                    aw_finish_login($db, ['id' => $user_id, 'username' => $username, 'role' => 'reader', 'first_name' => $first_name, 'last_name' => $last_name, 'name' => null], false);
+                    $_SESSION['notification'] = 'Welcome to AngelWrites, ' . htmlspecialchars($first_name) . '! Your account is ready.';
+                    $aw_back = (string)($social['back'] ?? '');
+                    header('Location: ' . SITE_URL . ($aw_back !== '' ? $aw_back : '/dashboard.php?welcome=1'));
+                    exit;
                 } else {
                     $error = 'Something went wrong. Please try again.';
                 }
@@ -187,6 +179,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         }
     }
 }
+// values to show again after an error, or from the provider
+$aw_v = function ($k) use ($social) {
+    if (isset($_POST[$k])) return (string)$_POST[$k];
+    if (!$social) return '';
+    if ($k === 'email') return (string)$social['email'];
+    if ($k === 'first_name') return $social['first_name'] !== '' ? $social['first_name'] : (string)strtok($social['display'], ' ');
+    if ($k === 'last_name') return $social['last_name'] !== '' ? $social['last_name'] : trim((string)substr($social['display'], strlen((string)strtok($social['display'], ' '))));
+    return '';
+};
+$aw_suggest_user = $social && !isset($_POST['username']) ? aw_social_username($db, $social['display'] ?: ($social['first_name'] . ' ' . $social['last_name']) ?: strtok($social['email'], '@')) : '';
 
 $pageTitle = 'Sign Up';
 ?>
@@ -198,8 +200,13 @@ $pageTitle = 'Sign Up';
             <div class="auth-card">
                 <?php if (!$success): ?>
                     <div class="auth-header">
+                        <?php if ($social): ?>
+                        <h1>Almost there</h1>
+                        <p>You are joining with <strong><?php echo htmlspecialchars($social['label']); ?></strong>. Just check these details and you are in.</p>
+                        <?php else: ?>
                         <h1>Join AngelWrites</h1>
-                        <p>Create your free account to access books, poems, and community.</p>
+                        <p>Create your free account to read books, poems and reflections, and to join the community. It takes a minute.</p>
+                        <?php endif; ?>
                     </div>
                     <?php if ($error): ?>
                         <div class="alert alert-error">
@@ -208,29 +215,33 @@ $pageTitle = 'Sign Up';
                         </div>
                     <?php endif; ?>
 
-                    <form method="POST" action="" class="auth-form" id="registerForm">
+                    <?php if (!$social) echo aw_social_buttons('register'); ?>
+                    <form method="POST" action="<?php echo $social ? '?social=1' : ''; ?>" class="auth-form" id="registerForm">
+                        <?php if ($social): ?><input type="hidden" name="social" value="1"><?php endif; ?>
                         <div class="form-group">
                             <label for="first_name">First Name</label>
-                            <input type="text" id="first_name" name="first_name" placeholder="Enter your first name" required autofocus>
+                            <input type="text" id="first_name" name="first_name" placeholder="Enter your first name" required autofocus autocomplete="given-name" value="<?php echo htmlspecialchars($aw_v('first_name')); ?>">
                         </div>
 
                         <div class="form-group">
                             <label for="last_name">Surname / Last Name</label>
-                            <input type="text" id="last_name" name="last_name" placeholder="Enter your last name" required>
+                            <input type="text" id="last_name" name="last_name" placeholder="Enter your last name" required autocomplete="family-name" value="<?php echo htmlspecialchars($aw_v('last_name')); ?>">
                         </div>
 
                         <div class="form-group">
                             <label for="username">Username</label>
-                            <input type="text" id="username" name="username" placeholder="Choose a username (3-20 chars)" required>
+                            <input type="text" id="username" name="username" placeholder="Choose a username (3-20 chars)" required autocomplete="username" value="<?php echo htmlspecialchars($aw_suggest_user !== '' ? $aw_suggest_user : $aw_v('username')); ?>">
                             <div id="usernameStatus" class="field-status"></div>
                         </div>
 
                         <div class="form-group">
                             <label for="email">Email Address</label>
-                            <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                            <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email" value="<?php echo htmlspecialchars($aw_v('email')); ?>"<?php echo ($social && !empty($social['email_verified'])) ? ' readonly aria-readonly="true"' : ''; ?>>
+                            <?php if ($social && !empty($social['email_verified'])): ?><small class="field-hint">Confirmed by <?php echo htmlspecialchars($social['label']); ?>.</small><?php elseif ($social): ?><small class="field-hint"><?php echo htmlspecialchars($social['label']); ?> did not share an email address; please add yours (for password resets and anything you ask us to send).</small><?php endif; ?>
                             <div id="emailStatus" class="field-status"></div>
                         </div>
 
+<?php if (!$social): ?>
                         <div class="form-group">
                             <label for="password">Password</label>
                             <div class="password-wrapper">
@@ -252,6 +263,7 @@ $pageTitle = 'Sign Up';
                             <div id="passwordMatchStatus" class="field-status"></div>
                         </div>
 
+<?php endif; ?>
                         <!-- Q24: optional details, folded away so joining takes five fields -->
                         <details class="optional-details" style="margin:12px 0;">
                             <summary style="cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center;">More about you (optional; you can add these later on your profile)</summary>
@@ -286,7 +298,7 @@ $pageTitle = 'Sign Up';
                         <div class="form-group">
                             <label for="contact">Contact Number <small>(optional)</small></label>
                             <div class="contact-wrapper">
-                                <span id="countryCodeDisplay" class="country-code-display">+265</span>
+                                <span id="countryCodeDisplay" class="country-code-display">+</span>
                                 <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456">
                             </div>
                         </div>
@@ -314,52 +326,15 @@ $pageTitle = 'Sign Up';
                             </label>
                         </div>
 
+                        <?php if (!$social) echo aw_hc_field('register'); ?>
                         <button type="submit" class="btn btn-primary btn-block">
                             <i class="fas fa-user-plus"></i>
-                            Create Account
+                            <?php echo $social ? 'Finish and join' : 'Create Account'; ?>
                         </button>
                     </form>
 
-                    <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
-                    <?php if (getenv('SOCIAL_LOGIN_ENABLED') === '1'): // F102: off unless enabled (decision D-M3) ?>
-                    <div class="social-login-section">
-                        <p>Or continue with:</p>
-                        <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
-                            <i class="fab fa-google"></i> Google
-                        </a>
-                    </div>
-                    <?php endif; ?>
-
                     <div class="auth-footer">
                         <p>Already have an account? <a href="<?php echo SITE_URL; ?>/login.php">Sign in here</a></p>
-                    </div>
-                <?php else: ?>
-                    <!-- SUCCESS POPUP -->
-                    <div class="success-popup">
-                        <div class="success-icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <h2>Account Created! 🎉</h2>
-                        <p class="success-message">
-                            Welcome to the AngelWrites community! 
-                            <?php if (!empty($mail_sent)): ?>
-                            <strong>A 6-digit verification code has been sent to your email address.</strong>
-                            Please check your inbox, enter the code on the verification page to activate your account.
-                            <?php else: ?>
-                            <strong>Your account is created, but we couldn't send the verification email just now.</strong>
-                            Please use <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>">Request a new code</a> in a few minutes.
-                            <?php endif; ?>
-                        </p>
-                        <div class="success-actions">
-                            <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>" class="btn btn-primary btn-block">
-                                <i class="fas fa-sign-in-alt"></i>
-                                Go to Verification
-                            </a>
-                            <p class="small-note">
-                                📧 Didn't receive the email? Check your spam folder or 
-                                <a href="<?php echo SITE_URL; ?>/verify.php?email=<?php echo urlencode($email ?? ''); ?>">Request a new code</a>.
-                            </p>
-                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -370,8 +345,8 @@ $pageTitle = 'Sign Up';
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // VF2: the "Account Created" screen has no form; the form scripts below must not run there
-    if (!document.getElementById('password')) return;
+    if (!document.getElementById('registerForm')) return;
+    if (document.getElementById('password')) { // joining with Google, Facebook...: no password fields
 
     // ===== GENERATE STRONG PASSWORD =====
     const genBtn = document.getElementById('generatePassword');
@@ -381,10 +356,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function generateStrongPassword(length = 16) {
         const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=';
         let password = '';
-        for (let i = 0; i < length; i++) {
-            const randomIndex = Math.floor(Math.random() * chars.length);
-            password += chars[randomIndex];
-        }
+        const rnd = new Uint32Array(length);
+        crypto.getRandomValues(rnd); // not Math.random(): a password must be unpredictable
+        for (let i = 0; i < length; i++) password += chars[rnd[i] % chars.length];
         return password;
     }
 
@@ -455,6 +429,8 @@ document.addEventListener('DOMContentLoaded', function() {
         this.setAttribute('aria-label', type === 'text' ? 'Hide password' : 'Show password');
         const awT = this.querySelector('.pw-toggle-text'); if (awT) awT.textContent = type === 'text' ? 'Hide' : 'Show';
     });
+
+    } // end of the password fields
 
     // ===== COUNTRY CODE DETECTION =====
     const countrySelect = document.getElementById('country');

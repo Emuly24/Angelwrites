@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/human_check.php';
 require_once 'includes/mail_helper.php';
 
 $error = '';
@@ -21,15 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $subject = trim($_POST['subject']);
     $message = trim($_POST['message']);
 
-    // ===== SIMPLE MATH CAPTCHA =====
-    // S11 (F179): the expected answer lives in the session, not in a hidden form field,
-    // and a wrong or missing answer stops the submission.
-    $captcha_result = isset($_POST['captcha_result']) && $_POST['captcha_result'] !== '' ? (int)$_POST['captcha_result'] : null;
-    $captcha_expected = $_SESSION['contact_captcha'] ?? null;
-    unset($_SESSION['contact_captcha']);
-    if ($captcha_expected === null || $captcha_result !== $captcha_expected) {
-        $error = 'Please solve the math puzzle correctly.';
-    }
+    // the built-in human check (includes/human_check.php) replaces the old sum puzzle
+    $error = aw_hc_verify('contact', $_POST);
+    if ($error === '' && !aw_hc_limit('contact', 6, 3600)) $error = 'You have sent several messages in the last hour. Please try again a little later, or email angelwrites@zohomail.com.';
 
     if ($error) {
         // captcha failed: nothing is saved or sent
@@ -68,11 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     }
 }
 
-// Generate random numbers for captcha
-$captcha_num1 = random_int(1, 10);
-$captcha_num2 = random_int(1, 10);
-$captcha_expected = $captcha_num1 + $captcha_num2;
-$_SESSION['contact_captcha'] = $captcha_expected; // S11: checked server-side on submit
+// the human check is printed in the form (aw_hc_field)
 
 $pageTitle = 'Contact';
 ?>
@@ -119,15 +110,8 @@ $pageTitle = 'Contact';
                         <textarea id="message" name="message" rows="5" placeholder="Write your message here..." required></textarea>
                     </div>
                     
-                    <!-- ===== MATH CAPTCHA ===== -->
-                    <div class="form-group captcha-group">
-                        <label for="captcha_result">Verify you are human</label>
-                        <div class="captcha-wrapper">
-                            <span class="captcha-question"><?php echo $captcha_num1; ?> + <?php echo $captcha_num2; ?> =</span>
-                            <input type="number" id="captcha_result" name="captcha_result" placeholder="?" required>
-                        </div>
-                    </div>
-                    
+                    <?php echo aw_hc_field('contact'); ?>
+
                     <button type="submit" class="btn btn-primary btn-block">
                         <i class="fas fa-paper-plane"></i> Send Message
                     </button>
