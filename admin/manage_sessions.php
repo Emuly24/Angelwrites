@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/csrf.php';
 
 aw_require('manage_members'); // K1
@@ -70,8 +71,7 @@ if (isset($_POST['update_status'])) {
 // S9: GET delete requires the CSRF token in the link.
 if (isset($_GET['delete']) && validate_csrf_token($_GET['csrf'] ?? '')) {
     $id = (int)$_GET['delete'];
-    $stmt = $db->prepare("DELETE FROM sessions WHERE id = ?");
-    $stmt->execute([$id]);
+    aw_safe_delete($db, 'sessions', $id); // tidies anything that points to it
     $success = 'Session deleted successfully.';
     header('Location: ' . SITE_URL . '/admin/manage_sessions.php');
     exit;

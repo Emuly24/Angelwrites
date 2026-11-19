@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R5: shared upload limits
@@ -32,8 +33,7 @@ if (isset($_GET['delete'])) {
         if (!empty($book['file_path']) && file_exists($doc_root . '/' . $book['file_path'])) {
             @unlink($doc_root . '/' . $book['file_path']);
         }
-        $stmt = $db->prepare("DELETE FROM books WHERE id = ?");
-        $stmt->execute([$id]);
+        aw_safe_delete($db, 'books', $id); // a book with readers, notes or reading groups used to be refused
         // a book a member shared: their own list now says it was taken down
         try {
             aw_mb_tables($db);
