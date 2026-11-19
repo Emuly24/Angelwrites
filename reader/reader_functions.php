@@ -192,9 +192,15 @@ function detectChapters($pages) {
     $pageToChapter = [];
     $currentChapter = 0;
 
+    // Books prepared automatically (includes/book_extract.php) mark every chapter, preface and
+    // section heading as <h2 class="chapter-heading">, whatever its words; older books only have
+    // headings that say "Chapter N".
+    $marked = false;
+    foreach ($pages as $html) { if (strpos($html, 'class="chapter-heading"') !== false) { $marked = true; break; } }
+    $pattern = $marked ? '/<h2 class="chapter-heading"[^>]*>(.*?)<\/h2>/is' : '/<h[2-3][^>]*>(.*?Chapter\s+(\d+|[IVXLCDM]+).*?)<\/h[2-3]>/i';
     foreach ($pages as $idx => $html) {
         $pageNum = $idx + 1;
-        if (preg_match('/<h[2-3][^>]*>(.*?Chapter\s+(\d+|[IVXLCDM]+).*?)<\/h[2-3]>/i', $html, $matches)) {
+        if (preg_match($pattern, $html, $matches)) {
             $currentChapter++;
             $chapterTitles[$currentChapter] = trim(strip_tags($matches[1]));
             $chapterMap[$currentChapter] = [];

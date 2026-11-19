@@ -52,31 +52,37 @@ if (empty($book['is_free'])) {
     }
 }
 
-// R5: the admin can open a draft version in the real reader before publishing it
-// (reader.php?id=N&preview=V). Nothing is counted or saved while previewing.
+// Drafts and hand publishing are retired: every book is prepared automatically
+// (includes/book_extract.php), so there is no draft to preview.
 $preview_version = 0;
-if (isAdmin() && !empty($_GET['preview'])) {
-    $pv = $db->prepare("SELECT version FROM book_content_history WHERE book_id = ? AND version = ?");
-    $pv->execute([$book_id, (int)$_GET['preview']]);
-    $preview_version = (int)$pv->fetchColumn();
-}
 
 // Opening the reader is a reading session (reading_sessions), not another view of the book page;
 // it used to add to the book's view count a second time.
 
 // --- Fetch processed content ---
-$stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
-$stmt->execute([$book_id]);
-$processed = $stmt->fetch(PDO::FETCH_ASSOC);
+// A book with no reader text yet is prepared from its file now, the first time it is opened
+// (normally it was already prepared when the file was uploaded). Text published by hand is kept.
+require_once __DIR__ . '/../includes/book_extract.php';
+$prepare_error = '';
+$fetch_content = function () use ($db, $book_id) {
+    $stmt = $db->prepare("SELECT * FROM book_content WHERE book_id = ?");
+    $stmt->execute([$book_id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+};
+$processed = $fetch_content();
+$needs_prep = empty($processed) || (int)$processed['is_processed'] !== 1 || trim((string)$processed['content_html']) === '';
+if (!$needs_prep) {
+    $aw_meta = json_decode((string)($processed['metadata_json'] ?? ''), true) ?: [];
+    // an automatic text made from an older file is prepared again from the current one
+    if (!empty($aw_meta['auto']) && ($aw_abs = aw_book_file_abs($book['file_path'] ?? '')) !== '' && ($aw_meta['source_sha1'] ?? '') !== (string)@sha1_file($aw_abs)) $needs_prep = true;
+}
+if ($needs_prep && !empty($book['file_path'])) {
+    $aw_prep = aw_book_prepare($db, $book_id, false);
+    if (empty($aw_prep['ok'])) $prepare_error = (string)($aw_prep['error'] ?? '');
+    $processed = $fetch_content();
+}
 $has_processed = !empty($processed) && $processed['is_processed'] == 1;
 $live_version = $has_processed ? (int)($processed['published_version'] ?? 0) : 0;
-if ($preview_version) {
-    $pv = $db->prepare("SELECT content_html, toc_json FROM book_content_history WHERE book_id = ? AND version = ?");
-    $pv->execute([$book_id, $preview_version]);
-    $draft = $pv->fetch(PDO::FETCH_ASSOC);
-    $processed = array_merge($processed ?: [], ['content_html' => $draft['content_html'], 'toc_json' => $draft['toc_json'], 'is_processed' => 1]);
-    $has_processed = true;
-}
 
 // --- Parse TOC if available ---
 $toc = $has_processed ? (json_decode($processed['toc_json'], true) ?? []) : [];
@@ -160,6 +166,7 @@ return [
 
     // Misc
     'view_count' => $book['view_count'] + 1,
-    'preview_version' => $preview_version, // R5
+    'preview_version' => $preview_version, // always 0 (drafts are retired)
+    'prepare_error' => $prepare_error,
     'live_version' => $live_version,
 ];

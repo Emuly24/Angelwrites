@@ -83,7 +83,7 @@ if (!function_exists('aw_upload_limits')) {
                 'too_big'     => 'This recording is too long to save here. Please record a shorter one',
                 'hint_types'  => 'MP4 or WebM',
             ],
-            // ---- Books: PDF or EPUB, plus DOCX because the book processor already reads it.
+            // ---- Books: PDF, EPUB, DOCX, ODT, RTF or TXT: every format includes/book_extract.php prepares for the reader.
             // Old .doc files are refused (the processor cannot read them). ----
             'book' => [
                 'label'      => 'book',
@@ -92,9 +92,13 @@ if (!function_exists('aw_upload_limits')) {
                     'application/pdf' => 'pdf',
                     'application/epub+zip' => 'epub',
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-                    'application/zip' => 'zip',   // EPUB and DOCX are zip files; the helper looks inside to tell which
+                    'application/vnd.oasis.opendocument.text' => 'odt',
+                    'text/rtf' => 'rtf',
+                    'application/rtf' => 'rtf',
+                    'text/plain' => 'txt',
+                    'application/zip' => 'zip',   // EPUB, DOCX and ODT are zip files; the helper looks inside to tell which
                 ],
-                'hint_types' => 'PDF, EPUB or DOCX',
+                'hint_types' => 'PDF, EPUB, DOCX, ODT, RTF or TXT',
             ],
         ];
 

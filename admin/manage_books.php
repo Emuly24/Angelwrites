@@ -5,6 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R5: shared upload limits
+require_once '../includes/book_extract.php'; // books are prepared for the reader automatically
 
 aw_require('manage_content'); // K1
 
@@ -107,8 +108,8 @@ if ($aw_upload_error !== '') {
         }
 
         // ===== BOOK FILE UPLOAD =====
-        // R5: PDF, EPUB or DOCX only, decided by the file's content (old .doc is refused: the book
-        // processor cannot read it), 25 MB at most (was 50 MB) and never more than the host accepts.
+        // R5: PDF, EPUB, DOCX, ODT, RTF or TXT, decided by the file's content (old .doc is refused: it
+        // cannot be read), 25 MB at most (was 50 MB) and never more than the host accepts.
         $aw_up = empty($error) ? aw_upload_store($_FILES['book_file'] ?? null, 'book', 'assets/uploads/books', ['prefix' => 'book_']) : ['ok' => false, 'empty' => true];
         if (empty($aw_up['ok']) && empty($aw_up['empty'])) {
             $error = 'Book file: ' . $aw_up['error'];
@@ -120,7 +121,7 @@ if ($aw_upload_error !== '') {
                 $file_filename = basename($file_path);
                 $file_size = $aw_up['bytes'];
                 $ext = strtolower(pathinfo($file_filename, PATHINFO_EXTENSION));
-                $file_type = in_array($ext, ['pdf', 'epub', 'doc', 'docx']) ? $ext : 'unknown';
+                $file_type = in_array($ext, ['pdf', 'epub', 'docx', 'odt', 'rtf', 'txt']) ? $ext : 'unknown';
 
                 // Extract metadata (simplified)
                 $full_path = '../' . $file_path;
@@ -150,10 +151,12 @@ if ($aw_upload_error !== '') {
                 $stmt->execute([$title, $author, $description, $price, $is_free, $is_sale, $cover_path, $file_path, $file_type, $file_size, $file_author, $release_date, $id]);
                 $db->prepare("UPDATE books SET sale_price = ? WHERE id = ?")->execute([$sale_price, $id]); // F79
                 $success = 'Book updated successfully.';
+                $aw_book_id = $id;
             } else {
                 $stmt = $db->prepare("INSERT INTO books (title, author, description, price, is_free, is_sale, cover_path, file_path, file_type, file_size, file_author, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$title, $author, $description, $price, $is_free, $is_sale, $cover_path, $file_path, $file_type, $file_size, $file_author, $release_date]);
-                $db->prepare("UPDATE books SET sale_price = ? WHERE id = ?")->execute([$sale_price, $db->lastInsertId()]); // F79
+                $aw_book_id = (int)$db->lastInsertId();
+                $db->prepare("UPDATE books SET sale_price = ? WHERE id = ?")->execute([$sale_price, $aw_book_id]); // F79
                 $success = 'Book added successfully.';
 
                 // Admin notification via Zoho SMTP
@@ -165,10 +168,24 @@ if ($aw_upload_error !== '') {
                 $body .= "<p><a href='" . SITE_URL . "/admin/manage_books.php'>View all books</a></p>";
                 sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
             }
+            // A new book file is prepared for the reader straight away (includes/book_extract.php):
+            // nobody has to correct or publish it by hand. The result is shown after the redirect.
+            if (!empty($aw_up['ok']) && !empty($aw_book_id)) {
+                $aw_prep = aw_book_prepare($db, $aw_book_id, true);
+                $_SESSION['aw_books_flash'] = !empty($aw_prep['ok'])
+                    ? ['ok', $success . ' It is ready in the reader: ' . (int)($aw_prep['pages'] ?? 0) . ' pages, ' . (int)($aw_prep['chapters'] ?? 0) . ' chapters or sections.']
+                    : ['error', $success . ' But it could not be prepared for the reader: ' . ($aw_prep['error'] ?? 'unknown problem.')];
+            } else {
+                $_SESSION['aw_books_flash'] = ['ok', $success];
+            }
             header('Location: ' . SITE_URL . '/admin/manage_books.php');
             exit;
         }
     }
+}
+if (!empty($_SESSION['aw_books_flash'])) {
+    if ($_SESSION['aw_books_flash'][0] === 'ok') $success = $_SESSION['aw_books_flash'][1]; else $error = $_SESSION['aw_books_flash'][1];
+    unset($_SESSION['aw_books_flash']);
 }
 
 // ===== FETCH TOTAL BOOKS =====
@@ -341,7 +358,7 @@ $pageTitle = 'Manage Books';
 
                         <!-- Book File Upload -->
                         <div class="form-group">
-                            <label for="book_file">Book File (PDF, EPUB or DOCX)</label>
+                            <label for="book_file">Book file (PDF, EPUB, DOCX, ODT, RTF or TXT)</label>
                             <input type="file" id="book_file" name="book_file"<?php echo aw_upload_attrs('book'); ?> data-max="<?php echo (int)aw_upload_effective('book')['accept_bytes']; ?>">
                             <small><?php echo htmlspecialchars(aw_upload_hint('book')); ?> (cover and book file together must also fit in <?php echo $aw_upload_limit_mb; ?> MB per save).</small><!-- R5 -->
                             <script>
@@ -356,9 +373,10 @@ $pageTitle = 'Manage Books';
                                 if (msg) { e.preventDefault(); alert(msg + ' Nothing was sent.'); }
                             });
                             </script>
+                            <small>It is prepared for the reader as soon as you save. Members read it on the site only; the file itself is never offered for download.</small>
                             <?php if ($edit_book && $edit_book['file_path']): ?>
                                 <div class="current-file">
-                                    <small>📁 Current file: <?php echo basename($edit_book['file_path']); ?></small>
+                                    <small>📁 Current file: <?php echo htmlspecialchars(basename($edit_book['file_path'])); ?></small>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -453,7 +471,7 @@ $pageTitle = 'Manage Books';
                                                         <a href="<?php echo SITE_URL; ?>/admin/manage_books.php?edit=<?php echo $book['id']; ?>" class="btn btn-sm btn-secondary action-btn" title="Edit">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
-                                                        <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-info action-btn" title="Process">
+                                                        <a href="<?php echo SITE_URL; ?>/admin/process_book.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-info action-btn" title="Reader copy" aria-label="Reader copy">
                                                             <i class="fas fa-cogs"></i>
                                                         </a>
                                                         <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book['id']; ?>" class="btn btn-sm btn-primary action-btn" target="_blank" title="View">
