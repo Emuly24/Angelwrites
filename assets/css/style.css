@@ -428,7 +428,7 @@ a:hover {
     gap: 12px;
     margin-bottom: 16px;
 }
-.social-icons a {
+.social-icons a, .social-icons .aw-soon {
     color: var(--footer-text);
     font-size: 1.2rem;
     transition: color var(--transition);

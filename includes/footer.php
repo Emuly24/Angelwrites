@@ -55,11 +55,11 @@ FOOTER – Brand, Links, Social
             <div class="footer-social">
                 <h4>Connect</h4>
                 <div class="social-icons">
-                    <a href="<?php echo SITE_URL; ?>/facebook" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
-                    <a href="<?php echo SITE_URL; ?>/instagram" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-                    <a href="<?php echo SITE_URL; ?>/twitter" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
-                    <a href="<?php echo SITE_URL; ?>/youtube" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
-                    <a href="<?php echo SITE_URL; ?>/pinterest" aria-label="Pinterest"><i class="fab fa-pinterest-p"></i></a>
+                    <?php
+                    // live accounts link out; the others say honestly that they are coming soon (includes/social_accounts.php)
+                    require_once __DIR__ . '/social_accounts.php';
+                    echo aw_social_footer_icons((isset($db) && $db instanceof PDO) ? $db : null);
+                    ?>
                 </div>
                 <?php
                 // Q37: the result of a no-JavaScript submission is shown here once.
