@@ -50,7 +50,7 @@ function aw_purifier($profile) {
         $c->set('HTML.DefinitionRev', 1);
     } else {
         $c->set('HTML.Allowed',
-            'p[style],br,strong,b,em,i,u,s,sub,sup,small,mark,blockquote[cite],q,cite,code,pre,hr,'
+            'p[style|class],br,strong,b,em,i,u,s,sub,sup,small,mark,blockquote[cite|class],q,cite,code,pre,hr,'
             . 'h2[style],h3[style],h4[style],h5,h6,span[style],div[style|class],'
             . 'ul,ol[start],li,dl,dt,dd,'
             . 'a[href|title|target|rel],img[src|alt|title|width|height|style],'
@@ -59,9 +59,10 @@ function aw_purifier($profile) {
             . 'iframe[src|width|height|frameborder|allowfullscreen|title]');
         $c->set('HTML.SafeIframe', true);
         $c->set('URI.SafeIframeRegexp', '%^https://(www\.youtube(-nocookie)?\.com/embed/|player\.vimeo\.com/video/)%');
-        $c->set('Attr.AllowedClasses', ['aw-figure', 'aw-video', 'aw-quote', 'aligncenter', 'alignleft', 'alignright']);
+        // aw-verse / aw-quote: Bible verses and quotations added with the editor's buttons (aw-writer-tools.js)
+        $c->set('Attr.AllowedClasses', ['aw-figure', 'aw-video', 'aw-quote', 'aw-verse', 'aw-verse-ref', 'aw-quote-ref', 'aligncenter', 'alignleft', 'alignright']);
         $c->set('HTML.DefinitionID', 'aw-rich');
-        $c->set('HTML.DefinitionRev', 1);
+        $c->set('HTML.DefinitionRev', 2);
         if ($def = $c->maybeGetRawHTMLDefinition()) {
             $def->addElement('figure', 'Block', 'Optional: (figcaption, Flow) | (Flow, figcaption) | Flow', 'Common');
             $def->addElement('figcaption', 'Inline', 'Flow', 'Common');

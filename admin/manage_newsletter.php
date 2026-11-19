@@ -504,6 +504,7 @@ require_once '../includes/header.php';
 details.nl-edit summary { cursor:pointer; color:var(--rose-dark, #c08a8b); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-writer-tools.js?v=1"></script><!-- Bible verse and Research buttons in the editor -->
 <script>
 if (document.getElementById('editor') && window.tinymce) {
     tinymce.init({

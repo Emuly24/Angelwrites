@@ -1619,3 +1619,11 @@ button.password-toggle:focus-visible { outline:2px solid var(--rose); outline-of
 
 /* N2: a mentioned member */
 .aw-mention { color: var(--rose-dark, #a8676a); font-weight: 600; background: rgba(219,161,162,.14); border-radius: 6px; padding: 0 3px; }
+
+/* Bible verses and quotations added with the editor's "Bible verse" and "Research" buttons */
+blockquote.aw-verse, blockquote.aw-quote { margin: 1.4em 0; padding: .8em 1.3em; border-left: 4px solid #9c5457; background: rgba(156, 84, 87, .06); border-radius: 0 14px 14px 0; font-style: italic; }
+blockquote.aw-verse p, blockquote.aw-quote p { margin: 0 0 .4em; }
+blockquote.aw-verse sup { color: #9c5457; font-style: normal; font-weight: 700; margin-right: 2px; }
+.aw-verse-ref, .aw-quote-ref { font-style: normal; font-size: .88em; color: var(--text-light, #6b5a5a); margin: .4em 0 0 !important; }
+html[data-theme="dark"] blockquote.aw-verse, html[data-theme="dark"] blockquote.aw-quote { border-left-color: #f0c4c5; background: rgba(240, 196, 197, .07); }
+html[data-theme="dark"] blockquote.aw-verse sup { color: #f0c4c5; }
