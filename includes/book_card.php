@@ -63,6 +63,7 @@ function aw_book_card(array $book, array $opts = []) {
         elseif ($price <= 0) $p = '<span class="bk-price-soon">Not yet on sale</span>';
         elseif ($sale) $p = '<s>' . aw_mwk($book['price']) . '</s> <span class="bk-price-sale">' . aw_mwk($book['sale_price']) . '</span>';
         else $p = '<span>' . aw_mwk($book['price']) . '</span>';
+        if (!$owned && !$free && $price > 0 && ($usd = aw_usd_note(aw_book_price($book))) !== '') $p .= ' <small class="bk-usd">' . $usd . '</small>';
 
         $html .= '<div class="bk-foot"><span class="bk-price">' . $p . '</span><span class="bk-actions">';
         if (!empty($opts['readable'])) {
