@@ -1,0 +1,158 @@
+/* ============================================================
+   AngelWrites colours and form fields (every page)
+   - Readable in every theme: the light brand rose (#DBA1A2) was used both as link text and behind
+     white button text, which reads at about 2:1 (it needs 4.5:1). In the light theme the brand
+     accent is now the deeper rose of the logo's ink (#9c5457, about 5:1 on the page); in the dark
+     theme a soft pink with dark text on pink buttons.
+   - Every text box, drop-down, check box, radio, slider and file button in brand colours.
+   Selectors start with "html.aw-ui body" or "html.aw-ui" so they win over each page's own older
+   styles whatever the order they load in.
+   ============================================================ */
+
+/* ----- brand tokens ----- */
+html.aw-ui {
+    --rose: #9c5457;            /* links, accents, button backgrounds (light theme) */
+    --rose-dark: #844346;
+    --aw-rose-deep: #9c5457;
+    --aw-rose-ink: #8f4c50;
+    --aw-on-accent: #ffffff;
+    --aw-grad: linear-gradient(135deg, #8b4549 0%, #a1585c 50%, #924d50 100%);
+    --aw-field-bg: #ffffff;
+    --aw-field-line: #dcc3c3;
+    --aw-field-line-hover: #c48f91;
+    --aw-field-ink: #3a2629;
+    --aw-field-ph: #8a7474;
+    --aw-chev: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMiA4Ij48cGF0aCBkPSJNMSAxLjVsNSA1IDUtNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOWM1NDU3IiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+");
+}
+html.aw-ui[data-theme="dark"] {
+    --rose: #f0c4c5;
+    --rose-dark: #f6d8d9;
+    --aw-rose-deep: #f0c4c5;
+    --aw-rose-ink: #f0c4c5;
+    --aw-on-accent: #2c1e1e;
+    --aw-grad: linear-gradient(135deg, #f2cbcc 0%, #e9b4b6 50%, #f0c4c5 100%);
+    --aw-field-bg: #241a1b;
+    --aw-field-line: #57403f;
+    --aw-field-line-hover: #c48f91;
+    --aw-field-ink: #f3eaea;
+    --aw-field-ph: #b9a5a5;
+    --aw-chev: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMiA4Ij48cGF0aCBkPSJNMSAxLjVsNSA1IDUtNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjBjNGM1IiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+");
+}
+html.aw-ui { accent-color: var(--aw-rose-deep); }
+
+/* ----- buttons filled with the brand colour: text that reads on them in both themes ----- */
+html.aw-ui body :is(.btn-primary, .btn.btn-primary, .bk-btn-primary, .awh-join, #cookieAccept, .note-submit, .cp-btn:not(.cp-btn-soft):not(.cp-btn-quiet):not(.cp-btn-danger)) {
+    color: var(--aw-on-accent);
+}
+html.aw-ui body :is(.btn-primary, .btn.btn-primary, #cookieAccept):not(:disabled) {
+    background: var(--aw-grad);
+    border-color: transparent;
+}
+html.aw-ui body :is(.btn-primary, .btn.btn-primary, .bk-btn-primary, .awh-join, #cookieAccept) i { color: inherit; }
+html.aw-ui[data-theme="dark"] body :is(.btn-primary, .btn.btn-primary, .bk-btn-primary, .awh-join, #cookieAccept, .note-submit):hover { color: var(--aw-on-accent); }
+html.aw-ui body :is(.btn-success) { background: #2f6b45; border-color: #2f6b45; color: #fff; }
+html.aw-ui body :is(.btn-warning) { background: #8a5a14; border-color: #8a5a14; color: #fff; }
+html.aw-ui body :is(.btn-info) { background: #2e6170; border-color: #2e6170; color: #fff; }
+html.aw-ui body :is(.btn-danger) { background: #a3262e; border-color: #a3262e; color: #fff; }
+html.aw-ui body :is(.btn-outline, .btn.btn-outline) { color: var(--aw-rose-deep); border-color: currentColor; background-color: transparent; }
+html.aw-ui body :is(.btn-outline, .btn.btn-outline):hover { background: var(--aw-rose-deep); color: var(--aw-on-accent); border-color: var(--aw-rose-deep); }
+html.aw-ui body .skip-link { background: #9c5457; color: #fff; }
+
+/* ----- small coloured labels (counts, roles, active tabs) ----- */
+html.aw-ui body :is(.count-badge, .badge-you, .role-badge.admin, .tab-btn.active, a.tab.active, .dsh-attn-n) {
+    background: var(--aw-rose-deep); color: var(--aw-on-accent);
+}
+
+/* ============================================================
+   Form fields in brand colours
+   (colours, borders, corners and focus only: each page keeps its own sizes and spacing)
+   ============================================================ */
+html.aw-ui body :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"], input[type="search"],
+    input[type="url"], input[type="tel"], input[type="number"], input[type="date"], input[type="datetime-local"],
+    input[type="time"], input[type="month"], input[type="week"], select, textarea) {
+    background-color: var(--aw-field-bg);
+    color: var(--aw-field-ink);
+    border: 1.5px solid var(--aw-field-line);
+    border-radius: 12px;
+    caret-color: var(--aw-rose-deep);
+}
+html.aw-ui body :is(input, textarea)::placeholder { color: var(--aw-field-ph); opacity: 1; }
+html.aw-ui body :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"], input[type="search"],
+    input[type="url"], input[type="tel"], input[type="number"], input[type="date"], input[type="datetime-local"],
+    input[type="time"], select, textarea):hover:not(:focus):not(:disabled) { border-color: var(--aw-field-line-hover); }
+html.aw-ui body :is(input:not([type]), input[type="text"], input[type="email"], input[type="password"], input[type="search"],
+    input[type="url"], input[type="tel"], input[type="number"], input[type="date"], input[type="datetime-local"],
+    input[type="time"], select, textarea):focus {
+    outline: none; border-color: var(--aw-rose-deep);
+    box-shadow: 0 0 0 4px rgba(156, 84, 87, .18);
+}
+html.aw-ui[data-theme="dark"] body :is(input, select, textarea):focus { box-shadow: 0 0 0 4px rgba(240, 196, 197, .2); }
+html.aw-ui body :is(input, select, textarea):disabled { opacity: .6; cursor: not-allowed; }
+html.aw-ui body :is(input, select, textarea)[aria-invalid="true"] { border-color: #a3262e; }
+html.aw-ui body input[readonly] { background-color: color-mix(in srgb, var(--aw-field-bg) 85%, var(--aw-field-line)); }
+
+/* drop-downs: a brand chevron instead of the grey system arrow */
+html.aw-ui body select:not([multiple]):not([size]) {
+    -webkit-appearance: none; appearance: none;
+    background-image: var(--aw-chev); background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 8px;
+    padding-right: 38px;
+}
+html.aw-ui body select option { background-color: var(--aw-field-bg); color: var(--aw-field-ink); }
+html.aw-ui body select[multiple] option:checked { background: var(--aw-rose-deep) linear-gradient(0deg, var(--aw-rose-deep), var(--aw-rose-deep)); color: var(--aw-on-accent); }
+
+/* check boxes, radios, sliders, progress: the brand colour */
+html.aw-ui body :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress, meter) { accent-color: var(--aw-rose-deep); }
+html.aw-ui body :is(input[type="checkbox"], input[type="radio"]) { width: 18px; height: 18px; cursor: pointer; }
+html.aw-ui body :is(input[type="checkbox"], input[type="radio"]):focus-visible { outline: 3px solid var(--aw-rose-deep); outline-offset: 2px; }
+
+/* file pickers: the "Choose file" button in brand colours */
+html.aw-ui body input[type="file"] { color: var(--aw-field-ink); font: inherit; max-width: 100%; }
+html.aw-ui body input[type="file"]::file-selector-button {
+    margin-right: 12px; padding: 9px 16px; border-radius: 999px; border: 0; cursor: pointer;
+    background: var(--aw-grad); color: var(--aw-on-accent); font: inherit; font-weight: 600;
+    transition: filter .2s ease, transform .2s ease;
+}
+html.aw-ui body input[type="file"]::file-selector-button:hover { filter: brightness(1.06); }
+html.aw-ui body input[type="file"]:focus-visible { outline: 3px solid var(--aw-rose-deep); outline-offset: 3px; border-radius: 10px; }
+
+/* the colour picker and search clear button */
+html.aw-ui body input[type="color"] { border: 1.5px solid var(--aw-field-line); border-radius: 10px; background: var(--aw-field-bg); }
+html.aw-ui body input[type="search"]::-webkit-search-cancel-button { filter: hue-rotate(310deg); }
+
+/* autofill keeps the brand colours instead of the browser's yellow or blue */
+html.aw-ui body :is(input, textarea, select):-webkit-autofill {
+    -webkit-text-fill-color: var(--aw-field-ink);
+    -webkit-box-shadow: 0 0 0 1000px var(--aw-field-bg) inset;
+    transition: background-color 9999s ease;
+}
+
+/* ============================================================
+   Dark theme safety net: text and symbols that pages coloured for the light theme only
+   ============================================================ */
+html.aw-ui[data-theme="dark"] body :is(h1, h2, h3, h4, h5, h6):not([class*="dsh-"]):not(.ab-script) { color: #f6ecec; }
+html.aw-ui[data-theme="dark"] body :is(.card, .card-body, .modal-wrapper, .auth-card, .admin-form, .stat-card, .content-card) { color: var(--text); }
+html.aw-ui[data-theme="dark"] body :is(.text-muted, .help-text, .field-hint, small) { color: var(--text-light); }
+html.aw-ui[data-theme="dark"] body a:not([class]) { color: #f0c4c5; }
+html.aw-ui[data-theme="dark"] body .aw-cookie a { color: #f0c4c5; }
+
+/* the footer: light text that reads on its dark background in both themes */
+html.aw-ui body .site-footer { color: #eadede; }
+html.aw-ui body .site-footer :is(p, span, li, small, .footer-tagline, .aw-sub-lead, .footer-heart) { color: #eadede; }
+html.aw-ui body .site-footer a:not(.btn) { color: #f3e6e6; }
+html.aw-ui body .site-footer a:not(.btn):hover { color: #ffffff; }
+html.aw-ui body .site-footer h4 { color: #ffffff; }
+html.aw-ui body .site-footer .social-icons :is(a, .aw-soon) { color: #f3e6e6; border-color: rgba(255, 255, 255, .28); }
+html.aw-ui body .site-footer .aw-sub :is(input) { background: rgba(255, 255, 255, .1); color: #fff; border-color: rgba(255, 255, 255, .35); }
+html.aw-ui body .site-footer .aw-sub input::placeholder { color: rgba(255, 255, 255, .78); }
+html.aw-ui body .site-footer .btn-primary { background: #f0c4c5; color: #2c1e1e; }
+
+/* approximate US dollar prices beside MWK */
+html.aw-ui body :is(.bk-usd, .book-usd) { display: inline-block; margin-left: 6px; font-size: .82em; font-weight: 500; color: var(--text-light); white-space: nowrap; }
+html.aw-ui body .cp-crisis-world { margin: 8px 0 0; font-size: .9rem; }
+
+/* category banners (Poetry and others) turn dark with the dark theme */
+html.aw-ui[data-theme="dark"] body .aw-cat-hero {
+    background: radial-gradient(circle at 20% 10%, rgba(240, 196, 197, .14), transparent 45%), linear-gradient(135deg, #2c1e1e 0%, #3a2627 55%, #4a2f31 100%);
+    border-color: rgba(240, 196, 197, .18);
+}
+html.aw-ui[data-theme="dark"] body .aw-cat-hero :is(h1, p, .aw-hero-kicker) { color: #f6ecec; }

@@ -276,7 +276,7 @@
     function siteDark() { return root.getAttribute('data-theme') === 'dark'; }
     function themeIcon() {
         var t = 'light';
-        try { t = localStorage.getItem('angelwrites_theme') || 'light'; } catch (e) {}
+        try { t = localStorage.getItem('angelwrites_theme') || 'system'; } catch (e) {}
         return t === 'dark' ? 'fas fa-sun' : (t === 'system' ? 'fas fa-circle-half-stroke' : 'fas fa-moon');
     }
     function syncTheme() {

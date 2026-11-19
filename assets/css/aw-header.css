@@ -172,3 +172,13 @@ html[data-theme="dark"] .awh-drawer { --h-accent: #f0c4c5; --h-line: rgba(255, 2
     .awh-drawer a.awh-dlink { opacity: 1; transform: none; }
 }
 @media print { .awh, .awh-drawer, .awh-scrim { display: none !important; } }
+
+/* theme menu: Light, Dark, Follow my device */
+.awh-theme { right: 0; min-width: 236px; }
+.awh-theme button span { white-space: nowrap; }
+.awh-theme button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: var(--h-ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.awh-theme button i { width: 18px; text-align: center; color: var(--h-muted, inherit); }
+.awh-theme button:hover { background: var(--h-soft); color: var(--h-accent); }
+.awh-theme button[aria-pressed="true"] { background: var(--h-soft); color: var(--h-accent); }
+.awh-theme button[aria-pressed="true"]::after { content: "\2713"; margin-left: auto; font-weight: 800; }
+.awh-theme button:focus-visible { outline: 3px solid var(--h-accent); outline-offset: 1px; }
