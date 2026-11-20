@@ -9,7 +9,8 @@ require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/newsletter.php';
 
 $qid = (int)($_GET['id'] ?? 0);
-$st = $db->prepare("SELECT subject, content FROM email_queue WHERE id = ?");
+aw_nl_queue_columns($db);
+$st = $db->prepare("SELECT subject, content, preheader, options FROM email_queue WHERE id = ?");
 $st->execute([$qid]);
 $q = $st->fetch(PDO::FETCH_ASSOC);
 if (!$q || !hash_equals(aw_nl_sign($db, 'web|' . $qid), (string)($_GET['s'] ?? ''))) {
@@ -18,7 +19,7 @@ if (!$q || !hash_equals(aw_nl_sign($db, 'web|' . $qid), (string)($_GET['s'] ?? '
     echo '<!doctype html><meta charset="utf-8"><title>Newsletter not found</title><p style="font-family:Georgia,serif;text-align:center;margin:60px 16px;">This newsletter link is not valid. <a href="' . htmlspecialchars(SITE_URL) . '">Visit AngelWrites</a></p>';
     exit;
 }
-$msg = aw_nl_render($db, $q['subject'], $q['content'], ['email' => '', 'name' => '', 'unsubscribe_token' => ''], ['preview' => true]);
+$msg = aw_nl_render($db, $q['subject'], $q['content'], ['email' => '', 'name' => '', 'unsubscribe_token' => ''], ['preview' => true, 'queue_id_issue' => $qid, 'issue' => aw_nl_issue_label($db, $qid)] + aw_nl_campaign_opts($q));
 header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex');
 echo $msg['html'];

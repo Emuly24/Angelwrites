@@ -114,7 +114,8 @@ function aw_nl_track_links($html, PDO $db, $queue_id, $email) {
 }
 function aw_nl_html_to_text($html) {
     $t = preg_replace('#<a\b[^>]*href=(["\'])([^"\']+)\1[^>]*>(.*?)</a>#is', '$3 ($2)', (string)$html);
-    $t = preg_replace('#<(br|/p|/div|/h[1-6]|/li|/tr)\b[^>]*>#i', "\n", $t);
+    $t = preg_replace('#<span\b[^>]*class="[^"]*aw-(verse|quote)-ref[^"]*"[^>]*>#i', "\n— ", $t); // a verse's reference on its own line
+    $t = preg_replace('#<(br|/p|/div|/h[1-6]|/li|/tr|/blockquote|hr)\b[^>]*>#i', "\n", $t);
     $t = preg_replace('#<li\b[^>]*>#i', "• ", $t);
     $t = html_entity_decode(strip_tags($t), ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $t = preg_replace("/[ \t]+/", ' ', $t);
@@ -135,6 +136,8 @@ function aw_nl_render(PDO $db, $subject, $content, array $sub, array $opts = [])
     $track = $qid && ($opts['track'] ?? true) && empty($opts['preview']);
     // S1: the written part of every newsletter is cleaned (the branded frame around it is ours)
     require_once __DIR__ . '/sanitize.php';
+    // the "add my signature" mark is an HTML comment, which cleaning removes: read it first
+    $has_sig_mark = strpos((string)$content, AW_NL_SIG_MARK) !== false;
     $content = aw_clean_html($content, 'rich');
     $body = aw_nl_personalize($content, $sub);
     if ($track) $body = aw_nl_track_links($body, $db, $qid, $sub['email'] ?? '');
@@ -144,28 +147,34 @@ function aw_nl_render(PDO $db, $subject, $content, array $sub, array $opts = [])
     $web = $qid ? aw_nl_web_url($db, $qid) : '';
     $e = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 
-    // E2: the same layout as every other AngelWrites email (includes/email_template.php). Angella's
-    // signature is added when the composer ticked it (stored as <!--aw-signature--> in the content).
+    // The AngelWrites Letter (includes/newsletter_design.php). Angella's signature is added when the
+    // composer ticked it (stored as <!--aw-signature--> in the content).
     require_once __DIR__ . '/email_template.php';
-    $sig = !empty($opts['signature']) || strpos((string)$content, AW_NL_SIG_MARK) !== false;
+    require_once __DIR__ . '/newsletter_design.php';
+    $sig = !empty($opts['signature']) || $has_sig_mark;
     $body = str_replace(AW_NL_SIG_MARK, '', $body);
     $text_body = str_replace(AW_NL_SIG_MARK, '', $text_body);
-    $html = aw_email_layout([
+    $custom_pre = trim((string)($opts['preheader'] ?? ''));
+    $latest = !empty($opts['latest']) ? aw_nl_latest_items($db) : [];
+    if ($latest && $track) foreach ($latest as &$li) { $li[3] = aw_nl_click_url($db, $qid, $sub['email'] ?? '', $li[3]); } unset($li);
+    $html = aw_nl_layout([
         'subject' => $subject,
-        'body' => '<div class="aw-email-layout">' . $body . '</div>',
-        'preheader' => $pre,
-        'signature' => $sig,
+        'body' => $body,
+        'preheader' => $custom_pre !== '' ? $custom_pre : $pre,
+        'standfirst' => $custom_pre,
         'web_url' => $web,
-        'kicker' => $site . ' Newsletter',
-        // no tracking image: hidden one-pixel images are a junk signal, and on this host the image address
-        // answers mail services with a browser check, so opens could not be counted anyway
-        'pixel' => '',
-        'footer' => 'You are receiving this because you subscribed to the ' . $e($site) . ' newsletter at <a href="' . $e($base) . '" style="color:#c08a8b;">' . $e(preg_replace('#^https?://#', '', $base)) . '</a>.<br>'
-            . ($unsub ? '<a href="' . $e($unsub) . '" style="color:#c08a8b;">Unsubscribe</a> · ' : '')
-            . '<a href="' . $e($base) . '/contact.php" style="color:#c08a8b;">Contact us</a>'
-            // ET2: a newsletter is automated mail; replies are not read (the footer used to invite them)
-            . '<br>' . $e(function_exists('aw_mail_automated_note') ? aw_mail_automated_note() : 'This is an automated message. Please do not reply to this email.'),
+        'issue' => $opts['issue'] ?? aw_nl_issue_label($db, $qid),
+        'signature' => $sig,
+        'latest' => $latest,
+        'unsub' => $unsub,
+        'forward_body' => $web !== '' ? 'I thought you would enjoy this letter from AngelWrites: ' . $web : 'I thought you would enjoy AngelWrites: ' . $base,
+        'socials' => aw_nl_social_links($db),
+        'junk_note' => empty($opts['preview']) || !empty($opts['junk_note']),
     ]);
+    if ($latest) {
+        $text_body .= "\n\nNEW ON " . strtoupper($site) . "\n";
+        foreach ($latest as [$kind, $t, $x, $u]) $text_body .= "\n" . $kind . ': ' . $t . "\n" . $u . "\n";
+    }
     if ($sig) $text_body .= "\n\nWith love and blessings,\nAngella Bottoman\nFounder, $site";
 
     $text = $subject . "\n" . str_repeat('=', min(60, mb_strlen($subject))) . "\n\n" . $text_body . "\n\n"
@@ -241,7 +250,27 @@ function aw_nl_attachments(PDO $db, $queue_id) {
 }
 
 /** Creates a campaign. $status: 'processing' (send now) or 'pending' (scheduled). Returns the id. */
+/** The composer's extra settings on a campaign: preheader (the inbox preview line) and options (JSON). */
+function aw_nl_queue_columns(PDO $db) {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        $have = [];
+        foreach ($db->query("PRAGMA table_info(email_queue)")->fetchAll(PDO::FETCH_ASSOC) as $c) $have[$c['name']] = true;
+        if (!isset($have['preheader'])) $db->exec("ALTER TABLE email_queue ADD COLUMN preheader TEXT");
+        if (!isset($have['options'])) $db->exec("ALTER TABLE email_queue ADD COLUMN options TEXT");
+        return $ok = true;
+    } catch (Throwable $e) { error_log('nl queue columns: ' . $e->getMessage()); return $ok = false; }
+}
+
+/** Render options for a stored campaign row: its preheader and options. */
+function aw_nl_campaign_opts(array $q) {
+    $o = json_decode((string)($q['options'] ?? ''), true);
+    return ['preheader' => (string)($q['preheader'] ?? ''), 'latest' => !empty($o['latest'])];
+}
+
 function aw_nl_queue(PDO $db, $subject, $content, array $recipients, $send_to, $segment_id = null, $scheduled_at = null, array $attachments = []) {
+    aw_nl_queue_columns($db);
     $clean = [];
     foreach ($recipients as $r) {
         $r = strtolower(trim((string)$r));
@@ -295,7 +324,7 @@ function aw_nl_send_batch(PDO $db, $queue_id, $batch = AW_NL_BATCH) {
             $db->prepare("UPDATE newsletter SET unsubscribe_token = ? WHERE id = ?")->execute([$sub['unsubscribe_token'], $sub['id']]);
         }
         $sub = $sub ?: ['email' => $email, 'name' => '', 'unsubscribe_token' => ''];
-        $msg = aw_nl_render($db, $q['subject'], $q['content'], $sub, ['queue_id' => $queue_id]);
+        $msg = aw_nl_render($db, $q['subject'], $q['content'], $sub, ['queue_id' => $queue_id] + aw_nl_campaign_opts($q));
         $ok = aw_nl_mail($email, $q['subject'], $msg['html'], $msg['text'], !empty($sub['unsubscribe_token']) ? aw_nl_unsubscribe_url($sub['unsubscribe_token']) : '', $files);
         $log->execute([$queue_id, $email, $ok ? 'sent' : 'failed']);
     }
