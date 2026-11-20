@@ -124,23 +124,23 @@ $pageTitle = 'Contact';
                 <div class="info-card">
                     <div class="info-icon"><i class="fas fa-envelope"></i></div>
                     <div>
-                        <h3>Email</h3>
-                        <p>Write to us any time; the button opens your email app.</p>
+                        <h3><?php echo aw_text('contact.h31', 'Email', 'line'); ?></h3>
+                        <p><?php echo aw_text('contact.p1', 'Write to us any time; the button opens your email app.', 'text'); ?></p>
                         <div class="aw-cbtns" style="margin-top:8px"><?php echo aw_mail_button('', 'Email us'); ?></div>
                     </div>
                 </div>
                 <div class="info-card">
                     <div class="info-icon"><i class="fas fa-map-marker-alt"></i></div>
                     <div>
-                        <h3>Location</h3>
-                        <p>Malawi</p>
+                        <h3><?php echo aw_text('contact.h32', 'Location', 'line'); ?></h3>
+                        <p><?php echo aw_text('contact.p2', 'Malawi', 'text'); ?></p>
                     </div>
                 </div>
                 <div class="info-card">
                     <div class="info-icon"><i class="fas fa-clock"></i></div>
                     <div>
-                        <h3>Response Time</h3>
-                        <p>Angella typically responds within 24–48 hours.</p>
+                        <h3><?php echo aw_text('contact.h33', 'Response Time', 'line'); ?></h3>
+                        <p><?php echo aw_text('contact.p3', 'Angella typically responds within 24–48 hours.', 'text'); ?></p>
                     </div>
                 </div>
             </div>

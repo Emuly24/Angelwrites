@@ -221,7 +221,7 @@ $pageTitle = htmlspecialchars($search !== '' ? 'Search: ' . $search : ($tag !== 
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-church" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
-                        <h3>No reflections found</h3>
+                        <h3><?php echo aw_text('reflections.h31', 'No reflections found', 'line'); ?></h3>
                         <p><?php echo ($search !== '' || $tag !== '') ? 'Try another word or tag.' : 'Check back soon for new reflections from Angella.'; ?></p>
                         <?php if ($search !== '' || $tag !== ''): ?><a class="btn btn-outline btn-sm" href="<?php echo SITE_URL; ?>/reflections.php">Show all reflections</a><?php endif; ?>
                     </div>
@@ -245,7 +245,7 @@ $pageTitle = htmlspecialchars($search !== '' ? 'Search: ' . $search : ($tag !== 
                             <?php endforeach; ?>
                         </ul>
                     <?php else: ?>
-                        <p class="text-muted">No posts yet.</p>
+                        <p class="text-muted"><?php echo aw_text('reflections.p1', 'No posts yet.', 'text'); ?></p>
                     <?php endif; ?>
                 </div>
 
@@ -266,7 +266,7 @@ $pageTitle = htmlspecialchars($search !== '' ? 'Search: ' . $search : ($tag !== 
                 <!-- Newsletter -->
                 <div class="sidebar-card">
                     <h4><i class="fas fa-envelope" style="color: var(--rose);"></i> Stay Updated</h4>
-                    <p>Get new reflections delivered to your inbox.</p>
+                    <p><?php echo aw_text('reflections.p2', 'Get new reflections delivered to your inbox.', 'text'); ?></p>
                     <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="sidebar-newsletter">
                         <input type="hidden" name="redirect" value="/reflections.php">
                         <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;">

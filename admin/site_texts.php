@@ -29,7 +29,11 @@ try {
 } catch (Throwable $e) { error_log('site texts list: ' . $e->getMessage()); }
 $st_pages = [];
 foreach ($st_rows as $r) $st_pages[$r['page'] ?: 'other'][] = $r;
-$st_known = ['index.php' => 'Home page', 'about.php' => 'About', 'books.php' => 'Books', 'poetry.php' => 'Poetry', 'reflections.php' => 'Reflections', 'blog.php' => 'Blog', 'contact.php' => 'Contact'];
+$st_known = ['index.php' => 'Home page', 'about.php' => 'About', 'books.php' => 'Books', 'poetry.php' => 'Poetry', 'reflections.php' => 'Reflections',
+             'blog.php' => 'Blog', 'videos.php' => 'Videos', 'contact.php' => 'Contact', 'stories.php' => 'Stories & Help', 'community.php' => 'Community Q&A',
+             'groups.php' => 'Reading groups', 'book_session.php' => 'Book a session', 'share_book.php' => 'Share a book',
+             'community_guidelines.php' => 'Community guidelines', 'terms.php' => 'Terms of Service', 'privacy.php' => 'Privacy Policy',
+             'accessibility.php' => 'Accessibility', '404.php' => 'Page not found'];
 $st_back = function ($page) { return SITE_URL . '/site_text_save.php?toggle=1&back=' . rawurlencode('/' . $page); };
 
 $pageTitle = 'Page text';
@@ -58,7 +62,7 @@ require_once '../includes/header.php';
 </style>
 <div class="stx">
     <h1>Page text</h1>
-    <p class="stx-lead">Change the words on the site's pages without any code. The easiest way: open a page below with <strong>Edit page text</strong>, click any text with a dotted outline, change it and save. You can also change texts here. Put <code>*asterisks*</code> around words to show them in the highlight colour; "Original wording" always brings back the first version.</p>
+    <p class="stx-lead">Change the words on the site's pages without any code. The easiest way: open a page below with <strong>Edit page text</strong>, click any text with a dotted outline, change it and save. You can also change texts here. <code>*one asterisk*</code> shows words in the highlight colour, <code>**two**</code> makes them bold and <code>[words](/page.php)</code> makes a link. "Original wording" always brings back the first version.</p>
     <?php if ($st_notice): ?><div class="stx-alert <?php echo $st_notice[0] === 'ok' ? 'ok' : 'error'; ?>" role="status"><?php echo htmlspecialchars($st_notice[1]); ?></div><?php endif; ?>
     <nav class="stx-pages" aria-label="Edit a page">
         <?php foreach ($st_known as $f => $label): ?><a href="<?php echo htmlspecialchars($st_back($f)); ?>"><i class="fas fa-pen" aria-hidden="true"></i> <?php echo htmlspecialchars($label); ?></a><?php endforeach; ?>

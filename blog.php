@@ -268,7 +268,7 @@ $pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog'
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-blog" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
-                        <h3>No Posts Yet</h3>
+                        <h3><?php echo aw_text('blog.h31', 'No Posts Yet', 'line'); ?></h3>
                         <p><?php echo $category_filter ? 'No posts in this category.' : 'Check back soon for new reflections from Angella.'; ?></p>
                         <?php if ($category_filter): ?>
                             <a href="<?php echo SITE_URL; ?>/blog.php" class="btn btn-outline">View all posts</a>
@@ -294,7 +294,7 @@ $pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog'
                             <?php endforeach; ?>
                         </ul>
                     <?php else: ?>
-                        <p class="text-muted">No posts yet.</p>
+                        <p class="text-muted"><?php echo aw_text('blog.p1', 'No posts yet.', 'text'); ?></p>
                     <?php endif; ?>
                 </div>
 
@@ -313,7 +313,7 @@ $pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog'
                             <?php endforeach; ?>
                         </ul>
                     <?php else: ?>
-                        <p class="text-muted">No categories yet.</p>
+                        <p class="text-muted"><?php echo aw_text('blog.p2', 'No categories yet.', 'text'); ?></p>
                     <?php endif; ?>
                 </div>
 
@@ -334,7 +334,7 @@ $pageTitle = $category_filter ? htmlspecialchars($category_filter) . ' — Blog'
                 <!-- Newsletter -->
                 <div class="sidebar-card">
                     <h4><i class="fas fa-envelope" style="color: var(--rose);"></i> Stay Updated</h4>
-                    <p>Get new reflections delivered to your inbox.</p>
+                    <p><?php echo aw_text('blog.p3', 'Get new reflections delivered to your inbox.', 'text'); ?></p>
                     <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="sidebar-newsletter">
                         <input type="email" name="email" placeholder="Your email address" required>
                         <button type="submit" class="btn btn-primary btn-block">

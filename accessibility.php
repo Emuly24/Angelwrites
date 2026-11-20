@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
@@ -18,8 +19,8 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
     <div class="container">
         <!-- ===== PAGE HEADER ===== -->
         <div class="accessibility-header">
-            <h1>Accessibility Statement</h1>
-            <p>AngelWrites is committed to making our website accessible to all users, including those with disabilities.</p>
+            <h1><?php echo aw_text('accessibility.h11', 'Accessibility Statement', 'line'); ?></h1>
+            <p><?php echo aw_text('accessibility.p1', 'AngelWrites is committed to making our website accessible to all users, including those with disabilities.', 'text'); ?></p>
             <div class="header-decoration">
                 <span class="decoration-line"></span>
             </div>
@@ -39,65 +40,65 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
         <!-- ===== MAIN CONTENT ===== -->
         <div class="accessibility-content">
             <section class="a11y-section">
-                <h2>Our Commitment</h2>
-                <p>AngelWrites strives to ensure that our website is accessible to people of all abilities. We are working towards the <strong>Web Content Accessibility Guidelines (WCAG) 2.1 Level AA</strong>. The site does not fully meet that standard yet; the known gaps are listed below.</p><!-- F224 -->
-                <p>We believe that everyone should have equal access to Christian writing, poetry, reflections, and community resources.</p>
+                <h2><?php echo aw_text('accessibility.h21', 'Our Commitment', 'line'); ?></h2>
+                <p><?php echo aw_text('accessibility.p2', 'AngelWrites strives to ensure that our website is accessible to people of all abilities. We are working towards the **Web Content Accessibility Guidelines (WCAG) 2.1 Level AA**. The site does not fully meet that standard yet; the known gaps are listed below.', 'text'); ?></p><!-- F224 -->
+                <p><?php echo aw_text('accessibility.p3', 'We believe that everyone should have equal access to Christian writing, poetry, reflections, and community resources.', 'text'); ?></p>
             </section>
 
             <section class="a11y-section">
-                <h2>Accessibility Features</h2>
+                <h2><?php echo aw_text('accessibility.h22', 'Accessibility Features', 'line'); ?></h2>
                 <div class="features-grid">
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-keyboard"></i></div>
-                        <h3>Keyboard Navigation</h3>
-                        <p>All interactive elements can be accessed using the <strong>Tab</strong> key. Use <strong>Enter</strong> or <strong>Space</strong> to activate links and buttons.</p>
+                        <h3><?php echo aw_text('accessibility.h31', 'Keyboard Navigation', 'line'); ?></h3>
+                        <p><?php echo aw_text('accessibility.p4', 'All interactive elements can be accessed using the **Tab** key. Use **Enter** or **Space** to activate links and buttons.', 'text'); ?></p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-universal-access"></i></div>
-                        <h3>Screen Reader Support</h3>
-                        <p>We use headings and labels so pages can be read with screen readers such as JAWS, NVDA and VoiceOver. Some controls are not labelled yet (see Known Limitations).</p>
+                        <h3><?php echo aw_text('accessibility.h32', 'Screen Reader Support', 'line'); ?></h3>
+                        <p><?php echo aw_text('accessibility.p5', 'We use headings and labels so pages can be read with screen readers such as JAWS, NVDA and VoiceOver. Some controls are not labelled yet (see Known Limitations).', 'text'); ?></p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-text-height"></i></div>
-                        <h3>Text Resizing</h3>
-                        <p>Use your browser's zoom function (Ctrl/Cmd + / -) or the built-in font size controls in our <strong>reader</strong> and <strong>bible reader</strong> pages.</p>
+                        <h3><?php echo aw_text('accessibility.h33', 'Text Resizing', 'line'); ?></h3>
+                        <p><?php echo aw_text('accessibility.p6', 'Use your browser\'s zoom function (Ctrl/Cmd + / -) or the built-in font size controls in our **reader** and **bible reader** pages.', 'text'); ?></p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-adjust"></i></div>
-                        <h3>High Contrast Mode</h3>
-                        <p>Click the <strong>"Toggle High Contrast Mode"</strong> button above to increase contrast for better readability.</p>
+                        <h3><?php echo aw_text('accessibility.h34', 'High Contrast Mode', 'line'); ?></h3>
+                        <p><?php echo aw_text('accessibility.p7', 'Click the **"Toggle High Contrast Mode"** button above to increase contrast for better readability.', 'text'); ?></p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-image"></i></div>
-                        <h3>Alternative Text</h3>
-                        <p>Book covers and most content images have alternative text (alt text). Some decorative and member-uploaded images do not yet.</p>
+                        <h3><?php echo aw_text('accessibility.h35', 'Alternative Text', 'line'); ?></h3>
+                        <p><?php echo aw_text('accessibility.p8', 'Book covers and most content images have alternative text (alt text). Some decorative and member-uploaded images do not yet.', 'text'); ?></p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-video"></i></div>
-                        <h3>Captions & Transcripts</h3>
-                        <p>Videos do not have captions or transcripts yet. If you need one, contact us and we will provide a transcript.</p>
+                        <h3><?php echo aw_text('accessibility.h36', 'Captions & Transcripts', 'line'); ?></h3>
+                        <p><?php echo aw_text('accessibility.p9', 'Videos do not have captions or transcripts yet. If you need one, contact us and we will provide a transcript.', 'text'); ?></p>
                     </div>
                 </div>
             </section>
 
             <section class="a11y-section">
-                <h2>Known Limitations</h2>
-                <p>We know of the following problems and are working on them:</p>
+                <h2><?php echo aw_text('accessibility.h23', 'Known Limitations', 'line'); ?></h2>
+                <p><?php echo aw_text('accessibility.p10', 'We know of the following problems and are working on them:', 'text'); ?></p>
                 <ul>
-                    <li><strong>Colour contrast:</strong> some light pink text and buttons may not have enough contrast. The High Contrast Mode above helps.</li>
-                    <li><strong>Unlabelled controls:</strong> some icon-only buttons (for example reactions and some reader tools) have no text label for screen readers.</li>
-                    <li><strong>Images and video:</strong> not every image has alt text, and videos have no captions or transcripts yet.</li>
-                    <li><strong>Pop-ups and forms:</strong> some pop-up windows (such as the book order form) do not yet move keyboard focus or announce themselves to screen readers.</li>
-                    <li><strong>Some older PDF documents</strong> may not be fully screen-reader accessible. We are updating these as we identify them.</li>
-                    <li><strong>Third-party integrations</strong> (e.g., Google OAuth, YouTube embeds) may have their own accessibility limitations.</li>
-                    <li><strong>Interactive features</strong> in the Bible reader and poem viewer are being tested for full keyboard navigation.</li>
+                    <li><?php echo aw_text('accessibility.li1', '**Colour contrast:** some light pink text and buttons may not have enough contrast. The High Contrast Mode above helps.', 'text'); ?></li>
+                    <li><?php echo aw_text('accessibility.li2', '**Unlabelled controls:** some icon-only buttons (for example reactions and some reader tools) have no text label for screen readers.', 'text'); ?></li>
+                    <li><?php echo aw_text('accessibility.li3', '**Images and video:** not every image has alt text, and videos have no captions or transcripts yet.', 'text'); ?></li>
+                    <li><?php echo aw_text('accessibility.li4', '**Pop-ups and forms:** some pop-up windows (such as the book order form) do not yet move keyboard focus or announce themselves to screen readers.', 'text'); ?></li>
+                    <li><?php echo aw_text('accessibility.li5', '**Some older PDF documents** may not be fully screen-reader accessible. We are updating these as we identify them.', 'text'); ?></li>
+                    <li><?php echo aw_text('accessibility.li6', '**Third-party integrations** (e.g., Google OAuth, YouTube embeds) may have their own accessibility limitations.', 'text'); ?></li>
+                    <li><?php echo aw_text('accessibility.li7', '**Interactive features** in the Bible reader and poem viewer are being tested for full keyboard navigation.', 'text'); ?></li>
                 </ul>
-                <p>If you encounter any barriers while using our site, please let us know.</p>
+                <p><?php echo aw_text('accessibility.p11', 'If you encounter any barriers while using our site, please let us know.', 'text'); ?></p>
             </section>
 
             <section class="a11y-section">
-                <h2>Need Help?</h2>
-                <p>If you have difficulty accessing any part of AngelWrites, please contact us and we will work with you to provide the information or service you need.</p>
+                <h2><?php echo aw_text('accessibility.h24', 'Need Help?', 'line'); ?></h2>
+                <p><?php echo aw_text('accessibility.p12', 'If you have difficulty accessing any part of AngelWrites, please contact us and we will work with you to provide the information or service you need.', 'text'); ?></p>
                 <div class="contact-actions">
                     <a href="<?php echo SITE_URL; ?>/contact.php" class="btn btn-primary">
                         <i class="fas fa-envelope"></i> Contact Us
@@ -107,13 +108,13 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
                     </a>
                 </div>
                 <p class="contact-details">
-                    <strong>Response Time:</strong> We typically respond within 2 business days.
+                    <?php echo aw_text('accessibility.p13', '**Response Time:** We typically respond within 2 business days.', 'text'); ?>
                 </p>
             </section>
 
             <section class="a11y-section">
-                <h2>Compliance & Standards</h2>
-                <p>AngelWrites <strong>partially conforms</strong> to <a href="https://www.w3.org/TR/WCAG21/" target="_blank" rel="noopener">WCAG 2.1 Level AA</a>: some parts of the site do not yet meet the standard (see Known Limitations). This statement is based on our own review of the site; it has not been independently audited.</p><!-- F224 -->
+                <h2><?php echo aw_text('accessibility.h25', 'Compliance & Standards', 'line'); ?></h2>
+                <p><?php echo aw_text('accessibility.p14', 'AngelWrites **partially conforms** to [WCAG 2.1 Level AA](https://www.w3.org/TR/WCAG21/): some parts of the site do not yet meet the standard (see Known Limitations). This statement is based on our own review of the site; it has not been independently audited.', 'text'); ?></p><!-- F224 -->
                 <p>This accessibility statement was last updated on <strong>6 November 2026</strong><!-- F222: a fixed date (it used to print today's date on every visit) -->.</p>
             </section>
         </div>

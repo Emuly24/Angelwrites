@@ -4,8 +4,9 @@
  *
  * In a page:   echo aw_text('home.vision', 'A world where…');            a paragraph
  *              echo aw_text('home.title', 'Welcome to *AngelWrites*', 'line');   one line
- * The second argument is the original wording (shown until it is changed). In a one-line text,
- * words between *asterisks* are shown in the brand highlight colour (as in "Welcome to AngelWrites").
+ * The second argument is the original wording (shown until it is changed). Words between *asterisks*
+ * are shown in the brand highlight colour, **double asterisks** make them bold, and [words](/page.php)
+ * or [words](https://…) makes a link.
  * Paragraph texts keep line breaks; a blank line starts a new paragraph.
  *
  * Editing: owners and admins choose "Edit page text" (the pencil button at the bottom of every page,
@@ -67,6 +68,16 @@ function aw_text_all(PDO $db) {
 /** Text to HTML: escaped; *highlight* in one-line texts; paragraphs and line breaks in paragraph texts. */
 function aw_text_render($value, $mode) {
     $h = htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    // [words](address): a link. Only web addresses (https://, http://), site pages (/page.php),
+    // email (mailto:) and phone (tel:) are allowed; anything else stays plain text.
+    $h = preg_replace_callback('/\[([^\]\n]{1,200})\]\(((?:https?:\/\/|\/|mailto:|tel:)[^\s()<>"]{0,500})\)/u', function ($m) {
+        $url = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
+        if ($url[0] === '/' && substr($url, 0, 2) !== '//') $url = (defined('SITE_URL') ? SITE_URL : '') . $url;
+        elseif (substr($url, 0, 2) === '//') return $m[0];
+        $ext = preg_match('#^https?://#i', $url) && strpos($url, (string)(defined('SITE_URL') ? SITE_URL : '')) !== 0;
+        return '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '"' . ($ext ? ' target="_blank" rel="noopener"' : '') . '>' . $m[1] . '</a>';
+    }, $h);
+    $h = preg_replace('/\*\*([^*\n]{1,200})\*\*/u', '<strong>$1</strong>', $h); // **bold**
     $h = preg_replace('/\*([^*\n]{1,80})\*/u', '<span class="rose-text">$1</span>', $h);
     if ($mode === 'line') return $h;
     if ($mode === 'list') { // one item per line
@@ -171,7 +182,7 @@ function aw_text_editor_ui() {
     ta.value = el.getAttribute('data-raw');
     var mode = el.getAttribute('data-mode');
     ta.rows = mode === 'line' ? 2 : 7;
-    document.getElementById('awEtHint').textContent = (mode === 'line' ? 'One line. ' : (mode === 'list' ? 'One item per line. ' : 'A blank line starts a new paragraph. ')) + 'Put *asterisks* around words to show them in the highlight colour.';
+    document.getElementById('awEtHint').textContent = (mode === 'line' ? 'One line. ' : (mode === 'list' ? 'One item per line. ' : 'A blank line starts a new paragraph. ')) + '*one asterisk* = highlight colour, **two** = bold, [words](/page.php) = a link.';
     dlg.showModal(); ta.focus();
   }
   document.addEventListener('click', function (e) { var el = e.target.closest && e.target.closest('.aw-et'); if (!el) return; e.preventDefault(); e.stopPropagation(); open(el); }, true);

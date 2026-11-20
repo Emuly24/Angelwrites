@@ -4,6 +4,7 @@
  * upload -> team review -> Community books shelf -> read on the site only -> remove at any time.
  */
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/csrf.php';
@@ -79,8 +80,8 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
 <div class="container cp-narrow">
     <p><a href="<?php echo SITE_URL; ?>/books.php?filter=community"><i class="fas fa-arrow-left" aria-hidden="true"></i> Community books</a></p>
     <header class="cp-head"><div>
-        <h1>Share a book</h1>
-        <p>Has a book helped you, or would you love to read it together with others? Share it with the AngelWrites family: one you wrote, or one by another author.</p>
+        <h1><?php echo aw_text('sharebook.h11', 'Share a book', 'line'); ?></h1>
+        <p><?php echo aw_text('sharebook.p1', 'Has a book helped you, or would you love to read it together with others? Share it with the AngelWrites family: one you wrote, or one by another author.', 'text'); ?></p>
     </div></header>
 
     <?php if ($flash): ?><div class="cp-banner cp-banner-calm" role="status"><?php echo htmlspecialchars($flash); ?></div><?php endif; ?>
@@ -191,9 +192,9 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
     <?php endif; ?>
 
     <section id="mine" style="margin-top:36px;" aria-labelledby="mbMineTitle">
-        <h2 id="mbMineTitle" style="font-size:1.3rem;">Books you have shared</h2>
+        <h2 id="mbMineTitle" style="font-size:1.3rem;"><?php echo aw_text('sharebook.h21', 'Books you have shared', 'line'); ?></h2>
         <?php if (!$mine): ?>
-            <p class="mb-meta">Nothing yet. Your books will appear here, with what the team decided.</p>
+            <p class="mb-meta"><?php echo aw_text('sharebook.p2', 'Nothing yet. Your books will appear here, with what the team decided.', 'text'); ?></p>
         <?php else: ?>
         <ul class="mb-list" role="list">
             <?php foreach ($mine as $m): ?>

@@ -3,6 +3,7 @@
 // and search engines. It now sends 404 (it is also the ErrorDocument in .htaccess).
 http_response_code(404);
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php'; // ADDED for Zoho SMTP
@@ -17,9 +18,9 @@ $pageTitle = 'Page Not Found — 404';
             <div class="error-icon">
                 <i class="fas fa-compass" style="font-size: 5rem; color: var(--rose);"></i>
             </div>
-            <h1>404</h1>
-            <h2>Page Not Found</h2>
-            <p>The page you're looking for doesn't exist or has been moved.</p>
+            <h1><?php echo aw_text('404.h11', '404', 'line'); ?></h1>
+            <h2><?php echo aw_text('404.h21', 'Page Not Found', 'line'); ?></h2>
+            <p><?php echo aw_text('404.p1', 'The page you\'re looking for doesn\'t exist or has been moved.', 'text'); ?></p>
 
             <div class="error-actions">
                 <a href="<?php echo SITE_URL; ?>/index.php" class="btn btn-primary">
@@ -35,7 +36,7 @@ $pageTitle = 'Page Not Found — 404';
 
             <!-- Search Suggestions -->
             <div class="error-search">
-                <h3>Search for what you're looking for</h3>
+                <h3><?php echo aw_text('404.h31', 'Search for what you\'re looking for', 'line'); ?></h3>
                 <form action="<?php echo SITE_URL; ?>/search_results.php" method="GET" class="search-form">
                     <input type="text" name="q" placeholder="Search books, poems, reflections..." required>
                     <button type="submit" class="btn btn-primary">
@@ -46,8 +47,8 @@ $pageTitle = 'Page Not Found — 404';
 
             <!-- Newsletter Signup -->
             <div class="error-newsletter">
-                <h3>Stay Updated</h3>
-                <p>Join the newsletter to receive the latest updates from AngelWrites.</p>
+                <h3><?php echo aw_text('404.h32', 'Stay Updated', 'line'); ?></h3>
+                <p><?php echo aw_text('404.p2', 'Join the newsletter to receive the latest updates from AngelWrites.', 'text'); ?></p>
                 <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="newsletter-form">
                     <input type="email" name="email" placeholder="Your email address" required>
                     <input type="hidden" name="redirect" value="/404.php">

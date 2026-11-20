@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
@@ -156,14 +157,14 @@ $pageTitle = 'Book a Session';
 
         <!-- Page Header -->
         <div class="session-header">
-            <h1>Book a Session</h1>
-            <p>Connect with Angella for guidance, encouragement, or a conversation about faith, writing, or life's journey.</p>
+            <h1><?php echo aw_text('booksession.h11', 'Book a Session', 'line'); ?></h1>
+            <p><?php echo aw_text('booksession.p1', 'Connect with Angella for guidance, encouragement, or a conversation about faith, writing, or life\'s journey.', 'text'); ?></p>
         </div>
 
         <!-- Upcoming Sessions -->
         <?php if (count($my_sessions) > 0): ?>
             <div class="my-sessions-section">
-                <h3>Your Upcoming Sessions</h3>
+                <h3><?php echo aw_text('booksession.h31', 'Your Upcoming Sessions', 'line'); ?></h3>
                 <div class="my-sessions-list">
                     <?php foreach ($my_sessions as $s): ?>
                         <div class="my-session-item">
@@ -190,7 +191,7 @@ $pageTitle = 'Book a Session';
         <!-- Session History (completed/cancelled) -->
         <?php if (count($session_history) > 0): ?>
             <div class="session-history-section">
-                <h3>Session History</h3>
+                <h3><?php echo aw_text('booksession.h32', 'Session History', 'line'); ?></h3>
                 <div class="session-history-list">
                     <?php foreach ($session_history as $h): ?>
                         <div class="session-history-item">
@@ -291,13 +292,13 @@ $pageTitle = 'Book a Session';
 
             <!-- Booking Info -->
             <div class="booking-info">
-                <h4>💡 What to expect</h4>
+                <h4><?php echo aw_text('booksession.h41', '💡 What to expect', 'line'); ?></h4>
                 <ul>
-                    <li><strong>Confirmation:</strong> Angella will confirm your session within 24 hours.</li>
-                    <li><strong>Platform:</strong> Sessions are typically held via Zoom or Google Meet. Details will be shared upon confirmation.</li>
-                    <li><strong>Duration:</strong> Choose a duration that works for you. Most sessions last 1 hour.</li>
-                    <li><strong>Preparation:</strong> Share a brief message above to help Angella prepare.</li>
-                    <li><strong>Rescheduling:</strong> To reschedule or cancel, please contact Angella directly.</li>
+                    <li><?php echo aw_text('booksession.li1', '**Confirmation:** Angella will confirm your session within 24 hours.', 'line'); ?></li>
+                    <li><?php echo aw_text('booksession.li2', '**Platform:** Sessions are typically held via Zoom or Google Meet. Details will be shared upon confirmation.', 'text'); ?></li>
+                    <li><?php echo aw_text('booksession.li3', '**Duration:** Choose a duration that works for you. Most sessions last 1 hour.', 'text'); ?></li>
+                    <li><?php echo aw_text('booksession.li4', '**Preparation:** Share a brief message above to help Angella prepare.', 'line'); ?></li>
+                    <li><?php echo aw_text('booksession.li5', '**Rescheduling:** To reschedule or cancel, please contact Angella directly.', 'text'); ?></li>
                 </ul>
             </div>
         <?php else: ?>

@@ -133,7 +133,7 @@ $og_description = "Poems by Angella Bottoman – words of faith, healing and hop
         <?php if (!$poems && !$featured): ?>
             <div class="aw-empty">
                 <div class="aw-ph"><i class="fas fa-heart" aria-hidden="true"></i></div>
-                <h3>No poems found</h3>
+                <h3><?php echo aw_text('poetry.h31', 'No poems found', 'line'); ?></h3>
                 <p><?php echo ($search !== '' || $only_audio) ? 'Try another word, or show all poems.' : 'Check back soon for new poetry from Angella.'; ?></p>
                 <?php if ($search !== '' || $only_audio): ?><a href="<?php echo SITE_URL; ?>/poetry.php" class="btn btn-outline btn-sm">Show all poems</a><?php endif; ?>
             </div>
