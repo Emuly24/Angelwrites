@@ -203,6 +203,7 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
         // the logo inside the email rather than fetched from the site (see aw_mail_embed_logo())
         $nl_logo = rtrim(SITE_URL, '/') . '/' . ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/');
         if (strpos($html, $nl_logo) !== false && function_exists('aw_mail_embed_logo') && aw_mail_embed_logo($mail)) $html = str_replace('src="' . htmlspecialchars($nl_logo, ENT_QUOTES) . '"', 'src="cid:awlogo"', $html);
+        if (function_exists('aw_signature_apply')) $html = aw_signature_apply($mail, $html); // her handwritten signature
         $mail->Body = $html;
         $mail->AltBody = $text;
         if ($unsubscribe_url) {

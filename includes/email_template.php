@@ -24,7 +24,11 @@ function aw_email_signature_html() {
     $base = rtrim(defined('SITE_URL') ? SITE_URL : '', '/');
     return '<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:28px;border-top:1px solid #EFD8D6;padding-top:18px;width:100%;"><tr><td>'
         . '<p style="margin:0 0 4px;font:italic 15px/1.5 Georgia,\'Times New Roman\',serif;color:#6b5a5a;">With love and blessings,</p>'
-        . '<p style="margin:0;font:600 22px/1.3 \'Playfair Display\',Georgia,serif;color:#c08a8b;">Angella Bottoman</p>'
+        // her handwritten signature (includes/email_signature.php): senders replace the marker with the image
+        // carried inside the email (cid:awsign); in a browser view the marker is invisible
+        . ((function_exists('aw_signature_file') && aw_signature_file() !== '') ? AW_SIGN_MARK
+            . '<p style="margin:2px 0 0;font:600 16px/1.3 \'Playfair Display\',Georgia,serif;color:#c08a8b;">Angella Bottoman</p>'
+            : '<p style="margin:0;font:600 22px/1.3 \'Playfair Display\',Georgia,serif;color:#c08a8b;">Angella Bottoman</p>')
         . '<p style="margin:4px 0 0;font:13px/1.5 \'Inter\',Arial,sans-serif;color:#6b5a5a;">Founder, ' . aw_email_e($site) . ' · <a href="' . aw_email_e($base) . '" style="color:#c08a8b;text-decoration:none;">' . aw_email_e(preg_replace('#^https?://#', '', $base)) . '</a></p>'
         . '<p style="margin:2px 0 0;font:italic 12px/1.5 \'Inter\',Arial,sans-serif;color:#9a8585;">Writing with purpose and grace.</p>'
         . '</td></tr></table>';
