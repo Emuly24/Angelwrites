@@ -260,5 +260,7 @@ window.AW_BIBLE = <?php echo json_encode([
     AWListen.attach({ label: 'Listen to this chapter', lang: '<?php echo htmlspecialchars(substr($langAttr, 0, 2) === 'yao' ? 'yao' : substr($langAttr, 0, 2)); ?>',
         blocks: function () { return [].slice.call(document.querySelectorAll('#brChapterTitle, #brBody .br-head, #brBody .br-v')); },
         start: function (b) { var h = location.hash.replace('#v', '') || new URLSearchParams(location.search).get('vs'); var i = h ? b.findIndex(function (x) { return x.dataset && x.dataset.v === String(h); }) : -1; return i > 0 ? i : 0; } }); });</script>
+<?php // guided tours (this full-screen page has no shared footer)
+if (!empty($_SESSION['user_id'])) { try { require_once __DIR__ . '/includes/tours.php'; echo aw_tour_footer(); } catch (Throwable $e) { error_log('tour: ' . $e->getMessage()); } } ?>
 </body>
 </html>

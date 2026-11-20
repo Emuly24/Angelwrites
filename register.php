@@ -133,6 +133,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                     // signed in straight away, with a welcome on the dashboard
                     aw_finish_login($db, ['id' => $user_id, 'username' => $username, 'role' => 'reader', 'first_name' => $first_name, 'last_name' => $last_name, 'name' => null], false);
                     $_SESSION['notification'] = 'Welcome to AngelWrites, ' . htmlspecialchars($first_name) . '! Your account is ready.';
+                    // the welcome tour starts on the dashboard (it can be closed or turned off at any time)
+                    require_once __DIR__ . '/includes/tours.php';
+                    aw_tour_set($db, $user_id, 'member', 'on', 0);
                     $aw_back = (string)($social['back'] ?? '');
                     header('Location: ' . SITE_URL . ($aw_back !== '' ? $aw_back : '/dashboard.php?welcome=1'));
                     exit;

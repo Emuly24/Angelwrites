@@ -519,3 +519,5 @@ if (document.getElementById('editor') && window.tinymce) {
     });
 }
 </script>
+<?php // guided tours (this page has no shared footer)
+if (!empty($_SESSION['user_id'])) { try { require_once __DIR__ . '/../includes/tours.php'; echo aw_tour_footer(); } catch (Throwable $e) { error_log('tour: ' . $e->getMessage()); } } ?>
