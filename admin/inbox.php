@@ -10,6 +10,7 @@ require_once '../includes/csrf.php';
 require_once '../includes/components.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/team_inbox.php';
+require_once '../includes/zoho_inbox.php'; // emails to the Zoho mailbox, read into this inbox
 
 aw_require('team_inbox');
 aw_inbox_tables($db);
@@ -20,6 +21,21 @@ $id = (int)($_GET['id'] ?? 0);
 
 $staff = [];
 try { $staff = $db->query("SELECT id, name, first_name, last_name, username, role FROM users WHERE role IN ('admin', 'moderator') ORDER BY id")->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $e) {}
+
+// new emails from the Zoho mailbox: when the inbox list opens (at most every 2 minutes), or on the button
+aw_zoho_inbox_columns($db);
+$zi = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_zoho'])) {
+    @set_time_limit(60);
+    $zi = aw_zoho_inbox_sync($db, true);
+    $_SESSION['aw_zi_flash'] = $zi;
+    header('Location: ' . SITE_URL . '/admin/inbox.php'); exit;
+} elseif ($_SERVER['REQUEST_METHOD'] === 'GET' && !$id && !isset($_GET['canned'])) {
+    @set_time_limit(60);
+    $zi = aw_zoho_inbox_sync($db, false);
+}
+if (!empty($_SESSION['aw_zi_flash'])) { $zi = $_SESSION['aw_zi_flash']; unset($_SESSION['aw_zi_flash']); }
+$zi_error = (string)aw_setting('zoho_inbox_error', '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mid = (int)($_POST['message_id'] ?? 0);
@@ -60,12 +76,15 @@ require_once '../includes/header.php';
 ?>
 <div class="admin-page"><div class="container" style="max-width:1000px;">
     <div class="admin-header">
-        <div><h1>Team Inbox</h1><p>Messages sent through Contact. Replies go out as “AngelWrites Team”.</p></div>
+        <div><h1>Team Inbox</h1><p>Messages sent through Contact and emails to <?php echo htmlspecialchars(aw_inbox_address()); ?>. Replies go out as “AngelWrites Team”.</p></div>
         <div class="admin-actions">
+            <form method="POST" style="display:inline"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>"><?php echo aw_btn('Check for new emails', 'outline', ['type' => 'submit', 'name' => 'check_zoho', 'value' => '1', 'small' => true, 'icon' => 'fa-rotate']); ?></form>
             <?php echo aw_link_btn(SITE_URL . '/admin/inbox.php?canned=1', 'Saved replies', 'outline', ['small' => true, 'icon' => 'fa-bookmark']); ?>
             <?php echo aw_link_btn(SITE_URL . '/admin/dashboard.php', 'Dashboard', 'outline', ['small' => true, 'icon' => 'fa-arrow-left']); ?>
         </div>
     </div>
+    <?php if ($zi && empty($zi['cached']) && $zi['message'] !== ''): ?><div class="alert <?php echo $zi['ok'] ? 'alert-success' : 'alert-error'; ?>" role="status"><i class="fas fa-envelope" aria-hidden="true"></i> <?php echo htmlspecialchars($zi['message']); ?></div>
+    <?php elseif ($zi_error !== ''): ?><div class="alert alert-error" role="status"><i class="fas fa-envelope" aria-hidden="true"></i> <?php echo htmlspecialchars(aw_zoho_inbox_advice($zi_error)); ?></div><?php endif; ?>
     <?php echo aw_alert('error', $error); echo aw_alert('success', $notice); ?>
 
 <?php if (isset($_GET['canned'])): ?>
@@ -100,6 +119,7 @@ require_once '../includes/header.php';
     <p><a href="<?php echo SITE_URL; ?>/admin/inbox.php" class="ib-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All messages</a></p>
     <article class="ib-card">
         <p class="ib-meta"><strong><?php echo htmlspecialchars($m['name']); ?></strong> · <?php echo htmlspecialchars($m['email']); ?><?php echo !empty($m['user_id']) ? ' · member' : ''; ?> · <?php echo htmlspecialchars(date('M j, Y g:i a', strtotime($m['created_at']))); ?></p>
+        <?php if (($m['source'] ?? '') === 'email'): ?><p class="ib-meta"><i class="fas fa-envelope" aria-hidden="true"></i> Emailed to <?php echo htmlspecialchars(aw_inbox_address()); ?>. Your reply is sent from that address, in the same email conversation.<?php if (!empty($m['attachments'])): ?> <strong>Attachments</strong> (open them in Zoho): <?php echo htmlspecialchars(str_replace("\n", ', ', (string)$m['attachments'])); ?>.<?php endif; ?></p><?php endif; ?>
         <?php // reach them directly: the member's own choices, or just email for someone without an account
         require_once __DIR__ . '/../includes/member_profile.php';
         $ib_u = ['email' => $m['email'], 'name' => $m['name'], 'contact_ok' => 'email'];
@@ -157,7 +177,7 @@ require_once '../includes/header.php';
     $where = ['open' => "COALESCE(s.status, 'open') = 'open'", 'mine' => "s.assigned_to = $me AND COALESCE(s.status, 'open') <> 'closed'", 'answered' => "s.status = 'answered'", 'closed' => "s.status = 'closed'", 'all' => '1'][$filter] ?? "COALESCE(s.status, 'open') = 'open'";
     $list = [];
     try {
-        $list = $db->query("SELECT m.id, m.name, m.subject, m.message, m.is_read, m.created_at, s.status, s.assigned_to,
+        $list = $db->query("SELECT m.id, m.name, m.subject, m.message, m.is_read, m.created_at, m.source, s.status, s.assigned_to,
                                    (SELECT COUNT(*) FROM team_replies t WHERE t.message_id = m.id) AS replies
                             FROM contact_messages m LEFT JOIN team_inbox_state s ON s.message_id = m.id
                             WHERE $where ORDER BY m.created_at DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
@@ -169,13 +189,13 @@ require_once '../includes/header.php';
             <a href="?f=<?php echo $k; ?>"<?php echo $filter === $k ? ' aria-current="page"' : ''; ?>><?php echo $l; ?></a>
         <?php endforeach; ?>
     </nav>
-    <?php if (!$list): echo aw_empty('Nothing here', $filter === 'open' ? 'When someone writes through Contact, their message appears here to answer.' : 'No messages in this view.', null, 'fa-inbox');
+    <?php if (!$list): echo aw_empty('Nothing here', $filter === 'open' ? 'When someone writes through Contact or emails ' . aw_inbox_address() . ', their message appears here to answer.' : 'No messages in this view.', null, 'fa-inbox');
     else: ?>
     <ul class="ib-list">
         <?php foreach ($list as $l): ?>
             <li class="<?php echo (int)$l['is_read'] ? '' : 'is-new'; ?>">
                 <a href="?id=<?php echo (int)$l['id']; ?>">
-                    <span class="ib-from"><?php echo htmlspecialchars($l['name']); ?><?php echo (int)$l['is_read'] ? '' : ' <span class="ib-new">New</span>'; ?></span>
+                    <span class="ib-from"><?php echo htmlspecialchars($l['name']); ?><?php echo (int)$l['is_read'] ? '' : ' <span class="ib-new">New</span>'; ?><?php echo ($l['source'] ?? '') === 'email' ? ' <span class="ib-src" title="Emailed to ' . htmlspecialchars(aw_inbox_address()) . '"><i class="fas fa-envelope" aria-hidden="true"></i> Email</span>' : ''; ?></span>
                     <span class="ib-subj"><?php echo htmlspecialchars($l['subject'] ?: mb_substr($l['message'], 0, 60)); ?></span>
                     <span class="ib-when"><?php echo htmlspecialchars(date('M j', strtotime($l['created_at']))); ?><?php echo (int)$l['replies'] ? ' · ' . (int)$l['replies'] . ' repl' . ((int)$l['replies'] === 1 ? 'y' : 'ies') : ''; ?><?php echo $l['assigned_to'] ? ' · ' . htmlspecialchars($names[(int)$l['assigned_to']] ?? 'assigned') : ''; ?></span>
                 </a>
@@ -192,7 +212,7 @@ require_once '../includes/header.php';
 .ib-card label { display:block; font-weight:600; margin:10px 0 4px; }
 .ib-card input[type=text], .ib-card textarea, .ib-card select { width:100%; min-height:44px; border:1px solid var(--border); border-radius:10px; padding:8px 12px; background:var(--card-bg); color:var(--text); font:inherit; }
 .ib-reply { border-left:4px solid var(--rose); margin-left:clamp(0px, 4vw, 40px); }
-.ib-meta { color:var(--text-light); font-size:.88rem; margin:0 0 8px; } .ib-author { font-style:italic; }
+.ib-meta { color:var(--text-light); font-size:.88rem; margin:0 0 8px; } .ib-src { display:inline-flex; align-items:center; gap:4px; font-size:.72rem; font-weight:600; padding:1px 8px; border-radius:999px; background:rgba(47,95,156,.12); color:#2f5f9c; margin-left:4px; } .ib-author { font-style:italic; }
 .ib-body { line-height:1.65; overflow-wrap:anywhere; }
 .ib-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; } .ib-row label { margin:0; } .ib-row select { width:auto; }
 .ib-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }

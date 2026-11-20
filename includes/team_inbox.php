@@ -74,11 +74,13 @@ function aw_inbox_reply(PDO $db, $message_id, $body) {
         $first = preg_split('/\s+/', trim((string)$m['name']))[0] ?? '';
         $body = str_replace('{first_name}', $first !== '' ? $first : 'friend', $body);
         if (!function_exists('sendEmail')) require_once __DIR__ . '/mail_helper.php';
-        $subject = 'Re: ' . (trim((string)$m['subject']) !== '' ? $m['subject'] : 'your message to AngelWrites');
+        $subject = trim((string)$m['subject']) !== '' ? (preg_match('/^\s*re:/i', (string)$m['subject']) ? (string)$m['subject'] : 'Re: ' . $m['subject']) : 'Re: your message to AngelWrites';
+        $from_email = ($m['source'] ?? '') === 'email'; // an email to the Zoho mailbox: answer in the same email conversation
         $text = $body . "\n\nWith love,\nAngelWrites Team\n\n—\nYou wrote on " . date('F j, Y', strtotime($m['created_at'])) . ":\n> "
               . str_replace("\n", "\n> ", mb_substr((string)$m['message'], 0, 2000));
         $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
-        $sent = (bool)sendEmail($m['email'], $subject, $html, 'angelwrites@zohomail.com', 'AngelWrites Team', true);
+        $sent = (bool)sendEmail($m['email'], $subject, $html, 'angelwrites@zohomail.com', 'AngelWrites Team', true, null, null,
+            $from_email ? ['in_reply_to' => (string)($m['ext_id'] ?? '')] : []);
         $db->prepare("INSERT INTO team_replies (message_id, author_id, body, emailed) VALUES (?, ?, ?, ?)")
            ->execute([(int)$message_id, (int)($_SESSION['user_id'] ?? 0) ?: null, $body, $sent ? 1 : 0]);
         $rid = (int)$db->lastInsertId();

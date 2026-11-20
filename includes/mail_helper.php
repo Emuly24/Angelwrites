@@ -195,6 +195,9 @@ function aw_mail_prepare(array $m): PHPMailer
     $mail->addReplyTo($cfg['from'], $fromName);
     $mail->addAddress((string)$m['to']);
     $mail->Subject = (string)$m['subject'];
+    // a reply to an email someone sent us: keep it in their conversation (Team inbox, includes/zoho_inbox.php)
+    $irt = trim((string)($m['opts']['in_reply_to'] ?? ''));
+    if ($irt !== '' && preg_match('/^<[^<>\s]+>$/', $irt)) { $mail->addCustomHeader('In-Reply-To', $irt); $mail->addCustomHeader('References', $irt); }
 
     $opts = array_merge(['to' => (string)$m['to']], (array)($m['opts'] ?? []));
     if ($kind === 'conversational') {
