@@ -9,6 +9,7 @@ require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
 require_once '../includes/components.php';
 require_once '../includes/twofactor.php';
+require_once '../includes/member_profile.php';
 
 aw_require('manage_staff');
 
@@ -77,7 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_2fa_required'])) 
 
 $staff = [];
 try {
-    $staff = $db->query("SELECT id, name, first_name, last_name, username, email, role, created_at FROM users WHERE role IN ('admin', 'moderator') ORDER BY role = 'admin' DESC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    aw_profile_columns($db);
+    $staff = $db->query("SELECT id, name, first_name, last_name, username, email, role, created_at, contact_number, whatsapp_number, contact_ok FROM users WHERE role IN ('admin', 'moderator') ORDER BY role = 'admin' DESC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) { error_log('staff list: ' . $e->getMessage()); }
 
 $pageTitle = 'Staff & Roles';
@@ -112,7 +114,7 @@ require_once '../includes/header.php';
                 <tbody>
                 <?php foreach ($staff as $u): $r = aw_role_of($u); ?>
                     <tr>
-                        <td><strong><?php echo htmlspecialchars(awDisplayName($u)); ?></strong><br><small style="color:var(--text-light);"><?php echo htmlspecialchars((string)$u['email']); ?></small></td>
+                        <td><strong><?php echo htmlspecialchars(awDisplayName($u)); ?></strong><br><small style="color:var(--text-light);"><?php echo htmlspecialchars((string)$u['email']); ?></small><?php if ((int)$u['id'] !== $me) { $st_b = aw_contact_buttons($u); if ($st_b !== '') echo '<div style="margin-top:6px">' . $st_b . '</div>'; } ?></td>
                         <td><?php echo htmlspecialchars(aw_role_label($r)); ?></td>
                         <td><?php echo aw_2fa_enabled($db, (int)$u['id']) ? 'On' : '<span style="color:#6f4e22;">Off</span>'; ?></td>
                         <td>

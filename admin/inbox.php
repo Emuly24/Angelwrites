@@ -100,6 +100,11 @@ require_once '../includes/header.php';
     <p><a href="<?php echo SITE_URL; ?>/admin/inbox.php" class="ib-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All messages</a></p>
     <article class="ib-card">
         <p class="ib-meta"><strong><?php echo htmlspecialchars($m['name']); ?></strong> · <?php echo htmlspecialchars($m['email']); ?><?php echo !empty($m['user_id']) ? ' · member' : ''; ?> · <?php echo htmlspecialchars(date('M j, Y g:i a', strtotime($m['created_at']))); ?></p>
+        <?php // reach them directly: the member's own choices, or just email for someone without an account
+        require_once __DIR__ . '/../includes/member_profile.php';
+        $ib_u = ['email' => $m['email'], 'name' => $m['name'], 'contact_ok' => 'email'];
+        if (!empty($m['user_id']) && aw_profile_columns($db)) { try { $ib_s = $db->prepare("SELECT id, username, name, first_name, last_name, email, contact_number, whatsapp_number, contact_ok FROM users WHERE id = ?"); $ib_s->execute([(int)$m['user_id']]); $ib_u = $ib_s->fetch(PDO::FETCH_ASSOC) ?: $ib_u; } catch (Throwable $e) { error_log('inbox contact: ' . $e->getMessage()); } }
+        $ib_btns = aw_contact_buttons($ib_u); if ($ib_btns !== ''): ?><p class="ib-meta">Reach them: <?php echo $ib_btns; ?></p><?php endif; ?>
         <h2 class="ib-h2"><?php echo htmlspecialchars($m['subject'] ?: '(no subject)'); ?></h2>
         <div class="ib-body"><?php echo nl2br(htmlspecialchars($m['message'])); ?></div>
     </article>

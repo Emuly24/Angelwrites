@@ -280,3 +280,54 @@ function aw_after_password_reset(PDO $db, $uid, $how) {
         }
     } catch (Throwable $e) { error_log('after reset notice: ' . $e->getMessage()); }
 }
+
+/**
+ * Buttons to reach a member: WhatsApp, call and email. For the team (capability contact_members).
+ * Only the ways the member agreed to are offered; admins also see the others, marked as not agreed,
+ * for safeguarding. $u needs contact_number, whatsapp_number, email, contact_ok (missing keys are fine).
+ * Returns '' when the viewer may not contact members or there is nothing to show.
+ */
+function aw_contact_buttons(array $u, $context = '') {
+    if (!function_exists('aw_can') || !aw_can('contact_members')) return '';
+    $admin = aw_can('manage_members');
+    $ok = array_filter(explode(',', (string)($u['contact_ok'] ?? '')));
+    $name = function_exists('awDisplayName') ? awDisplayName($u) : (string)($u['username'] ?? 'this member');
+    $e = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+    $phone = (string)($u['contact_number'] ?? '');
+    $wa = (string)($u['whatsapp_number'] ?? '') ?: $phone;
+    $digits = function ($n) { return preg_replace('/\D/', '', (string)$n); };
+    $items = [];
+    if ($wa !== '' && strlen($digits($wa)) >= 8) $items[] = ['whatsapp', 'https://wa.me/' . $digits($wa) . '?text=' . rawurlencode('Hello ' . $name . ', this is the AngelWrites team. '), 'fab fa-whatsapp', 'WhatsApp', $wa];
+    if ($phone !== '' && strlen($digits($phone)) >= 8) $items[] = ['call', 'tel:+' . $digits($phone), 'fas fa-phone', 'Call', $phone];
+    if (!empty($u['email'])) $items[] = ['email', 'mailto:' . rawurlencode((string)$u['email']) . '?subject=' . rawurlencode('From the AngelWrites team'), 'fas fa-envelope', 'Email', (string)$u['email']];
+    $h = '';
+    foreach ($items as [$way, $href, $icon, $label, $shown]) {
+        $agreed = in_array($way, $ok, true);
+        if (!$agreed && !$admin) continue;
+        $title = $label . ' ' . $name . ' (' . $shown . ')' . ($agreed ? '' : '. They have not agreed to be contacted this way');
+        $h .= '<a class="aw-cbtn aw-cbtn-' . $way . ($agreed ? '' : ' is-not-agreed') . '" href="' . $e($href) . '"' . ($way === 'whatsapp' ? ' target="_blank" rel="noopener"' : '')
+            . ' title="' . $e($title) . '" aria-label="' . $e($title) . '" data-contact-way="' . $way . '"><i class="' . $icon . '" aria-hidden="true"></i></a>';
+    }
+    if ($h === '') return '';
+    static $css = false;
+    if (!$css) {
+        $css = true;
+        $h .= '<style>.aw-cbtns{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}'
+            . '.aw-cbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;color:#fff;text-decoration:none;font-size:1.05rem;transition:transform .15s}'
+            . '.aw-cbtn:hover{transform:translateY(-1px);color:#fff}.aw-cbtn:focus-visible{outline:3px solid #3d2e2e;outline-offset:2px}'
+            . '.aw-cbtn-whatsapp{background:#1f8a4c}.aw-cbtn-call{background:#2f5f9c}.aw-cbtn-email{background:#9c5457}'
+            . '.aw-cbtn.is-not-agreed{opacity:.55;outline:2px dashed currentColor;outline-offset:-4px}</style>';
+    }
+    return '<span class="aw-cbtns" role="group" aria-label="Contact ' . $e($name) . '">' . $h . '</span>';
+}
+
+/** A short line of the member's details for team screens: phone, age range, sex, town. */
+function aw_member_facts(array $u) {
+    if (!function_exists('aw_can') || !aw_can('contact_members')) return '';
+    $bits = [];
+    if (!empty($u['contact_number'])) $bits[] = '<span><i class="fas fa-phone" aria-hidden="true"></i> ' . htmlspecialchars((string)$u['contact_number']) . '</span>';
+    if (!empty($u['age_range']) && isset(AW_AGE_RANGES[$u['age_range']])) $bits[] = '<span>Age ' . htmlspecialchars(AW_AGE_RANGES[$u['age_range']]) . '</span>';
+    if (!empty($u['gender']) && isset(AW_SEXES[$u['gender']])) $bits[] = '<span>' . htmlspecialchars(AW_SEXES[$u['gender']]) . '</span>';
+    if (!empty($u['city'])) $bits[] = '<span><i class="fas fa-location-dot" aria-hidden="true"></i> ' . htmlspecialchars((string)$u['city']) . '</span>';
+    return implode('', $bits);
+}

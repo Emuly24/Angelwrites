@@ -17,6 +17,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/member_profile.php'; // contact buttons and details
 require_once '../includes/admin_bulk.php'; // safe deletes, results after the redirect
 require_once '../includes/mail_helper.php';
 
@@ -79,9 +80,15 @@ if ($mu_filter === 'unverified') $mu_where[] = "is_verified = 0 AND role NOT IN 
 if ($mu_filter === 'staff') $mu_where[] = "role IN ('admin', 'moderator')";
 if ($mu_filter === 'members') $mu_where[] = "role NOT IN ('admin', 'moderator')";
 if ($mu_filter === 'new') $mu_where[] = "created_at >= datetime('now', '-30 days')";
+aw_profile_columns($db); aw_staff_tables($db);
+if ($mu_filter === 'staff') $mu_where[count($mu_where) - 1] = "(role IN ('admin', 'moderator') OR id IN (SELECT user_id FROM staff_areas))"; // volunteers are on the team too
 if ($mu_q !== '') {
-    $mu_where[] = "(name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR username LIKE ? OR country LIKE ?)";
-    array_push($mu_args, ...array_fill(0, 6, '%' . $mu_q . '%'));
+    // phone numbers are matched by their digits, so "0991 234 567" finds +265991234567
+    $mu_digits = preg_replace('/\D/', '', $mu_q);
+    $mu_where[] = "(name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR username LIKE ? OR country LIKE ? OR city LIKE ?"
+                . (strlen($mu_digits) >= 5 ? " OR REPLACE(contact_number, '+', '') LIKE ? OR REPLACE(whatsapp_number, '+', '') LIKE ?" : '') . ")";
+    array_push($mu_args, ...array_fill(0, 7, '%' . $mu_q . '%'));
+    if (strlen($mu_digits) >= 5) array_push($mu_args, '%' . ltrim($mu_digits, '0') . '%', '%' . ltrim($mu_digits, '0') . '%');
 }
 $mu_sql_where = $mu_where ? ' WHERE ' . implode(' AND ', $mu_where) : '';
 $mu_counts = ['all' => 0, 'unverified' => 0, 'staff' => 0, 'members' => 0, 'new' => 0];
@@ -89,7 +96,7 @@ $mu_total = 0; $mu_rows = [];
 try {
     $c = $db->query("SELECT COUNT(*) AS a,
                             SUM(CASE WHEN is_verified = 0 AND role NOT IN ('admin','moderator') THEN 1 ELSE 0 END) AS u,
-                            SUM(CASE WHEN role IN ('admin','moderator') THEN 1 ELSE 0 END) AS s,
+                            SUM(CASE WHEN role IN ('admin','moderator') OR id IN (SELECT user_id FROM staff_areas) THEN 1 ELSE 0 END) AS s,
                             SUM(CASE WHEN created_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END) AS n FROM users")->fetch(PDO::FETCH_ASSOC);
     $mu_counts = ['all' => (int)$c['a'], 'unverified' => (int)$c['u'], 'staff' => (int)$c['s'], 'members' => (int)$c['a'] - (int)$c['s'], 'new' => (int)$c['n']];
     $st = $db->prepare("SELECT COUNT(*) FROM users" . $mu_sql_where);
@@ -97,7 +104,9 @@ try {
     $mu_total = (int)$st->fetchColumn();
     $mu_pages = max(1, (int)ceil($mu_total / $mu_per));
     $mu_page = min($mu_page, $mu_pages);
-    $st = $db->prepare("SELECT id, name, first_name, last_name, username, email, role, country, is_verified, created_at, last_login, avatar, profile_pic, social_provider
+    aw_profile_columns($db);
+    $st = $db->prepare("SELECT id, name, first_name, last_name, username, email, role, country, is_verified, created_at, last_login, avatar, profile_pic, social_provider,
+                               contact_number, whatsapp_number, contact_ok, age_range, gender, city
                         FROM users" . $mu_sql_where . " ORDER BY created_at DESC, id DESC LIMIT " . $mu_per . " OFFSET " . (($mu_page - 1) * $mu_per));
     $st->execute($mu_args);
     $mu_rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -193,12 +202,14 @@ require_once '../includes/header.php';
                     <span>@<?php echo htmlspecialchars((string)$u['username']); ?></span>
                     <span class="mu-email"><?php echo htmlspecialchars((string)$u['email']); ?></span>
                     <?php if (!empty($u['country'])): ?><span><i class="fas fa-earth-africa" aria-hidden="true"></i> <?php echo htmlspecialchars((string)$u['country']); ?></span><?php endif; ?>
+                    <?php echo aw_member_facts($u); ?>
                     <span>Joined <?php echo htmlspecialchars(date('j M Y', strtotime((string)$u['created_at']))); ?></span>
                     <span>Last seen <?php echo htmlspecialchars($mu_ago($u['last_login'] ?? '')); ?></span>
                     <?php if (!empty($u['social_provider'])): ?><span>Signs in with <?php echo htmlspecialchars(ucfirst((string)$u['social_provider'])); ?></span><?php endif; ?>
                 </p>
             </div>
             <div class="mu-acts">
+                <?php if (!$is_me) echo aw_contact_buttons($u); ?>
                 <?php if (!$is_me): ?><a class="mu-icon" href="<?php echo SITE_URL; ?>/messages.php?to=<?php echo (int)$u['id']; ?>" title="Message <?php echo htmlspecialchars($name); ?>" aria-label="Message <?php echo htmlspecialchars($name); ?>"><i class="fas fa-comment-dots" aria-hidden="true"></i></a><?php endif; ?>
                 <?php if (!$verified): ?>
                     <form method="post"><input type="hidden" name="row_id" value="<?php echo (int)$u['id']; ?>"><button type="submit" name="row_action" value="verify" class="mu-icon" title="Mark <?php echo htmlspecialchars($name); ?> as verified" aria-label="Mark <?php echo htmlspecialchars($name); ?> as verified"><i class="fas fa-user-check" aria-hidden="true"></i></button></form>

@@ -32,7 +32,8 @@ const AW_CAPS = [
     'see_identities'   => ['owner', 'admin'],
     'audit_log'        => ['owner', 'admin'],
     'manage_staff'     => ['owner'],
-    'invite_staff'     => ['owner', 'admin'],              // admin/invite_staff.php: invite members to volunteer
+    'invite_staff'     => ['owner', 'admin'],
+    'contact_members'  => ['owner', 'admin', 'moderator'],  // phone/WhatsApp/email buttons and members' details (member_profile.php)              // admin/invite_staff.php: invite members to volunteer
     // volunteer areas (includes/staff_positions.php): a member who accepted an invitation gains just one of these
     'prayer_team'      => ['owner', 'admin', 'moderator'],
     'community_team'   => ['owner', 'admin', 'moderator'],

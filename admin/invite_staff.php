@@ -13,6 +13,7 @@ require_once '../includes/components.php';
 require_once '../includes/mail_helper.php';
 require_once '../includes/notifications.php';
 require_once '../includes/staff_positions.php';
+require_once '../includes/member_profile.php'; // contact buttons, age range
 
 aw_require('invite_staff'); // owner and admins; checks the CSRF token on every POST
 
@@ -30,7 +31,8 @@ function aw_is_find(PDO $db, $q) {
     } catch (Throwable $e) { error_log('invite find: ' . $e->getMessage()); return null; }
 }
 function aw_is_user(PDO $db, $id) {
-    try { $st = $db->prepare("SELECT id, name, first_name, last_name, username, email, role, is_verified FROM users WHERE id = ?"); $st->execute([(int)$id]); return $st->fetch(PDO::FETCH_ASSOC) ?: null; }
+    aw_profile_columns($db);
+    try { $st = $db->prepare("SELECT id, name, first_name, last_name, username, email, role, is_verified, contact_number, whatsapp_number, contact_ok, age_range, gender, city FROM users WHERE id = ?"); $st->execute([(int)$id]); return $st->fetch(PDO::FETCH_ASSOC) ?: null; }
     catch (Throwable $e) { error_log('invite user: ' . $e->getMessage()); return null; }
 }
 
@@ -93,7 +95,10 @@ require_once '../includes/header.php';
                     <?php if ($is_pre): ?>
                         <input type="hidden" name="user_id" value="<?php echo (int)$is_pre['id']; ?>">
                         <div class="form-group"><span class="is-label">Member</span>
-                            <p class="is-who"><strong><?php echo htmlspecialchars($is_to); ?></strong> · @<?php echo htmlspecialchars((string)$is_pre['username']); ?> <a href="<?php echo SITE_URL; ?>/admin/invite_staff.php">Choose someone else</a></p></div>
+                            <p class="is-who"><strong><?php echo htmlspecialchars($is_to); ?></strong> · @<?php echo htmlspecialchars((string)$is_pre['username']); ?> <a href="<?php echo SITE_URL; ?>/admin/invite_staff.php">Choose someone else</a></p>
+                            <p class="is-who is-facts"><?php echo aw_member_facts($is_pre); ?></p>
+                            <?php echo aw_contact_buttons($is_pre); ?>
+                            <?php if (($is_pre['age_range'] ?? '') === '13-17'): ?><p class="is-help" style="color:#a8432f"><strong>Under 18.</strong> Think carefully before giving a young person a team role, and never one that involves private contact with adults (mentoring, the inbox).</p><?php endif; ?></div>
                     <?php else: ?>
                         <?php echo aw_field('who', 'Their email or username', 'text', ['required' => true, 'maxlength' => 190, 'value' => (string)($_POST['who'] ?? '')]); ?>
                     <?php endif; ?>
@@ -139,7 +144,7 @@ require_once '../includes/header.php';
                     <tbody>
                     <?php foreach ($is_holders as $h): ?>
                         <tr>
-                            <td><strong><?php echo htmlspecialchars(awDisplayName($h)); ?></strong></td>
+                            <td><strong><?php echo htmlspecialchars(awDisplayName($h)); ?></strong><div style="margin-top:6px"><?php echo aw_contact_buttons($h); ?></div></td>
                             <td><i class="fas <?php echo AW_POSITIONS[$h['area']]['icon'] ?? 'fa-circle'; ?>" aria-hidden="true"></i> <?php echo htmlspecialchars(AW_POSITIONS[$h['area']]['title'] ?? $h['area']); ?></td>
                             <td><?php echo htmlspecialchars(date('j M Y', strtotime($h['granted_at'] . ' UTC'))); ?></td>
                             <td><?php if (aw_can('audit_log')): ?><a href="<?php echo SITE_URL; ?>/admin/audit.php?actor=<?php echo (int)$h['user_id']; ?>">What they did</a><?php endif; ?></td>
@@ -192,7 +197,7 @@ require_once '../includes/header.php';
 #isForm textarea{display:block;width:100%;float:none;min-height:110px;border-radius:10px;border:1px solid var(--border);padding:10px 12px;background:var(--card-bg);color:var(--text);font:inherit;box-sizing:border-box}
 #isForm label{display:block}
 .is-label{display:block;font-weight:600;margin-bottom:6px}
-.is-who{margin:0}
+.is-who{margin:0}.is-facts{display:flex;gap:12px;flex-wrap:wrap;color:var(--text-light);font-size:.9rem;margin:4px 0 8px}
 .is-select{width:100%;min-height:44px;border-radius:10px;border:1px solid var(--border);padding:8px 10px;background:var(--card-bg);color:var(--text);font-size:1rem}
 .is-help{color:var(--text-light);display:block;margin-top:4px}
 .is-preview-card{position:sticky;top:90px}

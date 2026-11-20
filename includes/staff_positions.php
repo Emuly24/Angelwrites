@@ -293,7 +293,8 @@ function aw_area_revoke(PDO $db, $uid, $area) {
 function aw_area_holders(PDO $db) {
     if (!aw_staff_tables($db)) return [];
     try {
-        return $db->query("SELECT a.user_id, a.area, a.granted_at, u.username, u.name, u.first_name, u.last_name
+        if (function_exists('aw_profile_columns')) aw_profile_columns($db);
+        return $db->query("SELECT a.user_id, a.area, a.granted_at, u.username, u.name, u.first_name, u.last_name, u.email, u.contact_number, u.whatsapp_number, u.contact_ok
                            FROM staff_areas a JOIN users u ON u.id = a.user_id ORDER BY a.granted_at DESC")->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) { error_log('aw_area_holders: ' . $e->getMessage()); return []; }
 }
@@ -358,6 +359,11 @@ function aw_invite_send(PDO $db, $uid, $position, $note, $by) {
     } catch (Throwable $e) { error_log('aw_invite_send: ' . $e->getMessage()); $u = false; }
     if (!$u) return ['ok' => false, 'msg' => 'That member was not found.', 'emailed' => false];
     if ($u['role'] === 'admin') return ['ok' => false, 'msg' => 'That person is already an admin and can do all of this.', 'emailed' => false];
+    // safeguarding: under-18s never get roles with private contact with adults
+    if (in_array($position, ['moderator', 'inbox', 'mentoring', 'community', 'prayer'], true)) {
+        try { $ar = $db->prepare("SELECT age_range FROM users WHERE id = ?"); $ar->execute([$uid]); if ((string)$ar->fetchColumn() === '13-17') return ['ok' => false, 'msg' => 'This member is under 18. This role involves private contact with adults, so it cannot be offered to them.', 'emailed' => false]; }
+        catch (Throwable $e) { /* no age column yet: nothing to check */ }
+    }
     if (aw_holds_position($db, $uid, $position)) return ['ok' => false, 'msg' => 'That member already has this role.', 'emailed' => false];
     if (aw_invite_pending($db, $uid, $position)) return ['ok' => false, 'msg' => 'That member already has an open invitation for this role.', 'emailed' => false];
     try {
