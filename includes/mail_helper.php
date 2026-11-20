@@ -208,7 +208,7 @@ function aw_mail_deliver(array $m, string $fn): bool
  * the sender (ET1). An optional 9th argument, ['signature' => false], leaves Angella's signature out.
  * It does not take attachments: use sendEmailWithAttachment() (ET3).
  */
-function sendEmail($to, $subject, $message, $fromEmail = 'no-reply@angelwrites.gt.tc', $fromName = 'AngelWrites', $isHTML = true) {
+function sendEmail($to, $subject, $message, $fromEmail = 'angelwrites@zohomail.com', $fromName = 'AngelWrites', $isHTML = true) {
     $aw_extra = func_get_args();
     return aw_mail_deliver([
         'kind' => 'transactional', 'to' => $to, 'subject' => $subject, 'message' => $message,

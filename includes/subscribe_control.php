@@ -80,7 +80,7 @@ function aw_subscribe_control(PDO $db, $variant = 'footer', $message = '', $erro
     } elseif ($member !== '') {
         $h .= '<form action="' . SITE_URL . '/newsletter.php" method="POST" class="aw-sub-form" data-aw-sub-form>'
             . '<input type="hidden" name="use_account" value="1"><input type="hidden" name="redirect" value="' . htmlspecialchars($back . '#' . $anchor) . '">'
-            . '<button type="submit" class="btn btn-primary btn-sm">Subscribe with ' . htmlspecialchars($member) . '</button></form>';
+            . '<button type="submit" class="btn btn-primary btn-sm" title="' . htmlspecialchars('Uses ' . $member) . '">Subscribe with my account email</button></form>';
     } else {
         $h .= '<form action="' . SITE_URL . '/newsletter.php" method="POST" class="aw-sub-form aw-sub-guest" data-aw-sub-form>'
             . '<label class="sr-only" for="' . $uid . '-name">Your name (optional)</label>'

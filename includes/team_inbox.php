@@ -78,7 +78,7 @@ function aw_inbox_reply(PDO $db, $message_id, $body) {
         $text = $body . "\n\nWith love,\nAngelWrites Team\n\n—\nYou wrote on " . date('F j, Y', strtotime($m['created_at'])) . ":\n> "
               . str_replace("\n", "\n> ", mb_substr((string)$m['message'], 0, 2000));
         $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
-        $sent = (bool)sendEmail($m['email'], $subject, $html, 'no-reply@angelwrites.gt.tc', 'AngelWrites Team', true);
+        $sent = (bool)sendEmail($m['email'], $subject, $html, 'angelwrites@zohomail.com', 'AngelWrites Team', true);
         $db->prepare("INSERT INTO team_replies (message_id, author_id, body, emailed) VALUES (?, ?, ?, ?)")
            ->execute([(int)$message_id, (int)($_SESSION['user_id'] ?? 0) ?: null, $body, $sent ? 1 : 0]);
         $rid = (int)$db->lastInsertId();

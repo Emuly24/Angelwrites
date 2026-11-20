@@ -30,15 +30,41 @@ function aw_site_name() {
     return aw_setting('site_name', SITE_NAME ?: 'AngelWrites');
 }
 
-// Saved admin email if it is a real address; 'admin@angelawrites.com' is the old seed value (see
-// F108), never set by the admin, so it is ignored. Then ADMIN_EMAIL from .env, then the inbox the
-// site has always used.
+// The address the team reads: angelwrites@zohomail.com. A saved or .env address is used only when it
+// is a real mailbox: addresses on angelwrites.com, angelawrites.com or angelwrites.gt.tc (old seed
+// values and placeholders, F108) have no mailbox behind them, so they are ignored.
+const AW_TEAM_EMAIL = 'angelwrites@zohomail.com';
+function aw_email_is_placeholder($email) {
+    $domain = strtolower((string)substr(strrchr((string)$email, '@') ?: '', 1));
+    return in_array($domain, ['angelwrites.com', 'angelawrites.com', 'angelwrites.gt.tc', 'example.com'], true);
+}
 function aw_admin_email() {
-    $saved = (string)aw_setting('admin_email', '');
-    if ($saved !== '' && strcasecmp($saved, 'admin@angelawrites.com') !== 0 && filter_var($saved, FILTER_VALIDATE_EMAIL)) {
-        return $saved;
+    foreach ([(string)aw_setting('admin_email', ''), (string)ADMIN_EMAIL] as $e) {
+        $e = trim($e);
+        if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL) && !aw_email_is_placeholder($e)) return $e;
     }
-    return (ADMIN_EMAIL && strcasecmp(ADMIN_EMAIL, 'admin@angelawrites.com') !== 0 && filter_var(ADMIN_EMAIL, FILTER_VALIDATE_EMAIL)) ? ADMIN_EMAIL : 'angelwrites@zohomail.com';
+    return AW_TEAM_EMAIL;
+}
+
+/**
+ * Contact details are shown as buttons, never as raw numbers or addresses: a phone button opens the
+ * phone's dialler, an email button opens the mail app. The number or address is still in the link
+ * (and in the accessible name, so screen readers say it). Styles: .aw-cbtn in aw-design.css.
+ */
+function aw_call_button($number, $label = 'Call', $who = '') {
+    $tel = preg_replace('/[^0-9+]/', '', (string)$number);
+    if ($tel === '') return '';
+    $name = trim(($who !== '' ? 'Call ' . $who : 'Call') . ' (' . trim((string)$number) . ')');
+    return '<a class="aw-cbtn aw-cbtn-call" href="tel:' . htmlspecialchars($tel) . '" aria-label="' . htmlspecialchars($name) . '" title="' . htmlspecialchars($name) . '">'
+        . '<i class="fas fa-phone" aria-hidden="true"></i><span>' . htmlspecialchars($label) . '</span></a>';
+}
+function aw_mail_button($email = '', $label = 'Email us', $subject = '') {
+    $email = trim((string)$email) !== '' ? trim((string)$email) : (defined('AW_TEAM_EMAIL') ? AW_TEAM_EMAIL : 'angelwrites@zohomail.com');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return '';
+    $href = 'mailto:' . $email . ($subject !== '' ? '?subject=' . rawurlencode($subject) : '');
+    $name = $label . ' (' . $email . ')';
+    return '<a class="aw-cbtn aw-cbtn-mail" href="' . htmlspecialchars($href) . '" aria-label="' . htmlspecialchars($name) . '" title="' . htmlspecialchars($name) . '">'
+        . '<i class="fas fa-envelope" aria-hidden="true"></i><span>' . htmlspecialchars($label) . '</span></a>';
 }
 
 function aw_logo_path() {

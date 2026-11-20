@@ -107,7 +107,6 @@ $metaDescription = 'AngelWrites is committed to making our website accessible to
                     </a>
                 </div>
                 <p class="contact-details">
-                    <strong>Email:</strong> <a href="mailto:angelwrites@zohomail.com">angelwrites@zohomail.com</a><br>
                     <strong>Response Time:</strong> We typically respond within 2 business days.
                 </p>
             </section>

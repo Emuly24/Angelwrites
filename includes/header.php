@@ -131,7 +131,7 @@ if ($isLoggedIn) {
         .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
     </style>
     <!-- D1: site-wide design layer, after the base styles so it applies on every page -->
-    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=2">
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=3">
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-header.css?v=1"><!-- the header -->
     <script src="<?php echo SITE_URL; ?>/assets/js/aw-motion.js?v=1" defer></script><!-- D2 -->
 <?php echo function_exists('aw_staff_csrf_script') ? aw_staff_csrf_script() : ''; /* K3: staff forms and fetches carry the CSRF token */ ?>
