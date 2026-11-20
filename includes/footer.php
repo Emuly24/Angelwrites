@@ -430,6 +430,8 @@ if (function_exists('aw_text_editor_ui')) echo aw_text_editor_ui();
 // the daily database copy, made after this page has been sent (includes/auto_backup.php)
 require_once __DIR__ . '/auto_backup.php'; aw_auto_backup_maybe();
 // anonymous daily totals for Admin > Statistics (includes/site_stats.php)
-require_once __DIR__ . '/site_stats.php'; aw_stats_record(); ?>
+require_once __DIR__ . '/site_stats.php'; aw_stats_record();
+// event reminders about 24 hours before (includes/events.php), checked at most once an hour
+require_once __DIR__ . '/events.php'; aw_event_reminders_maybe(); ?>
 </body>
 </html>

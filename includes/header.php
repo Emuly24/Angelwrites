@@ -192,7 +192,7 @@ $aw_groups = [];
 if (!$isLoggedIn) {
     $aw_groups['Explore'] = [['Search', 'fa-magnifying-glass', $aw_u . '/search_results.php', ['search_results.php']], ['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
         ['Reflections', 'fa-dove', $aw_u . '/reflections.php', ['reflections.php']], ['Blog', 'fa-pen-nib', $aw_u . '/blog.php', ['blog.php', 'blog_post.php']], ['Videos', 'fa-circle-play', $aw_u . '/videos.php', ['videos.php', 'video_watch.php']], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
-    $aw_groups['AngelWrites'] = [['About Angella', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Contact', 'fa-envelope', $aw_u . '/contact.php', ['contact.php']]];
+    $aw_groups['AngelWrites'] = [['About Angella', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Events', 'fa-calendar-days', $aw_u . '/events.php', ['events.php']], ['Devotionals', 'fa-sun', $aw_u . '/plans.php', ['plans.php']], ['Contact', 'fa-envelope', $aw_u . '/contact.php', ['contact.php']]];
 } elseif ($isAdmin) {
     $aw_groups['Admin'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']], ['Books', 'fa-book', $aw_u . '/admin/manage_books.php', ['admin/manage_books.php']], ['Poems', 'fa-feather', $aw_u . '/admin/manage_poems.php', ['admin/manage_poems.php']],
         ['Sessions', 'fa-calendar-check', $aw_u . '/admin/manage_sessions.php', ['admin/manage_sessions.php']], ['Members', 'fa-users', $aw_u . '/admin/manage_users.php', ['admin/manage_users.php']], ['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']], ['Moderation', 'fa-shield-heart', $aw_u . '/admin/moderation.php', ['admin/moderation.php']],
@@ -208,10 +208,10 @@ if (!$isLoggedIn) {
         $aw_stories_on ? ['My Stories & Help', 'fa-pen', $aw_u . '/my_stories.php', ['my_stories.php']] : null,
         isLoggedIn() ? ['Share your book', 'fa-book-medical', $aw_u . '/share_book.php', ['share_book.php']] : null,
         ['Prayer wall', 'fa-hands-praying', $aw_u . '/prayer.php', ['prayer.php']], ['Devotionals', 'fa-sun', $aw_u . '/plans.php', ['plans.php']],
-        ['Community Q&A', 'fa-circle-question', $aw_u . '/community.php', ['community.php']], ['Reading groups', 'fa-user-group', $aw_u . '/groups.php', ['groups.php', 'group.php']], ['Mentoring', 'fa-hands-holding-circle', $aw_u . '/mentoring.php', ['mentoring.php']], ['Book a session', 'fa-calendar-check', $aw_u . '/book_session.php', ['book_session.php']]]));
+        ['Community Q&A', 'fa-circle-question', $aw_u . '/community.php', ['community.php']], ['Reading groups', 'fa-user-group', $aw_u . '/groups.php', ['groups.php', 'group.php']], ['Mentoring', 'fa-hands-holding-circle', $aw_u . '/mentoring.php', ['mentoring.php']], ['Writing prompts', 'fa-feather-pointed', $aw_u . '/prompts.php', ['prompts.php']], ['Events', 'fa-calendar-days', $aw_u . '/events.php', ['events.php']], ['Book a session', 'fa-calendar-check', $aw_u . '/book_session.php', ['book_session.php']]]));
     if ($aw_is_staff) $aw_groups['Team'] = [['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']], ['Staff dashboard', 'fa-shield-heart', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']]];
 }
-$aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_stories.php', 'community.php', 'groups.php', 'group.php', 'book_session.php', 'prayer.php', 'plans.php', 'mentoring.php'];
+$aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_stories.php', 'community.php', 'groups.php', 'group.php', 'book_session.php', 'prayer.php', 'plans.php', 'mentoring.php', 'prompts.php', 'events.php'];
 ?>
     <header class="awh site-header" id="siteHeader">
         <div class="awh-bar">
@@ -252,6 +252,8 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                                 <a href="<?php echo $aw_u; ?>/plans.php"><i class="fas fa-sun" aria-hidden="true"></i><span>Devotionals<small>A few minutes with God each day</small></span></a>
                                 <a href="<?php echo $aw_u; ?>/community.php"><i class="fas fa-circle-question" aria-hidden="true"></i><span>Community Q&amp;A<small>Ask and answer</small></span></a>
                                 <a href="<?php echo $aw_u; ?>/groups.php"><i class="fas fa-user-group" aria-hidden="true"></i><span>Reading groups<small>Read a book together</small></span></a>
+                                <a href="<?php echo $aw_u; ?>/prompts.php"><i class="fas fa-feather-pointed" aria-hidden="true"></i><span>Writing prompts<small>Write with us each week</small></span></a>
+                                <a href="<?php echo $aw_u; ?>/events.php"><i class="fas fa-calendar-days" aria-hidden="true"></i><span>Events<small>Readings, prayer, workshops</small></span></a>
                                 <a href="<?php echo $aw_u; ?>/mentoring.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><span>Mentoring<small>Find a mentor · Be one</small></span></a>
                                 <a href="<?php echo $aw_u; ?>/book_session.php"><i class="fas fa-calendar-check" aria-hidden="true"></i><span>Book a session<small>Talk with Angella</small></span></a>
                             </div>
