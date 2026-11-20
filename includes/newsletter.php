@@ -91,19 +91,40 @@ function aw_nl_click_url(PDO $db, $queue_id, $email, $url) {
 }
 
 // ---------------------------------------------------------------- rendering
+/** The letter's logo: the site's own, or for the standard logo a tightly cropped copy that reads well small. */
+function aw_nl_logo_rel() {
+    $rel = function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png';
+    if (ltrim($rel, '/') === 'assets/images/logo.png' && is_file(dirname(__DIR__) . '/assets/images/logo_email.png')) return 'assets/images/logo_email.png';
+    return ltrim($rel, '/');
+}
 function aw_nl_first_name($name) {
     $name = trim((string)$name);
     if ($name === '') return 'friend';
     $parts = preg_split('/\s+/u', $name);
     return $parts[0];
 }
-function aw_nl_personalize($html, array $sub) {
+/**
+ * Fills in {{name}}, {{first_name}} and {{email}}. With $mark, a name written in the text (not inside
+ * a tag's attribute) is wrapped in <span class="aw-name">, which the letter shows in the brand colour.
+ */
+function aw_nl_personalize($html, array $sub, $mark = false) {
     $name = trim((string)($sub['name'] ?? ''));
-    return strtr((string)$html, [
+    $map = [
         '{{name}}' => htmlspecialchars($name !== '' ? $name : 'friend'),
         '{{first_name}}' => htmlspecialchars(aw_nl_first_name($name)),
         '{{email}}' => htmlspecialchars((string)($sub['email'] ?? '')),
-    ]);
+    ];
+    if (!$mark) return strtr((string)$html, $map);
+    $parts = preg_split('/(<[^>]*>)/', (string)$html, -1, PREG_SPLIT_DELIM_CAPTURE);
+    foreach ($parts as $i => $part) {
+        if ($part === '' || $part[0] === '<') { $parts[$i] = strtr($part, $map); continue; }
+        $parts[$i] = strtr($part, [
+            '{{name}}' => '<span class="aw-name">' . $map['{{name}}'] . '</span>',
+            '{{first_name}}' => '<span class="aw-name">' . $map['{{first_name}}'] . '</span>',
+            '{{email}}' => $map['{{email}}'],
+        ]);
+    }
+    return implode('', $parts);
 }
 function aw_nl_track_links($html, PDO $db, $queue_id, $email) {
     return preg_replace_callback('#\bhref\s*=\s*(["\'])(https?://[^"\']+)\1#i', function ($m) use ($db, $queue_id, $email) {
@@ -139,7 +160,7 @@ function aw_nl_render(PDO $db, $subject, $content, array $sub, array $opts = [])
     // the "add my signature" mark is an HTML comment, which cleaning removes: read it first
     $has_sig_mark = strpos((string)$content, AW_NL_SIG_MARK) !== false;
     $content = aw_clean_html($content, 'rich');
-    $body = aw_nl_personalize($content, $sub);
+    $body = aw_nl_personalize($content, $sub, true);
     if ($track) $body = aw_nl_track_links($body, $db, $qid, $sub['email'] ?? '');
     $text_body = aw_nl_html_to_text($body);
     $pre = mb_substr(preg_replace('/\s+/u', ' ', aw_nl_html_to_text(aw_nl_personalize($content, $sub))), 0, 140);
@@ -210,8 +231,8 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
         $mail->Subject = $subject;
         $mail->isHTML(true);
         // the logo inside the email rather than fetched from the site (see aw_mail_embed_logo())
-        $nl_logo = rtrim(SITE_URL, '/') . '/' . ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/');
-        if (strpos($html, $nl_logo) !== false && function_exists('aw_mail_embed_logo') && aw_mail_embed_logo($mail)) $html = str_replace('src="' . htmlspecialchars($nl_logo, ENT_QUOTES) . '"', 'src="cid:awlogo"', $html);
+        $nl_logo = rtrim(SITE_URL, '/') . '/' . aw_nl_logo_rel();
+        if (strpos($html, $nl_logo) !== false && function_exists('aw_mail_embed_logo') && aw_mail_embed_logo($mail, aw_nl_logo_rel())) $html = str_replace('src="' . htmlspecialchars($nl_logo, ENT_QUOTES) . '"', 'src="cid:awlogo"', $html);
         if (function_exists('aw_signature_apply')) $html = aw_signature_apply($mail, $html); // her handwritten signature
         $mail->Body = $html;
         $mail->AltBody = $text;
@@ -278,7 +299,7 @@ function aw_nl_queue(PDO $db, $subject, $content, array $recipients, $send_to, $
     }
     $status = $scheduled_at ? 'pending' : 'processing';
     $st = $db->prepare("INSERT INTO email_queue (subject, content, recipient_emails, send_to_type, segment_id, scheduled_at, status, attempt_count) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
-    $st->execute([$subject, $content, implode(',', array_keys($clean)), $send_to, $segment_id ?: null, $scheduled_at ?: date('Y-m-d H:i:s'), $status]);
+    $st->execute([$subject, $content, implode(',', array_keys($clean)), $send_to, $segment_id ?: null, $scheduled_at ?: gmdate('Y-m-d H:i:s'), $status]);
     $id = (int)$db->lastInsertId();
     $ins = $db->prepare("INSERT INTO email_attachments (email_queue_id, file_path, file_name, file_size) VALUES (?, ?, ?, ?)");
     foreach ($attachments as $a) $ins->execute([$id, $a['path'], $a['name'], (int)$a['size']]);
@@ -306,6 +327,28 @@ function aw_nl_progress(PDO $db, $queue_id) {
 
 /** Sends the next batch of a 'processing' campaign and finishes it when nobody is left. */
 function aw_nl_send_batch(PDO $db, $queue_id, $batch = AW_NL_BATCH) {
+    // One sender per campaign at a time (the admin page, site traffic and the timer can overlap):
+    // whoever does not get the lock sends nothing and reports the progress so far.
+    $lock = aw_nl_lock((int)$queue_id);
+    if ($lock === false) return aw_nl_progress($db, $queue_id);
+    try {
+        return aw_nl_send_batch_locked($db, $queue_id, $batch);
+    } finally {
+        if (is_resource($lock)) { flock($lock, LOCK_UN); fclose($lock); }
+    }
+}
+
+/** A non-blocking lock for one campaign: a handle, true when locking is unavailable, false when busy. */
+function aw_nl_lock($queue_id) {
+    $dir = __DIR__ . '/../data/locks';
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) { error_log('aw_nl_lock: cannot create data/locks'); return true; }
+    $h = @fopen($dir . '/newsletter_' . (int)$queue_id . '.lock', 'c');
+    if (!$h) { error_log('aw_nl_lock: cannot open lock file'); return true; }
+    if (!flock($h, LOCK_EX | LOCK_NB)) { fclose($h); return false; }
+    return $h;
+}
+
+function aw_nl_send_batch_locked(PDO $db, $queue_id, $batch) {
     $p = aw_nl_progress($db, $queue_id);
     if (!$p || $p['queue']['status'] !== 'processing') return $p;
     $q = $p['queue'];

@@ -242,9 +242,9 @@ function aw_mail_prepare(array $m): PHPMailer
  * Put the logo inside the email (Content-ID "awlogo") instead of linking to it on the site, so the
  * email has no outside images. Returns true when embedded; the layout then uses cid:awlogo.
  */
-function aw_mail_embed_logo(PHPMailer $mail): bool
+function aw_mail_embed_logo(PHPMailer $mail, string $rel = ''): bool
 {
-    $rel = function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png';
+    if ($rel === '') $rel = function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png';
     $file = dirname(__DIR__) . '/' . ltrim($rel, '/');
     if (!is_file($file) || filesize($file) > 200000) $file = dirname(__DIR__) . '/assets/images/logo.png';
     if (!is_file($file)) return false;

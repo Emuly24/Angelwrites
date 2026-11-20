@@ -1,0 +1,40 @@
+name: Send scheduled newsletters
+
+# The host has no timer, so GitHub wakes the site every 10 minutes and it sends any newsletter whose
+# time has come (and finishes any send left half-done). Site traffic also does this; this keeps
+# scheduled letters on time when nobody is visiting.
+# Needs the repository secret NEWSLETTER_CRON_KEY, with the same value as NEWSLETTER_CRON_KEY in .env
+# (the DOTENV secret). Without it the job does nothing. GitHub may run it a few minutes late.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: newsletter-schedule
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ask the site to send what is due
+        env:
+          KEY: ${{ secrets.NEWSLETTER_CRON_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "NEWSLETTER_CRON_KEY is not set: nothing to do."
+            exit 0
+          fi
+          # The host shows a browser check to unknown clients; link-preview crawlers get the real page.
+          code=$(curl -sS -o reply.json -w '%{http_code}' --max-time 60 \
+            -A 'facebookexternalhit/1.1' \
+            -H "X-Cron-Key: $KEY" \
+            --data-urlencode "key=$KEY" \
+            https://angelwrites.gt.tc/admin/process_queue.php || echo 000)
+          echo "HTTP $code"
+          head -c 600 reply.json; echo
+          if [ "$code" != "200" ] || ! grep -q '"ok":true' reply.json; then
+            echo "::warning::The site did not confirm the run (HTTP $code). Scheduled letters will still go out with site traffic."
+          fi
