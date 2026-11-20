@@ -239,6 +239,7 @@ require_once 'includes/header.php';
         <a href="<?php echo SITE_URL; ?>/journal.php"><i class="fas fa-book-open" aria-hidden="true"></i> My journal</a>
         <a href="<?php echo SITE_URL; ?>/prayer.php"><i class="fas fa-hands-praying" aria-hidden="true"></i> Prayer wall</a>
         <a href="<?php echo SITE_URL; ?>/plans.php"><i class="fas fa-sun" aria-hidden="true"></i> Devotionals</a>
+        <a href="<?php echo SITE_URL; ?>/mentoring.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i> Mentoring</a>
         <a href="<?php echo SITE_URL; ?>/books.php"><i class="fas fa-book" aria-hidden="true"></i> Books</a>
         <a href="<?php echo SITE_URL; ?>/poetry.php"><i class="fas fa-feather" aria-hidden="true"></i> Poetry</a>
         <a href="<?php echo SITE_URL; ?>/reflections.php"><i class="fas fa-dove" aria-hidden="true"></i> Reflections</a>
