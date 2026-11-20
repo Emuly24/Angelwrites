@@ -107,6 +107,15 @@ if ($isLoggedIn) {
 <meta name="twitter:description" content="<?php echo $og_description; ?>" />
 <meta name="twitter:image" content="<?php echo $og_image; ?>" />
 <meta name="twitter:image:alt" content="<?php echo $og_image_alt; ?>" />
+<?php
+    // every public page shares through the preview relay when one is set up, so WhatsApp & co. show the picture
+    require_once __DIR__ . '/og.php';
+    if (empty($aw_share_url) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && empty($aw_noindex) && function_exists('aw_share_link_here') && aw_share_base() !== '') {
+        $aw_share_here = aw_share_link_here();
+        if (strpos($aw_share_here, aw_share_base()) === 0) $aw_share_url = $aw_share_here;
+    }
+?>
+<?php if (aw_share_base() !== ''): ?><script>window.AW_SHARE_BASE = <?php echo json_encode(aw_share_base(), JSON_HEX_TAG | JSON_UNESCAPED_SLASHES); ?>;</script><?php endif; ?>
 <?php if (!empty($aw_share_url)): /* the share buttons and the reader's Share use the relay link when one is set up */ ?><script>window.AW_SHARE_URL = <?php echo json_encode((string)$aw_share_url, JSON_HEX_TAG | JSON_UNESCAPED_SLASHES); ?>;</script><?php endif; ?>
     
     <style>
@@ -210,7 +219,8 @@ if (!$isLoggedIn) {
         isLoggedIn() ? ['Share your book', 'fa-book-medical', $aw_u . '/share_book.php', ['share_book.php']] : null,
         ['Prayer wall', 'fa-hands-praying', $aw_u . '/prayer.php', ['prayer.php']], ['Devotionals', 'fa-sun', $aw_u . '/plans.php', ['plans.php']],
         ['Community Q&A', 'fa-circle-question', $aw_u . '/community.php', ['community.php']], ['Reading groups', 'fa-user-group', $aw_u . '/groups.php', ['groups.php', 'group.php']], ['Mentoring', 'fa-hands-holding-circle', $aw_u . '/mentoring.php', ['mentoring.php']], ['Writing prompts', 'fa-feather-pointed', $aw_u . '/prompts.php', ['prompts.php']], ['Events', 'fa-calendar-days', $aw_u . '/events.php', ['events.php']], ['Book a session', 'fa-calendar-check', $aw_u . '/book_session.php', ['book_session.php']]]));
-    if ($aw_is_staff) $aw_groups['Team'] = [['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']], ['Staff dashboard', 'fa-shield-heart', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']]];
+    if ($aw_is_staff) $aw_groups['Team'] = [['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']]];
+    if ($aw_is_staff && function_exists('aw_can') && aw_can('invite_staff')) $aw_groups['Team'][] = ['Invite to the team', 'fa-user-plus', $aw_u . '/admin/invite_staff.php', ['admin/invite_staff.php']];
 }
 $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_stories.php', 'community.php', 'groups.php', 'group.php', 'book_session.php', 'prayer.php', 'plans.php', 'mentoring.php', 'prompts.php', 'events.php'];
 ?>
@@ -312,7 +322,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                                 <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i><?php echo aw_t('My Stories & Help'); ?></a><?php endif; ?>
                                 <a href="<?php echo $aw_u; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i><?php echo aw_t('My shared books'); ?></a>
                                 <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i><?php echo aw_t('Profile'); ?></a>
-                                <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><?php echo aw_t('Team desk'); ?></a><a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i><?php echo aw_t('Staff dashboard'); ?></a><?php endif; ?>
+                                <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><?php echo aw_t('Team desk'); ?></a><?php endif; ?>
                             <?php endif; ?>
                             <hr>
                             <a class="awh-out" href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><?php echo aw_t('Log out'); ?></a>

@@ -15,7 +15,7 @@ require_once 'includes/bible_versions.php';
 $dv_uid = (int)($_SESSION['user_id'] ?? 0);
 $dv_self = SITE_URL . '/plans.php';
 aw_devo_tables($db);
-$dv_team = function_exists('aw_can') && aw_can('manage_content'); // the team may preview drafts
+$dv_team = function_exists('aw_can') && aw_can('devotionals_team'); // the team may preview drafts
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $dv_uid && validate_csrf_token($_POST['csrf_token'] ?? '')) {
     $pid = (int)($_POST['plan'] ?? 0); $day = (int)($_POST['day'] ?? 0);

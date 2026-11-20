@@ -8,7 +8,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/prompts.php';
 
-aw_require('manage_content'); // checks the CSRF token on every POST
+aw_require('prompts_team'); // checks the CSRF token on every POST
 aw_prompt_tables($db);
 $pa_back = SITE_URL . '/admin/prompts.php';
 

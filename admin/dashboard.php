@@ -14,6 +14,9 @@ require_once '../includes/dash.php';
 if (is_file(__DIR__ . '/../includes/community_posts.php')) require_once '../includes/community_posts.php';
 
 aw_require('staff_dashboard'); // K1
+// the admin dashboard (every figure and tool) is for the owner and admins; other staff (moderators)
+// work from the Team desk, which shows only what their role may act on
+if (!aw_can('manage_members')) { header('Location: ' . SITE_URL . '/admin/team.php'); exit; }
 
 $D = 14;
 // ----- daily series (last 14 days) -----
@@ -60,6 +63,7 @@ $autoAt = strtotime((string)aw_setting('auto_backup_at', '')) ?: 0;
 $autoOk = (string)aw_setting('auto_backup_error', '') === '' && time() - $autoAt < 2 * 86400;
 if (aw_can('backup') && (string)aw_setting('auto_backup_enabled', '1') !== '0' && !$autoOk && $autoAt > 0) $attention[] = ['Automatic backup needs a look', '!', 'backup.php'];
 if (aw_can('backup') && ($backupDays === null || $backupDays >= 30)) $attention[] = [$backupDays === null ? 'No backup downloaded yet' : 'days since a backup was downloaded', $backupDays === null ? '!' : $backupDays, 'backup.php'];
+if (aw_can('manage_members') && trim((string)aw_setting('share_base_url', '')) === '') $attention[] = ['Link previews: paste the relay address so WhatsApp shows pictures', '!', 'settings.php?tab=email#link-previews'];
 
 // ----- most viewed this week (from the view log) -----
 $top = aw_dsh_q($db, "SELECT v.target_type, v.target_id, COUNT(*) AS n,
@@ -114,7 +118,7 @@ $greet = $h < 12 ? 'Good morning' : ($h < 17 ? 'Good afternoon' : 'Good evening'
 $pageTitle = 'Admin Dashboard';
 require_once '../includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=4">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=6">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">
@@ -322,7 +326,7 @@ require_once '../includes/header.php';
         </div>
     </div>
 </main>
-<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=2" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=3" defer></script>
 <script>
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
 function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }

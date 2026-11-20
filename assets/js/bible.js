@@ -197,7 +197,7 @@
   }
   function verseText(n) { var el = $('v' + n); if (!el) return ''; var c = el.cloneNode(true); c.querySelectorAll('sup, .sr-only').forEach(function (x) { x.remove(); }); return c.textContent.replace(/\s+/g, ' ').trim(); }
   function ref(n) { return bookName(st.b) + ' ' + st.c + ':' + n + ' (' + (ver(st.v) || {}).short + ')'; }
-  function link(n) { return site + '/bible_reader.php?v=' + st.v + '&b=' + encodeURIComponent(st.b) + '&c=' + st.c + '&vs=' + n; }
+  function link(n) { return (window.AW_SHARE_BASE ? window.AW_SHARE_BASE + '/s' : site) + '/bible_reader.php?v=' + st.v + '&b=' + encodeURIComponent(st.b) + '&c=' + st.c + '&vs=' + n; }
   function copyVerse(n) {
     var text = '“' + verseText(n) + '” ' + ref(n);
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { toast('Copied'); }).catch(function () { toast('Select the verse and copy it'); });

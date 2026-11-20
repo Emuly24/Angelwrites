@@ -102,7 +102,7 @@ $token = generate_csrf_token();
 $pageTitle = 'My Dashboard';
 require_once 'includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=4">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=6">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">
@@ -122,10 +122,22 @@ require_once 'includes/header.php';
                 <?php require_once __DIR__ . '/includes/devotionals.php'; $aw_devo = aw_devo_current($db, (int)$_SESSION['user_id']); if ($aw_devo): ?><a class="dsh-pill" href="<?php echo SITE_URL; ?>/plans.php?plan=<?php echo (int)$aw_devo['plan']['id']; ?>&amp;day=<?php echo (int)$aw_devo['day']; ?>"><i class="fas fa-sun" aria-hidden="true"></i> Today's devotional · day <?php echo (int)$aw_devo['day']; ?></a><?php endif; ?>
                 <a class="dsh-pill" href="<?php echo SITE_URL; ?>/messages.php"><i class="fas fa-envelope" aria-hidden="true"></i> Messages<?php if ($unreadMsgs): ?> <span class="dsh-badge"><?php echo (int)$unreadMsgs; ?></span><?php endif; ?></a>
                 <a class="dsh-pill" href="<?php echo SITE_URL; ?>/stories.php"><i class="fas fa-seedling" aria-hidden="true"></i> Stories &amp; Help</a>
-                <?php if (function_exists('aw_is_staff') && aw_is_staff()): ?><a class="dsh-pill" href="<?php echo SITE_URL; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i> Staff</a><?php endif; ?>
+                <?php if (function_exists('aw_is_staff') && aw_is_staff()): ?><a class="dsh-pill dsh-pill-solid" href="<?php echo SITE_URL; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i> Team desk</a><?php endif; ?>
             </div>
         </div>
     </section>
+
+    <?php $aw_inv = function_exists('aw_invite_pending') ? aw_invite_pending($db, (int)$_SESSION['user_id']) : null;
+    if ($aw_inv && isset(AW_POSITIONS[$aw_inv['position']])): $aw_ip = AW_POSITIONS[$aw_inv['position']]; ?>
+    <section class="dsh-invite" aria-labelledby="dInvite">
+        <span class="dsh-invite-ico" aria-hidden="true"><i class="fas <?php echo $aw_ip['icon']; ?>"></i></span>
+        <div>
+            <h2 id="dInvite">You are invited to join the team as <?php echo htmlspecialchars($aw_ip['title']); ?></h2>
+            <p><?php echo htmlspecialchars($aw_ip['summary']); ?> Read what the role involves, then accept or decline.</p>
+        </div>
+        <a class="dsh-pill dsh-pill-solid" href="<?php echo SITE_URL; ?>/staff_invite.php?id=<?php echo (int)$aw_inv['id']; ?>">Read the invitation</a>
+    </section>
+    <?php endif; ?>
 
     <section class="dsh-kpis" aria-label="At a glance">
         <?php foreach ($chips as $i => [$label, $n, $icon, $href, $c]): ?>
@@ -254,5 +266,5 @@ require_once 'includes/header.php';
         <a href="<?php echo SITE_URL; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i> Profile</a>
     </nav>
 </main>
-<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=2" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=3" defer></script>
 <?php require_once 'includes/footer.php'; ?>

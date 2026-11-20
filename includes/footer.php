@@ -95,6 +95,8 @@ FOOTER – Brand, Links, Social
         </div>
     </div>
 </footer>
+<?php // the "coming soon" note for social links, outside the footer so it keeps its own colours
+if (function_exists('aw_social_soon_dialog')) echo aw_social_soon_dialog(); ?>
 
 <!-- ============================================================
 LOAD MAIN JAVASCRIPT

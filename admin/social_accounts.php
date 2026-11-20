@@ -10,7 +10,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/social_accounts.php';
 
-aw_require('staff_dashboard'); // overseers may be moderators; editing needs manage_settings (checked below)
+aw_require('moderate'); // overseers may be moderators; editing needs manage_settings (checked below)
 aw_social_accounts_table($db);
 $sa_manage = aw_social_can_manage();
 $sa_me = (int)$_SESSION['user_id'];

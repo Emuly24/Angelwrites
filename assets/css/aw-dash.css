@@ -242,13 +242,18 @@ html[data-theme="dark"] .dsh {
    on a new row. They now flow into columns like a masonry wall: each card is as tall as its content
    and the next one follows straight below it. Pairs side by side (chart and live feed; where you
    left off and the verse) share one height, and a long feed scrolls inside its card. */
-.dsh-row-3, .dsh-tools { display: block; columns: 4 270px; column-gap: 16px; }
-.dsh-row-3 > *, .dsh-tools > * { break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; width: 100%; margin: 0 0 16px; }
-.dsh-row-3 > .dsh-card, .dsh-tools > .dsh-card { height: auto; }
+   CSS multi-column was used for this, but Safari (iPad, iPhone) sometimes does not paint cards inside
+   columns that fade or move in, so some cards were invisible. aw-dash.js now deals the cards into
+   real columns (each card into the shortest one, in reading order); without the script it is a grid. */
+.dsh-row-3, .dsh-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; align-items: start; }
+.dsh-row-3.dsh-masonry, .dsh-tools.dsh-masonry { display: flex; align-items: flex-start; gap: 16px; }
+.dsh-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.dsh-col > * { width: 100%; margin: 0; }
+.dsh-row-3 > .dsh-card, .dsh-tools > .dsh-card, .dsh-col > .dsh-card { height: auto; }
 .dsh-row-2 { align-items: stretch; }
 .dsh-row-2 > * { min-width: 0; }
 .dsh-row-2 .dsh-feed { max-height: 420px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
-@media (max-width: 600px) { .dsh-row-3, .dsh-tools { columns: 1; } }
+@media (max-width: 600px) { .dsh-row-3, .dsh-tools { grid-template-columns: 1fr; } }
 
 /* readable on the banner and on the coloured feed circles in every theme */
 .dsh-hero { text-shadow: 0 1px 2px rgba(40, 16, 22, .25); }
@@ -258,3 +263,13 @@ html[data-theme="dark"] .dsh-feed .dsh-fico { color: #1d1314; }
 .dsh-pill { background: rgba(40, 12, 20, .26); }
 .dsh-card h2 .dsh-ico { color: #8a4448; }
 html[data-theme="dark"] .dsh-card h2 .dsh-ico { color: #f0c4c5; }
+
+/* a team invitation waiting for the member */
+.dsh-invite{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 20px;padding:18px 20px;border-radius:18px;background:linear-gradient(135deg,#fff5f5,#fdecec);border:1px solid #efc7c8;color:#3d2e2e}
+.dsh-invite > div{flex:1 1 260px;min-width:0}
+.dsh-invite h2{font-family:'Playfair Display',Georgia,serif;font-size:1.15rem;margin:0 0 4px;color:#3d2e2e}
+.dsh-invite p{margin:0;color:#5b4747}
+.dsh-invite-ico{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:#9c5457;color:#fff;font-size:1.2rem;flex:none}
+[data-theme="dark"] .dsh-invite{background:linear-gradient(135deg,#2f2224,#3a2729);border-color:#5e3c3e;color:#f3e6e6}
+[data-theme="dark"] .dsh-invite h2{color:#f8eded}
+[data-theme="dark"] .dsh-invite p{color:#e3cfcf}

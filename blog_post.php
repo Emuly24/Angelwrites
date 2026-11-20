@@ -7,6 +7,7 @@ require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/mail_helper.php';
 require_once 'includes/csrf.php';
 require_once 'includes/upload.php'; // R3: shared upload limits
+require_once 'includes/og.php'; // the share link (through the preview relay when one is set up)
 
 // ===== FETCH POST =====
 $slug = isset($_GET['slug']) ? trim($_GET['slug']) : '';
@@ -308,15 +309,15 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                     <?php endif; ?>
                 </div>
                 <?php echo aw_save_button('post', (int)$post['id']); ?>
-                <div class="share-section">
+                <div class="share-section"><?php $bp_share = aw_share_link('blog_post.php?slug=' . rawurlencode((string)$slug)); ?>
                     <span>Share:</span>
-                    <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/blog_post.php?slug=' . $slug); ?>" target="_blank" class="share-btn facebook">
+                    <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode($bp_share); ?>" target="_blank" class="share-btn facebook">
                         <i class="fab fa-facebook-f"></i>
                     </a>
-                    <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode($post['title'] . ' — read this reflection by Angella Bottoman'); ?>&url=<?php echo urlencode(SITE_URL . '/blog_post.php?slug=' . $slug); ?>" target="_blank" class="share-btn twitter">
+                    <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode($post['title'] . ' — read this reflection by Angella Bottoman'); ?>&url=<?php echo urlencode($bp_share); ?>" target="_blank" class="share-btn twitter">
                         <i class="fab fa-twitter"></i>
                     </a>
-                    <a href="https://api.whatsapp.com/send?text=<?php echo urlencode($post['title'] . ' — read this reflection: ' . SITE_URL . '/blog_post.php?slug=' . $slug); ?>" target="_blank" class="share-btn whatsapp">
+                    <a href="https://api.whatsapp.com/send?text=<?php echo urlencode($post['title'] . ' — read this reflection: ' . $bp_share); ?>" target="_blank" class="share-btn whatsapp">
                         <i class="fab fa-whatsapp"></i>
                     </a>
                 </div>

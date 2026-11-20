@@ -9,7 +9,7 @@ require_once '../includes/auth.php';
 require_once '../includes/events.php';
 require_once '../includes/notifications.php';
 
-aw_require('manage_content'); // checks the CSRF token on every POST
+aw_require('events_team'); // checks the CSRF token on every POST
 aw_event_tables($db);
 $ea_back = SITE_URL . '/admin/events.php';
 

@@ -15,7 +15,7 @@ require_once '../includes/csrf.php';
 require_once '../includes/components.php';
 require_once '../includes/community_posts.php';
 
-aw_require('moderate');
+aw_require('community_team');
 aw_cp_tables($db);
 aw_cp_purge($db); // retention: removed writing older than 90 days is erased
 $full = aw_cp_staff_full();

@@ -80,6 +80,8 @@ $td_urgent = [];
 if (aw_can('moderate')) {
     foreach (aw_dsh_q($db, "SELECT target_type, target_id, MIN(created_at) AS since, COUNT(*) AS n FROM reports WHERE status = 'pending' AND reason = 'harm' GROUP BY target_type, target_id ORDER BY since LIMIT 10") as $r)
         $td_urgent[] = ['what' => 'Reported: self-harm or someone in danger' . ($r['n'] > 1 ? ' (' . (int)$r['n'] . ' reports)' : ''), 'since' => $r['since'], 'link' => 'moderation.php', 'act' => 'Open the report'];
+}
+if (aw_can('community_team')) { // moderators and the Stories & Help helpers
     $crisis = defined('AW_CP_CRISIS_WARNINGS') ? AW_CP_CRISIS_WARNINGS : ['selfharm', 'suicide', 'abuse', 'violence'];
     $like = implode(' OR ', array_map(function ($w) { return "warnings LIKE '%" . preg_replace('/[^a-z]/', '', $w) . "%'"; }, $crisis));
     $vis = aw_can('see_identities') ? '' : " AND visibility <> 'team'";
@@ -100,14 +102,20 @@ if (aw_can('moderate')) {
         'Report', 'fa-flag', 'moderation.php');
     foreach ($td_queue as &$q) if ($q['place'] === 'Report' && defined('AW_REPORT_REASONS')) $q['title'] = AW_REPORT_REASONS[$q['title']] ?? $q['title'];
     unset($q);
+}
+if (aw_can('community_team')) {
     $td_add(aw_dsh_q($db, "SELECT title, created_at AS since FROM community_posts WHERE status = 'held' AND visibility <> 'team' ORDER BY created_at LIMIT 15"), 'Story waiting for a first read', 'fa-seedling', 'community.php');
     $td_add(aw_dsh_q($db, "SELECT id, title, created_at AS since FROM community_posts p WHERE status = 'published' AND visibility <> 'team' AND type IN ('question', 'help')
                            AND NOT EXISTS (SELECT 1 FROM community_replies r WHERE r.post_id = p.id AND r.status = 'published') ORDER BY created_at LIMIT 15"),
         'Asked for help, no reply yet', 'fa-hand-holding-heart', function ($r) { return '../story.php?id=' . (int)$r['id']; });
     $td_add(aw_dsh_q($db, "SELECT id, title, created_at AS since FROM questions q WHERE NOT EXISTS (SELECT 1 FROM answers a WHERE a.question_id = q.id) ORDER BY created_at LIMIT 15"),
         'Question with no answer', 'fa-circle-question', function ($r) { return '../community.php?id=' . (int)$r['id']; });
+}
+if (aw_can('prayer_team')) {
     $td_add(aw_dsh_q($db, "SELECT COALESCE(NULLIF(request_type, ''), 'Prayer request') AS title, created_at AS since FROM prayer_requests WHERE COALESCE(status, 'pending') NOT IN ('prayed', 'answered', 'removed') ORDER BY created_at LIMIT 15"),
         'Prayer request', 'fa-hands-praying', 'manage_prayer_requests.php');
+}
+if (aw_can('comments_team')) {
     $td_add(aw_dsh_q($db, "SELECT substr(testimony, 1, 80) AS title, created_at AS since FROM testimonials WHERE approved = 0 AND is_public = 1 ORDER BY created_at LIMIT 15"),
         'Testimonial to review', 'fa-quote-left', 'manage_testimonials.php');
 }
@@ -125,6 +133,10 @@ if (aw_can('team_inbox')) {
 }
 if (aw_can('manage_content')) {
     $td_add(aw_dsh_q($db, "SELECT title, created_at AS since FROM member_books WHERE status = 'waiting' ORDER BY created_at LIMIT 15"), 'Book shared by a member', 'fa-book', 'member_books.php');
+}
+if (aw_can('mentoring_team') && !aw_can('manage_members')) { // the mentoring coordinator sees only mentoring
+    $td_add(aw_dsh_q($db, "SELECT CASE status WHEN 'proposed' THEN 'Waiting for a mentor to answer' ELSE 'Asked for a mentor' END AS title, created_at AS since FROM mentor_requests WHERE status IN ('waiting', 'proposed') ORDER BY created_at LIMIT 15"), 'Mentoring request', 'fa-hands-holding-circle', 'mentoring.php');
+    $td_add(aw_dsh_q($db, "SELECT 'Offered to mentor' AS title, created_at AS since FROM mentors WHERE status = 'pending' ORDER BY created_at LIMIT 15"), 'Mentor offer', 'fa-hand-holding-heart', 'mentoring.php');
 }
 if (aw_can('manage_members')) {
     $td_add(aw_dsh_q($db, "SELECT 'Session on ' || date || ' at ' || time AS title, created_at AS since FROM sessions WHERE status = 'pending' ORDER BY created_at LIMIT 15"), 'Session request', 'fa-calendar-check', 'manage_sessions.php?status=pending');
@@ -162,6 +174,10 @@ if (function_exists('aw_social_accounts')) {
 // ----- notes and your week --------------------------------------------------------------------
 $td_notes = aw_dsh_q($db, "SELECT n.*, u.name, u.first_name, u.last_name, u.username FROM team_notes n LEFT JOIN users u ON u.id = n.user_id
                            WHERE n.done_at IS NULL OR n.done_at >= datetime('now', '-3 days') ORDER BY (n.done_at IS NULL) DESC, n.pinned DESC, n.created_at DESC LIMIT 30");
+// owner and admins see what every member of the team did lately (the audit log, newest first)
+$td_team_log = aw_can('audit_log') ? aw_dsh_q($db, "SELECT a.action, a.target_type, a.target_id, a.created_at, a.actor_role, a.actor_id, u.name, u.first_name, u.last_name, u.username
+    FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id WHERE a.actor_id IS NOT NULL AND a.action NOT LIKE 'staff_%' AND a.created_at >= datetime('now', '-7 days')
+    ORDER BY a.id DESC LIMIT 14") : [];
 $td_week = aw_dsh_q($db, "SELECT action, COUNT(*) AS n FROM audit_log WHERE actor_id = ? AND created_at >= datetime('now', '-7 days')
                           AND action NOT LIKE 'staff_%' AND action <> 'access_denied' GROUP BY action ORDER BY n DESC LIMIT 8", [$td_me]);
 $td_week_total = array_sum(array_map(function ($r) { return (int)$r['n']; }, $td_week));
@@ -173,7 +189,7 @@ $td_words = function ($action) {
 };
 
 $td_name = explode(' ', awDisplayName(aw_dsh_q($db, "SELECT name, first_name, last_name, username FROM users WHERE id = ?", [$td_me])[0] ?? []))[0];
-$td_role = aw_role_label(aw_my_role());
+$td_role = function_exists('aw_my_staff_label') ? aw_my_staff_label() : aw_role_label(aw_my_role());
 $h = (int)date('G');
 
 $pageTitle = 'Team desk';
@@ -191,8 +207,17 @@ require_once '../includes/header.php';
         <nav class="td-hero-acts" aria-label="Team tools">
             <?php if (aw_can('moderate')): ?><a href="moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i> Moderation</a><?php endif; ?>
             <?php if (aw_can('team_inbox')): ?><a href="inbox.php"><i class="fas fa-inbox" aria-hidden="true"></i> Team inbox</a><?php endif; ?>
-            <?php if (aw_can('moderate')): ?><a href="community.php"><i class="fas fa-seedling" aria-hidden="true"></i> Stories &amp; Help</a><?php endif; ?>
-            <a href="dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i> <?php echo aw_can('manage_content') ? 'Admin dashboard' : 'Staff dashboard'; ?></a>
+            <?php if (aw_can('community_team')): ?><a href="community.php"><i class="fas fa-seedling" aria-hidden="true"></i> Stories &amp; Help</a><?php endif; ?>
+            <?php // a volunteer's own tools: one button per page their area uses (moderators and admins already have theirs)
+            if (!aw_can('manage_members') && function_exists('aw_user_areas')) { $td_seen = ['admin/inbox.php' => aw_can('team_inbox'), 'admin/community.php' => aw_can('community_team')];
+                foreach (aw_user_areas($td_me) as $td_a) foreach (AW_POSITIONS[$td_a]['pages'] as [$td_pl, $td_pu]) { if (!empty($td_seen[$td_pu])) continue; $td_seen[$td_pu] = true; ?>
+                <a href="<?php echo SITE_URL . '/' . $td_pu; ?>"><i class="fas <?php echo AW_POSITIONS[$td_a]['icon']; ?>" aria-hidden="true"></i> <?php echo htmlspecialchars($td_pl); ?></a>
+            <?php } } ?>
+            <?php if (function_exists('aw_user_areas') && aw_user_areas($td_me)): ?><a href="<?php echo SITE_URL; ?>/staff_invite.php"><i class="fas fa-id-badge" aria-hidden="true"></i> My roles</a><?php endif; ?>
+            <?php if (aw_can('invite_staff')): ?><a href="invite_staff.php"><i class="fas fa-user-plus" aria-hidden="true"></i> Invite to the team</a><?php endif; ?>
+            <?php // the right dashboard for each person: admins to the admin dashboard, other staff to their own member dashboard ?>
+            <?php if (aw_can('manage_members')): ?><a href="dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i> Admin dashboard</a>
+            <?php else: ?><a href="<?php echo SITE_URL; ?>/dashboard.php"><i class="fas fa-house-user" aria-hidden="true"></i> My dashboard</a><?php endif; ?>
         </nav>
     </header>
 
@@ -288,6 +313,17 @@ require_once '../includes/header.php';
                 <?php endif; ?>
             </section>
 
+            <?php if ($td_team_log): ?>
+            <section class="td-card" aria-labelledby="tdTeamLog">
+                <div class="td-card-head"><h2 id="tdTeamLog"><i class="fas fa-eye" aria-hidden="true"></i> What the team did</h2><a class="td-btn" href="audit.php">Full log</a></div>
+                <ul class="td-log">
+                    <?php foreach ($td_team_log as $l): ?>
+                    <li><b><?php echo htmlspecialchars(awDisplayName($l)); ?></b> <small><?php echo htmlspecialchars(aw_role_label((string)$l['actor_role'])); ?></small><br><span><?php echo htmlspecialchars($td_words($l['action'])); ?><?php echo $l['target_type'] ? ' · ' . htmlspecialchars($l['target_type']) . ($l['target_id'] ? ' #' . (int)$l['target_id'] : '') : ''; ?></span> <small><?php echo htmlspecialchars(date('j M, H:i', strtotime($l['created_at']))); ?></small>
+                        <a class="td-log-who" href="audit.php?actor=<?php echo (int)$l['actor_id']; ?>" aria-label="Everything <?php echo htmlspecialchars(awDisplayName($l)); ?> did">all</a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </section>
+            <?php endif; ?>
             <section class="td-card" aria-labelledby="tdGuide">
                 <div class="td-card-head"><h2 id="tdGuide"><i class="fas fa-compass" aria-hidden="true"></i> Good to have at hand</h2></div>
                 <ul class="td-guide">
@@ -372,7 +408,8 @@ html[data-theme="dark"] .td-notes li { background: #2e2620; border-color: #4a3d2
 .td-mine, .td-week, .td-guide { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
 .td-mine li { display: flex; gap: 10px; align-items: center; } .td-mine li span { flex: 1; } .td-mine small { color: var(--td-mute); margin-left: 6px; } .td-mine i { color: var(--td-rose); width: 20px; text-align: center; }
 .td-week li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--td-line); } .td-week b { color: var(--td-rose); }
-.td-guide a { color: var(--td-rose); font-weight: 600; } .td-guide small { display: block; color: var(--td-mute); }
+.td-guide a { color: var(--td-rose); font-weight: 600; }
+.td-log { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; font-size: .88rem; } .td-log li { padding-bottom: 8px; border-bottom: 1px dashed var(--td-line); } .td-log small { color: var(--td-mute); } .td-log-who { float: right; color: var(--td-rose); font-weight: 600; } .td-guide small { display: block; color: var(--td-mute); }
 @media (max-width: 900px) { .td-grid { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .td-list li { grid-template-columns: 34px minmax(0, 1fr) auto; } .td-list .td-btn { grid-column: 2 / -1; justify-self: start; } .td-hero { padding: 22px 18px; } }
 @media (prefers-reduced-motion: reduce) { .td-list li { animation: none; } }

@@ -10,7 +10,7 @@ require_once '../includes/auth.php';
 require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/reading_groups.php';
 
-aw_require('manage_content'); // K1
+aw_require('clubs_team'); // K1
 
 // F47: the POST actions below answer the page's fetch() calls with JSON; they used to run after
 // header.php had already printed the page, so the JSON was appended to ~21 KB of HTML and the

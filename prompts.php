@@ -15,7 +15,7 @@ if (is_file(__DIR__ . '/includes/moderation.php')) require_once 'includes/modera
 $wp_uid = (int)($_SESSION['user_id'] ?? 0);
 $wp_self = SITE_URL . '/prompts.php';
 aw_prompt_tables($db);
-$wp_team = function_exists('aw_can') && aw_can('manage_content');
+$wp_team = function_exists('aw_can') && aw_can('prompts_team');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $wp_uid) {
     $back = $wp_self . '?p=' . (int)($_POST['prompt_id'] ?? 0);

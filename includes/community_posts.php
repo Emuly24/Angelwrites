@@ -194,7 +194,7 @@ function aw_cp_restriction(PDO $db, $uid) {
 /** Can the signed-in member see real identities and team-only posts? (owner and admins) */
 function aw_cp_staff_full() { return function_exists('aw_can') && aw_can('see_identities'); }
 /** Can the signed-in member moderate public posts? */
-function aw_cp_staff_mod() { return function_exists('aw_can') && aw_can('moderate'); }
+function aw_cp_staff_mod() { return function_exists('aw_can') && (aw_can('moderate') || aw_can('community_team')); }
 
 // ----- visibility ---------------------------------------------------------------------------
 

@@ -125,6 +125,7 @@ if (!empty($_SESSION['aw_usd_flash'])) { $aw_usd_msg = ['ok' => true, 'msg' => $
 $aw_share_msg = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_share_base'])) {
     $aw_sb = rtrim(trim((string)($_POST['share_base_url'] ?? '')), '/');
+    if ($aw_sb !== '' && !preg_match('#^[a-z]+://#i', $aw_sb)) $aw_sb = 'https://' . $aw_sb; // pasted without https://
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
         $aw_share_msg = ['ok' => false, 'msg' => 'Your session expired. Please reload the page and try again.'];
     } elseif ($aw_sb !== '' && !preg_match('#^https://[a-z0-9.-]+(/[a-z0-9._/-]*)?$#i', $aw_sb)) {
@@ -133,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_share_base'])) {
         $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute(['share_base_url', $aw_sb]);
         if (function_exists('aw_audit')) aw_audit('settings_changed', 'settings', null, 'share_base_url ' . ($aw_sb !== '' ? 'set' : 'cleared'));
         $_SESSION['aw_share_flash'] = $aw_sb !== '' ? 'Saved. Shared links now go through the preview relay.' : 'Saved. Shared links go straight to the site.';
-        header('Location: ' . SITE_URL . '/admin/settings.php#link-previews');
+        header('Location: ' . SITE_URL . '/admin/settings.php?tab=email#link-previews');
         exit;
     }
 }
@@ -196,7 +197,7 @@ $pageTitle = 'Site Settings';
         <div class="settings-tabs">
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
-            <button class="tab-btn<?php echo $aw_mail_test ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
+            <button class="tab-btn<?php echo ($aw_mail_test || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
             <button class="tab-btn<?php echo ($aw_quota_msg || ($_GET['tab'] ?? '') === 'uploads') ? ' aw-open-email' : ''; ?>" data-tab="uploads">Uploads</button><!-- R13 -->
         </div>
 
@@ -435,8 +436,25 @@ $pageTitle = 'Site Settings';
 
                     <h3 id="link-previews" style="margin:28px 0 10px;">Link previews (WhatsApp, Telegram, X…)</h3>
                     <?php if ($aw_share_msg): ?><div class="alert <?php echo $aw_share_msg['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_share_msg['msg']); ?></div><?php endif; ?>
-                    <p style="color:var(--text-light);margin:0 0 12px;">The free hosting plan shows a “browser check” page to WhatsApp, Telegram, X and most other apps, so shared links appear without a picture. Facebook is let through. A free relay fixes this; the steps are in <code>tools/share-relay/README.md</code>. Paste the relay’s address here once it is set up, or leave it empty.</p>
-                    <form method="POST" class="admin-form" action="<?php echo SITE_URL; ?>/admin/settings.php#link-previews">
+                    <?php $aw_sb_now = (string)aw_setting('share_base_url', ''); ?>
+                    <div class="aw-relay-state <?php echo $aw_sb_now !== '' ? 'is-on' : 'is-off'; ?>" role="status">
+                        <i class="fas <?php echo $aw_sb_now !== '' ? 'fa-circle-check' : 'fa-triangle-exclamation'; ?>" aria-hidden="true"></i>
+                        <?php if ($aw_sb_now !== ''): ?>
+                            <span><strong>On.</strong> Every Share button on the site now hands out relay links, so WhatsApp, Telegram and X can show the title and picture.</span>
+                        <?php else: ?>
+                            <span><strong>Off.</strong> Shared links go straight to the site, and WhatsApp, Telegram and X show them without a picture. Deploying the relay is not enough on its own: its address has to be pasted below.</span>
+                        <?php endif; ?>
+                    </div>
+                    <p style="color:var(--text-light);margin:0 0 8px;">The free hosting plan shows a “browser check” page to WhatsApp, Telegram, X and most other apps, so they never see the title or picture. Facebook is let through. The free relay (<code>tools/share-relay</code>, deployed on Cloudflare as <strong>angelwrites-share</strong>) reads the page the way Facebook does and gives the apps the preview.</p>
+                    <details class="aw-relay-help"><summary>Where do I find the relay address?</summary>
+                        <ol>
+                            <li>Sign in at <a href="https://dash.cloudflare.com" target="_blank" rel="noopener">dash.cloudflare.com</a>.</li>
+                            <li>Open <strong>Workers &amp; Pages</strong> (or <strong>Compute → Workers</strong>) and click <strong>angelwrites-share</strong>.</li>
+                            <li>Open <strong>Settings → Domains &amp; Routes</strong>. The <strong>workers.dev</strong> line shows the address, like <code>angelwrites-share.yourname.workers.dev</code>. If it says <em>Disabled</em>, click <strong>Enable</strong>.</li>
+                            <li>Copy it, paste it below and press Save.</li>
+                        </ol>
+                    </details>
+                    <form method="POST" class="admin-form" action="<?php echo SITE_URL; ?>/admin/settings.php?tab=email#link-previews">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                         <div class="form-group">
                             <label for="share_base_url">Preview relay address</label>
@@ -444,6 +462,24 @@ $pageTitle = 'Site Settings';
                         </div>
                         <button type="submit" name="save_share_base" value="1" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
                     </form>
+                    <?php if ($aw_sb_now !== ''): $aw_sb_now = rtrim($aw_sb_now, '/'); ?>
+                        <p style="margin:12px 0 4px;"><strong>Check it:</strong> open these. Each should show a small page that sends you on to the site. The image link should show a picture.</p>
+                        <ul class="aw-relay-tests">
+                            <li><a href="<?php echo htmlspecialchars($aw_sb_now); ?>/" target="_blank" rel="noopener">The home page through the relay</a></li>
+                            <li><a href="<?php echo htmlspecialchars($aw_sb_now); ?>/i?u=%2Fassets%2Fimages%2Fog-logo.jpg" target="_blank" rel="noopener">The preview picture through the relay</a></li>
+                        </ul>
+                        <p style="color:var(--text-light);margin:4px 0 0;font-size:.9rem;">WhatsApp remembers a link’s preview, so test with a poem you have not shared before. Use the site’s own <strong>Share</strong> button rather than the browser’s; the browser shares the plain page address.</p>
+                    <?php endif; ?>
+                    <style>
+                        .aw-relay-state{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;margin:0 0 12px;border:1px solid}
+                        .aw-relay-state.is-on{background:#eaf6ee;border-color:#9fd3ae;color:#1d5130}
+                        .aw-relay-state.is-off{background:#fff4e5;border-color:#f0c27a;color:#6b4100}
+                        .aw-relay-state i{margin-top:3px}
+                        .aw-relay-help{margin:0 0 12px}.aw-relay-help summary{cursor:pointer;font-weight:600;color:var(--primary-dark,#9c5457)}
+                        .aw-relay-help ol{margin:8px 0 0 20px;line-height:1.6}.aw-relay-tests{margin:0 0 0 20px;line-height:1.7}
+                        [data-theme="dark"] .aw-relay-state.is-on{background:#16301f;border-color:#2f6b43;color:#cdeed7}
+                        [data-theme="dark"] .aw-relay-state.is-off{background:#33260f;border-color:#7a5a1e;color:#f6deb0}
+                    </style>
 
                     <h3 style="margin:28px 0 10px;">Recent failed emails</h3>
                     <?php if (!$aw_mail_failures): ?>

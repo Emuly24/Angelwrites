@@ -49,9 +49,51 @@ function aw_og_image_url(PDO $db, $type, $id) {
  * WhatsApp and the others can show the picture; people are sent straight on to the page.
  */
 function aw_share_url($type, $id) {
-    $base = function_exists('aw_setting') ? rtrim((string)aw_setting('share_base_url', ''), '/') : '';
-    if ($base !== '' && preg_match('#^https://[a-z0-9.-]+(/[a-z0-9._/-]*)?$#i', $base)) return $base . ($type === 'book' ? '/b/' : '/p/') . (int)$id;
+    $base = aw_share_base();
+    if ($base !== '') return $base . ($type === 'book' ? '/b/' : '/p/') . (int)$id;
     return rtrim(SITE_URL, '/') . ($type === 'book' ? '/book.php?id=' : '/poem_view.php?id=') . (int)$id;
+}
+
+/** The relay address from Settings, or '' when none (or not a plain https address). */
+function aw_share_base() {
+    $base = function_exists('aw_setting') ? rtrim((string)aw_setting('share_base_url', ''), '/') : '';
+    return ($base !== '' && preg_match('#^https://[a-z0-9.-]+(/[a-z0-9._/-]*)?$#i', $base)) ? $base : '';
+}
+
+/** Pages the relay will preview (keep in step with PAGES in tools/share-relay/worker.js). */
+const AW_SHARE_PAGES = ['index.php', 'about.php', 'poem_view.php', 'poetry.php', 'book.php', 'books.php', 'blog.php', 'blog_post.php',
+    'reflections.php', 'video_watch.php', 'videos.php', 'events.php', 'plans.php', 'reading_plan.php', 'prayer.php',
+    'prompts.php', 'bible_reader.php', 'contact.php', 'newsletter.php', 'community_guidelines.php'];
+
+/**
+ * The link to share for any public page, given its site path ("blog_post.php?slug=x", "" for home).
+ * Through the relay when one is set up and the page is on its list; otherwise the page itself.
+ */
+function aw_share_link($path) {
+    $path = ltrim((string)$path, '/');
+    $direct = rtrim(SITE_URL, '/') . '/' . $path;
+    $base = aw_share_base();
+    if ($base === '') return $direct;
+    $file = (string)strtok($path, '?');
+    $q = (string)parse_url('/' . $path, PHP_URL_QUERY);
+    if ($file === '' || $file === 'index.php') return $q === '' ? $base . '/' : $direct;
+    if (!in_array($file, AW_SHARE_PAGES, true)) return $direct;
+    if ($file === 'poem_view.php' && preg_match('/^id=(\d+)$/', $q, $m)) return $base . '/p/' . $m[1];
+    if ($file === 'book.php' && preg_match('/^id=(\d+)$/', $q, $m)) return $base . '/b/' . $m[1];
+    if ($q !== '' && !preg_match('/^[A-Za-z0-9=&._%-]{1,200}$/', $q)) return $direct;
+    return $base . '/s/' . $file . ($q !== '' ? '?' . $q : '');
+}
+
+/** The share link for the page being shown now (no preview flags or tracking). */
+function aw_share_link_here() {
+    $uri = (string)($_SERVER['REQUEST_URI'] ?? '/');
+    $site_path = (string)parse_url(SITE_URL, PHP_URL_PATH);
+    $path = (string)parse_url($uri, PHP_URL_PATH);
+    if ($site_path !== '' && strpos($path, $site_path) === 0) $path = substr($path, strlen($site_path));
+    parse_str((string)parse_url($uri, PHP_URL_QUERY), $qs);
+    foreach (['preview', 'utm_source', 'utm_medium', 'utm_campaign', 'fbclid', 'aw_t'] as $k) unset($qs[$k]);
+    $q = http_build_query($qs);
+    return aw_share_link(ltrim($path, '/') . ($q !== '' ? '?' . $q : ''));
 }
 
 /** A plain one-line description for previews (no tags, no line breaks), at most $len characters. */

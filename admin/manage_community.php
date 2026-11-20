@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-aw_require('moderate'); // K1
+aw_require('community_team'); // K1
 // N4: one moderation queue for every kind of report
 header('Location: ' . SITE_URL . '/admin/moderation.php');
 exit;

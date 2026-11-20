@@ -5,6 +5,27 @@
   'use strict';
   var root = document.querySelector('.dsh'); if (!root) return;
   var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // masonry without CSS columns: deal the cards into real columns, each into the shortest one
+  function masonry() {
+    root.querySelectorAll('.dsh-row-3, .dsh-tools').forEach(function (box) {
+      var cards = box._awCards || (box._awCards = [].slice.call(box.children).filter(function (c) { return !c.classList.contains('dsh-col'); }));
+      var width = box.getBoundingClientRect().width;
+      var n = Math.max(1, Math.min(4, Math.floor((width + 16) / (270 + 16))));
+      if (box._awCols === n) return;
+      box._awCols = n;
+      [].slice.call(box.querySelectorAll(':scope > .dsh-col')).forEach(function (c) { c.remove(); });
+      if (n === 1) { box.classList.remove('dsh-masonry'); cards.forEach(function (c) { box.appendChild(c); }); return; }
+      box.classList.add('dsh-masonry');
+      var cols = [], h = [];
+      for (var i = 0; i < n; i++) { var c = document.createElement('div'); c.className = 'dsh-col'; box.appendChild(c); cols.push(c); h.push(0); }
+      cards.forEach(function (card) {
+        var k = h.indexOf(Math.min.apply(null, h));
+        cols[k].appendChild(card);
+        h[k] += card.getBoundingClientRect().height + 16;
+      });
+    });
+  }
+  try { masonry(); var mt; window.addEventListener('resize', function () { clearTimeout(mt); mt = setTimeout(masonry, 150); }); } catch (e) {}
   var items = root.querySelectorAll('.dsh-reveal');
   function countUp(el) {
     var end = parseFloat(el.getAttribute('data-count')) || 0, fmt = new Intl.NumberFormat();

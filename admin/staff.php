@@ -101,6 +101,7 @@ require_once '../includes/header.php';
                 <li><strong>Owner</strong> (you): everything, including this page.</li>
                 <li><strong>Admin</strong>: content, members, newsletter, payments, settings, backups, moderation and the team inbox. Can see who wrote a pseudonymous post.</li>
                 <li><strong>Moderator</strong>: the moderation queue, comments, community Q&amp;A, testimonials, prayer requests and the team inbox. Cannot reach settings, roles, backups, payments, members or the newsletter, and never sees who is behind a pseudonym.</li>
+                <li><strong>Volunteers</strong>: members who accepted an invitation to help in one area only (prayer team, events, translations…). They get that area's page and their Team desk, nothing else. <a href="<?php echo SITE_URL; ?>/admin/invite_staff.php">Invite to the team</a></li>
             </ul>
         </div></div>
 
