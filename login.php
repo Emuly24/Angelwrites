@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
 
                 // K5: staff with two-step sign-in give their code first (login_2fa.php finishes the sign-in)
                 require_once __DIR__ . '/includes/twofactor.php';
-                if (aw_is_staff_role($user['role']) && aw_2fa_enabled($db, (int)$user['id'])) {
+                if (aw_is_staff_role($user['role'], (int)$user['id']) && aw_2fa_enabled($db, (int)$user['id'])) {
                     session_regenerate_id(true);
                     $_SESSION['pending_2fa'] = ['uid' => (int)$user['id'], 'remember' => (bool)$remember_me, 'redirect' => $redirect_target, 'at' => time(), 'tries' => 0];
                     header('Location: ' . SITE_URL . '/login_2fa.php');
@@ -191,7 +191,7 @@ $pageTitle = 'Sign In';
                     </div>
 
                     <div class="form-group">
-                        <a href="<?php echo SITE_URL; ?>/forgot_password.php" style="font-size: 0.9rem; color: var(--rose);">Forgot password?</a>
+                        <a href="<?php echo SITE_URL; ?>/forgot_password.php" style="font-size: 0.9rem; color: var(--rose);">Forgot password?</a> <span aria-hidden="true">·</span> <a href="<?php echo SITE_URL; ?>/recover.php" style="font-size: 0.9rem; color: var(--rose);">No access to your email?</a>
                     </div>
 
                     <button type="submit" name="login_submit" class="btn btn-primary btn-block">

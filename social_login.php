@@ -58,7 +58,7 @@ function aw_social_signin(PDO $db, $user_id, $back) {
     $st->execute([(int)$user_id]);
     $u = $st->fetch(PDO::FETCH_ASSOC);
     if (!$u) aw_social_fail('That account no longer exists. Please sign up again.');
-    if (function_exists('aw_is_staff_role') && aw_is_staff_role($u['role']) && function_exists('aw_2fa_enabled') && aw_2fa_enabled($db, (int)$u['id'])) {
+    if (function_exists('aw_is_staff_role') && aw_is_staff_role($u['role'], (int)$u['id']) && function_exists('aw_2fa_enabled') && aw_2fa_enabled($db, (int)$u['id'])) {
         session_regenerate_id(true);
         $_SESSION['pending_2fa'] = ['uid' => (int)$u['id'], 'remember' => false, 'redirect' => $back, 'at' => time(), 'tries' => 0];
         header('Location: ' . SITE_URL . '/login_2fa.php');

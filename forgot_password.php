@@ -4,6 +4,8 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/mail_helper.php';
 require_once 'includes/human_check.php';
+require_once 'includes/member_profile.php';
+aw_profile_columns($db);
 
 $error = '';
 $message = '';
@@ -41,16 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
 
             // F105: the answer must not depend on whether the account exists (it used to say
             // "a code has been sent" or "failed to send" only for real accounts).
-            if (sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
-                
-                // ===== SEND ADMIN NOTIFICATION =====
-                $admin_email = aw_admin_email();
-                $admin_subject = '🔑 Password Reset Requested';
-                $admin_body = "A user requested a password reset code.\n\nEmail: $email\nName: " . $user['first_name'];
-                sendEmail($admin_email, $admin_subject, $admin_body, 'angelwrites@zohomail.com', 'AngelWrites');
-            } else {
-                error_log('forgot_password: reset code email failed for user ' . $user['id']);
-            }
+            // a new code starts a fresh count of wrong tries (reset_password.php)
+            try { $db->prepare("UPDATE users SET reset_attempts = 0 WHERE id = ?")->execute([$user['id']]); } catch (Throwable $e) { /* column added by member_profile.php */ }
+            // F105: the answer must not depend on whether the account exists
+            if (!sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) error_log('forgot_password: reset code email failed for user ' . $user['id']);
         }
         // F105: same message and same rate limit whether or not the account exists
         $message = 'If an account with that email exists, a reset code has been sent. Please check your inbox and spam folder.';
@@ -93,6 +89,7 @@ $pageTitle = 'Forgot Password';
                 </form>
 
                 <div class="auth-footer">
+                    <p><strong>No access to your email?</strong> <a href="<?php echo SITE_URL; ?>/recover.php">Reset with your phone number and recovery question</a></p>
                     <p><a href="<?php echo SITE_URL; ?>/login.php">Back to Login</a></p>
                 </div>
             </div>

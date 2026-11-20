@@ -38,3 +38,31 @@ jobs:
             update_schema.php
             allow_url_fopen
             CLAUDE.md
+
+      # The server's .env (keys for email, Google/Facebook sign-in, journals...) is never in the
+      # repository. If the repository secret DOTENV holds the whole .env file, it is uploaded here,
+      # on its own, so the keys reach the server without anyone opening the file manager.
+      # DOTENV must contain EVERY line the site needs: it replaces the .env on the server.
+      - name: Write .env from the DOTENV secret
+        id: dotenv
+        env:
+          DOTENV: ${{ secrets.DOTENV }}
+        run: |
+          if [ -n "$DOTENV" ]; then
+            mkdir -p ./.dotenv_upload
+            printf '%s\n' "$DOTENV" > ./.dotenv_upload/.env
+            echo "present=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload .env
+        if: steps.dotenv.outputs.present == 'yes'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./.dotenv_upload/
+          server-dir: /angelwrites.gt.tc/htdocs/
+          state-name: .ftp-deploy-dotenv-state.json

@@ -117,7 +117,11 @@ function aw_2fa_disable(PDO $db, $uid) {
     catch (Throwable $e) { error_log('2fa disable: ' . $e->getMessage()); return false; }
 }
 
-function aw_is_staff_role($role) { return in_array((string)$role, ['admin', 'moderator'], true); }
+/** Staff for two-step sign-in: admins, moderators, and members holding a volunteer area (give $uid). */
+function aw_is_staff_role($role, $uid = 0) {
+    if (in_array((string)$role, ['admin', 'moderator'], true)) return true;
+    return $uid > 0 && function_exists('aw_user_areas') && (bool)aw_user_areas((int)$uid);
+}
 
 /** Finish a sign-in: the session, "remember me", last login. Shared by login.php and login_2fa.php. */
 function aw_finish_login(PDO $db, array $user, $remember) {
@@ -145,7 +149,7 @@ function aw_2fa_enforce() {
     $db = $GLOBALS['db'] ?? null;
     if (!$db instanceof PDO || empty($_SESSION['user_id'])) return;
     if (!function_exists('aw_setting') || (string)aw_setting('staff_2fa_required', '0') !== '1') return;
-    if (!aw_is_staff_role($_SESSION['role'] ?? '')) return;
+    if (!aw_is_staff_role($_SESSION['role'] ?? '', (int)$_SESSION['user_id'])) return;
     if (aw_2fa_enabled($db, (int)$_SESSION['user_id'])) return;
     header('Location: ' . SITE_URL . '/account_security.php?required=1');
     exit;

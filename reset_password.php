@@ -3,6 +3,9 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/notifications.php';
+require_once 'includes/member_profile.php'; // aw_after_password_reset()
+aw_profile_columns($db);
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
@@ -63,41 +66,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reset_password']) && 
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } else {
-        $stmt = $db->prepare("SELECT id, reset_code, reset_code_expiry, name FROM users WHERE email = ? COLLATE NOCASE");
+        $stmt = $db->prepare("SELECT id, reset_code, reset_code_expiry, COALESCE(reset_attempts, 0) AS tries FROM users WHERE email = ? COLLATE NOCASE");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$user) {
-            $error = 'No account found with that email address.';
-            $attempts++;
-            $last_attempt = time();
-            file_put_contents($attempts_file, $attempts . '|' . $last_attempt);
-        } elseif ($user['reset_code'] !== $code) {
-            $error = 'Invalid reset code. Please try again.';
-            $attempts++;
-            $last_attempt = time();
-            file_put_contents($attempts_file, $attempts . '|' . $last_attempt);
-        } elseif (strtotime($user['reset_code_expiry']) < time()) {
-            $error = 'Reset code has expired. Please request a new code.';
+        $fail = function () use (&$attempts, &$last_attempt, $attempts_file) { $attempts++; $last_attempt = time(); file_put_contents($attempts_file, $attempts . '|' . $last_attempt); };
+        // one message for "no such account" and "wrong code", so this page never tells who has an account
+        if (!$user || (string)$user['reset_code'] === '' || !hash_equals((string)$user['reset_code'], $code)) {
+            $error = 'That code is not right, or it has expired. Check the newest email, or request a new code.';
+            $fail();
+            if ($user && (string)$user['reset_code'] !== '') {
+                // five wrong codes for an account and the code stops working, whatever network they come from
+                $db->prepare("UPDATE users SET reset_attempts = COALESCE(reset_attempts, 0) + 1, reset_code = CASE WHEN COALESCE(reset_attempts, 0) + 1 >= 5 THEN NULL ELSE reset_code END WHERE id = ?")->execute([(int)$user['id']]);
+            }
+        } elseif (strtotime((string)$user['reset_code_expiry']) < time()) {
+            $error = 'That code is not right, or it has expired. Check the newest email, or request a new code.';
         } else {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $db->prepare("UPDATE users SET password = ?, reset_code = NULL, reset_code_expiry = NULL WHERE id = ?");
-            $stmt->execute([$hashed, $user['id']]);
+            $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $user['id']]);
+            aw_after_password_reset($db, (int)$user['id'], 'email code'); // signs out other devices, tells the member
             $success = 'Password reset successfully! You can now <a href="login.php">log in</a>.';
-            
-            // Reset attempts on success
-            if (file_exists($attempts_file)) {
-                unlink($attempts_file);
-            }
-            
-            // ===== SEND ADMIN NOTIFICATION =====
-            $admin_email = aw_admin_email();
-            $subject = '🔐 Password Reset Completed';
-            $body = "<h2>Password Reset Completed</h2>";
-            $body .= "<p><strong>Email:</strong> $email</p>";
-            $body .= "<p><strong>Name:</strong> " . $user['name'] . "</p>";
-            $body .= "<p><a href='" . SITE_URL . "/admin/manage_users.php'>View user in admin panel</a></p>";
-            sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+            if (file_exists($attempts_file)) unlink($attempts_file);
         }
     }
 }

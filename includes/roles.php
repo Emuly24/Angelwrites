@@ -32,7 +32,8 @@ const AW_CAPS = [
     'see_identities'   => ['owner', 'admin'],
     'audit_log'        => ['owner', 'admin'],
     'manage_staff'     => ['owner'],
-    'invite_staff'     => ['owner', 'admin'],              // admin/invite_staff.php: invite members to volunteer
+    'invite_staff'     => ['owner', 'admin'],
+    'contact_members'  => ['owner', 'admin', 'moderator'],  // phone/WhatsApp/email buttons and members' details (member_profile.php)              // admin/invite_staff.php: invite members to volunteer
     // volunteer areas (includes/staff_positions.php): a member who accepted an invitation gains just one of these
     'prayer_team'      => ['owner', 'admin', 'moderator'],
     'community_team'   => ['owner', 'admin', 'moderator'],
@@ -114,8 +115,10 @@ function aw_can($cap) {
 /** What the signed-in person is on the team, for headings: "Moderator", "Prayer team · Events coordinator"… */
 function aw_my_staff_label() {
     $role = aw_my_role();
-    $parts = $role === 'member' ? [] : [aw_role_label($role)];
-    if (function_exists('aw_user_areas') && !empty($_SESSION['user_id'])) foreach (aw_user_areas((int)$_SESSION['user_id']) as $a) $parts[] = AW_POSITIONS[$a]['title'];
+    $areas = (function_exists('aw_user_areas') && !empty($_SESSION['user_id'])) ? aw_user_areas((int)$_SESSION['user_id']) : [];
+    // volunteers are part of the Care Team, like moderators
+    $parts = $role === 'member' ? ($areas ? [aw_team_name()] : []) : [aw_role_label($role)];
+    foreach ($areas as $a) $parts[] = AW_POSITIONS[$a]['title'];
     return $parts ? implode(' · ', $parts) : aw_role_label($role);
 }
 
@@ -142,6 +145,11 @@ function aw_require($cap) {
            . '<h1 style="font-family:Georgia,serif">This page is not part of your role</h1>'
            . '<p>Your team role does not include this page. If you need it, ask the owner.</p>'
            . '<p><a href="' . htmlspecialchars(SITE_URL) . '/admin/team.php" style="color:#a8676a">Back to your Team desk</a></p></div>';
+        exit;
+    }
+    // the Care Team reads their role's training once before its pages open (admin/training.php)
+    if (function_exists('aw_training_needed_for') && ($aw_tn = aw_training_needed_for($cap)) !== '') {
+        header('Location: ' . SITE_URL . '/admin/training.php?area=' . rawurlencode($aw_tn));
         exit;
     }
     aw_staff_request_guard();
@@ -263,7 +271,19 @@ function aw_audit($action, $target_type = null, $target_id = null, $details = ''
     }
 }
 
-/** A role's name for people. */
+/**
+ * What each role is called, for people. Chosen in Admin > Settings > Team names, so the words never
+ * suggest a ladder: by default the Founder, Stewards, the Care Team (moderators and volunteers) and
+ * Members, who all serve one another. The roles behind them (owner, admin, moderator) do not change.
+ */
+const AW_ROLE_NAMES = ['owner' => 'Founder', 'admin' => 'Steward', 'moderator' => 'Care Team', 'member' => 'Member'];
+
 function aw_role_label($role) {
-    return ['owner' => 'Owner', 'admin' => 'Admin', 'moderator' => 'Moderator', 'member' => 'Member', 'guest' => 'Guest'][$role] ?? 'Member';
+    if ($role === 'guest') return 'Guest';
+    $role = isset(AW_ROLE_NAMES[$role]) ? $role : 'member';
+    $set = function_exists('aw_setting') ? trim((string)aw_setting('role_name_' . $role, '')) : '';
+    return $set !== '' ? $set : AW_ROLE_NAMES[$role];
 }
+
+/** The name for everyone who serves (moderators and volunteers): "Care Team" by default. */
+function aw_team_name() { return aw_role_label('moderator'); }

@@ -30,6 +30,14 @@ function aw_housekeeping(PDO $db) {
                 error_log('aw_housekeeping: ' . $e->getMessage()); // e.g. a table not created yet
             }
         }
+        // the Care Team: monthly check-ins, meeting reminders and the owner's weekly summary. Run at the end
+        // of the request, when roles, settings and mail are loaded, after the page has been sent.
+        register_shutdown_function(function () use ($db) {
+            if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
+            if (!function_exists('aw_setting') || !function_exists('aw_owner_id')) return;
+            require_once __DIR__ . '/team_care.php';
+            aw_team_care_daily($db);
+        });
     } catch (Throwable $e) {
         error_log('aw_housekeeping: ' . $e->getMessage());
     }

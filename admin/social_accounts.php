@@ -126,7 +126,7 @@ require_once '../includes/header.php';
                 <select id="sa-o-<?php echo $k; ?>" name="overseers[]" multiple>
                     <?php foreach ($sa_staff as $u): ?><option value="<?php echo (int)$u['id']; ?>"<?php echo in_array((int)$u['id'], $a['overseers'], true) ? ' selected' : ''; ?>><?php echo htmlspecialchars($sa_name($u) . ' (' . $u['role'] . ')'); ?></option><?php endforeach; ?>
                 </select>
-                <p class="sa-hint">Hold Ctrl (or Cmd) to choose more than one. Team members are added in Staff &amp; roles.</p>
+                <p class="sa-hint">Hold Ctrl (or Cmd) to choose more than one. Team members are added in Team &amp; roles.</p>
                 <label for="sa-l-<?php echo $k; ?>">Sign-in email or username</label>
                 <input type="text" id="sa-l-<?php echo $k; ?>" name="login_name" value="<?php echo htmlspecialchars($a['login_name']); ?>" autocomplete="off">
                 <label for="sa-p-<?php echo $k; ?>">Password <?php echo $a['has_secret'] ? '(saved; type a new one to replace it)' : ''; ?></label>

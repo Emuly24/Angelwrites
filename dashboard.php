@@ -127,6 +127,22 @@ require_once 'includes/header.php';
         </div>
     </section>
 
+    <?php // details the team relies on (country, phone, age range, sex, recovery question): ask until they are given
+    require_once __DIR__ . '/includes/member_profile.php';
+    $aw_miss = [];
+    if (aw_profile_columns($db)) { try { $aw_mr = $db->prepare("SELECT country, contact_number, age_range, gender, recovery_question FROM users WHERE id = ?"); $aw_mr->execute([(int)$_SESSION['user_id']]); $aw_miss = aw_profile_missing($aw_mr->fetch(PDO::FETCH_ASSOC) ?: []); } catch (Throwable $e) { error_log('dashboard details: ' . $e->getMessage()); } }
+    if ($aw_miss): $aw_need_rq = in_array('recovery question', $aw_miss, true); $aw_other = array_diff($aw_miss, ['recovery question']); ?>
+    <section class="dsh-invite dsh-details" aria-labelledby="dDetails">
+        <span class="dsh-invite-ico" aria-hidden="true"><i class="fas fa-id-card"></i></span>
+        <div>
+            <h2 id="dDetails">Please complete your details</h2>
+            <p>Missing: <?php echo htmlspecialchars(implode(', ', $aw_miss)); ?>. They help the team look after you and let you reset your password even without email. Only the team sees them.</p>
+        </div>
+        <?php if ($aw_other): ?><a class="dsh-pill dsh-pill-solid" href="<?php echo SITE_URL; ?>/profile.php">Add my details</a><?php endif; ?>
+        <?php if ($aw_need_rq): ?><a class="dsh-pill<?php echo $aw_other ? '' : ' dsh-pill-solid'; ?>" href="<?php echo SITE_URL; ?>/account_security.php#recovery">Set a recovery question</a><?php endif; ?>
+    </section>
+    <?php endif; ?>
+
     <?php $aw_inv = function_exists('aw_invite_pending') ? aw_invite_pending($db, (int)$_SESSION['user_id']) : null;
     if ($aw_inv && isset(AW_POSITIONS[$aw_inv['position']])): $aw_ip = AW_POSITIONS[$aw_inv['position']]; ?>
     <section class="dsh-invite" aria-labelledby="dInvite">

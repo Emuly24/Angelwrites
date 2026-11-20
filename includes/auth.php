@@ -26,7 +26,7 @@ if (!isset($_SESSION['user_id']) && !empty($_COOKIE['remember_token']) && isset(
         // AV1: admins are not required to verify their email (same rule as login.php)
         // K5: staff with two-step sign-in must sign in fully; a remembered cookie never skips the code
         $aw_needs_code = false;
-        if ($aw_ru && in_array($aw_ru['role'], ['admin', 'moderator'], true)) {
+        if ($aw_ru) { // anyone with two-step sign-in on (staff and volunteers)
             try { $aw_tf = $GLOBALS['db']->prepare("SELECT 1 FROM staff_2fa WHERE user_id = ? AND enabled_at IS NOT NULL"); $aw_tf->execute([$aw_ru['id']]); $aw_needs_code = (bool)$aw_tf->fetchColumn(); }
             catch (Throwable $e) { /* no 2FA table yet */ }
         }
