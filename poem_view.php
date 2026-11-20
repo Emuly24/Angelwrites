@@ -649,6 +649,10 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
         echo aw_poem_assets();
         echo aw_poem_reader($poem, $db);
         ?>
+        <!-- Listen: the poem read aloud by the device's own voice, a stanza at a time (assets/js/aw-listen.js) -->
+        <script src="<?php echo SITE_URL; ?>/assets/js/aw-listen.js<?php echo '?v=1'; ?>" defer></script>
+        <script>document.addEventListener('DOMContentLoaded', function () { if (window.AWListen && AWListen.supported) AWListen.attach({ label: 'Listen to this poem', lang: 'en',
+            blocks: function () { var s = [].slice.call(document.querySelectorAll('.aw-poem .aw-stanza')); return s.length ? s : [].slice.call(document.querySelectorAll('.aw-poem p, .aw-poem .aw-line')); } }); });</script>
 
         <!-- Styled Reaction Section -->
         <div class="reaction-section aw-hide-focus">

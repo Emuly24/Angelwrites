@@ -235,6 +235,7 @@ require_once 'includes/header.php';
 
     <h2 class="dsh-tools-h">Explore</h2>
     <nav class="dsh-explore dsh-reveal" aria-label="Explore AngelWrites">
+        <a href="<?php echo SITE_URL; ?>/journal.php"><i class="fas fa-book-open" aria-hidden="true"></i> My journal</a>
         <a href="<?php echo SITE_URL; ?>/books.php"><i class="fas fa-book" aria-hidden="true"></i> Books</a>
         <a href="<?php echo SITE_URL; ?>/poetry.php"><i class="fas fa-feather" aria-hidden="true"></i> Poetry</a>
         <a href="<?php echo SITE_URL; ?>/reflections.php"><i class="fas fa-dove" aria-hidden="true"></i> Reflections</a>

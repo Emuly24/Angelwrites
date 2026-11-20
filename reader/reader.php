@@ -982,6 +982,8 @@ require_once __DIR__ . '/reader_share.php';
     }
 
     // Go to a book page; frac (0-1) is how far into that page, so a saved place is found exactly.
+    window.awReaderGoTo = function (n) { if (n !== currentPage) goToPage(n); }; // listen mode turns the pages
+    window.awReaderPage = function () { return currentPage; };
     function goToPage(pageNum, frac) {
         if (pageNum < 1 || pageNum > totalPages) return;
         frac = Math.max(0, Math.min(0.999, frac || 0));
@@ -1990,5 +1992,21 @@ require_once __DIR__ . '/reader_share.php';
     });
 })();
 </script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-listen.js?v=1" defer></script>
+<script>document.addEventListener('DOMContentLoaded', function () { if (!window.AWListen || !AWListen.supported) return;
+    // the book read aloud from the page you are on, paragraph by paragraph; the pages turn as it reads
+    var pick = function () {
+        var out = [];
+        [].forEach.call(document.querySelectorAll('#scroll-container .page-content-inner'), function (pg) {
+            var all = [].slice.call(pg.querySelectorAll('p, h1, h2, h3, h4, li, blockquote'));
+            all = all.filter(function (el) { return !all.some(function (o) { return o !== el && o.contains(el); }); });
+            if (!all.length && pg.textContent.trim()) all = [pg];
+            all.forEach(function (el) { el.dataset.awlPage = pg.dataset.page; out.push(el); });
+        });
+        return out;
+    };
+    AWListen.attach({ label: 'Listen to this book', lang: (document.documentElement.lang || 'en').slice(0, 2), blocks: pick,
+        start: function (b) { var p = window.awReaderPage ? String(window.awReaderPage()) : '1'; var i = b.findIndex(function (x) { return x.dataset.awlPage === p; }); return i > 0 ? i : 0; },
+        onBlock: function (el) { var n = parseInt(el.dataset.awlPage, 10); if (n && window.awReaderGoTo) window.awReaderGoTo(n); } }); });</script>
 </body>
 </html>

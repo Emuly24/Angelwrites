@@ -254,5 +254,11 @@ window.AW_BIBLE = <?php echo json_encode([
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
 </script>
 <script src="<?php echo SITE_URL; ?>/assets/js/bible.js?v=3" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-listen.js?v=1" defer></script>
+<script>document.addEventListener('DOMContentLoaded', function () { if (!window.AWListen || !AWListen.supported) return;
+    // the chapter read aloud, verse by verse, from the chosen verse (or the start); the chapter title first
+    AWListen.attach({ label: 'Listen to this chapter', lang: '<?php echo htmlspecialchars(substr($langAttr, 0, 2) === 'yao' ? 'yao' : substr($langAttr, 0, 2)); ?>',
+        blocks: function () { return [].slice.call(document.querySelectorAll('#brChapterTitle, #brBody .br-head, #brBody .br-v')); },
+        start: function (b) { var h = location.hash.replace('#v', '') || new URLSearchParams(location.search).get('vs'); var i = h ? b.findIndex(function (x) { return x.dataset && x.dataset.v === String(h); }) : -1; return i > 0 ? i : 0; } }); });</script>
 </body>
 </html>
