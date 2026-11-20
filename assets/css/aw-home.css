@@ -1,0 +1,25 @@
+/* Home page: "Our heart" cards (vision, mission, goals, who it is for, values, promise). */
+.heart-section { position: relative; overflow: hidden; }
+.heart-section::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: radial-gradient(50% 60% at 10% 0%, rgba(219, 161, 162, .18), transparent 70%), radial-gradient(40% 50% at 95% 100%, rgba(214, 168, 92, .12), transparent 70%); }
+.heart-head { text-align: center; max-width: 720px; margin: 0 auto 34px; }
+.heart-kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: .78rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #9c5457; }
+.heart-kicker::before, .heart-kicker::after { content: ""; width: 26px; height: 2px; background: currentColor; border-radius: 2px; }
+.heart-head h2 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); margin: 0 0 10px; }
+.heart-lead { color: var(--text-light); font-size: 1.08rem; margin: 0; }
+.heart-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 18px; }
+.heart-card { position: relative; padding: 26px 24px 24px; border-radius: 24px; background: var(--card-bg, #fff); border: 1px solid var(--border, #ecdcdc);
+    box-shadow: 0 1px 2px rgba(44,30,30,.05), 0 10px 30px rgba(44,30,30,.07); overflow: hidden; transition: transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s, border-color .35s; }
+.heart-card::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(#9c5457, #dba1a2); opacity: .85; }
+.heart-card:hover { transform: translateY(-6px); box-shadow: 0 22px 50px rgba(44,30,30,.14); border-color: #c48f91; }
+.heart-ico { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; margin-bottom: 16px; font-size: 1.25rem; color: #fff; background: linear-gradient(135deg, #8b4549, #a8676a); box-shadow: 0 10px 22px rgba(156,84,87,.28); transition: transform .35s; }
+.heart-card:hover .heart-ico { transform: rotate(-6deg) scale(1.06); }
+.heart-card h3 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.25rem; margin: 0 0 8px; color: var(--dark, #2c1e1e); }
+.heart-card p { margin: 0; color: var(--text); line-height: 1.7; }
+.heart-card .aw-li { display: block; position: relative; padding-left: 22px; margin: 0 0 6px; }
+.heart-card .aw-li::before { content: ""; position: absolute; left: 4px; top: .7em; width: 7px; height: 7px; border-radius: 50%; background: #9c5457; }
+html[data-theme="dark"] .heart-kicker { color: #f0c4c5; }
+html[data-theme="dark"] .heart-card h3 { color: #f6ecec; }
+html[data-theme="dark"] .heart-card .aw-li::before { background: #f0c4c5; }
+html[data-theme="dark"] .heart-ico { background: linear-gradient(135deg, #f0c4c5, #d9a2a4); color: #2c1e1e; }
+@media (prefers-reduced-motion: reduce) { .heart-card, .heart-ico { transition: none; } .heart-card:hover { transform: none; } .heart-card:hover .heart-ico { transform: none; } }

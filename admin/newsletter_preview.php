@@ -13,6 +13,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     aw_csrf_require();
     $subject = trim((string)($_POST['subject'] ?? ''));
     $content = (string)($_POST['content'] ?? '');
+} elseif (empty($_GET['id'])) {
+    // opened directly (no draft, no issue): explain instead of a "not found" page
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Newsletter preview</title>'
+       . '<div style="font-family:system-ui,sans-serif;max-width:520px;margin:12vh auto;padding:0 16px;text-align:center;color:#3d2e2e">'
+       . '<h1 style="font-family:Georgia,serif;color:#9c5457">Nothing to preview yet</h1>'
+       . '<p>Write an issue on the Compose tab and press Preview, or open Preview next to an issue in the Archive.</p>'
+       . '<p><a href="' . htmlspecialchars(SITE_URL) . '/admin/manage_newsletter.php" style="color:#9c5457;font-weight:600">Back to the newsletter</a></p></div>';
+    exit;
 } else {
     $st = $db->prepare("SELECT subject, content FROM newsletter_archive WHERE id = ?");
     $st->execute([(int)($_GET['id'] ?? 0)]);

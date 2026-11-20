@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/site_texts.php'; // page text Angella can change on the site
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
@@ -557,19 +558,19 @@ if ('serviceWorker' in navigator) {
 <section class="hero">
     <div class="container hero-content">
         <div class="hero-text">
-            <span class="hero-badge">✧ A Safe Place for Your Heart</span>
+            <span class="hero-badge"><?php echo aw_text('home.badge', '✧ A Safe Place for Your Heart', 'line'); ?></span>
             <h1>
                 <?php if ($isLoggedIn): ?>
-                    Welcome Back, <span class="rose-text">Home</span>.
+                    <?php echo aw_text('home.title_member', 'Welcome Back, *Home*.', 'line'); ?>
                 <?php else: ?>
-                    Your Story <span class="rose-text">Lives Here</span>
+                    <?php echo aw_text('home.title', 'Your Story *Lives Here*', 'line'); ?>
                 <?php endif; ?>
             </h1>
             <p class="hero-sub">
                 <?php if ($isLoggedIn): ?>
-                    You are home. Dive deeper into faith, healing, and community.
+                    <?php echo aw_text('home.sub_member', 'You are home. Dive deeper into faith, healing, and community.'); ?>
                 <?php else: ?>
-                    No judgment. No criticism. Just kindness, love, and a God who holds your pain with you. Here, you can show up exactly as you are — raw, broken, honest — and be met with grace.
+                    <?php echo aw_text('home.sub', 'No judgment. No criticism. Just kindness, love, and a God who holds your pain with you. Here, you can show up exactly as you are — raw, broken, honest — and be met with grace.'); ?>
                 <?php endif; ?>
             </p>
             <div class="hero-buttons">
@@ -594,7 +595,7 @@ if ('serviceWorker' in navigator) {
             <div class="hero-image-container">
                 <img src="<?php echo get_image_url('/assets/images/hero-logo.png'); ?>" alt="AngelWrites - Your Story Lives Here" loading="lazy">
             </div>
-            <p class="hero-quote">"You don't have to be fixed before you walk in. Just come as you are."</p>
+            <p class="hero-quote"><?php echo aw_text('home.quote', '"You don\'t have to be fixed before you walk in. Just come as you are."', 'line'); ?></p>
         </div>
     </div>
 </section>
@@ -603,11 +604,11 @@ if ('serviceWorker' in navigator) {
 <section class="about-section section-padding" id="about">
     <div class="container">
         <div class="about-text">
-            <h2>Welcome to <span class="rose-text">AngelWrites</span></h2>
+            <h2><?php echo aw_text('home.welcome_title', 'Welcome to *AngelWrites*', 'line'); ?></h2>
             <div class="about-lead-wrapper">
-                <p class="about-lead">You're here because something inside you is crying out for hope. You've been carrying pain, confusion, or loneliness — and you're looking for a place where you can just be real. You've found it.</p>
+                <p class="about-lead"><?php echo aw_text('home.welcome_lead', "You're here because something inside you is crying out for hope. You've been carrying pain, confusion, or loneliness — and you're looking for a place where you can just be real. You've found it."); ?></p>
             </div>
-            <p class="about-body">AngelWrites is not about one person. It's about <strong>you</strong> and every human like you who needs to know that God hasn't given up on you. This is a <strong>community</strong> where you can heal, grow, and discover that your story matters.</p>
+            <p class="about-body"><?php echo aw_text('home.welcome_body', "AngelWrites is not about one person. It's about you and every human like you who needs to know that God hasn't given up on you. This is a community where you can heal, grow, and discover that your story matters."); ?></p>
             <p class="about-body-intro">Here, you will find:</p>
             <div class="about-features-grid">
                 <div class="about-feature"><i class="fas fa-book-reader"></i><h4>Books &amp; Poems</h4><p>Read words that speak to your soul.</p></div>
@@ -617,7 +618,7 @@ if ('serviceWorker' in navigator) {
                 <div class="about-feature"><i class="fas fa-users"></i><h4>Reading Groups</h4><p>Join or create a circle where you can grow together.</p></div>
                 <div class="about-feature"><i class="fas fa-bible"></i><h4>Bible Reader</h4><p>All common translations with highlights and notes.</p></div>
             </div>
-            <p>This community was built by <strong>Angella Bottoman</strong> — a Christian writer who believes every broken vessel holds a beautiful story.</p>
+            <p><?php echo aw_text('home.built_by', 'This community was built by Angella Bottoman — a Christian writer who believes every broken vessel holds a beautiful story.'); ?></p>
             <div class="about-cta">
                 <?php if (!$isLoggedIn): ?>
                     <a href="<?php echo SITE_URL; ?>/register.php" class="btn btn-primary">Join the Community — It's Free</a>
@@ -630,7 +631,52 @@ if ('serviceWorker' in navigator) {
     </div>
 </section>
 
+<!-- OUR HEART: vision, mission, goals, who it is for... (every word can be changed on the page: includes/site_texts.php) -->
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-home.css?v=1">
+<section class="heart-section section-padding" id="our-heart" aria-labelledby="heartTitle">
+    <div class="container">
+        <header class="heart-head">
+            <p class="heart-kicker"><?php echo aw_text('home.heart_kicker', 'Our heart', 'line'); ?></p>
+            <h2 id="heartTitle"><?php echo aw_text('home.heart_title', 'Why *AngelWrites* exists', 'line'); ?></h2>
+            <p class="heart-lead"><?php echo aw_text('home.heart_lead', 'What we believe, what we are building, and who it is for.'); ?></p>
+        </header>
+        <ul class="heart-grid" role="list">
+            <li class="heart-card" style="--i:0">
+                <span class="heart-ico" aria-hidden="true"><i class="fas fa-eye"></i></span>
+                <h3><?php echo aw_text('home.vision_title', 'Our vision', 'line'); ?></h3>
+                <p><?php echo aw_text('home.vision', "A world where every hurting heart finds hope, healing and a home in God’s love, and where no one has to carry their story alone.", 'text'); ?></p>
+            </li>
+            <li class="heart-card" style="--i:1">
+                <span class="heart-ico" aria-hidden="true"><i class="fas fa-bullseye"></i></span>
+                <h3><?php echo aw_text('home.mission_title', 'Our mission', 'line'); ?></h3>
+                <p><?php echo aw_text('home.mission', "To write and share words that heal, inspire and transform, and to build a safe, kind community where people find encouragement, purpose and a place to tell their own stories.", 'text'); ?></p>
+            </li>
+            <li class="heart-card" style="--i:2">
+                <span class="heart-ico" aria-hidden="true"><i class="fas fa-flag-checkered"></i></span>
+                <h3><?php echo aw_text('home.goals_title', 'Our goals', 'line'); ?></h3>
+                <p><?php echo aw_text('home.goals', "Share writing that points to God and brings healing.\nKeep a safe, kind and private place to talk and pray.\nOffer one-to-one support and prayer to anyone who asks.\nHelp people read, reflect and grow together.", 'list'); ?></p>
+            </li>
+            <li class="heart-card" style="--i:3">
+                <span class="heart-ico" aria-hidden="true"><i class="fas fa-people-group"></i></span>
+                <h3><?php echo aw_text('home.audience_title', 'Who it is for', 'line'); ?></h3>
+                <p><?php echo aw_text('home.audience', "Anyone carrying pain, doubt, loneliness or questions who longs for hope: women and men, young and old, wherever you are in the world and whatever your story.", 'text'); ?></p>
+            </li>
+            <li class="heart-card" style="--i:4">
+                <span class="heart-ico" aria-hidden="true"><i class="fas fa-hand-holding-heart"></i></span>
+                <h3><?php echo aw_text('home.values_title', 'What we value', 'line'); ?></h3>
+                <p><?php echo aw_text('home.values', "Kindness before criticism. Honesty and grace. Your privacy and safety. Faith that is real in the hard places. Respect for every story.", 'text'); ?></p>
+            </li>
+            <li class="heart-card" style="--i:5">
+                <span class="heart-ico" aria-hidden="true"><i class="fas fa-shield-heart"></i></span>
+                <h3><?php echo aw_text('home.promise_title', 'Our promise to you', 'line'); ?></h3>
+                <p><?php echo aw_text('home.promise', "No judgment and no pressure. What you share is treated with care, you choose who sees it, and you are welcome exactly as you are.", 'text'); ?></p>
+            </li>
+        </ul>
+    </div>
+</section>
+
 <?php if (!empty($aw_picks)): ?>
+
 <!-- C2: ANGELLA'S PICKS -->
 <section class="picks-section section-padding" id="picks" aria-labelledby="picksTitle">
     <div class="container">
