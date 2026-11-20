@@ -1,9 +1,11 @@
 <?php
+require_once __DIR__ . '/includes/member_profile.php'; // the details the team relies on
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
 require_once 'includes/upload.php'; // R4: shared upload limits
+aw_profile_columns($db);
 
 redirectIfNotLoggedIn();
 
@@ -89,9 +91,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     $name = trim($first_name . ' ' . $last_name);
     $email = trim($_POST['email']);
     $username = trim($_POST['username']);
-    $gender = $_POST['gender'] ?? '';
-    $country = trim($_POST['country']);
-    $contact_number = trim($_POST['contact_number']);
+    // country (with the phone's code), phone, WhatsApp, age range, sex, town, contact choices (includes/member_profile.php)
+    $aw_pf = aw_profile_collect($_POST, true, false);
+    $gender = $aw_pf['data']['gender'];
+    $country = $aw_pf['data']['country'];
+    $contact_number = $aw_pf['data']['contact_number'];
     // Q24: sign-up now leaves date of birth optional and says it can be added on the profile.
     $date_of_birth = trim((string)($_POST['date_of_birth'] ?? ''));
     $bio = trim($_POST['bio']);
@@ -115,6 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         // R4: the picture was refused; say why and save nothing
     } elseif ($first_name === '' || $last_name === '' || empty($email) || empty($username)) {
         $error = 'First name, last name, email and username are required.';
+    } elseif ($aw_pf['error'] !== '') {
+        $error = $aw_pf['error'];
     } elseif ($date_of_birth !== '' && (!($aw_d = DateTime::createFromFormat('Y-m-d', $date_of_birth)) || $aw_d->format('Y-m-d') !== $date_of_birth || $date_of_birth > date('Y-m-d'))) {
         $error = 'Please enter a valid date of birth, or leave it empty.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -140,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 // S5 (F115): the email column keeps the current address; a new address only
                 // takes effect after the code sent to it is confirmed (handler above).
                 $stmt->execute([$name, $first_name, $last_name, $user['email'], $username, $gender, $country, $contact_number, $date_of_birth !== '' ? $date_of_birth : null, $bio, $profile_pic, $user_id]);
+                aw_profile_save($db, $user_id, array_diff_key($aw_pf['data'], ['gender' => 1, 'country' => 1, 'contact_number' => 1]));
                 $_SESSION['name'] = $name;
                 $success = 'Profile updated successfully!';
                 // Show what was just saved (the form used to redisplay the values loaded before saving).
@@ -306,31 +313,8 @@ $pageTitle = 'My Profile';
                         <div id="emailStatus" class="field-status"></div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="gender">Gender</label>
-                        <select id="gender" name="gender">
-                            <option value="" <?php echo empty($user['gender']) ? 'selected' : ''; ?>>Select your gender</option>
-                            <option value="male" <?php echo ($user['gender'] ?? '') === 'male' ? 'selected' : ''; ?>>Male</option>
-                            <option value="female" <?php echo ($user['gender'] ?? '') === 'female' ? 'selected' : ''; ?>>Female</option>
-                            <option value="other" <?php echo ($user['gender'] ?? '') === 'other' ? 'selected' : ''; ?>>Other</option>
-                            <option value="prefer not to say" <?php echo ($user['gender'] ?? '') === 'prefer not to say' ? 'selected' : ''; ?>>Prefer not to say</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="country">Country</label>
-                        <input type="text" id="country" name="country" value="<?php echo htmlspecialchars($user['country'] ?? ''); ?>" placeholder="Enter your country">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="contact_number">Contact Number</label>
-                        <input type="text" id="contact_number" name="contact_number" value="<?php echo htmlspecialchars($user['contact_number'] ?? ''); ?>" placeholder="with your country code, e.g. +44 20 7946 0000">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="date_of_birth">Date of Birth <small>(optional)</small></label>
-                        <input type="date" id="date_of_birth" name="date_of_birth" value="<?php echo htmlspecialchars((string)($user['date_of_birth'] ?? '')); ?>" max="<?php echo date('Y-m-d'); ?>">
-                    </div>
+                    <?php echo aw_profile_fields_html(($error && $_SERVER['REQUEST_METHOD'] === 'POST') ? $_POST : $user, ['require' => true, 'prefix' => 'pr']); ?>
+                    <p class="field-hint" style="margin:-6px 0 14px">Your account recovery question is in <a href="<?php echo SITE_URL; ?>/account_security.php">Account security</a>.</p>
 
                     <div class="form-group">
                         <label for="bio">Bio</label>

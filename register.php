@@ -6,6 +6,7 @@ require_once 'includes/mail_helper.php';
 require_once 'includes/human_check.php'; // a built-in human check instead of an email code
 require_once 'includes/social_auth.php';
 require_once 'includes/twofactor.php';    // aw_finish_login()
+require_once 'includes/member_profile.php'; // country, phone, age range, sex, recovery question
 
 // ===== REDIRECT IF ALREADY LOGGED IN =====
 if (isLoggedIn()) {
@@ -25,49 +26,7 @@ $social = (isset($_GET['social']) || isset($_POST['social'])) && !empty($_SESSIO
     ? $_SESSION['aw_social_new'] : null;
 if (isset($_GET['social']) && !$social) { header('Location: ' . SITE_URL . '/login.php?social=expired'); exit; }
 
-// ===== LIST OF COUNTRIES WITH PHONE CODES =====
-$countries = [
-    'Afghanistan' => '+93', 'Albania' => '+355', 'Algeria' => '+213', 'Andorra' => '+376', 'Angola' => '+244',
-    'Antigua and Barbuda' => '+1', 'Argentina' => '+54', 'Armenia' => '+374', 'Australia' => '+61', 'Austria' => '+43',
-    'Azerbaijan' => '+994', 'Bahamas' => '+1', 'Bahrain' => '+973', 'Bangladesh' => '+880', 'Barbados' => '+1',
-    'Belarus' => '+375', 'Belgium' => '+32', 'Belize' => '+501', 'Benin' => '+229', 'Bhutan' => '+975',
-    'Bolivia' => '+591', 'Bosnia and Herzegovina' => '+387', 'Botswana' => '+267', 'Brazil' => '+55', 'Brunei' => '+673',
-    'Bulgaria' => '+359', 'Burkina Faso' => '+226', 'Burundi' => '+257', 'Cabo Verde' => '+238', 'Cambodia' => '+855',
-    'Cameroon' => '+237', 'Canada' => '+1', 'Central African Republic' => '+236', 'Chad' => '+235', 'Chile' => '+56',
-    'China' => '+86', 'Colombia' => '+57', 'Comoros' => '+269', 'Congo (DRC)' => '+243', 'Congo (Republic)' => '+242',
-    'Costa Rica' => '+506', 'Croatia' => '+385', 'Cuba' => '+53', 'Cyprus' => '+357', 'Czech Republic' => '+420',
-    'Denmark' => '+45', 'Djibouti' => '+253', 'Dominica' => '+1', 'Dominican Republic' => '+1', 'Ecuador' => '+593',
-    'Egypt' => '+20', 'El Salvador' => '+503', 'Equatorial Guinea' => '+240', 'Eritrea' => '+291', 'Estonia' => '+372',
-    'Eswatini' => '+268', 'Ethiopia' => '+251', 'Fiji' => '+679', 'Finland' => '+358', 'France' => '+33',
-    'Gabon' => '+241', 'Gambia' => '+220', 'Georgia' => '+995', 'Germany' => '+49', 'Ghana' => '+233',
-    'Greece' => '+30', 'Grenada' => '+1', 'Guatemala' => '+502', 'Guinea' => '+224', 'Guinea-Bissau' => '+245',
-    'Guyana' => '+592', 'Haiti' => '+509', 'Honduras' => '+504', 'Hungary' => '+36', 'Iceland' => '+354',
-    'India' => '+91', 'Indonesia' => '+62', 'Iran' => '+98', 'Iraq' => '+964', 'Ireland' => '+353',
-    'Israel' => '+972', 'Italy' => '+39', 'Ivory Coast' => '+225', 'Jamaica' => '+1', 'Japan' => '+81',
-    'Jordan' => '+962', 'Kazakhstan' => '+7', 'Kenya' => '+254', 'Kiribati' => '+686', 'Kuwait' => '+965',
-    'Kyrgyzstan' => '+996', 'Laos' => '+856', 'Latvia' => '+371', 'Lebanon' => '+961', 'Lesotho' => '+266',
-    'Liberia' => '+231', 'Libya' => '+218', 'Liechtenstein' => '+423', 'Lithuania' => '+370', 'Luxembourg' => '+352',
-    'Madagascar' => '+261', 'Malawi' => '+265', 'Malaysia' => '+60', 'Maldives' => '+960', 'Mali' => '+223',
-    'Malta' => '+356', 'Marshall Islands' => '+692', 'Mauritania' => '+222', 'Mauritius' => '+230', 'Mexico' => '+52',
-    'Micronesia' => '+691', 'Moldova' => '+373', 'Monaco' => '+377', 'Mongolia' => '+976', 'Montenegro' => '+382',
-    'Morocco' => '+212', 'Mozambique' => '+258', 'Myanmar' => '+95', 'Namibia' => '+264', 'Nauru' => '+674',
-    'Nepal' => '+977', 'Netherlands' => '+31', 'New Zealand' => '+64', 'Nicaragua' => '+505', 'Niger' => '+227',
-    'Nigeria' => '+234', 'North Korea' => '+850', 'North Macedonia' => '+389', 'Norway' => '+47', 'Oman' => '+968',
-    'Pakistan' => '+92', 'Palau' => '+680', 'Palestine' => '+970', 'Panama' => '+507', 'Papua New Guinea' => '+675',
-    'Paraguay' => '+595', 'Peru' => '+51', 'Philippines' => '+63', 'Poland' => '+48', 'Portugal' => '+351',
-    'Qatar' => '+974', 'Romania' => '+40', 'Russia' => '+7', 'Rwanda' => '+250', 'Saint Kitts and Nevis' => '+1',
-    'Saint Lucia' => '+1', 'Saint Vincent' => '+1', 'Samoa' => '+685', 'San Marino' => '+378', 'Sao Tome and Principe' => '+239',
-    'Saudi Arabia' => '+966', 'Senegal' => '+221', 'Serbia' => '+381', 'Seychelles' => '+248', 'Sierra Leone' => '+232',
-    'Singapore' => '+65', 'Slovakia' => '+421', 'Slovenia' => '+386', 'Solomon Islands' => '+677', 'Somalia' => '+252',
-    'South Africa' => '+27', 'South Korea' => '+82', 'South Sudan' => '+211', 'Spain' => '+34', 'Sri Lanka' => '+94',
-    'Sudan' => '+249', 'Suriname' => '+597', 'Sweden' => '+46', 'Switzerland' => '+41', 'Syria' => '+963',
-    'Taiwan' => '+886', 'Tajikistan' => '+992', 'Tanzania' => '+255', 'Thailand' => '+66', 'Timor-Leste' => '+670',
-    'Togo' => '+228', 'Tonga' => '+676', 'Trinidad and Tobago' => '+1', 'Tunisia' => '+216', 'Turkey' => '+90',
-    'Turkmenistan' => '+993', 'Tuvalu' => '+688', 'Uganda' => '+256', 'Ukraine' => '+380', 'United Arab Emirates' => '+971',
-    'United Kingdom' => '+44', 'United States' => '+1', 'Uruguay' => '+598', 'Uzbekistan' => '+998', 'Vanuatu' => '+678',
-    'Vatican City' => '+379', 'Venezuela' => '+58', 'Vietnam' => '+84', 'Yemen' => '+967', 'Zambia' => '+260',
-    'Zimbabwe' => '+263'
-];
+$countries = AW_COUNTRIES; // includes/member_profile.php
 
 // ===== LIST OF REFERRAL SOURCES =====
 $referral_sources = [
@@ -97,10 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     if ($social && !empty($social['email_verified'])) $email = $social['email']; // confirmed by the provider: not editable
     $password = (string)($_POST['password'] ?? '');
     $confirm_password = (string)($_POST['confirm_password'] ?? '');
-    $gender = $_POST['gender'] ?? '';
-    $country = $_POST['country'] ?? '';
-    $contact = trim((string)($_POST['contact'] ?? ''));
-    $dob = trim((string)($_POST['dob'] ?? ''));
+    // country (gives the phone's code), phone, WhatsApp, age range, sex, town, contact choices, recovery question
+    $aw_pf = aw_profile_collect($_POST, true, true);
+    $gender = (string)($aw_pf['data']['gender'] ?? '');
+    $country = (string)($aw_pf['data']['country'] ?? '');
+    $contact = (string)($aw_pf['data']['contact_number'] ?? '');
+    $dob = '';
     $referral_source = trim($_POST['referral_source'] ?? '');
 
     if ($referral_source === 'Other' && !empty(trim($_POST['other_referral'] ?? ''))) {
@@ -120,6 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         $error = 'Several accounts were just created from your network. Please try again in an hour, or sign in with an account you already have.';
     } elseif (empty($first_name) || empty($last_name) || empty($username) || empty($email) || (!$social && (empty($password) || empty($confirm_password)))) {
         $error = $social ? 'Please fill in your name, a username and your email.' : 'Please fill in your first and last name, username, email and password.';
+    } elseif ($aw_pf['error'] !== '') {
+        $error = htmlspecialchars($aw_pf['error']);
     } elseif (empty($_POST['terms'])) {
         $error = 'Please agree to the Terms of Service and Privacy Policy.';
     } elseif ($dob !== null && (!($aw_d = DateTime::createFromFormat('Y-m-d', $dob)) || $aw_d->format('Y-m-d') !== $dob || $dob > date('Y-m-d'))) {
@@ -151,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                 if ($stmt->execute([$first_name, $last_name, $username, $email, $hashed_password, $gender, $country, $contact, $dob, $referral_source])) {
                     $user_id = (int)$db->lastInsertId();
                     aw_hc_limit('register', 5, 3600, true);
+                    aw_profile_save($db, $user_id, $aw_pf['data']); // WhatsApp, age range, town, contact choices, recovery answer
 
                     // Generate referral code
                     $ref_code = strtoupper(substr(md5($username . time()), 0, 8));
@@ -264,51 +228,16 @@ $pageTitle = 'Sign Up';
                         </div>
 
 <?php endif; ?>
-                        <!-- Q24: optional details, folded away so joining takes five fields -->
-                        <details class="optional-details" style="margin:12px 0;">
-                            <summary style="cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center;">More about you (optional; you can add these later on your profile)</summary>
-                        <div class="form-group">
-                            <label for="gender">Gender <small>(optional)</small></label>
-                            <select id="gender" name="gender">
-                                <option value="">Select your gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                                <option value="prefer not to say">Prefer not to say</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="dob">Date of Birth <small>(optional)</small></label>
-                            <input type="date" id="dob" name="dob" max="<?php echo date('Y-m-d'); ?>">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="country">Country <small>(optional)</small></label>
-                            <select id="country" name="country">
-                                <option value="">Select your country</option>
-                                <?php foreach ($countries as $name => $code): ?>
-                                    <option value="<?php echo htmlspecialchars($name); ?>" data-code="<?php echo htmlspecialchars($code); ?>">
-                                        <?php echo htmlspecialchars($name) . ' (' . htmlspecialchars($code) . ')'; ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="contact">Contact Number <small>(optional)</small></label>
-                            <div class="contact-wrapper">
-                                <span id="countryCodeDisplay" class="country-code-display">+</span>
-                                <input type="text" id="contact" name="contact" placeholder="e.g. 999 123 456">
-                            </div>
-                        </div>
+                        <h2 class="auth-sub">About you</h2>
+                        <p class="field-hint" style="margin:-4px 0 12px">These help the team look after you: reaching you if you ask for help, age-appropriate groups and mentoring, and inviting volunteers. Only the team sees them.</p>
+                        <?php echo aw_profile_fields_html($_POST ?: [], ['require' => true, 'recovery' => true, 'prefix' => 'rg']); ?>
 
                         <div class="form-group">
                             <label for="referral_source">How did you hear about AngelWrites? <small>(optional)</small></label>
                             <select id="referral_source" name="referral_source">
                                 <option value="">Select a source</option>
                                 <?php foreach ($referral_sources as $source): ?>
-                                    <option value="<?php echo htmlspecialchars($source); ?>"><?php echo htmlspecialchars($source); ?></option>
+                                    <option value="<?php echo htmlspecialchars($source); ?>"<?php echo ($_POST['referral_source'] ?? '') === $source ? ' selected' : ''; ?>><?php echo htmlspecialchars($source); ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div id="otherReferralWrapper" style="display: none; margin-top: 8px;">
@@ -316,8 +245,6 @@ $pageTitle = 'Sign Up';
                                 <input type="text" id="other_referral" name="other_referral" placeholder="Where did you hear about us?">
                             </div>
                         </div>
-
-                        </details>
 
                         <div class="checkbox-group">
                             <input type="checkbox" name="terms" id="terms" required>
@@ -431,22 +358,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     } // end of the password fields
-
-    // ===== COUNTRY CODE DETECTION =====
-    const countrySelect = document.getElementById('country');
-    const codeDisplay = document.getElementById('countryCodeDisplay');
-
-    countrySelect.addEventListener('change', function() {
-        const selected = this.options[this.selectedIndex];
-        const code = selected.getAttribute('data-code');
-        if (code) {
-            codeDisplay.textContent = code;
-        }
-    });
-
-    if (countrySelect.value) {
-        countrySelect.dispatchEvent(new Event('change'));
-    }
 
     // ===== REFERRAL 'OTHER' FIELD =====
     const referralSelect = document.getElementById('referral_source');
@@ -579,6 +490,8 @@ document.addEventListener('DOMContentLoaded', function() {
     .auth-card { padding: 20px; }
     .success-popup { padding: 20px; }
 }
+
+.auth-sub{font-family:'Playfair Display',Georgia,serif;font-size:1.15rem;margin:20px 0 6px;}
 </style>
 
 <?php require_once 'includes/footer.php'; ?>

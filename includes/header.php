@@ -322,6 +322,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                                 <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i><?php echo aw_t('My Stories & Help'); ?></a><?php endif; ?>
                                 <a href="<?php echo $aw_u; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i><?php echo aw_t('My shared books'); ?></a>
                                 <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i><?php echo aw_t('Profile'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/account_security.php"><i class="fas fa-lock" aria-hidden="true"></i><?php echo aw_t('Account security'); ?></a>
                                 <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><?php echo aw_t('Team desk'); ?></a><?php endif; ?>
                             <?php endif; ?>
                             <hr>

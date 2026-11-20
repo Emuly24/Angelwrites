@@ -1,21 +1,36 @@
 <?php
-// K5: Account security for staff: turn two-step sign-in on or off, and get new recovery codes.
+// Account security: every member sets their recovery question (reset a password without email);
+// the team (admins, moderators, volunteers) also turns two-step sign-in on or off and gets recovery codes.
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/csrf.php';
 require_once 'includes/components.php';
 require_once 'includes/twofactor.php';
+require_once 'includes/member_profile.php';
 
 redirectIfNotLoggedIn();
-if (!aw_is_staff_role($_SESSION['role'] ?? '')) { header('Location: ' . SITE_URL . '/profile.php'); exit; }
 $uid = (int)$_SESSION['user_id'];
+$is_team = aw_is_staff_role($_SESSION['role'] ?? '', $uid);
+// members who joined with Google/Facebook never chose a password, so they are not asked for one here
+$via_social = false;
+try { $vs = $db->prepare("SELECT 1 FROM user_social WHERE user_id = ? LIMIT 1"); $vs->execute([$uid]); $via_social = (bool)$vs->fetchColumn(); } catch (Throwable $e) { /* no table yet */ }
+aw_profile_columns($db);
 $error = ''; $notice = ''; $codes = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pw = $db->prepare("SELECT password FROM users WHERE id = ?"); $pw->execute([$uid]); $hash = (string)$pw->fetchColumn();
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = 'Your session expired. Please try again.';
+    } elseif (isset($_POST['save_recovery'])) {
+        $q = (string)($_POST['recovery_question'] ?? ''); $a = aw_recovery_norm($_POST['recovery_answer'] ?? '');
+        if (!$via_social && !password_verify((string)($_POST['password'] ?? ''), $hash)) $error = 'That password is not correct.';
+        elseif (!isset(AW_RECOVERY_QUESTIONS[$q])) $error = 'Please choose a question.';
+        elseif (mb_strlen($a) < 3) $error = 'Please give an answer of at least 3 letters or numbers.';
+        elseif (aw_profile_save($db, $uid, ['recovery_question' => $q, 'recovery_answer' => password_hash($a, PASSWORD_DEFAULT)])) { $notice = 'Your recovery question is saved.'; if (function_exists('aw_audit')) aw_audit('recovery_question_set', 'user', $uid, ''); }
+        else $error = 'That could not be saved. Please try again.';
+    } elseif (!$is_team) {
+        $error = 'Two-step sign-in is for the AngelWrites team.';
     } elseif (isset($_POST['begin']) || isset($_POST['disable'])) {
         if (!password_verify((string)($_POST['password'] ?? ''), $hash)) $error = 'That password is not correct.';
         elseif (isset($_POST['begin'])) { aw_2fa_begin($db, $uid); }
@@ -26,7 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$codes) $error = 'That code did not match. Check that the time on your phone is set automatically, then try the newest code.';
     }
 }
-$row = aw_2fa_row($db, $uid);
+$row = $is_team ? aw_2fa_row($db, $uid) : null;
+$rq = $db->prepare("SELECT recovery_question FROM users WHERE id = ?"); $rq->execute([$uid]); $my_rq = (string)$rq->fetchColumn();
 $on = $row && !empty($row['enabled_at']);
 $pending = $row && empty($row['enabled_at']);
 $left = $on ? count(json_decode((string)$row['recovery'], true) ?: []) : 0;
@@ -41,9 +57,26 @@ require_once 'includes/header.php';
     <?php if (isset($_GET['required']) && !$on): ?><?php echo aw_alert('warning', 'The owner asks every staff member to use two-step sign-in. Please turn it on to continue to the staff pages.'); ?><?php endif; ?>
     <?php echo aw_alert('error', $error); echo aw_alert('success', $notice); ?>
 
+    <div class="card" id="recovery" style="margin-bottom:20px;"><div class="card-body" style="padding:24px;">
+        <h2 style="font-size:1.25rem;margin:0 0 6px;">Account recovery</h2>
+        <p style="color:var(--text-light);">If you lose access to your email, your phone number and the answer to this question let you reset your password on the <a href="<?php echo SITE_URL; ?>/recover.php">recovery page</a>.</p>
+        <p><strong><?php echo $my_rq !== '' && isset(AW_RECOVERY_QUESTIONS[$my_rq]) ? 'Your question: ' . htmlspecialchars(AW_RECOVERY_QUESTIONS[$my_rq]) : 'Not set yet.'; ?></strong></p>
+        <form method="POST" autocomplete="off">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+            <div class="form-group"><label for="rq">Question</label><select id="rq" name="recovery_question" required style="min-height:44px;max-width:100%;">
+                <option value="">Choose a question</option>
+                <?php foreach (AW_RECOVERY_QUESTIONS as $k => $l): ?><option value="<?php echo $k; ?>"<?php echo $my_rq === $k ? ' selected' : ''; ?>><?php echo htmlspecialchars($l); ?></option><?php endforeach; ?>
+            </select></div>
+            <div class="form-group"><label for="ra">Your answer</label><input type="text" id="ra" name="recovery_answer" required maxlength="100" autocomplete="off" style="max-width:320px;"><small class="field-hint" style="display:block">Capitals and spaces do not matter. It is stored scrambled; nobody can read it.</small></div>
+            <?php if (!$via_social): ?><div class="form-group"><label for="pw0">Your password</label><input type="password" id="pw0" name="password" required autocomplete="current-password" style="max-width:320px;"></div><?php endif; ?>
+            <?php echo aw_btn($my_rq !== '' ? 'Change recovery question' : 'Save recovery question', 'primary', ['type' => 'submit', 'name' => 'save_recovery', 'value' => '1', 'small' => true]); ?>
+        </form>
+    </div></div>
+
+    <?php if ($is_team): ?>
     <div class="card"><div class="card-body" style="padding:24px;">
         <h2 style="font-size:1.25rem;margin:0 0 6px;">Two-step sign-in</h2>
-        <p style="color:var(--text-light);">Staff accounts can see private messages and members' details. With two-step sign-in, a stolen password alone is not enough: signing in also needs a code from an app on your phone (Google Authenticator, Microsoft Authenticator, Authy or similar).</p>
+        <p style="color:var(--text-light);">Team accounts can see private messages and members' details. With two-step sign-in, a stolen password alone is not enough: signing in also needs a code from an app on your phone (Google Authenticator, Microsoft Authenticator, Authy or similar).</p>
 
         <?php if ($codes): ?>
             <?php echo aw_alert('success', 'Two-step sign-in is on.'); ?>
@@ -81,5 +114,6 @@ require_once 'includes/header.php';
             </form>
         <?php endif; ?>
     </div></div>
+    <?php endif; ?>
 </div>
 <?php require_once 'includes/footer.php'; ?>

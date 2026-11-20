@@ -19,7 +19,7 @@ if (!$privacy_content) {
             // most of what is collected: IP logging, date of birth, gender, phone, camera and voice uploads,
             // reading activity, orders, Google sign-in and the CDNs every page loads.
             ['heading' => '1. Who we are', 'content' => 'AngelWrites (angelwrites.gt.tc) is run from Malawi and is responsible for the personal information described here. Contact: angelwrites@zohomail.com.'],
-            ['heading' => '2. Information we collect', 'content' => 'When you register: first and last name, username, email address, password (stored only as a secure hash), gender, country, phone number, date of birth and how you heard about us.
+            ['heading' => '2. Information we collect', 'content' => 'When you register: first and last name, username, email address, password (stored only as a secure hash), country, phone number (and a WhatsApp number if different), age range, sex, town (optional), how the team may contact you, how you heard about us, and a recovery question with its answer (the answer is stored only as a secure hash). Why: so the team can reach you if you ask for help, offer age-appropriate groups and mentoring, invite volunteers, keep the community safe, and let you reset your password without email. Your phone number and contact details are seen only by the AngelWrites team (the owner, admins and the Care Team), never shown on the site, and the team contacts you only in the ways you allow.
 
 If you add them: a profile photo (uploaded or taken with your camera), a short bio and contact details on your profile.
 
