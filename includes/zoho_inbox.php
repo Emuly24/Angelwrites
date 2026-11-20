@@ -304,7 +304,7 @@ function aw_zoho_inbox_sync(PDO $db, bool $force = false): array
     sort($uids);
     $uids = array_slice($uids, 0, AW_ZI_MAX_PER_SYNC);
 
-    $added = 0; $skipped = 0; $maxUid = $lastUid;
+    $added = 0; $skipped = 0; $maxUid = $lastUid; $new = [];
     $ins = $db->prepare("INSERT OR IGNORE INTO contact_messages (name, email, subject, message, is_read, created_at, user_id, source, ext_id, attachments) VALUES (?, ?, ?, ?, 0, ?, ?, 'email', ?, ?)");
     $who = $db->prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE LIMIT 1");
     foreach ($uids as $uid) {
@@ -323,12 +323,30 @@ function aw_zoho_inbox_sync(PDO $db, bool $force = false): array
             $ins->execute([mb_substr($p['from_name'], 0, 120), $p['from_email'], mb_substr($p['subject'] !== '' ? $p['subject'] : '(no subject)', 0, 250),
                            $p['text'] !== '' ? $p['text'] : '(This email has no text. Open it in Zoho to see it.)', $p['date'], $uidMember, $ext,
                            $p['files'] ? implode("\n", $p['files']) : null]);
-            if ($ins->rowCount()) $added++; else $skipped++;
+            if ($ins->rowCount()) { $added++; $new[] = [(string)$db->lastInsertId(), $p['from_name'] !== '' ? $p['from_name'] : $p['from_email'], $p['subject']]; } else $skipped++;
         } catch (Throwable $e) { $skipped++; error_log('zoho inbox message ' . $uid . ': ' . $e->getMessage()); }
     }
     $im->close();
     aw_zi_set($db, 'zoho_inbox_uidvalidity', $validity);
     aw_zi_set($db, 'zoho_inbox_uid', (string)$maxUid);
     aw_zi_set($db, 'zoho_inbox_error', '');
+    if ($new) aw_zoho_inbox_notify($db, $new);
     return ['ok' => true, 'added' => $added, 'skipped' => $skipped, 'message' => $added ? $added . ' new ' . ($added === 1 ? 'email' : 'emails') . ' from Zoho.' : 'No new emails in Zoho.'];
+}
+
+/** Tell the Team-inbox staff (bell only, no email about an email) that new emails arrived. $new: [[id, from, subject], ...] */
+function aw_zoho_inbox_notify(PDO $db, array $new): void
+{
+    try {
+        require_once __DIR__ . '/notifications.php';
+        if (!function_exists('awNotify')) return;
+        $n = count($new);
+        [$id, $from, $subject] = $new[0];
+        $title = $n === 1 ? 'New email from ' . mb_substr($from, 0, 60) : $n . ' new emails in the Team inbox';
+        $text = $n === 1 ? ($subject !== '' ? mb_substr($subject, 0, 120) : 'Open the Team inbox to read and answer it.') : 'From ' . implode(', ', array_slice(array_unique(array_map(function ($r) { return mb_substr($r[1], 0, 40); }, $new)), 0, 3)) . ($n > 3 ? ' and others' : '') . '.';
+        $link = rtrim(SITE_URL, '/') . '/admin/inbox.php' . ($n === 1 ? '?id=' . (int)$id : '');
+        foreach ($db->query("SELECT id FROM users WHERE role IN ('admin', 'moderator')")->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+            awNotify($db, (int)$uid, 'team_email', $title, $text, $link, ['email' => false, 'actor' => 0]);
+        }
+    } catch (Throwable $e) { error_log('zoho inbox notify: ' . $e->getMessage()); }
 }

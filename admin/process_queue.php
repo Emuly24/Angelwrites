@@ -32,8 +32,11 @@ if (php_sapi_name() !== 'cli') {
         @set_time_limit(40);
         ignore_user_abort(true);
         $r = aw_nl_auto_run($db, 20, 5);
+        // the same timer brings new emails from Zoho into the Team inbox (at most every 2 minutes)
+        $zi = null;
+        try { require_once __DIR__ . '/../includes/zoho_inbox.php'; $zi = aw_zoho_inbox_sync($db, false); } catch (Throwable $e) { error_log('cron inbox: ' . $e->getMessage()); }
         $next = $db->query("SELECT scheduled_at FROM email_queue WHERE status = 'pending' ORDER BY scheduled_at LIMIT 1")->fetchColumn();
-        echo json_encode(['ok' => $r !== false] + ($r ?: []) + ['next_scheduled_utc' => $next ?: null]);
+        echo json_encode(['ok' => $r !== false] + ($r ?: []) + ['next_scheduled_utc' => $next ?: null, 'inbox' => $zi ? ($zi['message'] ?: 'checked recently') : 'not checked']);
         exit;
     }
     if (!isAdmin()) {
