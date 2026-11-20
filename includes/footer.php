@@ -25,6 +25,7 @@ TOC NAVIGATOR (Appears on all pages after scrolling 400px)
 <!-- ============================================================
 FOOTER – Brand, Links, Social
 ============================================================ -->
+<?php require_once __DIR__ . '/i18n.php'; ?>
 <footer class="site-footer">
     <div class="container">
         <div class="footer-grid">
@@ -36,24 +37,24 @@ FOOTER – Brand, Links, Social
             </div>
 
             <div class="footer-links">
-                <h4>Quick Links</h4>
+                <h4><?php echo aw_t('Quick Links'); ?></h4>
                 <ul>
                     <?php if (isLoggedIn()): ?>
-                        <li><a href="<?php echo SITE_URL; ?>/dashboard.php">Dashboard</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/library.php">My Library</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/dashboard.php"><?php echo aw_t('Dashboard'); ?></a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/library.php"><?php echo aw_t('My Library'); ?></a></li>
                     <?php else: ?>
-                        <li><a href="<?php echo SITE_URL; ?>/index.php">Home</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/books.php">Books</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/poetry.php">Poems</a></li>
-                        <li><a href="<?php echo SITE_URL; ?>/blog.php">Blog</a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/index.php"><?php echo aw_t('Home'); ?></a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/books.php"><?php echo aw_t('Books'); ?></a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/poetry.php"><?php echo aw_t('Poems'); ?></a></li>
+                        <li><a href="<?php echo SITE_URL; ?>/blog.php"><?php echo aw_t('Blog'); ?></a></li>
                     <?php endif; ?>
-                    <li><a href="<?php echo SITE_URL; ?>/about.php">About</a></li>
-                    <li><a href="<?php echo SITE_URL; ?>/contact.php">Contact</a></li>
+                    <li><a href="<?php echo SITE_URL; ?>/about.php"><?php echo aw_t('About'); ?></a></li>
+                    <li><a href="<?php echo SITE_URL; ?>/contact.php"><?php echo aw_t('Contact'); ?></a></li>
                 </ul>
             </div>
 
             <div class="footer-social">
-                <h4>Connect</h4>
+                <h4><?php echo aw_t('Connect'); ?></h4>
                 <div class="social-icons">
                     <?php
                     // live accounts link out; the others say honestly that they are coming soon (includes/social_accounts.php)
@@ -78,17 +79,18 @@ FOOTER – Brand, Links, Social
 
         <div class="footer-bottom">
             <p>
-                &copy; <?php echo date('Y'); ?> <?php echo SITE_NAME; ?>. All rights reserved.
-                <span class="footer-heart">Made with <i class="fas fa-heart" aria-hidden="true" style="color: #f0a8ab;"></i> in Malawi, for readers everywhere.</span>
+                &copy; <?php echo date('Y'); ?> <?php echo SITE_NAME; ?>. <?php echo aw_t('All rights reserved.'); ?>
+                <span class="footer-heart"><?php echo aw_t('Made with'); ?> <i class="fas fa-heart" aria-hidden="true" style="color: #f0a8ab;"></i> <?php echo aw_t('in Malawi, for readers everywhere.'); ?></span>
             </p>
             
             <!-- ===== ADDED: Terms & Privacy Links ===== -->
+            <nav class="footer-langs" aria-label="<?php echo aw_t('Language'); ?>"><i class="fas fa-language" aria-hidden="true"></i> <?php $aw_fl = []; foreach (AW_LANGS as $aw_lk => $aw_lv) $aw_fl[] = aw_lang() === $aw_lk ? '<strong lang="' . $aw_lk . '" aria-current="true">' . htmlspecialchars($aw_lv[1]) . '</strong>' : '<a href="' . htmlspecialchars(aw_lang_url($aw_lk)) . '" hreflang="' . $aw_lk . '" lang="' . $aw_lk . '">' . htmlspecialchars($aw_lv[1]) . '</a>'; echo implode(' · ', $aw_fl); ?></nav>
             <div class="footer-legal">
-                <a href="<?php echo SITE_URL; ?>/terms.php">Terms of Service</a>
+                <a href="<?php echo SITE_URL; ?>/terms.php"><?php echo aw_t('Terms of Service'); ?></a>
                 <span>|</span>
-                <a href="<?php echo SITE_URL; ?>/privacy.php">Privacy Policy</a>
+                <a href="<?php echo SITE_URL; ?>/privacy.php"><?php echo aw_t('Privacy Policy'); ?></a>
                 <span>|</span>
-                <a href="<?php echo SITE_URL; ?>/accessibility.php">Accessibility</a>
+                <a href="<?php echo SITE_URL; ?>/accessibility.php"><?php echo aw_t('Accessibility'); ?></a>
             </div>
         </div>
     </div>

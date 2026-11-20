@@ -993,3 +993,19 @@ html[data-theme="dark"] .aw-cbtn { background: transparent; border-color: #f0c4c
 html[data-theme="dark"] .aw-cbtn i { background: #f0c4c5; color: #2c1e1e; }
 html[data-theme="dark"] .aw-cbtn:hover, html[data-theme="dark"] .aw-cbtn:focus-visible { background: #f0c4c5; color: #2c1e1e; }
 .aw-cbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Language switch (includes/i18n.php): drawer foot and footer */
+.awh-langs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; margin-bottom: 6px; }
+.awh-langs i { color: #9c5457; margin-right: 2px; }
+.awh-langs a { min-height: 36px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(156, 84, 87, .3); text-decoration: none; font-weight: 600; font-size: .86rem; }
+.awh-langs a.is-on { background: #9c5457; border-color: #9c5457; color: #fff; }
+html[data-theme="dark"] .awh-langs a.is-on { background: #f0c4c5; border-color: #f0c4c5; color: #2c1e1e; }
+.footer-langs { margin: 0 0 10px; font-size: .92rem; }
+.footer-langs a { color: inherit; text-decoration: underline; text-underline-offset: 3px; padding: 6px 2px; }
+.footer-langs i { margin-right: 4px; }
+
+/* The site in Chichewa: longer menu words. Tighter spacing on wide screens; below 1400px the menu
+   moves into the drawer a little sooner than in English, so nothing collides. */
+html[lang="ny"] .awh-link { padding: 0 9px; font-size: .9rem; white-space: nowrap; }
+@media (max-width: 1400px) and (min-width: 1200px) { html[lang="ny"] .awh-link { padding: 0 7px; font-size: .84rem; } }
+@media (max-width: 1199px) { html[lang="ny"] .awh-nav { display: none; } html[lang="ny"] .awh-burger { display: inline-grid; } html[lang="ny"] .awh-hide-md { display: none; } }

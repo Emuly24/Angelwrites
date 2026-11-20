@@ -29,6 +29,9 @@ try {
 } catch (Throwable $e) { error_log('site texts list: ' . $e->getMessage()); }
 $st_pages = [];
 foreach ($st_rows as $r) $st_pages[$r['page'] ?: 'other'][] = $r;
+// Chichewa versions ("key@ny", includes/i18n.php)
+$st_ny = [];
+try { foreach ($db->query("SELECT text_key, value FROM site_texts WHERE text_key LIKE '%@ny'") as $r) $st_ny[substr($r['text_key'], 0, -3)] = (string)$r['value']; } catch (Throwable $e) { error_log('site texts ny: ' . $e->getMessage()); }
 $st_known = ['index.php' => 'Home page', 'about.php' => 'About', 'books.php' => 'Books', 'poetry.php' => 'Poetry', 'reflections.php' => 'Reflections',
              'blog.php' => 'Blog', 'videos.php' => 'Videos', 'contact.php' => 'Contact', 'stories.php' => 'Stories & Help', 'community.php' => 'Community Q&A',
              'groups.php' => 'Reading groups', 'book_session.php' => 'Book a session', 'share_book.php' => 'Share a book',
@@ -57,6 +60,7 @@ require_once '../includes/header.php';
 .stx-acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .stx-acts .btn { min-height: 40px; }
 .stx-changed { color: #2f6b45; }
+.stx-ny { margin: -4px 0 8px; padding: 0 0 8px 14px; border-left: 3px solid #d6a85c; } .stx-ny summary { cursor: pointer; font-weight: 600; font-size: .88rem; min-height: 36px; display: flex; gap: 8px; align-items: center; } .stx-ny summary small { font-weight: 400; color: var(--text-light); }
 .stx-alert { padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; font-weight: 500; }
 .stx-alert.ok { background: #e3efe6; color: #2d5039; } .stx-alert.error { background: #f6e1e3; color: #6e2a31; }
 </style>
@@ -80,6 +84,13 @@ require_once '../includes/header.php';
             <textarea id="<?php echo $id; ?>" name="value" rows="<?php echo $r['mode'] === 'line' ? 2 : 4; ?>"><?php echo htmlspecialchars($val); ?></textarea>
             <div class="stx-acts"><button type="submit" class="btn btn-primary btn-sm">Save</button><?php if ($r['value'] !== null): ?><button type="submit" name="reset" value="1" class="btn btn-outline btn-sm" onclick="return confirm('Put back the original wording?');">Original wording</button><?php endif; ?></div>
         </form>
+        <details class="stx-ny"<?php echo isset($st_ny[$r['text_key']]) ? '' : ''; ?>><summary><i class="fas fa-language" aria-hidden="true"></i> Chichewa <?php echo isset($st_ny[$r['text_key']]) ? '<span class="stx-changed">translated</span>' : '<small>not translated yet: readers see the English</small>'; ?></summary>
+            <form method="post" class="stx-item">
+                <input type="hidden" name="key" value="<?php echo htmlspecialchars($r['text_key'] . '@ny'); ?>"><input type="hidden" name="mode" value="<?php echo htmlspecialchars($r['mode']); ?>">
+                <textarea name="value" lang="ny" aria-label="Chichewa for <?php echo htmlspecialchars($r['text_key']); ?>" rows="<?php echo $r['mode'] === 'line' ? 2 : 4; ?>" placeholder="<?php echo htmlspecialchars($val); ?>"><?php echo htmlspecialchars($st_ny[$r['text_key']] ?? ''); ?></textarea>
+                <div class="stx-acts"><button type="submit" class="btn btn-primary btn-sm">Save Chichewa</button><?php if (isset($st_ny[$r['text_key']])): ?><button type="submit" name="reset" value="1" class="btn btn-outline btn-sm">Remove the translation</button><?php endif; ?></div>
+            </form>
+        </details>
         <?php endforeach; ?>
     </section>
     <?php endforeach; ?>
