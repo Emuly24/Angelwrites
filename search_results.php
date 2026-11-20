@@ -200,6 +200,7 @@ if ($sort === 'newest') {
 
 // F58: page the merged, sorted list: 12 results per page in total.
 $total_results = count($results);
+if ($q !== '' && $page === 1) { require_once __DIR__ . '/includes/site_stats.php'; aw_stats_search($q, $total_results > 0); } // what readers look for (Admin > Statistics)
 $results = array_slice($results, $offset, $limit);
 $total_pages = ceil($total_results / $limit);
 $current_page = $page;

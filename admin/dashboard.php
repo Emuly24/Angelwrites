@@ -279,6 +279,7 @@ require_once '../includes/header.php';
             <a class="dsh-tile" href="manage_newsletter.php?tab=send"><i class="fas fa-paper-plane" aria-hidden="true"></i>Send a campaign</a>
         </div></section>
         <section class="dsh-card dsh-reveal" style="--i:5"><h3>System</h3><div class="dsh-tiles">
+            <?php if (aw_can('manage_settings')): ?><a class="dsh-tile" href="stats.php"><i class="fas fa-chart-simple" aria-hidden="true"></i>Statistics</a><?php endif; ?>
             <a class="dsh-tile" href="settings.php"><i class="fas fa-sliders" aria-hidden="true"></i>Settings</a>
             <a class="dsh-tile" href="social_accounts.php"><i class="fas fa-share-nodes" aria-hidden="true"></i>Social accounts</a>
             <a class="dsh-tile" href="backup.php"><i class="fas fa-database" aria-hidden="true"></i>Backup</a>
