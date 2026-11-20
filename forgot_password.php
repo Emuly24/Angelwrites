@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             if (!sendEmail($email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites')) error_log('forgot_password: reset code email failed for user ' . $user['id']);
         }
         // F105: same message and same rate limit whether or not the account exists
-        $message = 'If an account with that email exists, a reset code has been sent. Please check your inbox and spam folder.';
+        $message = 'If an account with that email exists, a reset code has been sent. Please check your inbox, and your Junk or Spam folder: our emails sometimes land there.';
         file_put_contents($attempts_file, time());
     }
 }

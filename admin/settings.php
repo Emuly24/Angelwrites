@@ -169,6 +169,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_email']) && val
     @set_time_limit(60);
     $aw_mail_check = aw_mail_diagnose(); // each step of sending, in plain words (never the password)
 }
+// ===== Junk-folder help for members (includes/inbox_help.php) =====
+$aw_ih_msg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['inbox_help_switch']) || isset($_POST['inbox_help_notify'])) && validate_csrf_token($_POST['csrf_token'] ?? '')) {
+    if (isset($_POST['inbox_help_switch'])) {
+        $db->prepare("INSERT INTO settings (key, value) VALUES ('inbox_help_on', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute([$_POST['inbox_help_switch'] === '1' ? '1' : '0']);
+        $aw_ih_msg = ['ok' => true, 'msg' => $_POST['inbox_help_switch'] === '1' ? 'The dashboard reminder is on.' : 'The dashboard reminder is off.'];
+    } else {
+        require_once __DIR__ . '/../includes/notifications.php';
+        $n = aw_inbox_help_notify_all($db);
+        $aw_ih_msg = ['ok' => $n > 0, 'msg' => $n > 0 ? $n . ' members were notified on the site (the bell).' : 'No members could be notified.'];
+    }
+}
 $aw_mail_test = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_plain_test']) && validate_csrf_token($_POST['csrf_token'] ?? '')) {
     $aw_to = trim($_POST['test_to'] ?? '');
@@ -241,7 +253,7 @@ $pageTitle = 'Site Settings';
         <div class="settings-tabs">
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
-            <button class="tab-btn<?php echo ($aw_mail_test || $aw_mail_check || $aw_seo_msg || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
+            <button class="tab-btn<?php echo ($aw_mail_test || $aw_ih_msg || $aw_mail_check || $aw_seo_msg || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
             <button class="tab-btn<?php echo ($aw_quota_msg || ($_GET['tab'] ?? '') === 'uploads') ? ' aw-open-email' : ''; ?>" data-tab="uploads">Uploads</button><!-- R13 -->
         </div>
 
@@ -480,6 +492,15 @@ $pageTitle = 'Site Settings';
                             <button type="submit" name="send_test_email" value="1" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send test email</button>
                             <button type="submit" name="send_plain_test" value="1" class="btn btn-outline"><i class="fas fa-align-left"></i> Send a plain test (no pictures, no links)</button>
                         </div>
+                    </form>
+
+                    <h3 id="junk-help" style="margin:28px 0 10px;">Help members find our emails</h3>
+                    <?php if ($aw_ih_msg): ?><div class="alert <?php echo $aw_ih_msg['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_ih_msg['msg']); ?></div><?php endif; ?>
+                    <p style="color:var(--text-light);margin:0 0 10px;">While the site sends from a free address, mailboxes may put its emails in Junk. Members are asked on their dashboard to mark one email “Not spam” and add the address to their contacts (<a href="<?php echo SITE_URL; ?>/email_help.php" target="_blank" rel="noopener">the help page</a> has steps for Gmail, Outlook, Yahoo, iCloud and others). Every email's footer also says how. The reminder is <strong><?php echo function_exists('aw_inbox_help_on') && aw_inbox_help_on() ? 'on' : 'off'; ?></strong>.</p>
+                    <form method="POST" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;" action="<?php echo SITE_URL; ?>/admin/settings.php?tab=email#junk-help">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <button type="submit" name="inbox_help_switch" value="<?php echo aw_inbox_help_on() ? '0' : '1'; ?>" class="btn btn-outline"><?php echo aw_inbox_help_on() ? 'Turn the dashboard reminder off' : 'Turn the dashboard reminder on'; ?></button>
+                        <button type="submit" name="inbox_help_notify" value="1" class="btn btn-primary" onclick="return confirm('Send every member a notification on the site asking them to check their Junk folder?');"><i class="fas fa-bell"></i> Notify every member now</button>
                     </form>
 
                     <h3 id="prices" style="margin:28px 0 10px;">Prices for readers abroad</h3>
