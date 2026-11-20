@@ -91,7 +91,7 @@ function aw_social_footer_icons(PDO $db = null) {
             $h .= '<button type="button" class="aw-soon" data-aw-soon="' . htmlspecialchars($a['label']) . '" aria-haspopup="dialog" aria-label="AngelWrites on ' . htmlspecialchars($a['label']) . ' (coming soon)"><i class="' . $a['icon'] . '" aria-hidden="true"></i></button>';
         }
     }
-    return $h . aw_social_soon_dialog();
+    return $h; // the "coming soon" note is printed after the footer (aw_social_soon_dialog), never inside the icon row
 }
 
 /** The "coming soon" note (printed once per page). */
@@ -115,20 +115,26 @@ function aw_social_soon_dialog() {
 </dialog>
 <style>
 .aw-soon { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
-.aw-soon-dialog { border: 0; border-radius: 22px; padding: 28px 26px 24px; max-width: min(440px, calc(100vw - 32px)); background: var(--card-bg, #fff); color: var(--text, #3d2e2e); box-shadow: 0 24px 60px rgba(30, 18, 18, .3); text-align: center; }
+.aw-soon-dialog { --sd-bg: #ffffff; --sd-ink: #2c1e1e; --sd-text: #4a3a3a; --sd-line: #e5d5d5; --sd-rose: #9c5457;
+    position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100vh - 32px); overflow: auto;
+    border: 0; border-radius: 22px; padding: 28px 26px 24px; width: min(440px, calc(100vw - 32px)); max-width: none; background: var(--sd-bg); color: var(--sd-text); box-shadow: 0 24px 60px rgba(30, 18, 18, .3); text-align: center; }
+html[data-theme="dark"] .aw-soon-dialog { --sd-bg: #2a1f22; --sd-ink: #f6ecec; --sd-text: #e6d6d6; --sd-line: rgba(240, 196, 197, .25); --sd-rose: #f0c4c5; }
+.aw-soon-dialog * { color: inherit; }
+.aw-soon-dialog h2 span { color: var(--sd-rose); }
 .aw-soon-dialog::backdrop { background: rgba(30, 18, 18, .45); backdrop-filter: blur(3px); }
-.aw-soon-dialog h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.35rem; margin: 6px 0 10px; color: var(--dark, #2c1e1e); }
-.aw-soon-dialog p { margin: 0 0 10px; line-height: 1.6; color: var(--text-light, #6b5a5a); }
+.aw-soon-dialog h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.35rem; margin: 6px 0 10px; color: var(--sd-ink); }
+.aw-soon-dialog p { margin: 0 0 10px; line-height: 1.6; color: var(--sd-text); }
 .aw-soon-ico { width: 56px; height: 56px; margin: 0 auto; border-radius: 18px; display: grid; place-items: center; font-size: 1.4rem; color: #fff; background: linear-gradient(135deg, #9c5457, #c48f91); }
 .aw-soon-actions { display: grid; gap: 10px; margin-top: 16px; }
-.aw-soon-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border, #e5d5d5); color: var(--text, #3d2e2e); text-decoration: none; font-weight: 600; word-break: break-all; }
-.aw-soon-primary { background: #9c5457; border-color: #9c5457; color: #fff; }
+.aw-soon-dialog .aw-soon-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: auto; min-height: 46px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--sd-rose); background: transparent; color: var(--sd-rose); text-decoration: none; font: 600 .95rem Inter, system-ui, sans-serif; }
+.aw-soon-dialog .aw-soon-btn i { color: inherit; }
+.aw-soon-dialog .aw-soon-primary { background: #9c5457; border-color: #9c5457; color: #fff; }
 .aw-soon-primary:hover { color: #fff; filter: brightness(.94); }
 .aw-soon-close-f { position: absolute; top: 8px; right: 10px; margin: 0; }
-.aw-soon-x { width: 40px; height: 40px; border: 0; background: none; font-size: 1.6rem; color: var(--text-light, #6b5a5a); cursor: pointer; border-radius: 50%; }
+.aw-soon-dialog .aw-soon-x { width: 44px; height: 44px; border: 0; background: none; font-size: 1.6rem; color: var(--sd-text); cursor: pointer; border-radius: 50%; display: grid; place-items: center; }
 .aw-soon-x:focus-visible, .aw-soon-btn:focus-visible { outline: 3px solid #9c5457; outline-offset: 2px; }
 html[data-theme="dark"] .aw-soon-dialog h2 { color: #f6ecec; }
-html[data-theme="dark"] .aw-soon-primary { background: #f0c4c5; border-color: #f0c4c5; color: #2c1e1e; }
+html[data-theme="dark"] .aw-soon-dialog .aw-soon-primary { background: #f0c4c5; border-color: #f0c4c5; color: #2c1e1e; }
 </style>
 <script>
 document.addEventListener('click', function (e) {
