@@ -57,7 +57,7 @@ function aw_journal_key($uid) {
     static $site = null;
     if (!function_exists('sodium_crypto_secretbox')) return '';
     if ($site === null) {
-        $env = trim((string)getenv('JOURNAL_KEY'));
+        $env = trim((string)aw_env('JOURNAL_KEY'));
         if ($env !== '') $site = sodium_crypto_generichash($env, '', 32);
         else {
             $file = dirname(__DIR__) . '/data/journal.key';

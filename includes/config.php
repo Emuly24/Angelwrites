@@ -1,12 +1,12 @@
 <?php
 require_once __DIR__ . '/load_env.php';
 // Site Configuration
-define('SITE_NAME', getenv('SITE_NAME'));
-define('UPLOAD_PATH', getenv('UPLOAD_PATH'));
-define('BIBLE_PATH', getenv('BIBLE_PATH'));
-define('ADMIN_EMAIL', getenv('ADMIN_EMAIL'));
+define('SITE_NAME', aw_env('SITE_NAME'));
+define('UPLOAD_PATH', aw_env('UPLOAD_PATH'));
+define('BIBLE_PATH', aw_env('BIBLE_PATH'));
+define('ADMIN_EMAIL', aw_env('ADMIN_EMAIL'));
 define('DB_PATH', __DIR__ . '/../data/site.db');
-define('SITE_URL', rtrim(getenv('SITE_URL') ?: 'https://angelwrites.gt.tc', '/')); // F213: SITE_URL in .env overrides
+define('SITE_URL', rtrim(aw_env('SITE_URL') ?: 'https://angelwrites.gt.tc', '/')); // F213: SITE_URL in .env overrides
 
 // F191: admin/settings.php saves site name, admin email and logo in the settings table, but
 // nothing read them. These helpers read them (once per request), with safe fallbacks.

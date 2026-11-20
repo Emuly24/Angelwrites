@@ -206,11 +206,11 @@ if (!$isLoggedIn) {
 } elseif ($isAdmin) {
     $aw_groups['Admin'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']], ['Books', 'fa-book', $aw_u . '/admin/manage_books.php', ['admin/manage_books.php']], ['Poems', 'fa-feather', $aw_u . '/admin/manage_poems.php', ['admin/manage_poems.php']],
         ['Sessions', 'fa-calendar-check', $aw_u . '/admin/manage_sessions.php', ['admin/manage_sessions.php']], ['Members', 'fa-users', $aw_u . '/admin/manage_users.php', ['admin/manage_users.php']], ['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']], ['Moderation', 'fa-shield-heart', $aw_u . '/admin/moderation.php', ['admin/moderation.php']],
-        ['Stories & Help', 'fa-seedling', $aw_u . '/admin/community.php', ['admin/community.php']], ['Settings', 'fa-sliders', $aw_u . '/admin/settings.php', ['admin/settings.php']]];
+        ['Stories & Help', 'fa-seedling', $aw_u . '/admin/community.php', ['admin/community.php']], ['Settings', 'fa-sliders', $aw_u . '/admin/settings.php', ['admin/settings.php']], ["Founder's handbook", 'fa-book-open', $aw_u . '/admin/handbook.php', ['admin/handbook.php']], ['Guided tours', 'fa-route', $aw_u . '/tour.php', ['tour.php']]];
     $aw_groups['Site'] = [['View the site', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_unread], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
 } else {
     $aw_groups['You'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/dashboard.php', ['dashboard.php']], ['My library', 'fa-bookmark', $aw_u . '/library.php', ['library.php']], ['My journal', 'fa-book-open', $aw_u . '/journal.php', ['journal.php']],
-        ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_on ? $aw_msg_unread : null], ['Notifications', 'fa-bell', $aw_u . '/notifications.php', ['notifications.php'], $unreadNotifications], ['Profile', 'fa-user', $aw_u . '/profile.php', ['profile.php']]];
+        ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_on ? $aw_msg_unread : null], ['Notifications', 'fa-bell', $aw_u . '/notifications.php', ['notifications.php'], $unreadNotifications], ['Profile', 'fa-user', $aw_u . '/profile.php', ['profile.php']], ['Guided tours', 'fa-route', $aw_u . '/tour.php', ['tour.php']]];
     $aw_groups['Read'] = [['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
         ['Reflections', 'fa-dove', $aw_u . '/reflections.php', ['reflections.php']], ['Blog', 'fa-pen-nib', $aw_u . '/blog.php', ['blog.php', 'blog_post.php']], ['Videos', 'fa-circle-play', $aw_u . '/videos.php', ['videos.php', 'video_watch.php']], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
     $aw_groups['Community'] = array_values(array_filter([
@@ -315,6 +315,8 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                                 <a href="<?php echo $aw_u; ?>/admin/moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i><?php echo aw_t('Moderation'); ?></a>
                                 <a href="<?php echo $aw_u; ?>/index.php"><i class="fas fa-house" aria-hidden="true"></i><?php echo aw_t('View the site'); ?></a>
                                 <a href="<?php echo $aw_u; ?>/account_security.php"><i class="fas fa-lock" aria-hidden="true"></i><?php echo aw_t('Account security'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/admin/handbook.php"><i class="fas fa-book-open" aria-hidden="true"></i><?php echo aw_t("Founder's handbook"); ?></a>
+                                <a href="<?php echo $aw_u; ?>/tour.php"><i class="fas fa-route" aria-hidden="true"></i><?php echo aw_t('Guided tours'); ?></a>
                             <?php else: ?>
                                 <a href="<?php echo $aw_u; ?>/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i><?php echo aw_t('Dashboard'); ?></a>
                                 <a href="<?php echo $aw_u; ?>/library.php"><i class="fas fa-bookmark" aria-hidden="true"></i><?php echo aw_t('My library'); ?></a>
@@ -324,6 +326,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                                 <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i><?php echo aw_t('Profile'); ?></a>
                                 <a href="<?php echo $aw_u; ?>/account_security.php"><i class="fas fa-lock" aria-hidden="true"></i><?php echo aw_t('Account security'); ?></a>
                                 <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><?php echo aw_t('Team desk'); ?></a><?php endif; ?>
+                                <a href="<?php echo $aw_u; ?>/tour.php"><i class="fas fa-route" aria-hidden="true"></i><?php echo aw_t('Guided tours'); ?></a>
                             <?php endif; ?>
                             <hr>
                             <a class="awh-out" href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><?php echo aw_t('Log out'); ?></a>

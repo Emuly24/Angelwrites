@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $si_flash = ['ok' => false, 'msg' => 'Your session expired, so nothing was changed. Please try again.'];
     } elseif (isset($_POST['accept']) || isset($_POST['decline'])) {
         $si_flash = aw_invite_answer($db, $si_id, $si_me, isset($_POST['accept']));
+        if ($si_flash['ok'] && isset($_POST['accept'])) { header('Location: ' . SITE_URL . '/admin/team.php'); exit; } // the Care Team tour starts there
         $_SESSION['aw_si_flash'] = $si_flash;
         header('Location: ' . SITE_URL . '/staff_invite.php?id=' . $si_id);
         exit;

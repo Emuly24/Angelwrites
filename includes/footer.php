@@ -437,5 +437,7 @@ require_once __DIR__ . '/auto_backup.php'; aw_auto_backup_maybe();
 require_once __DIR__ . '/site_stats.php'; aw_stats_record();
 // event reminders about 24 hours before (includes/events.php), checked at most once an hour
 require_once __DIR__ . '/events.php'; aw_event_reminders_maybe(); ?>
+<?php // guided tours: the card for this page, or "continue the tour" (includes/tours.php)
+if (!empty($_SESSION['user_id']) && defined('SITE_URL') && isset($GLOBALS['db'])) { try { require_once __DIR__ . '/tours.php'; echo aw_tour_footer(); } catch (Throwable $e) { error_log('tour footer: ' . $e->getMessage()); } } ?>
 </body>
 </html>

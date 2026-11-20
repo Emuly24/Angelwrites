@@ -236,6 +236,20 @@ require_once '../includes/header.php';
         <?php endif; ?>
     </div>
 
+    <?php // first visit: offer the Founder's tour and handbook until it has been started or dismissed
+    require_once __DIR__ . '/../includes/tours.php';
+    if (aw_tour_get($db, (int)$_SESSION['user_id'], 'admin') === null): ?>
+    <section class="dsh-invite" aria-labelledby="dTour">
+        <span class="dsh-invite-ico" aria-hidden="true"><i class="fas fa-route"></i></span>
+        <div><h2 id="dTour">New to running AngelWrites?</h2><p>The Founder's tour walks through every admin page and what it is for, step by step. You can stop it at any time. The same words are in the Founder's handbook.</p></div>
+        <form method="POST" action="<?php echo SITE_URL; ?>/tour.php" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>"><input type="hidden" name="tour" value="admin">
+            <button type="submit" name="action" value="restart" class="dsh-pill dsh-pill-solid">Start the tour</button>
+            <a class="dsh-pill" href="handbook.php">Read the handbook</a>
+            <button type="submit" name="action" value="off" class="dsh-pill">Not now</button>
+        </form>
+    </section>
+    <?php endif; ?>
     <h2 class="dsh-tools-h">Your tools</h2>
     <div class="dsh-tools">
         <?php if (!aw_can('manage_content')): /* K1: a moderator's tools */ ?>
@@ -298,6 +312,8 @@ require_once '../includes/header.php';
             <a class="dsh-tile" href="../account_security.php"><i class="fas fa-lock" aria-hidden="true"></i>Account security</a>
             <?php if (aw_can('manage_staff')): ?><a class="dsh-tile" href="staff.php"><i class="fas fa-user-shield" aria-hidden="true"></i>Team &amp; roles</a><?php endif; ?>
             <?php if (aw_can('audit_log')): ?><a class="dsh-tile" href="audit.php"><i class="fas fa-clipboard-list" aria-hidden="true"></i>Audit log</a><?php endif; ?>
+            <a class="dsh-tile" href="handbook.php"><i class="fas fa-book-open" aria-hidden="true"></i>Founder's handbook</a>
+            <a class="dsh-tile" href="../tour.php"><i class="fas fa-route" aria-hidden="true"></i>Guided tours</a>
         </div></section>
         <?php endif; ?>
     </div>

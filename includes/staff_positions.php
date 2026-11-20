@@ -431,6 +431,7 @@ function aw_invite_answer(PDO $db, $id, $uid, $accept) {
         return ['ok' => false, 'msg' => 'Your answer could not be saved. Please try again.'];
     }
     if (function_exists('aw_audit')) aw_audit($accept ? 'staff_invite_accepted' : 'staff_invite_declined', 'user', (int)$uid, $inv['position']);
+    if ($accept) { require_once __DIR__ . '/tours.php'; aw_tour_set($db, (int)$uid, 'team', 'on', 0); } // the Care Team tour starts on the Team desk
     if (function_exists('awNotify')) {
         $me = function_exists('awDisplayName') ? awDisplayName(aw_staff_user_row($db, $uid)) : 'A member';
         awNotify($db, (int)$inv['invited_by'], 'staff_invite_answer', $me . ($accept ? ' accepted' : ' declined') . ' the invitation: ' . $pos['title'],
