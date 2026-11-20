@@ -199,7 +199,7 @@ if (!$isLoggedIn) {
         ['Stories & Help', 'fa-seedling', $aw_u . '/admin/community.php', ['admin/community.php']], ['Settings', 'fa-sliders', $aw_u . '/admin/settings.php', ['admin/settings.php']]];
     $aw_groups['Site'] = [['View the site', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_unread], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
 } else {
-    $aw_groups['You'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/dashboard.php', ['dashboard.php']], ['My library', 'fa-bookmark', $aw_u . '/library.php', ['library.php']],
+    $aw_groups['You'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/dashboard.php', ['dashboard.php']], ['My library', 'fa-bookmark', $aw_u . '/library.php', ['library.php']], ['My journal', 'fa-book-open', $aw_u . '/journal.php', ['journal.php']],
         ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_on ? $aw_msg_unread : null], ['Notifications', 'fa-bell', $aw_u . '/notifications.php', ['notifications.php'], $unreadNotifications], ['Profile', 'fa-user', $aw_u . '/profile.php', ['profile.php']]];
     $aw_groups['Read'] = [['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
         ['Reflections', 'fa-dove', $aw_u . '/reflections.php', ['reflections.php']], ['Blog', 'fa-pen-nib', $aw_u . '/blog.php', ['blog.php', 'blog_post.php']], ['Videos', 'fa-circle-play', $aw_u . '/videos.php', ['videos.php', 'video_watch.php']], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
@@ -301,6 +301,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                             <?php else: ?>
                                 <a href="<?php echo $aw_u; ?>/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i>Dashboard</a>
                                 <a href="<?php echo $aw_u; ?>/library.php"><i class="fas fa-bookmark" aria-hidden="true"></i>My library</a>
+                                <a href="<?php echo $aw_u; ?>/journal.php"><i class="fas fa-book-open" aria-hidden="true"></i>My journal</a>
                                 <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i>My Stories &amp; Help</a><?php endif; ?>
                                 <a href="<?php echo $aw_u; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i>My shared books</a>
                                 <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i>Profile</a>

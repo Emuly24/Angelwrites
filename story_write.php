@@ -26,6 +26,12 @@ $v = $old ? [
     'warnings' => [], 'no_warnings' => false, 'title' => '', 'body' => '',
 ];
 if (!$old && !empty($_GET['pray'])) { $v['title'] = 'Please pray with me'; $v['category'] = $v['category'] ?: 'faith'; }
+// "Share as a story" from the private journal: a draft only; nothing is shared until the member sends it
+if (!$old && $_SERVER['REQUEST_METHOD'] !== 'POST' && !empty($_SESSION['aw_story_from_journal'])) {
+    $v['title'] = mb_substr((string)$_SESSION['aw_story_from_journal']['title'], 0, AW_CP_LIMITS['title']);
+    $v['body'] = (string)$_SESSION['aw_story_from_journal']['body'];
+    unset($_SESSION['aw_story_from_journal']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
