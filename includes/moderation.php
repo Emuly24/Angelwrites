@@ -40,6 +40,9 @@ function aw_report_types() {
         // the prayer wall (includes/prayer.php): a request is hidden (status 'removed'); an encouragement is archived
         'prayer'             => ['prayer_requests', 'user_id', "COALESCE(title, '') || ' — ' || COALESCE(message, '')", "'prayer.php#p' || id", 'status'],
         'prayer_update'      => ['prayer_updates', 'user_id', 'body', "'prayer.php#p' || request_id", 'archive'],
+        // writing prompts (includes/prompts.php)
+        'prompt_response'    => ['prompt_responses', 'user_id', "COALESCE(title, '') || ' — ' || body", "'prompts.php?p=' || prompt_id || '#r' || id", 'status'],
+        'prompt_feedback'    => ['prompt_feedback', 'user_id', "COALESCE(touched, '') || ' / ' || COALESCE(more, '')", "'prompts.php'", 'archive'],
     ];
 }
 
