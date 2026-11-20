@@ -221,6 +221,11 @@ require_once '../includes/header.php';
         </nav>
     </header>
 
+    <?php $td_train = function_exists('aw_training_pending') ? aw_training_pending() : []; if ($td_train): ?>
+    <div class="td-alert is-train" role="status"><i class="fas fa-graduation-cap" aria-hidden="true"></i>
+        <span><strong>Before you start:</strong> a short training (about 10 minutes) opens your tools.
+        <?php foreach ($td_train as $td_t): ?><a href="training.php?area=<?php echo rawurlencode($td_t); ?>"><?php echo htmlspecialchars(AW_POSITIONS[$td_t]['title']); ?> training</a> <?php endforeach; ?></span></div>
+    <?php endif; ?>
     <?php if ($td_flash): ?><div class="td-alert <?php echo $td_flash[0] === 'ok' ? 'is-ok' : 'is-error'; ?>" role="status"><?php echo htmlspecialchars($td_flash[1]); ?></div><?php endif; ?>
 
     <?php if ($td_urgent): ?>
@@ -413,5 +418,9 @@ html[data-theme="dark"] .td-notes li { background: #2e2620; border-color: #4a3d2
 @media (max-width: 900px) { .td-grid { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .td-list li { grid-template-columns: 34px minmax(0, 1fr) auto; } .td-list .td-btn { grid-column: 2 / -1; justify-self: start; } .td-hero { padding: 22px 18px; } }
 @media (prefers-reduced-motion: reduce) { .td-list li { animation: none; } }
+
+.td-alert.is-train{display:flex;gap:10px;align-items:flex-start;background:#fff8e8;border:1px solid #f0c27a;color:#5c3a00}
+.td-alert.is-train a{font-weight:700;color:#7a4300;margin-right:10px}
+[data-theme="dark"] .td-alert.is-train{background:#33260f;border-color:#7a5a1e;color:#f6deb0}[data-theme="dark"] .td-alert.is-train a{color:#ffd58a}
 </style>
 <?php require_once '../includes/footer.php'; ?>

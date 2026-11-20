@@ -296,7 +296,7 @@ require_once '../includes/header.php';
             <a class="dsh-tile" href="../reader/admin/reader_analytics.php"><i class="fas fa-chart-line" aria-hidden="true"></i>Reader analytics</a>
             <?php if (aw_can('see_identities')): ?><button type="button" class="dsh-tile" style="font:inherit;font-size:.78rem;font-weight:600;cursor:pointer" onclick="openStatsModal('reading')"><i class="fas fa-book-open-reader" aria-hidden="true"></i>Reading sessions</button><?php endif; ?>
             <a class="dsh-tile" href="../account_security.php"><i class="fas fa-lock" aria-hidden="true"></i>Account security</a>
-            <?php if (aw_can('manage_staff')): ?><a class="dsh-tile" href="staff.php"><i class="fas fa-user-shield" aria-hidden="true"></i>Staff &amp; roles</a><?php endif; ?>
+            <?php if (aw_can('manage_staff')): ?><a class="dsh-tile" href="staff.php"><i class="fas fa-user-shield" aria-hidden="true"></i>Team &amp; roles</a><?php endif; ?>
             <?php if (aw_can('audit_log')): ?><a class="dsh-tile" href="audit.php"><i class="fas fa-clipboard-list" aria-hidden="true"></i>Audit log</a><?php endif; ?>
         </div></section>
         <?php endif; ?>

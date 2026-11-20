@@ -309,14 +309,14 @@ function aw_invite_message($position, $to_name, $from_name, $note = '') {
     $li = function (array $items) use ($e) { return '<ul>' . implode('', array_map(function ($x) use ($e) { return '<li>' . $e($x) . '</li>'; }, $items)) . '</ul>'; };
     $pages = implode(', ', array_map(function ($pg) { return $pg[0]; }, $p['pages']));
     $html = '<p>Dear ' . $e($to_name) . ',</p>'
-          . '<p>' . $e($from_name) . ' invites you to volunteer on the AngelWrites team as <strong>' . $e($p['title']) . '</strong>. '
+          . '<p>' . $e($from_name) . ' invites you to join the AngelWrites ' . $e(function_exists('aw_team_name') ? aw_team_name() : 'team') . ' as <strong>' . $e($p['title']) . '</strong>. '
           . $e($p['summary']) . '</p>'
           . (trim((string)$note) !== '' ? '<blockquote style="margin:12px 0;padding:10px 14px;border-left:3px solid #DBA1A2;background:#fdf6f6">' . nl2br($e(trim((string)$note))) . '<br>— ' . $e($from_name) . '</blockquote>' : '')
           . '<h3>What you would do</h3>' . $li($p['do'])
           . '<h3>What this role does not include</h3>' . $li($p['dont'])
           . '<h3>For everyone on the team</h3>' . $li(AW_STAFF_RULES)
           . '<p><strong>Time:</strong> ' . $e($p['time']) . '. <strong>Where:</strong> your Team desk and ' . $e($pages) . '.</p>'
-          . '<p>This is a volunteer role, and saying no is completely fine. Nothing changes until you accept. The invitation stays open for ' . AW_INVITE_DAYS . ' days.</p>';
+          . '<p>This is a volunteer role, and saying no is completely fine. Nothing changes until you accept. If you accept, a short training (about 10 minutes) opens first. The invitation stays open for ' . AW_INVITE_DAYS . ' days.</p>';
     return ['subject' => $from_name . ' invites you to the AngelWrites team: ' . $p['title'], 'html' => $html];
 }
 
@@ -461,4 +461,72 @@ function aw_invite_list(PDO $db, $limit = 50) {
         $st->execute();
         return $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) { error_log('aw_invite_list: ' . $e->getMessage()); return []; }
+}
+
+// ===== training: read once before a role's tools open ================================================
+
+/** How to respond when someone may be at risk: every training page starts with this. */
+const AW_SAFEGUARDING = [
+    'Listen first. Thank them for telling you, and take what they say seriously.',
+    'Never promise to keep something secret when someone may be at risk. Say kindly that you will need to share it with the person who can help.',
+    'If someone may be in danger now, share the crisis contacts (Team desk → Crisis contacts) and tell the owner at once, by phone if you can.',
+    'Do not investigate, question in detail or contact the other people involved yourself.',
+    'Write down what was said, when, and what you did, in a handover note. Keep it factual.',
+    'Look after yourself too. If something upsets you, talk to the owner.',
+];
+
+/** Three short situations; every answer must be right to finish. [question, options, index of the right one, why] */
+const AW_TRAINING_QUIZ = [
+    ['A member writes that they want to end their life. What do you do first?',
+     ['Reply later, when you have more time', 'Reply with care, share the crisis contacts and tell the owner straight away', 'Hide the post so that others do not see it'], 1,
+     'Someone may be in danger: respond kindly at once, give the crisis contacts and tell the owner. Hiding it or waiting can leave them alone.'],
+    ['A member asks for your WhatsApp number so you can talk privately.',
+     ['Give it, to be friendly', 'Kindly keep the conversation on AngelWrites', 'Ignore the message'], 1,
+     'Conversations stay on AngelWrites, where the team can support you both. Kindness, not silence.'],
+    ['You are not sure whether something breaks the community guidelines.',
+     ['Remove it to be safe', 'Leave a handover note or ask the owner', 'Argue with the person who wrote it'], 1,
+     'When unsure, ask. Nobody expects you to decide everything alone.'],
+];
+
+function aw_training_table(PDO $db) {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS staff_training (user_id INTEGER NOT NULL, area TEXT NOT NULL, completed_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, area))");
+        return $ok = true;
+    } catch (Throwable $e) { error_log('training table: ' . $e->getMessage()); return $ok = false; }
+}
+
+function aw_training_done($uid, $area) {
+    $db = $GLOBALS['db'] ?? null;
+    if (!$db instanceof PDO || !aw_training_table($db)) return true; // never lock people out because of a database problem
+    try { $st = $db->prepare("SELECT 1 FROM staff_training WHERE user_id = ? AND area = ?"); $st->execute([(int)$uid, (string)$area]); return (bool)$st->fetchColumn(); }
+    catch (Throwable $e) { error_log('aw_training_done: ' . $e->getMessage()); return true; }
+}
+
+function aw_training_complete(PDO $db, $uid, $area) {
+    if (!aw_training_table($db)) return false;
+    try { $db->prepare("INSERT OR REPLACE INTO staff_training (user_id, area, completed_at) VALUES (?, ?, CURRENT_TIMESTAMP)")->execute([(int)$uid, (string)$area]); if (function_exists('aw_audit')) aw_audit('training_completed', 'user', (int)$uid, (string)$area); return true; }
+    catch (Throwable $e) { error_log('aw_training_complete: ' . $e->getMessage()); return false; }
+}
+
+/** The signed-in person's roles that still need training (position keys). Owners and admins need none. */
+function aw_training_pending() {
+    if (empty($_SESSION['user_id']) || !function_exists('aw_my_role')) return [];
+    $role = aw_my_role();
+    if (in_array($role, ['owner', 'admin', 'guest'], true)) return [];
+    $uid = (int)$_SESSION['user_id'];
+    $areas = $role === 'moderator' ? ['moderator'] : [];
+    foreach (aw_user_areas($uid) as $a) $areas[] = $a;
+    return array_values(array_filter(array_unique($areas), function ($a) use ($uid) { return !aw_training_done($uid, $a); }));
+}
+
+/** For aw_require(): the position whose training must come before using $cap, or ''. */
+function aw_training_needed_for($cap) {
+    if (in_array($cap, ['staff_dashboard'], true)) return '';
+    foreach (aw_training_pending() as $a) {
+        if ($a === 'moderator') return $a;          // a moderator trains once before any team page
+        if ((AW_POSITIONS[$a]['cap'] ?? '') === $cap) return $a;
+    }
+    return '';
 }

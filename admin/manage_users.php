@@ -141,7 +141,7 @@ require_once '../includes/header.php';
             <p class="mu-lead"><?php echo number_format($mu_counts['all']); ?> accounts · <?php echo number_format($mu_counts['new']); ?> joined in the last 30 days</p>
         </div>
         <div class="mu-head-acts">
-            <?php if ($mu_can_staff): ?><a class="mu-btn" href="<?php echo SITE_URL; ?>/admin/staff.php"><i class="fas fa-user-shield" aria-hidden="true"></i> Staff &amp; roles</a><?php endif; ?>
+            <?php if ($mu_can_staff): ?><a class="mu-btn" href="<?php echo SITE_URL; ?>/admin/staff.php"><i class="fas fa-user-shield" aria-hidden="true"></i> Team &amp; roles</a><?php endif; ?>
             <a class="mu-btn" href="<?php echo SITE_URL; ?>/admin/dashboard.php"><i class="fas fa-arrow-left" aria-hidden="true"></i> Dashboard</a>
         </div>
     </header>
@@ -159,7 +159,7 @@ require_once '../includes/header.php';
             <?php if ($mu_q !== ''): ?><a class="mu-btn" href="<?php echo htmlspecialchars($mu_link(['search' => '', 'page' => ''])); ?>">Clear</a><?php endif; ?>
         </form>
         <nav class="mu-chips" aria-label="Show">
-            <?php foreach (['' => ['All', 'all'], 'members' => ['Members', 'members'], 'staff' => ['Staff', 'staff'], 'unverified' => ['Not verified', 'unverified'], 'new' => ['New this month', 'new']] as $f => [$label, $ck]): ?>
+            <?php foreach (['' => ['All', 'all'], 'members' => ['Members', 'members'], 'staff' => [aw_team_name() . ' & stewards', 'staff'], 'unverified' => ['Not verified', 'unverified'], 'new' => ['New this month', 'new']] as $f => [$label, $ck]): ?>
                 <a href="<?php echo htmlspecialchars($mu_link(['filter' => $f, 'page' => ''])); ?>" class="mu-chip<?php echo $mu_filter === $f ? ' is-on' : ''; ?>"<?php echo $mu_filter === $f ? ' aria-current="page"' : ''; ?>><?php echo $label; ?> <span><?php echo number_format($mu_counts[$ck]); ?></span></a>
             <?php endforeach; ?>
         </nav>
@@ -216,7 +216,7 @@ require_once '../includes/header.php';
                 <?php endif; ?>
                 <?php if (aw_can('invite_staff') && $role === 'member' && (int)$u['id'] !== (int)$_SESSION['user_id']): ?><a class="mu-icon" href="<?php echo SITE_URL; ?>/admin/invite_staff.php?user=<?php echo (int)$u['id']; ?>" title="Invite <?php echo htmlspecialchars($name); ?> to the team" aria-label="Invite <?php echo htmlspecialchars($name); ?> to the team"><i class="fas fa-user-plus" aria-hidden="true"></i></a><?php endif; ?>
                 <?php if (aw_can('audit_log') && $staff): ?><a class="mu-icon" href="<?php echo SITE_URL; ?>/admin/audit.php?actor=<?php echo (int)$u['id']; ?>" title="What <?php echo htmlspecialchars($name); ?> did (team log)" aria-label="What <?php echo htmlspecialchars($name); ?> did"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i></a><?php endif; ?>
-                <?php if ($staff && $mu_can_staff && !$is_me): ?><a class="mu-icon" href="<?php echo SITE_URL; ?>/admin/staff.php" title="Change role in Staff &amp; roles" aria-label="Change <?php echo htmlspecialchars($name); ?>'s role in Staff &amp; roles"><i class="fas fa-user-shield" aria-hidden="true"></i></a><?php endif; ?>
+                <?php if ($staff && $mu_can_staff && !$is_me): ?><a class="mu-icon" href="<?php echo SITE_URL; ?>/admin/staff.php" title="Change role in Team &amp; roles" aria-label="Change <?php echo htmlspecialchars($name); ?>'s role in Team &amp; roles"><i class="fas fa-user-shield" aria-hidden="true"></i></a><?php endif; ?>
                 <?php if (!$is_me && !$protected): ?>
                     <form method="post"><input type="hidden" name="row_id" value="<?php echo (int)$u['id']; ?>"><button type="submit" name="row_action" value="delete" class="mu-icon mu-del" data-confirm="delete" data-name="<?php echo htmlspecialchars($name); ?>" title="Delete <?php echo htmlspecialchars($name); ?>" aria-label="Delete <?php echo htmlspecialchars($name); ?>"><i class="fas fa-trash" aria-hidden="true"></i><span>Delete</span></button></form>
                 <?php endif; ?>

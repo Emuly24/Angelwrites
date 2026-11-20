@@ -82,7 +82,7 @@ require_once '../includes/header.php';
                 <h1>Invite to the team</h1>
                 <p>Ask a member to volunteer in one part of AngelWrites. The invitation explains exactly what the role does and does not include.</p>
             </div>
-            <div class="admin-actions"><?php echo aw_link_btn(SITE_URL . '/admin/team.php', 'Team desk', 'outline', ['icon' => 'fa-hands-holding-circle']); ?><?php if (aw_can('manage_staff')) echo ' ' . aw_link_btn(SITE_URL . '/admin/staff.php', 'Staff & roles', 'outline', ['icon' => 'fa-user-shield']); ?></div>
+            <div class="admin-actions"><?php echo aw_link_btn(SITE_URL . '/admin/team.php', 'Team desk', 'outline', ['icon' => 'fa-hands-holding-circle']); ?><?php if (aw_can('manage_staff')) echo ' ' . aw_link_btn(SITE_URL . '/admin/staff.php', 'Team & roles', 'outline', ['icon' => 'fa-user-shield']); ?></div>
         </div>
 
         <?php echo aw_alert('error', $error); echo aw_alert('success', $notice); ?>
@@ -125,6 +125,7 @@ require_once '../includes/header.php';
                 <?php foreach (AW_POSITIONS as $k => $p): $m = aw_invite_message($k, $is_to, $is_from, ''); ?>
                     <div class="is-preview" data-pos="<?php echo htmlspecialchars($k); ?>"<?php echo $k === $is_pos ? '' : ' hidden'; ?>>
                         <p class="is-subject"><span>Subject:</span> <?php echo htmlspecialchars($m['subject']); ?></p>
+                        <p class="is-help" style="margin:-4px 0 10px;"><a href="<?php echo SITE_URL; ?>/admin/training.php?area=<?php echo rawurlencode($k); ?>" target="_blank" rel="noopener">See the training they will do first</a></p>
                         <div class="is-mail">
                             <?php echo $m['html']; /* built from fixed text and escaped names in aw_invite_message() */ ?>
                         </div>
@@ -137,7 +138,7 @@ require_once '../includes/header.php';
         <div class="card" style="margin-top:20px;"><div class="card-body">
             <h2 class="is-h2">Volunteers</h2>
             <?php if (!$is_holders): ?>
-                <p class="no-items">Nobody holds a volunteer role yet. Moderators are listed on the Staff page.</p>
+                <p class="no-items">Nobody holds a volunteer role yet. Moderators are listed on Team & roles.</p>
             <?php else: ?>
                 <div class="table-responsive"><table class="admin-table">
                     <thead><tr><th scope="col">Member</th><th scope="col">Role</th><th scope="col">Since</th><th scope="col">Activity</th><th scope="col">End</th></tr></thead>
