@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/social_auth.php';
 
 // ===== CAPTURE REDIRECT URL (if present) =====
 $redirect = isset($_GET['redirect']) ? trim($_GET['redirect']) : '';
@@ -32,11 +33,13 @@ if (isLoggedIn()) {
 }
 
 $error = '';
-// F102: message from social_login.php when Google sign-in is off or failed
-if (isset($_GET['social']) && $_GET['social'] === 'unavailable') {
-    $error = 'Google sign-in is not available right now. Please log in with your email or username.';
-}
 $success = '';
+// messages from social_login.php (a provider sign-in that failed, or an account to link)
+$aw_social_note = (string)($_SESSION['aw_social_msg'] ?? '');
+unset($_SESSION['aw_social_msg']);
+if (($_GET['social'] ?? '') === 'expired') $aw_social_note = 'That took a little long. Please choose how to sign in again.';
+if ($aw_social_note !== '' && ($_GET['social'] ?? '') === 'link') $success = htmlspecialchars($aw_social_note);
+elseif ($aw_social_note !== '') $error = htmlspecialchars($aw_social_note);
 $login_value = isset($_POST['login']) ? trim($_POST['login']) : '';
 
 // ===== RATE LIMITING (FILE-BASED) =====
@@ -79,10 +82,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit']) && !$
             // AV1: accounts with the admin role do not need to verify their email. The exemption
             // follows the role stored in the database, never the username, and registration only
             // ever creates 'reader' accounts, so nobody can sign up into it.
-            if ($user['is_verified'] == 0 && $user['role'] !== 'admin') {
-                // F232: send the member straight to the verify page for their address, where a new code can be requested
-                $error = 'Please verify your email address before logging in. <a href="verify.php?email=' . urlencode($user['email']) . '">Enter your code or get a new one</a>';
+            // Email codes are retired: new members pass a human check when they join instead
+            // (includes/human_check.php), so an unconfirmed email no longer blocks signing in.
+            if ((int)$user['is_verified'] === 0) {
+                try { $db->prepare("UPDATE users SET is_verified = 1 WHERE id = ?")->execute([(int)$user['id']]); } catch (Throwable $e) {}
             }
+            // a provider account waiting to be linked (social_login.php): same email, proven by the password
+            $aw_pl = $_SESSION['aw_social_pending_link'] ?? null;
+            if ($aw_pl && time() - (int)$aw_pl['at'] < 1800 && strcasecmp((string)$aw_pl['email'], (string)$user['email']) === 0) {
+                aw_social_link($db, (int)$user['id'], $aw_pl['provider'], $aw_pl['uid'], $aw_pl['email']);
+                $_SESSION['notification'] = 'Your ' . htmlspecialchars($aw_pl['label']) . ' account is now linked: next time you can sign in with it in one tap.';
+            }
+            unset($_SESSION['aw_social_pending_link']);
 
             // If error is set, stop here
             if (!$error) {
@@ -189,15 +200,8 @@ $pageTitle = 'Sign In';
                     </button>
                 </form>
 
-                <!-- ===== SOCIAL LOGIN BUTTONS ===== -->
-                <?php if (getenv('SOCIAL_LOGIN_ENABLED') === '1'): // F102: off unless enabled (decision D-M3) ?>
-                <div class="social-login-section">
-                    <p>Or continue with:</p>
-                    <a href="<?php echo SITE_URL; ?>/social_login.php?provider=Google" class="btn btn-google">
-                        <i class="fab fa-google"></i> Google
-                    </a>
-                </div>
-                <?php endif; ?>
+                <!-- ===== SOCIAL LOGIN BUTTONS (only the providers with keys in .env) ===== -->
+                <?php echo aw_social_buttons('login'); ?>
 
                 <div class="auth-footer">
                     <p>Don't have an account? <a href="<?php echo SITE_URL; ?>/register.php">Sign up here</a></p>

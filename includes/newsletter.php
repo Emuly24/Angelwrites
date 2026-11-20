@@ -64,7 +64,7 @@ function aw_nl_secret(PDO $db) {
         }
         $secret = (string)$s;
     } catch (Throwable $e) {
-        $secret = hash('sha256', __FILE__ . (getenv('GMAIL_APP_PASSWORD') ?: 'aw')); // settings table missing: still unguessable per install
+        $secret = hash('sha256', __FILE__ . (getenv('ZOHO_APP_PASSWORD') ?: (getenv('GMAIL_APP_PASSWORD') ?: 'aw'))); // settings table missing: still unguessable per install
     }
     return $secret;
 }
@@ -183,7 +183,7 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
     }
     try {
         $mail = new PHPMailer(true);
-        // ET1: same provider and settings as every other email (Zoho or the Gmail fallback, from .env)
+        // ET1: the same Zoho settings as every other email (includes/mail_helper.php)
         $cfg = aw_mail_config();
         if (empty($cfg['ok'])) {
             throw new \RuntimeException($cfg['error']);
@@ -208,7 +208,7 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
         foreach ($attachments as $a) {
             if (!empty($a['path']) && is_file($a['path'])) $mail->addAttachment($a['path'], $a['name'] ?? basename($a['path']));
         }
-        $mail->send();
+        aw_mail_send($mail, $cfg);
         return true;
     } catch (Throwable $e) {
         error_log('aw_nl_mail failed (to: ' . $to . '): ' . $e->getMessage());

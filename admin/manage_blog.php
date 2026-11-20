@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/mail_helper.php';
 
 aw_require('manage_content'); // K1
@@ -16,8 +17,7 @@ $offset = ($page - 1) * $limit;
 // ===== HANDLE DELETE =====
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    $stmt = $db->prepare("DELETE FROM blog_posts WHERE id = ?");
-    $stmt->execute([$id]);
+    aw_safe_delete($db, 'blog_posts', $id); // tidies anything that points to it
     $success = 'Blog post deleted successfully.';
     header('Location: ' . SITE_URL . '/admin/manage_blog.php');
     exit;

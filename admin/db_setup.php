@@ -37,6 +37,8 @@ function aw_setup_features() {
         ['Planned reads', 'reading_plans.php', 'aw_plans_table', ['reading_plans']],
         ['Messages', 'messaging.php', 'aw_msg_tables', ['msg_threads', 'msg_participants', 'messages', 'msg_settings']],
         ['Member books', 'member_books.php', 'aw_mb_tables', ['member_books']],
+        ['Sign in with Google, Facebook...', 'social_auth.php', 'aw_social_table', ['user_social']],
+        ['Social accounts (footer icons)', 'social_accounts.php', 'aw_social_accounts_table', ['social_accounts']],
     ];
 }
 

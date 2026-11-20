@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/mail_helper.php';
 require_once '../includes/upload.php'; // R6: shared upload limits
 
@@ -27,8 +28,7 @@ if (isset($_GET['delete'])) {
         if (!empty($video['video_file']) && file_exists($doc_root . '/' . $video['video_file'])) {
             @unlink($doc_root . '/' . $video['video_file']);
         }
-        $stmt = $db->prepare("DELETE FROM videos WHERE id = ?");
-        $stmt->execute([$id]);
+        aw_safe_delete($db, 'videos', $id); // tidies anything that points to it
         $success = 'Video deleted successfully.';
     } else {
         $error = 'Video not found.';

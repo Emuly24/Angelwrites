@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/mail_helper.php';
 require_once '../includes/csrf.php'; // VF3
 
@@ -21,24 +22,35 @@ if (isset($_GET['delete'])) {
     if ($id === $_SESSION['user_id']) {
         $error = 'You cannot delete your own account.';
     } else {
-        $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT name, first_name, last_name, username, email, role FROM users WHERE id = ?");
         $stmt->execute([$id]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
-        $stmt->execute([$id]);
-        $success = 'User deleted successfully.';
-        
-        $admin_email = aw_admin_email();
-        $subject = '👤 User Deleted: ' . $user['name'];
-        $body = "<h2>User Account Deleted</h2>";
-        $body .= "<p><strong>Name:</strong> " . $user['name'] . "</p>";
-        $body .= "<p><strong>Email:</strong> " . $user['email'] . "</p>";
-        sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
-        
+        if (!$user) {
+            $_SESSION['aw_users_flash'] = ['error', 'That account was already deleted.'];
+        } elseif (in_array($user['role'], ['owner', 'admin'], true)) {
+            // their books, poems and posts would be deleted with them: change the role to member first
+            $_SESSION['aw_users_flash'] = ['error', 'Admin and owner accounts cannot be deleted here. Change the role to member first (Staff & roles), then delete.'];
+        } else {
+            // the database refused to delete members with any activity (foreign keys): aw_safe_delete tidies it
+            $r = aw_safe_delete($db, 'users', $id);
+            if (!empty($r['ok'])) {
+                if (function_exists('aw_audit')) aw_audit('user_delete', 'user', $id, (string)$user['email']);
+                $aw_name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) ?: ($user['name'] ?: $user['username']);
+                $_SESSION['aw_users_flash'] = ['ok', $aw_name . ' (' . $user['email'] . ') was deleted.'];
+                $body = "<h2>Member account deleted</h2><p><strong>Name:</strong> " . htmlspecialchars($aw_name) . "</p><p><strong>Email:</strong> " . htmlspecialchars($user['email']) . "</p>";
+                @sendEmail(aw_admin_email(), 'Member deleted: ' . $aw_name, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+            } else {
+                $_SESSION['aw_users_flash'] = ['error', $r['error']];
+            }
+        }
         header('Location: ' . SITE_URL . '/admin/manage_users.php');
         exit;
     }
+}
+
+if (!empty($_SESSION['aw_users_flash'])) {
+    if ($_SESSION['aw_users_flash'][0] === 'ok') $success = $_SESSION['aw_users_flash'][1]; else $error = $_SESSION['aw_users_flash'][1];
+    unset($_SESSION['aw_users_flash']);
 }
 
 // ===== VF3: VERIFY BY HAND, OR SEND A NEW CODE =====
@@ -111,10 +123,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
         // Filter out current admin
         $ids = array_filter($ids, function($id) { return $id != $_SESSION['user_id']; });
         if (!empty($ids)) {
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = $db->prepare("DELETE FROM users WHERE id IN ($placeholders)");
-            $stmt->execute($ids);
-            $success = count($ids) . ' users deleted.';
+            $done = 0; $skipped = 0; $failed = 0;
+            foreach ($ids as $aw_id) {
+                $st = $db->prepare("SELECT role, email FROM users WHERE id = ?");
+                $st->execute([(int)$aw_id]);
+                $aw_row = $st->fetch(PDO::FETCH_ASSOC);
+                if (!$aw_row) continue;
+                if (in_array($aw_row['role'], ['owner', 'admin'], true)) { $skipped++; continue; }
+                $r = aw_safe_delete($db, 'users', (int)$aw_id);
+                if (!empty($r['ok'])) { $done++; if (function_exists('aw_audit')) aw_audit('user_delete', 'user', (int)$aw_id, (string)$aw_row['email']); } else $failed++;
+            }
+            $success = $done . ' member' . ($done === 1 ? '' : 's') . ' deleted.' . ($skipped ? ' ' . $skipped . ' admin or owner account' . ($skipped === 1 ? ' was' : 's were') . ' left (change the role first).' : '');
+            if ($failed) $error = $failed . ' could not be deleted just now; please try again.';
         } else {
             $error = 'You cannot delete your own account.';
         }

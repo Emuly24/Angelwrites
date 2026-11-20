@@ -640,7 +640,7 @@ html.aw-ui .footer-links ul li a:hover::before { width: 0.7em; opacity: 1; }
 html.aw-ui .footer-legal a { transition: color 0.25s ease; }
 html.aw-ui .footer-legal a:hover { color: #fff; }
 
-html.aw-ui .social-icons a {
+html.aw-ui .social-icons a, html.aw-ui .social-icons .aw-soon {
     width: 40px; height: 40px;
     display: inline-grid;
     place-items: center;
@@ -651,7 +651,7 @@ html.aw-ui .social-icons a {
     background: rgba(255, 255, 255, 0.04);
     transition: transform 0.4s var(--aw-spring), background 0.3s ease, color 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
-html.aw-ui .social-icons a:hover {
+html.aw-ui .social-icons a:hover, html.aw-ui .social-icons .aw-soon:hover, html.aw-ui .social-icons .aw-soon:focus-visible {
     color: #fff;
     text-decoration: none;
     border-color: transparent;

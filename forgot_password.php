@@ -3,6 +3,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/mail_helper.php';
+require_once 'includes/human_check.php';
 
 $error = '';
 $message = '';
@@ -16,8 +17,11 @@ if (file_exists($attempts_file) && (time() - filemtime($attempts_file) < 300)) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
-    $email = trim($_POST['email']);
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $email = trim((string)($_POST['email'] ?? ''));
+    $aw_hc = aw_hc_verify('forgot', $_POST); // bots must not use this to send email
+    if ($aw_hc !== '') {
+        $error = $aw_hc;
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
         $stmt = $db->prepare("SELECT id, first_name FROM users WHERE email = ? COLLATE NOCASE");
@@ -82,6 +86,7 @@ $pageTitle = 'Forgot Password';
                         <label for="email">Email Address</label>
                         <input type="email" id="email" name="email" placeholder="you@example.com" required>
                     </div>
+                    <?php echo aw_hc_field('forgot'); ?>
                     <button type="submit" class="btn btn-primary btn-block">
                         <i class="fas fa-paper-plane"></i> Send Reset Code
                     </button>

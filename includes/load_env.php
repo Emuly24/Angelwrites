@@ -10,6 +10,7 @@ function loadEnv($file) {
         if (strpos(trim($line), '#') === 0) {
             continue;
         }
+        if (strpos($line, '=') === false) continue; // a stray line without a value
         list($name, $value) = explode('=', $line, 2);
         $name = trim($name);
         $value = trim($value);

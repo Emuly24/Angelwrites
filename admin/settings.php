@@ -138,10 +138,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test_email'])) {
             : ['ok' => false, 'msg' => 'The test email could not be sent. Reason: ' . ($GLOBALS['aw_mail_last_error'] ?? 'unknown')];
     }
 }
-// ET1: the status follows whichever provider .env selects (Zoho, or the Gmail fallback)
+// ET1: mail goes through Zoho only (includes/mail_helper.php)
 $aw_mail_cfg = aw_mail_config();
 $aw_smtp_ready = !empty($aw_mail_cfg['ok']);
-$aw_smtp_provider = ucfirst((string)($aw_mail_cfg['provider'] ?? 'gmail'));
+$aw_smtp_provider = 'Zoho Mail';
 $aw_smtp_shown = $aw_smtp_ready ? preg_replace('/^(.).*(@.*)$/', '$1•••$2', (string)$aw_mail_cfg['from']) : '';
 $aw_mail_failures = aw_mail_recent_failures(10);
 
@@ -379,9 +379,10 @@ $pageTitle = 'Site Settings';
                 </div>
                 <div class="card-body">
                     <?php if ($aw_smtp_ready): ?>
-                        <div class="alert alert-success">Email is set up. Messages are sent through <?php echo htmlspecialchars($aw_smtp_provider); ?> as <strong><?php echo htmlspecialchars($aw_smtp_shown); ?></strong>.<?php if (trim((string)getenv('MAIL_PROVIDER')) === ''): ?> (MAIL_PROVIDER is not set in <code>.env</code>, so the Gmail fallback is used. Set <code>MAIL_PROVIDER=zoho</code> to send through Zoho.)<?php endif; ?></div>
+                        <div class="alert alert-success">Email is set up. Messages are sent through <?php echo htmlspecialchars($aw_smtp_provider); ?> as <strong><?php echo htmlspecialchars($aw_smtp_shown); ?></strong>. (<?php echo htmlspecialchars($aw_mail_cfg['host'] . ', port ' . $aw_mail_cfg['port']); ?>; the other Zoho port is tried if this one is blocked.)</div>
                     <?php else: ?>
-                        <div class="alert alert-error"><?php echo htmlspecialchars((string)$aw_mail_cfg['error']); ?> Until this is fixed, no verification codes or other emails can be sent.</div>
+                        <div class="alert alert-error"><?php echo htmlspecialchars((string)$aw_mail_cfg['error']); ?> Until this is done, no emails (newsletter, password resets, notifications) can be sent.</div>
+                        <p class="field-hint">On the server, open <code>htdocs/.env</code> in the InfinityFree file manager and add one line: <code>ZOHO_APP_PASSWORD=your-app-password</code>. In Zoho Mail, make sure <em>Settings &gt; Mail Accounts &gt; IMAP/POP/SMTP access</em> is on; with two-step sign-in, create the password under <em>Security &gt; App Passwords</em>.</p>
                     <?php endif; ?>
 
                     <?php if ($aw_mail_test): ?>
