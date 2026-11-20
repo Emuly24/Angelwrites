@@ -102,8 +102,8 @@ $nl_tested = ($_SESSION['aw_nl_tested'] ?? '') === md5($subject . '|' . $content
                 </div>
                 <div id="scheduleGroup" hidden class="form-group" style="margin-top:10px;">
                     <label for="schedule">Date and time</label>
-                    <input type="datetime-local" id="schedule" name="schedule" min="<?php echo date('Y-m-d\TH:i'); ?>">
-                    <small class="field-hint">This host has no timer: a scheduled letter waits on Campaigns until you press <strong>Send queued now</strong> on or after its time.</small>
+                    <input type="datetime-local" id="schedule" name="schedule" min="<?php echo htmlspecialchars(aw_nl_local_now()); ?>" aria-describedby="scheduleHint">
+                    <small class="field-hint" id="scheduleHint">In <?php echo htmlspecialchars(aw_nl_tz_label()); ?>. Write whenever you are free: the letter goes out <strong>by itself</strong> at this time (usually within 10 minutes of it). Until then you can change the time, send it early or cancel it on Campaigns.</small>
                 </div>
                 <details class="nlc-more"><summary>Attachments (optional)</summary>
                     <input type="file" id="attachments" name="attachments[]" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.mp3,.txt">
@@ -282,6 +282,7 @@ html[data-theme="dark"] .nlc-inbox{background:#1f1718;color:#eee}html[data-theme
         checks();
     }
     form.querySelectorAll('input[name="send_to"], input[name="schedule_type"]').forEach(r => r.addEventListener('change', updateGroups));
+    document.getElementById('schedule').addEventListener('input', checks);
     ['segment_id', 'single_email'].forEach(id => document.getElementById(id).addEventListener('input', updateGroups));
     document.querySelectorAll('.pick').forEach(cb => cb.addEventListener('change', function () {
         document.getElementById('selectedIds').value = Array.from(document.querySelectorAll('.pick:checked')).map(c => c.value).join(',');
@@ -308,6 +309,11 @@ html[data-theme="dark"] .nlc-inbox{background:#1f1718;color:#eee}html[data-theme
         if (text.length < 40) add('bad', 'The letter is very short.'); else add('ok', 'The letter has ' + text.split(' ').length + ' words.');
         /\{\{(first_)?name\}\}/.test(html) ? add('ok', 'It greets each reader by name.') : add('warn', 'Greet readers by name: press Greeting or First name.');
         /<a\s[^>]*href=/i.test(html) || document.getElementById('addLatest').checked ? add('ok', 'There is somewhere to go next (a link or the latest pieces).') : add('warn', 'Add a button or link so readers can visit the site.');
+        if (form.querySelector('input[name="schedule_type"]:checked').value === 'later') {
+            const sv = document.getElementById('schedule').value;
+            if (!sv) add('bad', 'Choose the date and time it should go out.');
+            else add('ok', 'It goes out by itself on ' + new Date(sv).toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) + '.');
+        }
         const imgs = html.match(/<img\b[^>]*>/gi) || [];
         if (imgs.some(i => !/alt="[^"]+"/i.test(i))) add('warn', 'A picture has no description (alt text). Add one for readers using screen readers, and for when pictures are blocked.');
         if (imgs.length > 4) add('warn', imgs.length + ' pictures: many pictures make a letter heavy and more likely to land in Junk.');
