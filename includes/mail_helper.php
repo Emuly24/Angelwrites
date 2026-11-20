@@ -21,23 +21,46 @@ require_once __DIR__ . '/load_env.php';
  *
  * Returns ['ok' => true, provider, host, port, username, password, from, from_name] or ['ok' => false, 'error' => why].
  */
+/** The names each mail setting may have in .env: the documented one first, then common other spellings. */
+const AW_MAIL_KEY_NAMES = [
+    'password'  => ['ZOHO_APP_PASSWORD', 'ZOHO_PASSWORD', 'ZOHO_MAIL_PASSWORD', 'ZOHO_SMTP_PASSWORD', 'ZOHO_APP_PASS', 'ZOHO_PASS', 'SMTP_PASSWORD', 'SMTP_PASS', 'MAIL_PASSWORD', 'EMAIL_PASSWORD', 'MAIL_PASS'],
+    'username'  => ['ZOHO_USERNAME', 'ZOHO_USER', 'ZOHO_EMAIL', 'ZOHO_MAIL', 'ZOHO_SMTP_USER', 'ZOHO_SMTP_USERNAME', 'SMTP_USERNAME', 'SMTP_USER', 'MAIL_USERNAME', 'MAIL_USER', 'EMAIL_USERNAME', 'EMAIL_USER'],
+    'from'      => ['ZOHO_FROM_ADDRESS', 'ZOHO_FROM', 'MAIL_FROM', 'MAIL_FROM_ADDRESS', 'EMAIL_FROM'],
+    'from_name' => ['ZOHO_FROM_NAME', 'MAIL_FROM_NAME', 'EMAIL_FROM_NAME'],
+    'host'      => ['ZOHO_SMTP_HOST', 'ZOHO_HOST', 'SMTP_HOST', 'MAIL_HOST'],
+    'port'      => ['ZOHO_SMTP_PORT', 'ZOHO_PORT', 'SMTP_PORT', 'MAIL_PORT'],
+];
+/** Zoho's mail servers by data centre; an account only signs in on its own one. */
+const AW_ZOHO_HOSTS = ['smtp.zoho.com', 'smtp.zoho.eu', 'smtp.zoho.in', 'smtp.zoho.com.au', 'smtp.zoho.jp', 'smtp.zohocloud.ca', 'smtp.zoho.sa', 'smtp.zoho.com.cn'];
+
+/** The first of a setting's names that has a value: [name, value], or ['', '']. */
+function aw_mail_key(string $kind): array
+{
+    foreach (AW_MAIL_KEY_NAMES[$kind] ?? [] as $n) { $v = trim((string)aw_env($n)); if ($v !== '') return [$n, $v]; }
+    return ['', ''];
+}
+
 function aw_mail_config(): array
 {
-    $env = function ($k, $default = '') { $v = trim((string)aw_env($k)); return $v !== '' ? $v : $default; };
-    $user = $env('ZOHO_USERNAME', 'angelwrites@zohomail.com');
-    $pass = (string)aw_env('ZOHO_APP_PASSWORD');
-    $from = $env('ZOHO_FROM_ADDRESS', $user);
-    if ($pass === '' || trim($pass) === '') {
+    $user = aw_mail_key('username')[1] ?: 'angelwrites@zohomail.com';
+    $pass = aw_mail_key('password')[1];
+    // app passwords are often copied with spaces between groups ("abcd efgh ijkl"): Zoho wants them without
+    if (preg_match('/^[A-Za-z0-9]{4}(\s+[A-Za-z0-9]{4}){2,}$/', $pass)) $pass = preg_replace('/\s+/', '', $pass);
+    $from = aw_mail_key('from')[1] ?: $user;
+    if ($pass === '') {
         return ['ok' => false, 'provider' => 'zoho',
-                'error' => 'Email is not switched on yet: add ZOHO_APP_PASSWORD=<your Zoho app password> to the .env file on the server. Nothing was sent.'];
+                'error' => 'Email is not switched on yet: the site found no Zoho password in the .env file (it looks for ZOHO_APP_PASSWORD, or names like ZOHO_PASSWORD or SMTP_PASSWORD). Nothing was sent.'];
     }
     if (!filter_var($user, FILTER_VALIDATE_EMAIL) || !filter_var($from, FILTER_VALIDATE_EMAIL)) {
-        return ['ok' => false, 'provider' => 'zoho', 'error' => 'ZOHO_USERNAME or ZOHO_FROM_ADDRESS in the .env file is not a valid email address. Nothing was sent.'];
+        return ['ok' => false, 'provider' => 'zoho', 'error' => 'The Zoho username (or From address) in the .env file is not a full email address, like angelwrites@zohomail.com. Nothing was sent.'];
     }
-    $port = (int)$env('ZOHO_SMTP_PORT', '587');
+    $port = (int)(aw_mail_key('port')[1] ?: '587');
     if (!in_array($port, [587, 465], true)) $port = 587;
-    return ['ok' => true, 'provider' => 'zoho', 'host' => $env('ZOHO_SMTP_HOST', 'smtp.zoho.com'), 'port' => $port,
-            'username' => $user, 'password' => $pass, 'from' => $from, 'from_name' => $env('ZOHO_FROM_NAME', 'AngelWrites')];
+    // the host: from .env if given; else the Zoho data centre this site last signed in to; else zoho.com
+    [$hostName, $host] = aw_mail_key('host');
+    $learned = function_exists('aw_setting') ? (string)aw_setting('mail_smtp_host_detected', '') : '';
+    return ['ok' => true, 'provider' => 'zoho', 'host' => $host !== '' ? $host : ($learned !== '' ? $learned : 'smtp.zoho.com'), 'host_fixed' => $host !== '', 'port' => $port,
+            'username' => $user, 'password' => $pass, 'from' => $from, 'from_name' => aw_mail_key('from_name')[1] ?: 'AngelWrites'];
 }
 
 /** ET1: applies the SMTP settings to a PHPMailer object. Shared by sendEmail() and the newsletter. */
@@ -65,6 +88,23 @@ function aw_mail_send(PHPMailer $mail, array $cfg): bool
         return $mail->send();
     } catch (\Throwable $e) {
         $msg = $e->getMessage() . ' ' . $mail->ErrorInfo;
+        if (aw_mail_is_auth_error($msg) && empty($cfg['host_fixed'])) {
+            // the password may be right but for another Zoho data centre (zoho.eu, zoho.in…): try those once
+            foreach (AW_ZOHO_HOSTS as $h) {
+                if ($h === $cfg['host']) continue;
+                $alt = $cfg; $alt['host'] = $h;
+                $mail->smtpClose();
+                aw_mail_transport($mail, $alt);
+                try {
+                    if ($mail->send()) { aw_mail_remember_host($h); error_log('mail: signed in on ' . $h . ', remembered for next time'); return true; }
+                } catch (\Throwable $e2) {
+                    if (!aw_mail_is_auth_error($e2->getMessage() . ' ' . $mail->ErrorInfo)) break;
+                }
+            }
+            $mail->smtpClose();
+            aw_mail_transport($mail, $cfg);
+            throw $e;
+        }
         if (!preg_match('/could not connect|connect\(\) failed|connection (refused|timed out)|timed out|network is unreachable|failed to connect/i', $msg)) throw $e;
         $alt = $cfg;
         $alt['port'] = (int)$cfg['port'] === 465 ? 587 : 465;
@@ -73,6 +113,20 @@ function aw_mail_send(PHPMailer $mail, array $cfg): bool
         error_log('mail: port ' . (int)$cfg['port'] . ' unreachable, trying ' . $alt['port']);
         return $mail->send();
     }
+}
+
+function aw_mail_is_auth_error(string $msg): bool
+{
+    return (bool)preg_match('/could not authenticate|authentication (failed|unsuccessful)|\b535\b|invalid (login|credentials)|username and password not accepted/i', $msg);
+}
+
+/** Remember the Zoho data centre that accepted the sign-in, so later emails go there first. */
+function aw_mail_remember_host(string $host): void
+{
+    $db = $GLOBALS['db'] ?? null;
+    if (!$db instanceof PDO) return;
+    try { $db->prepare("INSERT INTO settings (key, value) VALUES ('mail_smtp_host_detected', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute([$host]); }
+    catch (\Throwable $e) { error_log('mail host: ' . $e->getMessage()); }
 }
 
 /**
@@ -275,6 +329,72 @@ function aw_mail_recent_failures($limit = 10) {
         $r = json_decode($l, true);
         if (is_array($r)) $out[] = $r;
         if (count($out) >= $limit) break;
+    }
+    return $out;
+}
+
+/**
+ * Admin > Settings > Email > "Check email": each step of sending, in plain words, so the reason
+ * email fails is visible without server logs. Never shows a password, only which name it was found
+ * under and its length. Returns [[status ok|bad|warn, title, detail], ...].
+ */
+function aw_mail_diagnose(): array
+{
+    $out = [];
+    $rep = function_exists('aw_env_report') ? aw_env_report() : ['file' => '', 'count' => 0];
+    [$pn, $pv] = aw_mail_key('password');
+    $out[] = $rep['file'] !== '' ? ['ok', 'Settings file', 'Found: ' . $rep['file'] . ' (' . (int)$rep['count'] . ' settings).']
+                                 : ($pn !== '' ? ['warn', 'Settings file', 'No .env file was found, but the server itself provides the mail settings.']
+                                               : ['bad', 'Settings file', 'No .env file could be read, so there is no Zoho password.']);
+    [$un, $uv] = aw_mail_key('username');
+    $out[] = $pn !== '' ? ['ok', 'Zoho password', 'Found as ' . $pn . ' (' . strlen(preg_replace('/\s+/', '', $pv)) . ' characters' . (preg_match('/\s/', $pv) ? ', spaces removed' : '') . ').']
+                        : ['bad', 'Zoho password', 'Not found. Add a line ZOHO_APP_PASSWORD=your-app-password to the .env file.'];
+    $out[] = $un !== '' ? ['ok', 'Zoho mailbox', 'Found as ' . $un . ': ' . $uv . '.'] : ['warn', 'Zoho mailbox', 'Not set, so angelwrites@zohomail.com is used. If your mailbox is different, add ZOHO_USERNAME=your@address.'];
+    $cfg = aw_mail_config();
+    if (empty($cfg['ok'])) { $out[] = ['bad', 'Ready to send', (string)$cfg['error']]; return $out; }
+
+    // can the hosting server reach Zoho at all?
+    $host = $cfg['host'];
+    $ip = gethostbyname($host);
+    if ($ip === $host) { $out[] = ['bad', 'Finding Zoho', 'The server could not look up ' . $host . '. Check ZOHO_SMTP_HOST, or try again later.']; return $out; }
+    $reach = [];
+    foreach ([587 => 'tcp://', 465 => 'ssl://'] as $port => $scheme) {
+        $errno = 0; $errstr = '';
+        $fp = @stream_socket_client($scheme . $host . ':' . $port, $errno, $errstr, 6);
+        if ($fp) { fclose($fp); $reach[$port] = true; } else { $reach[$port] = $errstr !== '' ? $errstr : 'no answer'; }
+    }
+    $open = array_keys(array_filter($reach, function ($r) { return $r === true; }));
+    if (!$open) {
+        $out[] = ['bad', 'Reaching Zoho', 'The hosting server cannot connect to ' . $host . ' on port 587 (' . $reach[587] . ') or 465 (' . $reach[465] . '). The host is blocking outgoing email connections; no password can fix this. Ask the host, or move to hosting that allows SMTP.'];
+        return $out;
+    }
+    $out[] = ['ok', 'Reaching Zoho', $host . ' answers on port ' . implode(' and ', $open) . '.'];
+
+    // sign in, as sending does; on a refused password try Zoho's other data centres
+    $try = function (string $h, int $port) use ($cfg) {
+        $m = new PHPMailer(true);
+        $c = $cfg; $c['host'] = $h; $c['port'] = $port;
+        aw_mail_transport($m, $c);
+        try { $ok = $m->smtpConnect(); $m->smtpClose(); return $ok ? true : ($m->ErrorInfo ?: 'refused'); }
+        catch (\Throwable $e) { return trim($e->getMessage() . ' ' . $m->ErrorInfo); }
+    };
+    $port = in_array((int)$cfg['port'], $open, true) ? (int)$cfg['port'] : $open[0];
+    $r = $try($host, $port);
+    if ($r === true) { $out[] = ['ok', 'Signing in', 'Zoho accepted the mailbox and password on ' . $host . '. Email should work: use “Send test email” to be sure.']; return $out; }
+    if (aw_mail_is_auth_error($r) && empty($cfg['host_fixed'])) {
+        foreach (AW_ZOHO_HOSTS as $h) {
+            if ($h === $host || gethostbyname($h) === $h) continue;
+            if ($try($h, $port) === true) {
+                aw_mail_remember_host($h);
+                $out[] = ['ok', 'Signing in', 'Your Zoho account is on ' . $h . ' (not ' . $host . '). The site will use it from now on. Email should work now.'];
+                return $out;
+            }
+        }
+    }
+    if (aw_mail_is_auth_error($r)) {
+        $out[] = ['bad', 'Signing in', 'Zoho refused the sign-in (' . mb_substr($r, 0, 160) . '). In Zoho Mail check: (1) Settings > Mail Accounts > IMAP/POP/SMTP access is ON for ' . $cfg['username'] . '; (2) if your Zoho account has two-step sign-in, ZOHO_APP_PASSWORD must be an app password made in Zoho > My Account > Security > App Passwords, not your normal password; (3) the mailbox in ZOHO_USERNAME is the one the password belongs to. Some free Zoho plans do not allow SMTP at all; then Zoho refuses every password.'];
+    } else {
+        $out[] = ['bad', 'Signing in', 'Zoho did not let the site sign in: ' . mb_substr($r, 0, 200)];
     }
     return $out;
 }

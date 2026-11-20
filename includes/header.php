@@ -67,12 +67,22 @@ if ($isLoggedIn) {
     
     <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : 'AngelWrites — Christian writing and community platform by Angella Bottoman.'; ?>">
     <meta name="keywords" content="AngelWrites, Christian writing, faith, poetry, books, reflections, Angella Bottoman">
-    <meta name="robots" content="<?php echo !empty($aw_noindex) ? 'noindex, nofollow' : 'index, follow'; ?>"><!-- D2: private-ish pages (Stories & Help) ask search engines to stay away -->
+    <?php
+    // search engines: members' own pages, team pages and tools are never listed (robots.txt says the same)
+    $aw_seo_here = ltrim((string)parse_url((string)($_SERVER['SCRIPT_NAME'] ?? ''), PHP_URL_PATH), '/');
+    if (strpos($aw_seo_here, 'admin/') === 0 || strpos($aw_seo_here, 'reader/') === 0 || in_array($aw_seo_here, ['dashboard.php', 'library.php', 'journal.php', 'messages.php', 'my_messages.php',
+        'notifications.php', 'profile.php', 'account_security.php', 'my_stories.php', 'my_purchases.php', 'story_write.php', 'staff_invite.php', 'tour.php', 'recover.php',
+        'reset_password.php', 'forgot_password.php', 'verify.php', 'search_results.php', 'login.php', 'register.php', '404.php'], true)) $aw_noindex = true;
+    ?>
+    <meta name="robots" content="<?php echo !empty($aw_noindex) ? 'noindex, nofollow' : 'index, follow, max-image-preview:large'; ?>"><!-- D2: private-ish pages (Stories & Help) ask search engines to stay away -->
     <!-- Q32: og:title/description/url and twitter:card were printed here and again in the Open Graph
          block below, so pages that set their own $og_* values were shadowed by these generic ones. -->
     
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="manifest" href="<?php echo SITE_URL; ?>/manifest.json">
+    <link rel="search" type="application/opensearchdescription+xml" title="AngelWrites" href="<?php echo SITE_URL; ?>/opensearch.xml"><!-- search the site from the browser's address bar -->
+    <?php // proving to Google and Bing that this is Angella's site (codes from Admin > Settings > Search engines; public, not secrets)
+    foreach (['google-site-verification' => 'seo_google_verify', 'msvalidate.01' => 'seo_bing_verify'] as $aw_vn => $aw_vk) { $aw_vv = function_exists('aw_setting') ? trim((string)aw_setting($aw_vk, '')) : ''; if ($aw_vv !== '') echo '<meta name="' . $aw_vn . '" content="' . htmlspecialchars($aw_vv) . '">' . "\n    "; } ?>
     <meta name="theme-color" content="#DBA1A2">
     <link rel="icon" type="image/x-icon" href="<?php echo SITE_URL; ?>/favicon.ico">
     <link rel="apple-touch-icon" href="<?php echo SITE_URL; ?>/assets/images/apple-touch-icon.png"><!-- Q44 -->
@@ -93,6 +103,27 @@ if ($isLoggedIn) {
 <meta property="og:title" content="<?php echo $og_title; ?>" />
 <meta property="og:description" content="<?php echo $og_description; ?>" />
 <meta property="og:url" content="<?php echo $og_url; ?>" />
+<?php if (empty($aw_noindex)): ?>
+<link rel="canonical" href="<?php echo htmlspecialchars(rtrim(preg_replace('/([?&])(utm_[a-z]+|fbclid|preview|aw_t)=[^&]*(&|$)/', '$1', html_entity_decode($og_url, ENT_QUOTES)), '?&'), ENT_QUOTES); ?>">
+<?php
+    // structured data for search engines: the site (with its search box) everywhere; the writing itself on its own pages
+    $aw_ld = [['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => aw_site_name(), 'url' => rtrim(SITE_URL, '/') . '/',
+               'potentialAction' => ['@type' => 'SearchAction', 'target' => rtrim(SITE_URL, '/') . '/search_results.php?q={search_term_string}', 'query-input' => 'required name=search_term_string']]];
+    if ($aw_seo_here === 'index.php' || $aw_seo_here === '' || $aw_seo_here === 'about.php') {
+        $aw_ld[] = ['@context' => 'https://schema.org', '@type' => 'Person', 'name' => 'Angella Bottoman', 'url' => rtrim(SITE_URL, '/') . '/about.php', 'jobTitle' => 'Christian writer and poet', 'nationality' => 'Malawi'];
+    }
+    $aw_ld_type = ['poem_view.php' => 'CreativeWork', 'book.php' => 'Book', 'blog_post.php' => 'BlogPosting', 'video_watch.php' => 'VideoObject'][$aw_seo_here] ?? '';
+    if ($aw_ld_type !== '') {
+        $aw_item = ['@context' => 'https://schema.org', '@type' => $aw_ld_type, 'name' => html_entity_decode($og_title, ENT_QUOTES), 'headline' => html_entity_decode($og_title, ENT_QUOTES),
+                    'description' => html_entity_decode($og_description, ENT_QUOTES), 'image' => html_entity_decode($og_image, ENT_QUOTES), 'url' => html_entity_decode($og_url, ENT_QUOTES),
+                    'author' => ['@type' => 'Person', 'name' => 'Angella Bottoman'], 'inLanguage' => 'en'];
+        if ($aw_ld_type === 'VideoObject') { $aw_item['thumbnailUrl'] = $aw_item['image']; unset($aw_item['headline']); }
+        if ($aw_ld_type === 'CreativeWork') $aw_item['genre'] = 'Poetry';
+        $aw_ld[] = $aw_item;
+    }
+    foreach ($aw_ld as $aw_l) echo '<script type="application/ld+json">' . json_encode($aw_l, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . "</script>\n";
+?>
+<?php endif; ?>
 <meta property="og:image" content="<?php echo $og_image; ?>" />
 <meta property="og:image:secure_url" content="<?php echo $og_image; ?>" />
 <?php if ($og_image_type !== ''): ?><meta property="og:image:type" content="<?php echo $og_image_type; ?>" /><?php endif; ?>
