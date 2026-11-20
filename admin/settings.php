@@ -143,6 +143,11 @@ if (!empty($_SESSION['aw_share_flash'])) { $aw_share_msg = ['ok' => true, 'msg' 
 // ===== VF3: EMAIL DELIVERY CHECK =====
 // Members reported verification codes not arriving. This sends a real test email and shows the
 // exact reason when it fails, plus the last failures the site recorded.
+$aw_mail_check = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_email']) && validate_csrf_token($_POST['csrf_token'] ?? '')) {
+    @set_time_limit(60);
+    $aw_mail_check = aw_mail_diagnose(); // each step of sending, in plain words (never the password)
+}
 $aw_mail_test = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test_email'])) {
     $aw_to = trim($_POST['test_to'] ?? '');
@@ -197,7 +202,7 @@ $pageTitle = 'Site Settings';
         <div class="settings-tabs">
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
-            <button class="tab-btn<?php echo ($aw_mail_test || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
+            <button class="tab-btn<?php echo ($aw_mail_test || $aw_mail_check || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
             <button class="tab-btn<?php echo ($aw_quota_msg || ($_GET['tab'] ?? '') === 'uploads') ? ' aw-open-email' : ''; ?>" data-tab="uploads">Uploads</button><!-- R13 -->
         </div>
 
@@ -403,11 +408,25 @@ $pageTitle = 'Site Settings';
                         <div class="alert alert-success">Email is set up. Messages are sent through <?php echo htmlspecialchars($aw_smtp_provider); ?> as <strong><?php echo htmlspecialchars($aw_smtp_shown); ?></strong>. (<?php echo htmlspecialchars($aw_mail_cfg['host'] . ', port ' . $aw_mail_cfg['port']); ?>; the other Zoho port is tried if this one is blocked.)</div>
                     <?php else: ?>
                         <div class="alert alert-error"><?php echo htmlspecialchars((string)$aw_mail_cfg['error']); ?> Until this is done, no emails (newsletter, password resets, notifications) can be sent.</div>
-                        <p class="field-hint">On the server, open <code>htdocs/.env</code> in the InfinityFree file manager and add one line: <code>ZOHO_APP_PASSWORD=your-app-password</code>. In Zoho Mail, make sure <em>Settings &gt; Mail Accounts &gt; IMAP/POP/SMTP access</em> is on; with two-step sign-in, create the password under <em>Security &gt; App Passwords</em>.</p>
+                        <p class="field-hint">On the server, open <code>htdocs/.env</code> in the InfinityFree file manager and add one line: <code>ZOHO_APP_PASSWORD=your-app-password</code> (other common names such as ZOHO_PASSWORD or SMTP_PASSWORD are understood too). In Zoho Mail, make sure <em>Settings &gt; Mail Accounts &gt; IMAP/POP/SMTP access</em> is on; with two-step sign-in, create the password under <em>Security &gt; App Passwords</em>.</p>
                     <?php endif; ?>
 
                     <?php if ($aw_mail_test): ?>
                         <div class="alert <?php echo $aw_mail_test['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_mail_test['msg']); ?></div>
+                    <?php endif; ?>
+
+                    <form method="POST" style="margin:12px 0;" id="email-check">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <button type="submit" name="check_email" value="1" class="btn btn-outline"><i class="fas fa-stethoscope"></i> Check email step by step</button>
+                        <small class="field-hint" style="display:block;margin-top:4px;">Checks the settings file, the password, whether the server can reach Zoho, and whether Zoho accepts the sign-in. Takes up to half a minute. Never shows the password.</small>
+                    </form>
+                    <?php if ($aw_mail_check): ?>
+                        <ol class="aw-mail-check">
+                        <?php foreach ($aw_mail_check as [$aw_st, $aw_t, $aw_d]): ?>
+                            <li class="is-<?php echo $aw_st; ?>"><i class="fas <?php echo $aw_st === 'ok' ? 'fa-circle-check' : ($aw_st === 'warn' ? 'fa-circle-info' : 'fa-circle-xmark'); ?>" aria-hidden="true"></i><span><strong><?php echo htmlspecialchars($aw_t); ?>:</strong> <?php echo htmlspecialchars($aw_d); ?></span></li>
+                        <?php endforeach; ?>
+                        </ol>
+                        <style>.aw-mail-check{list-style:none;padding:0;margin:0 0 16px;display:grid;gap:8px}.aw-mail-check li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;border:1px solid var(--border)}.aw-mail-check i{margin-top:3px}.aw-mail-check .is-ok i{color:#2f7a4a}.aw-mail-check .is-bad{border-color:#e6a69c;background:rgba(168,67,47,.06)}.aw-mail-check .is-bad i{color:#a8432f}.aw-mail-check .is-warn i{color:#9a6b00}</style>
                     <?php endif; ?>
 
                     <form method="POST" class="admin-form" style="margin-top:12px;">
