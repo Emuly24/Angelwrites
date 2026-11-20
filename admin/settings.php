@@ -134,6 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_seo']) && valida
     else {
         $st = $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
         $st->execute(['seo_google_verify', $g]); $st->execute(['seo_bing_verify', $b]);
+        $st->execute(['seo_description', trim(mb_substr(preg_replace('/\s+/', ' ', strip_tags((string)($_POST['seo_description'] ?? ''))), 0, 300))]);
         if (function_exists('aw_audit')) aw_audit('settings_changed', 'settings', null, 'search engine verification');
         $_SESSION['aw_seo_flash'] = 'Saved. Now press Verify on Google or Bing.';
         header('Location: ' . SITE_URL . '/admin/settings.php?tab=email#search-engines'); exit;
@@ -176,11 +177,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test_email'])) {
     } elseif (!filter_var($aw_to, FILTER_VALIDATE_EMAIL)) {
         $aw_mail_test = ['ok' => false, 'msg' => 'Please enter a valid email address to send the test to.'];
     } else {
-        $sent = sendEmail($aw_to, 'AngelWrites test email',
-            "Hello,\n\nThis is a test from AngelWrites (Admin > Settings > Email). If you can read this, verification codes and other emails can be delivered.\n\n— AngelWrites",
+        // the test greets the person by their first name when the address belongs to a member
+        $aw_first = '';
+        try { $aw_fs = $db->prepare("SELECT first_name, name, username FROM users WHERE email = ? COLLATE NOCASE LIMIT 1"); $aw_fs->execute([$aw_to]); $aw_fu = $aw_fs->fetch(PDO::FETCH_ASSOC);
+              if ($aw_fu) $aw_first = trim((string)($aw_fu['first_name'] ?: strtok((string)$aw_fu['name'], ' ') ?: $aw_fu['username'])); } catch (Throwable $e) { error_log('test email name: ' . $e->getMessage()); }
+        $aw_hello = $aw_first !== '' ? $aw_first : 'friend';
+        $aw_today = date('l j F Y');
+        $sent = sendEmail($aw_to, 'Hello ' . $aw_hello . ', a quick test from AngelWrites',
+            '<p>Dear ' . htmlspecialchars($aw_hello) . ',</p>'
+            . '<p>Today, ' . htmlspecialchars($aw_today) . ', we are testing whether the AngelWrites newsletter and our other emails (welcome messages, password resets, replies from the team and event reminders) reach you safely.</p>'
+            . '<p>If you are reading this, it worked. Thank you for being part of AngelWrites. If this message landed in your junk or spam folder, please mark it as <strong>Not junk</strong> and add angelwrites@zohomail.com to your contacts, so our next letters come straight to your inbox.</p>',
             'angelwrites@zohomail.com', 'AngelWrites');
         $aw_mail_test = $sent
-            ? ['ok' => true, 'msg' => 'Test email sent to ' . $aw_to . '. If it does not arrive within a few minutes, check the spam folder.']
+            ? ['ok' => true, 'msg' => 'Test email sent to ' . $aw_to . ($aw_first !== '' ? ' (greeting ' . $aw_first . ')' : '') . '. If it does not arrive within a few minutes, check the spam folder and mark it Not junk.']
             : ['ok' => false, 'msg' => 'The test email could not be sent. Reason: ' . ($GLOBALS['aw_mail_last_error'] ?? 'unknown')];
     }
 }
@@ -528,10 +537,15 @@ $pageTitle = 'Site Settings';
                             <li><strong>Google:</strong> open <a href="https://search.google.com/search-console" target="_blank" rel="noopener">Google Search Console</a>, sign in, choose <em>Add property → URL prefix</em>, type <code><?php echo htmlspecialchars(rtrim(SITE_URL, '/')); ?>/</code>, choose <em>HTML tag</em>, copy the tag, paste it below and Save, then press <em>Verify</em> on Google. Then open <em>Sitemaps</em> and submit <code>sitemap.xml</code>.</li>
                             <li><strong>Bing:</strong> open <a href="https://www.bing.com/webmasters" target="_blank" rel="noopener">Bing Webmaster Tools</a>, sign in, and choose <em>Import from Google Search Console</em> (easiest), or add the site and use the <em>Meta tag</em> option the same way. Submit <code>sitemap.xml</code> there too.</li>
                             <li>New pages usually appear in results within a few days to a few weeks. Searching <code>site:angelwrites.gt.tc</code> on Google shows what is already found.</li>
+                            <li><strong>Faster:</strong> in Google Search Console, paste <code><?php echo htmlspecialchars(rtrim(SITE_URL, '/')); ?>/</code> into the search bar at the top (URL inspection) and press <em>Request indexing</em>. Do the same for a few important pages (a book, a poem). In Bing Webmaster Tools use <em>URL Submission</em>.</li>
+                            <li>Searching just “AngelWrites” takes longest, because other sites use similar names and this one is new. Links to the site help most: put <code><?php echo htmlspecialchars(rtrim(SITE_URL, '/')); ?></code> in the bio of every AngelWrites and personal social account (Facebook, TikTok, YouTube, WhatsApp), and add those accounts in Admin > Social accounts.</li>
                         </ol>
                     </details>
                     <form method="POST" class="admin-form" action="<?php echo SITE_URL; ?>/admin/settings.php?tab=email#search-engines">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <div class="form-group"><label for="seo_description">Site description (shown by Google under the name AngelWrites)</label>
+                            <textarea id="seo_description" name="seo_description" rows="3" maxlength="300" placeholder="AngelWrites is the home of Angella Bottoman's Christian writing: poems, books, reflections and devotionals, the Bible in English and Chichewa, prayer and a caring community." oninput="document.getElementById('seoDescN').textContent=this.value.length"><?php echo htmlspecialchars((string)aw_setting('seo_description', '')); ?></textarea>
+                            <small class="field-hint"><span id="seoDescN"><?php echo mb_strlen((string)aw_setting('seo_description', '')); ?></span> characters. About 120 to 160 is best; Google cuts longer text. Leave empty for the wording shown in grey. Google updates it the next time it reads the site (days, sometimes weeks).</small></div>
                         <div class="form-group"><label for="seo_google_verify">Google verification code (or the whole tag)</label>
                             <input type="text" id="seo_google_verify" name="seo_google_verify" placeholder='&lt;meta name="google-site-verification" content="…"&gt;' value="<?php echo htmlspecialchars((string)aw_setting('seo_google_verify', '')); ?>"></div>
                         <div class="form-group"><label for="seo_bing_verify">Bing verification code (or the whole tag)</label>

@@ -209,7 +209,7 @@ $aw_readable = [];
 try { foreach ($db->query("SELECT book_id FROM book_content WHERE is_processed = 1")->fetchAll(PDO::FETCH_COLUMN) as $rid) $aw_readable[(int)$rid] = true; } catch (PDOException $e) { error_log('index readable: ' . $e->getMessage()); }
 $aw_picks = aw_picks($db);
 
-$pageTitle = 'AngelWrites — Christian Writing & Community';
+$pageTitle = 'AngelWrites by Angella Bottoman | Christian poems, books & reflections'; // the blue link in search results
 ?>
 <?php require_once 'includes/header.php'; ?>
 <?php echo aw_poem_assets(); /* M1: poem card styles */ ?>

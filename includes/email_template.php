@@ -26,7 +26,7 @@ function aw_email_signature_html() {
         . '<p style="margin:0 0 4px;font:italic 15px/1.5 Georgia,\'Times New Roman\',serif;color:#6b5a5a;">With love and blessings,</p>'
         . '<p style="margin:0;font:600 22px/1.3 \'Playfair Display\',Georgia,serif;color:#c08a8b;">Angella Bottoman</p>'
         . '<p style="margin:4px 0 0;font:13px/1.5 \'Inter\',Arial,sans-serif;color:#6b5a5a;">Founder, ' . aw_email_e($site) . ' · <a href="' . aw_email_e($base) . '" style="color:#c08a8b;text-decoration:none;">' . aw_email_e(preg_replace('#^https?://#', '', $base)) . '</a></p>'
-        . '<p style="margin:2px 0 0;font:italic 12px/1.5 \'Inter\',Arial,sans-serif;color:#9a8585;">Writing with purpose, faith, and passion.</p>'
+        . '<p style="margin:2px 0 0;font:italic 12px/1.5 \'Inter\',Arial,sans-serif;color:#9a8585;">Writing with purpose and grace.</p>'
         . '</td></tr></table>';
 }
 
