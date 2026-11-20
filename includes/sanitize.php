@@ -51,18 +51,19 @@ function aw_purifier($profile) {
     } else {
         $c->set('HTML.Allowed',
             'p[style|class],br,strong,b,em,i,u,s,sub,sup,small,mark,blockquote[cite|class],q,cite,code,pre,hr,'
-            . 'h2[style],h3[style],h4[style],h5,h6,span[style],div[style|class],'
+            . 'h2[style],h3[style],h4[style],h5,h6,span[style|class],div[style|class],'
             . 'ul,ol[start],li,dl,dt,dd,'
-            . 'a[href|title|target|rel],img[src|alt|title|width|height|style],'
+            . 'a[href|title|target|rel|class],img[src|alt|title|width|height|style],'
             . 'figure,figcaption,'
             . 'table[style],thead,tbody,tfoot,tr,th[colspan|rowspan|scope|style],td[colspan|rowspan|style],caption,'
             . 'iframe[src|width|height|frameborder|allowfullscreen|title]');
         $c->set('HTML.SafeIframe', true);
         $c->set('URI.SafeIframeRegexp', '%^https://(www\.youtube(-nocookie)?\.com/embed/|player\.vimeo\.com/video/)%');
         // aw-verse / aw-quote: Bible verses and quotations added with the editor's buttons (aw-writer-tools.js)
-        $c->set('Attr.AllowedClasses', ['aw-figure', 'aw-video', 'aw-quote', 'aw-verse', 'aw-verse-ref', 'aw-quote-ref', 'aligncenter', 'alignleft', 'alignright']);
+        // aw-btn / aw-callout: the newsletter composer's button and callout blocks (includes/newsletter_design.php)
+        $c->set('Attr.AllowedClasses', ['aw-figure', 'aw-video', 'aw-quote', 'aw-verse', 'aw-verse-ref', 'aw-quote-ref', 'aligncenter', 'alignleft', 'alignright', 'aw-btn', 'aw-callout']);
         $c->set('HTML.DefinitionID', 'aw-rich');
-        $c->set('HTML.DefinitionRev', 2);
+        $c->set('HTML.DefinitionRev', 3);
         if ($def = $c->maybeGetRawHTMLDefinition()) {
             $def->addElement('figure', 'Block', 'Optional: (figcaption, Flow) | (Flow, figcaption) | Flow', 'Common');
             $def->addElement('figcaption', 'Inline', 'Flow', 'Common');
