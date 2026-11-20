@@ -266,6 +266,11 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
             <div class="post-content">
                 <?php require_once __DIR__ . '/includes/sanitize.php'; echo aw_clean_html($post['content'], 'rich'); /* S1: also cleans posts saved before the sanitiser */ ?>
             </div>
+            <script src="<?php echo SITE_URL; ?>/assets/js/aw-listen.js?v=1" defer></script>
+            <script>document.addEventListener('DOMContentLoaded', function () { if (!window.AWListen || !AWListen.supported) return;
+                AWListen.attach({ label: 'Listen', lang: (document.documentElement.lang || 'en').slice(0, 2), blocks: function () {
+                    var all = [].slice.call(document.querySelectorAll('.post-header h1, .post-content p, .post-content h2, .post-content h3, .post-content h4, .post-content li, .post-content blockquote'));
+                    return all.filter(function (el) { return !all.some(function (o) { return o !== el && o.contains(el); }); }); } }); });</script>
 
             <!-- Reading Progress -->
             <?php if ($reading_progress !== null): ?>
