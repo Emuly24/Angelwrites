@@ -278,7 +278,7 @@ function aw_nl_queue(PDO $db, $subject, $content, array $recipients, $send_to, $
     }
     $status = $scheduled_at ? 'pending' : 'processing';
     $st = $db->prepare("INSERT INTO email_queue (subject, content, recipient_emails, send_to_type, segment_id, scheduled_at, status, attempt_count) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
-    $st->execute([$subject, $content, implode(',', array_keys($clean)), $send_to, $segment_id ?: null, $scheduled_at ?: date('Y-m-d H:i:s'), $status]);
+    $st->execute([$subject, $content, implode(',', array_keys($clean)), $send_to, $segment_id ?: null, $scheduled_at ?: gmdate('Y-m-d H:i:s'), $status]);
     $id = (int)$db->lastInsertId();
     $ins = $db->prepare("INSERT INTO email_attachments (email_queue_id, file_path, file_name, file_size) VALUES (?, ?, ?, ?)");
     foreach ($attachments as $a) $ins->execute([$id, $a['path'], $a['name'], (int)$a['size']]);
@@ -306,6 +306,28 @@ function aw_nl_progress(PDO $db, $queue_id) {
 
 /** Sends the next batch of a 'processing' campaign and finishes it when nobody is left. */
 function aw_nl_send_batch(PDO $db, $queue_id, $batch = AW_NL_BATCH) {
+    // One sender per campaign at a time (the admin page, site traffic and the timer can overlap):
+    // whoever does not get the lock sends nothing and reports the progress so far.
+    $lock = aw_nl_lock((int)$queue_id);
+    if ($lock === false) return aw_nl_progress($db, $queue_id);
+    try {
+        return aw_nl_send_batch_locked($db, $queue_id, $batch);
+    } finally {
+        if (is_resource($lock)) { flock($lock, LOCK_UN); fclose($lock); }
+    }
+}
+
+/** A non-blocking lock for one campaign: a handle, true when locking is unavailable, false when busy. */
+function aw_nl_lock($queue_id) {
+    $dir = __DIR__ . '/../data/locks';
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) { error_log('aw_nl_lock: cannot create data/locks'); return true; }
+    $h = @fopen($dir . '/newsletter_' . (int)$queue_id . '.lock', 'c');
+    if (!$h) { error_log('aw_nl_lock: cannot open lock file'); return true; }
+    if (!flock($h, LOCK_EX | LOCK_NB)) { fclose($h); return false; }
+    return $h;
+}
+
+function aw_nl_send_batch_locked(PDO $db, $queue_id, $batch) {
     $p = aw_nl_progress($db, $queue_id);
     if (!$p || $p['queue']['status'] !== 'processing') return $p;
     $q = $p['queue'];

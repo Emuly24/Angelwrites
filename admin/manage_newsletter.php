@@ -12,6 +12,7 @@ define('AW_NEWSLETTER_ADMIN', true);
 // includes/newsletter.php. Every action below checks the CSRF token, then redirects back (so a
 // reload never repeats it and the lists are always current).
 require_once __DIR__ . '/../includes/newsletter.php';
+require_once __DIR__ . '/../includes/newsletter_auto.php'; // scheduled letters send themselves
 require_once __DIR__ . '/../includes/newsletter_optin.php';
 require_once __DIR__ . '/../includes/pagination.php';
 if (!defined('AW_NEWSLETTER_ADMIN')) define('AW_NEWSLETTER_ADMIN', true);
@@ -53,9 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $scheduled_at = null;
         if (($_POST['schedule_type'] ?? 'now') === 'later') {
-            $ts = strtotime((string)($_POST['schedule'] ?? '')); // F171: an unparseable date is refused, not stored as 1970
-            if ($ts === false) { aw_nl_flash('error', 'Please choose a valid date and time.'); aw_nl_back('send'); }
-            $scheduled_at = date('Y-m-d H:i:s', $ts);
+            // F171: an unparseable date is refused, not stored as 1970. The time is typed in site time
+            // (e.g. Malawi time) and stored in UTC, which the automatic sender compares with.
+            $scheduled_at = aw_nl_local_to_utc($_POST['schedule'] ?? '');
+            if ($scheduled_at === '') { aw_nl_flash('error', 'Please choose a valid date and time.'); aw_nl_back('send'); }
         }
         $files = []; $total = 0;
         if (!empty($_FILES['attachments']['name'][0])) {
@@ -75,7 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         aw_nl_audit($db, $scheduled_at ? 'schedule_newsletter' : 'send_newsletter', "Campaign #$qid \"$subject\" to " . count($recipients) . " ($send_to)");
         unset($_SESSION['aw_nl_draft']);
         if ($scheduled_at) {
-            aw_nl_flash('success', 'Scheduled for ' . date('F j, Y, g:i a', strtotime($scheduled_at)) . ' (' . count($recipients) . ' recipients). Press "Send queued now" on the Campaigns tab on or after that time.');
+            $soon = strtotime($scheduled_at . ' UTC') <= time() + 60;
+            aw_nl_flash('success', ($soon ? 'That time has already come, so it starts sending within a few minutes' : 'Scheduled for ' . aw_nl_when($scheduled_at, 'l j F Y, H:i') . ' (' . aw_nl_tz_label() . ')') . ': ' . count($recipients) . ' recipient' . (count($recipients) === 1 ? '' : 's') . '. It sends by itself; you can change the time or send it now on Campaigns.');
             aw_nl_back('queue');
         }
         aw_nl_back('queue', ['sending' => $qid]);
@@ -112,11 +115,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($action === 'send_due') {
         $st = $db->prepare("SELECT id FROM email_queue WHERE status = 'pending' AND scheduled_at <= ? ORDER BY scheduled_at ASC LIMIT 1");
-        $st->execute([date('Y-m-d H:i:s')]);
+        $st->execute([gmdate('Y-m-d H:i:s')]);
         $due = (int)$st->fetchColumn();
         if (!$due) { aw_nl_flash('success', 'Nothing is due yet. Scheduled newsletters can be sent on or after their date.'); aw_nl_back('queue'); }
         $db->prepare("UPDATE email_queue SET status = 'processing' WHERE id = ?")->execute([$due]);
         aw_nl_back('queue', ['sending' => $due]);
+    }
+    // a scheduled letter: send it now instead, or move it to another time
+    if ($action === 'send_now') {
+        $qid = (int)($_POST['queue_id'] ?? 0);
+        $st = $db->prepare("UPDATE email_queue SET status = 'processing', scheduled_at = ? WHERE id = ? AND status = 'pending'");
+        $st->execute([gmdate('Y-m-d H:i:s'), $qid]);
+        if ($st->rowCount() !== 1) { aw_nl_flash('error', 'That letter is no longer waiting: it may have started sending already.'); aw_nl_back('queue'); }
+        aw_nl_audit($db, 'send_now', "Scheduled campaign #$qid sent early");
+        aw_nl_back('queue', ['sending' => $qid]);
+    }
+    if ($action === 'reschedule') {
+        $qid = (int)($_POST['queue_id'] ?? 0);
+        $when = aw_nl_local_to_utc($_POST['schedule'] ?? '');
+        if ($when === '') { aw_nl_flash('error', 'Please choose a valid date and time.'); aw_nl_back('queue'); }
+        $st = $db->prepare("UPDATE email_queue SET scheduled_at = ? WHERE id = ? AND status = 'pending'");
+        $st->execute([$when, $qid]);
+        if ($st->rowCount() !== 1) { aw_nl_flash('error', 'That letter is no longer waiting: it may have started sending already.'); aw_nl_back('queue'); }
+        aw_nl_audit($db, 'reschedule', "Campaign #$qid to $when UTC");
+        aw_nl_flash('success', 'New time: ' . aw_nl_when($when, 'l j F Y, H:i') . ' (' . aw_nl_tz_label() . '). It sends by itself.');
+        aw_nl_back('queue');
     }
     if ($action === 'resend_failed') {
         $qid = (int)($_POST['queue_id'] ?? 0);
@@ -408,7 +431,7 @@ require_once '../includes/header.php';
             <div>
                 <p class="nlh-kicker"><i class="fas fa-envelope-open-text" aria-hidden="true"></i> The <?php echo htmlspecialchars(aw_site_name()); ?> Letter</p>
                 <h1>Newsletter</h1>
-                <p class="nlh-sub"><?php echo $nl_lastsent ? 'Last letter sent ' . htmlspecialchars(date('j F', strtotime($nl_lastsent))) . '.' : 'No letter sent yet.'; ?><?php echo $nl_next ? ' Next one scheduled for ' . htmlspecialchars(date('j F, H:i', strtotime($nl_next))) . '.' : ''; ?></p>
+                <p class="nlh-sub"><?php echo $nl_lastsent ? 'Last letter sent ' . htmlspecialchars(aw_nl_when($nl_lastsent, 'j F')) . '.' : 'No letter sent yet.'; ?><?php echo $nl_next ? ' Next one sends by itself on ' . htmlspecialchars(aw_nl_when($nl_next, 'j F, H:i')) . '.' : ''; ?></p>
             </div>
             <div class="admin-actions">
                 <a href="?tab=send" class="btn btn-primary btn-sm"><i class="fas fa-pen-nib"></i> Write a letter</a>
