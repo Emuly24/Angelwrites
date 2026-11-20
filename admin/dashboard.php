@@ -14,6 +14,9 @@ require_once '../includes/dash.php';
 if (is_file(__DIR__ . '/../includes/community_posts.php')) require_once '../includes/community_posts.php';
 
 aw_require('staff_dashboard'); // K1
+// the admin dashboard (every figure and tool) is for the owner and admins; other staff (moderators)
+// work from the Team desk, which shows only what their role may act on
+if (!aw_can('manage_members')) { header('Location: ' . SITE_URL . '/admin/team.php'); exit; }
 
 $D = 14;
 // ----- daily series (last 14 days) -----
@@ -114,7 +117,7 @@ $greet = $h < 12 ? 'Good morning' : ($h < 17 ? 'Good afternoon' : 'Good evening'
 $pageTitle = 'Admin Dashboard';
 require_once '../includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=4">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=5">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">
@@ -322,7 +325,7 @@ require_once '../includes/header.php';
         </div>
     </div>
 </main>
-<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=2" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=3" defer></script>
 <script>
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
 function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }

@@ -102,7 +102,7 @@ $token = generate_csrf_token();
 $pageTitle = 'My Dashboard';
 require_once 'includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=4">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=5">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">
@@ -122,7 +122,7 @@ require_once 'includes/header.php';
                 <?php require_once __DIR__ . '/includes/devotionals.php'; $aw_devo = aw_devo_current($db, (int)$_SESSION['user_id']); if ($aw_devo): ?><a class="dsh-pill" href="<?php echo SITE_URL; ?>/plans.php?plan=<?php echo (int)$aw_devo['plan']['id']; ?>&amp;day=<?php echo (int)$aw_devo['day']; ?>"><i class="fas fa-sun" aria-hidden="true"></i> Today's devotional · day <?php echo (int)$aw_devo['day']; ?></a><?php endif; ?>
                 <a class="dsh-pill" href="<?php echo SITE_URL; ?>/messages.php"><i class="fas fa-envelope" aria-hidden="true"></i> Messages<?php if ($unreadMsgs): ?> <span class="dsh-badge"><?php echo (int)$unreadMsgs; ?></span><?php endif; ?></a>
                 <a class="dsh-pill" href="<?php echo SITE_URL; ?>/stories.php"><i class="fas fa-seedling" aria-hidden="true"></i> Stories &amp; Help</a>
-                <?php if (function_exists('aw_is_staff') && aw_is_staff()): ?><a class="dsh-pill" href="<?php echo SITE_URL; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i> Staff</a><?php endif; ?>
+                <?php if (function_exists('aw_is_staff') && aw_is_staff()): ?><a class="dsh-pill dsh-pill-solid" href="<?php echo SITE_URL; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i> Team desk</a><?php endif; ?>
             </div>
         </div>
     </section>
@@ -254,5 +254,5 @@ require_once 'includes/header.php';
         <a href="<?php echo SITE_URL; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i> Profile</a>
     </nav>
 </main>
-<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=2" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=3" defer></script>
 <?php require_once 'includes/footer.php'; ?>
