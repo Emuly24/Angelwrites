@@ -125,7 +125,8 @@ $pageTitle = 'Contact';
                     <div class="info-icon"><i class="fas fa-envelope"></i></div>
                     <div>
                         <h3>Email</h3>
-                        <p><a href="mailto:angelwrites@zohomail.com">angelwrites@zohomail.com</a></p>
+                        <p>Write to us any time; the button opens your email app.</p>
+                        <div class="aw-cbtns" style="margin-top:8px"><?php echo aw_mail_button('', 'Email us'); ?></div>
                     </div>
                 </div>
                 <div class="info-card">
@@ -233,7 +234,7 @@ p { line-height: 1.6; }
     text-align: center; margin-bottom: 32px; padding: 20px 0;
 }
 .contact-hero h1 { font-size: 2.8rem; margin-bottom: 8px; }
-.contact-hero p { font-size: 1.15rem; color: var(--text-light); max-width: 600px; margin: 0 auto; }
+.contact-hero p { font-size: 1.15rem; color: var(--text); max-width: 600px; margin: 0 auto; }
 .hero-divider { width: 60px; height: 3px; background: var(--rose); margin: 16px auto 0; border-radius: 4px; }
 
 /* ===== ALERTS ===== */
@@ -288,7 +289,11 @@ p { line-height: 1.6; }
 }
 .info-icon i { font-size: 1.2rem; color: var(--rose); }
 .info-card h3 { font-size: 1.1rem; margin: 0 0 2px; }
-.info-card p { margin: 0; font-size: 0.95rem; color: var(--text-light); }
+.info-card p { margin: 0; font-size: 0.95rem; color: var(--text); }
+/* hints in empty fields: readable, still lighter than what people type */
+.contact-form input::placeholder, .contact-form textarea::placeholder { color: #7a6262; opacity: 1; }
+html[data-theme="dark"] .contact-form input::placeholder, html[data-theme="dark"] .contact-form textarea::placeholder { color: #cdb8b8; }
+.contact-form .aw-hc-status { color: var(--text); }
 .info-card a { color: var(--rose); text-decoration: none; transition: color 0.2s; }
 .info-card a:hover { color: var(--rose-dark); text-decoration: underline; }
 
