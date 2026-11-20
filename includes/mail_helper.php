@@ -215,7 +215,9 @@ function aw_mail_prepare(array $m): PHPMailer
         $opts['footer_note'] = aw_mail_automated_note();
     }
 
+    $GLOBALS['AW_EMAIL_INLINE_LOGO'] = aw_mail_embed_logo($mail);
     [$html, $text] = aw_email_brand((string)$m['subject'], (string)$m['message'], !empty($m['is_html']), $opts);
+    $GLOBALS['AW_EMAIL_INLINE_LOGO'] = false;
     $mail->isHTML(true);
     $mail->Body    = $html;
     $mail->AltBody = $text;
@@ -228,6 +230,20 @@ function aw_mail_prepare(array $m): PHPMailer
         $mail->addAttachment($path, (string)($m['attachment']['name'] ?? '') ?: basename($path));
     }
     return $mail;
+}
+
+/**
+ * Put the logo inside the email (Content-ID "awlogo") instead of linking to it on the site, so the
+ * email has no outside images. Returns true when embedded; the layout then uses cid:awlogo.
+ */
+function aw_mail_embed_logo(PHPMailer $mail): bool
+{
+    $rel = function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png';
+    $file = dirname(__DIR__) . '/' . ltrim($rel, '/');
+    if (!is_file($file) || filesize($file) > 200000) $file = dirname(__DIR__) . '/assets/images/logo.png';
+    if (!is_file($file)) return false;
+    try { return $mail->addEmbeddedImage($file, 'awlogo', 'angelwrites-logo.' . strtolower(pathinfo($file, PATHINFO_EXTENSION) ?: 'png')); }
+    catch (\Throwable $e) { error_log('mail logo: ' . $e->getMessage()); return false; }
 }
 
 /** ET2: prepare, send, and on any failure log it and return false. Nothing escapes; nothing dies. */
