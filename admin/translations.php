@@ -10,7 +10,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/i18n.php';
 
-aw_require('manage_content'); // checks the CSRF token on every POST
+aw_require('translations_team'); // checks the CSRF token on every POST
 aw_i18n_tables($db);
 $tr_lang = 'ny';
 

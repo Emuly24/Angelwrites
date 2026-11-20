@@ -118,7 +118,7 @@ $greet = $h < 12 ? 'Good morning' : ($h < 17 ? 'Good afternoon' : 'Good evening'
 $pageTitle = 'Admin Dashboard';
 require_once '../includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=5">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=6">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">

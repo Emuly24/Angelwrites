@@ -10,7 +10,7 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/prayer.php'; // the prayer wall's columns (title, visibility, anonymous...)
 
-aw_require('moderate'); // K1
+aw_require('prayer_team'); // K1
 aw_prayer_tables($db);
 $pr_eye = aw_can('see_identities'); // moderators never see who is behind an anonymous request
 

@@ -11,7 +11,7 @@ require_once '../includes/auth.php';
 require_once '../includes/devotionals.php';
 require_once '../includes/bible_versions.php';
 
-aw_require('manage_content'); // checks the CSRF token on every POST
+aw_require('devotionals_team'); // checks the CSRF token on every POST
 aw_devo_tables($db);
 $dv_back = SITE_URL . '/admin/devotionals.php';
 

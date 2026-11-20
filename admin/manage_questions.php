@@ -5,7 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/admin_bulk.php'; // bulk actions: safe deletes, the result shown after the redirect
 require_once '../includes/mail_helper.php';
 
-aw_require('moderate'); // K1
+aw_require('community_team'); // K1
 
 $error = '';
 $success = '';

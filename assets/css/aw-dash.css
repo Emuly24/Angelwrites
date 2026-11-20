@@ -263,3 +263,13 @@ html[data-theme="dark"] .dsh-feed .dsh-fico { color: #1d1314; }
 .dsh-pill { background: rgba(40, 12, 20, .26); }
 .dsh-card h2 .dsh-ico { color: #8a4448; }
 html[data-theme="dark"] .dsh-card h2 .dsh-ico { color: #f0c4c5; }
+
+/* a team invitation waiting for the member */
+.dsh-invite{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 20px;padding:18px 20px;border-radius:18px;background:linear-gradient(135deg,#fff5f5,#fdecec);border:1px solid #efc7c8;color:#3d2e2e}
+.dsh-invite > div{flex:1 1 260px;min-width:0}
+.dsh-invite h2{font-family:'Playfair Display',Georgia,serif;font-size:1.15rem;margin:0 0 4px;color:#3d2e2e}
+.dsh-invite p{margin:0;color:#5b4747}
+.dsh-invite-ico{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:#9c5457;color:#fff;font-size:1.2rem;flex:none}
+[data-theme="dark"] .dsh-invite{background:linear-gradient(135deg,#2f2224,#3a2729);border-color:#5e3c3e;color:#f3e6e6}
+[data-theme="dark"] .dsh-invite h2{color:#f8eded}
+[data-theme="dark"] .dsh-invite p{color:#e3cfcf}

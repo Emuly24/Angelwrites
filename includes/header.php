@@ -220,6 +220,7 @@ if (!$isLoggedIn) {
         ['Prayer wall', 'fa-hands-praying', $aw_u . '/prayer.php', ['prayer.php']], ['Devotionals', 'fa-sun', $aw_u . '/plans.php', ['plans.php']],
         ['Community Q&A', 'fa-circle-question', $aw_u . '/community.php', ['community.php']], ['Reading groups', 'fa-user-group', $aw_u . '/groups.php', ['groups.php', 'group.php']], ['Mentoring', 'fa-hands-holding-circle', $aw_u . '/mentoring.php', ['mentoring.php']], ['Writing prompts', 'fa-feather-pointed', $aw_u . '/prompts.php', ['prompts.php']], ['Events', 'fa-calendar-days', $aw_u . '/events.php', ['events.php']], ['Book a session', 'fa-calendar-check', $aw_u . '/book_session.php', ['book_session.php']]]));
     if ($aw_is_staff) $aw_groups['Team'] = [['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']]];
+    if ($aw_is_staff && function_exists('aw_can') && aw_can('invite_staff')) $aw_groups['Team'][] = ['Invite to the team', 'fa-user-plus', $aw_u . '/admin/invite_staff.php', ['admin/invite_staff.php']];
 }
 $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_stories.php', 'community.php', 'groups.php', 'group.php', 'book_session.php', 'prayer.php', 'plans.php', 'mentoring.php', 'prompts.php', 'events.php'];
 ?>

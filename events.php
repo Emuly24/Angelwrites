@@ -15,7 +15,7 @@ if (is_file(__DIR__ . '/includes/notifications.php')) require_once 'includes/not
 $ev_uid = (int)($_SESSION['user_id'] ?? 0);
 $ev_self = SITE_URL . '/events.php';
 aw_event_tables($db);
-$ev_team = function_exists('aw_can') && aw_can('manage_content');
+$ev_team = function_exists('aw_can') && aw_can('events_team');
 
 if (isset($_GET['ics'])) {
     $e = aw_event_get($db, (int)$_GET['ics']);

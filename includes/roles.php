@@ -32,7 +32,19 @@ const AW_CAPS = [
     'see_identities'   => ['owner', 'admin'],
     'audit_log'        => ['owner', 'admin'],
     'manage_staff'     => ['owner'],
+    'invite_staff'     => ['owner', 'admin'],              // admin/invite_staff.php: invite members to volunteer
+    // volunteer areas (includes/staff_positions.php): a member who accepted an invitation gains just one of these
+    'prayer_team'      => ['owner', 'admin', 'moderator'],
+    'community_team'   => ['owner', 'admin', 'moderator'],
+    'comments_team'    => ['owner', 'admin', 'moderator'],
+    'events_team'      => ['owner', 'admin'],
+    'prompts_team'     => ['owner', 'admin'],
+    'devotionals_team' => ['owner', 'admin'],
+    'translations_team'=> ['owner', 'admin'],
+    'mentoring_team'   => ['owner', 'admin'],
+    'clubs_team'       => ['owner', 'admin'],
 ];
+require_once __DIR__ . '/staff_positions.php';
 
 function aw_roles_enabled() {
     return function_exists('aw_setting') ? (string)aw_setting('roles_enabled', '1') !== '0' : true;
@@ -89,7 +101,22 @@ function aw_can($cap) {
     if (empty($_SESSION['user_id'])) return false;
     if (!aw_roles_enabled()) return ($_SESSION['role'] ?? '') === 'admin';
     $role = aw_my_role();
-    return in_array($role, AW_CAPS[$cap] ?? [], true);
+    if (in_array($role, AW_CAPS[$cap] ?? [], true)) return true;
+    // a volunteer: only the capability their accepted area grants, and the Team desk (never admin-only caps)
+    if (in_array($role, ['member', 'moderator'], true) && function_exists('aw_area_caps')) {
+        $mine = aw_area_caps((int)$_SESSION['user_id']);
+        if ($cap === 'staff_dashboard') return (bool)$mine;
+        return in_array($cap, $mine, true);
+    }
+    return false;
+}
+
+/** What the signed-in person is on the team, for headings: "Moderator", "Prayer team · Events coordinator"… */
+function aw_my_staff_label() {
+    $role = aw_my_role();
+    $parts = $role === 'member' ? [] : [aw_role_label($role)];
+    if (function_exists('aw_user_areas') && !empty($_SESSION['user_id'])) foreach (aw_user_areas((int)$_SESSION['user_id']) as $a) $parts[] = AW_POSITIONS[$a]['title'];
+    return $parts ? implode(' · ', $parts) : aw_role_label($role);
 }
 
 function aw_is_staff() { return aw_can('staff_dashboard'); }
@@ -113,8 +140,8 @@ function aw_require($cap) {
         echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Not available</title>'
            . '<div style="font-family:system-ui,sans-serif;max-width:520px;margin:15vh auto;padding:0 16px;text-align:center;color:#3d2e2e">'
            . '<h1 style="font-family:Georgia,serif">This page is not part of your role</h1>'
-           . '<p>Your account can moderate and answer the team inbox, but this page is for admins. If you need it, ask the owner.</p>'
-           . '<p><a href="' . htmlspecialchars(SITE_URL) . '/admin/dashboard.php" style="color:#a8676a">Back to the staff dashboard</a></p></div>';
+           . '<p>Your team role does not include this page. If you need it, ask the owner.</p>'
+           . '<p><a href="' . htmlspecialchars(SITE_URL) . '/admin/team.php" style="color:#a8676a">Back to your Team desk</a></p></div>';
         exit;
     }
     aw_staff_request_guard();

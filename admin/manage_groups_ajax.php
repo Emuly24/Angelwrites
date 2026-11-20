@@ -18,7 +18,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/reading_groups.php';
 
 aw_staff_request_guard(); // K3
-if (!aw_can('manage_content')) { // K1
+if (!aw_can('clubs_team')) { // K1: owner, admins and book club hosts
     http_response_code(403);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'error' => 'Admin access required.']);

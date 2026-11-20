@@ -10,7 +10,7 @@ require_once '../includes/messaging.php';
 require_once '../includes/mentoring.php';
 require_once '../includes/notifications.php';
 
-aw_require('manage_members'); // owner and admins; checks the CSRF token on every POST
+aw_require('mentoring_team'); // owner and admins; checks the CSRF token on every POST
 aw_mentor_tables($db);
 $ma_back = SITE_URL . '/admin/mentoring.php';
 
