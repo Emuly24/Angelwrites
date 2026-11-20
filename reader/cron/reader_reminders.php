@@ -14,7 +14,7 @@ require_once __DIR__ . '/../../includes/mail_helper.php';
 // S13 (F212): only run via CLI, or over HTTP with the key from the READER_CRON_KEY env
 // var sent in an X-Cron-Key header (never in the URL, where it lands in logs and history).
 // With READER_CRON_KEY unset the HTTP route is closed.
-$cron_key = (string)getenv('READER_CRON_KEY');
+$cron_key = (string)aw_env('READER_CRON_KEY');
 $sent_key = (string)($_SERVER['HTTP_X_CRON_KEY'] ?? '');
 if (php_sapi_name() !== 'cli' && ($cron_key === '' || !hash_equals($cron_key, $sent_key))) {
     http_response_code(403);

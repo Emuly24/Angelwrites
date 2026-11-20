@@ -1,17 +1,13 @@
 <?php
 /**
- * Sign in with Google, Facebook, GitHub, Microsoft, Telegram or TikTok (Hybridauth, already in vendor/).
+ * Sign in with Google or Facebook (Hybridauth, already in vendor/). Only these two are offered.
  *
  * A provider's button appears only when its keys are in the .env file on the server:
  *   Google     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET            (console.cloud.google.com > Credentials)
  *   Facebook   FACEBOOK_APP_ID, FACEBOOK_APP_SECRET              (developers.facebook.com > Facebook Login)
- *   GitHub     GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET            (github.com > Settings > Developer settings > OAuth Apps)
- *   Microsoft  MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET      (portal.azure.com > App registrations)
- *   Telegram   TELEGRAM_CLIENT_ID, TELEGRAM_CLIENT_SECRET        (@BotFather > Bot Settings > Web Login)
- *   TikTok     TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET           (developers.tiktok.com > Login Kit)
- * Every provider uses the same return address: https://<site>/social_login.php
- *
- * Instagram is not offered: Meta closed Instagram sign-in for other websites in December 2024.
+ * Common other spellings are accepted too (AW_SOCIAL_KEY_NAMES below), and the keys are read with
+ * aw_env(), which finds the .env file wherever the loader found it (includes/load_env.php).
+ * Both use the same return address: https://<site>/social_login.php
  *
  * Accounts: a provider account is remembered in user_social. It signs in to the same AngelWrites
  * account every time. A new provider account joins an existing AngelWrites account only when the
@@ -24,16 +20,27 @@
 
 require_once __DIR__ . '/load_env.php';
 
+/** The names each key may have in .env: the first is the documented one, the others are common spellings. */
+const AW_SOCIAL_KEY_NAMES = [
+    'Google'   => ['id' => ['GOOGLE_CLIENT_ID', 'GOOGLE_ID', 'GOOGLE_APP_ID', 'GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_ID'],
+                   'secret' => ['GOOGLE_CLIENT_SECRET', 'GOOGLE_SECRET', 'GOOGLE_APP_SECRET', 'GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_OAUTH_SECRET']],
+    'Facebook' => ['id' => ['FACEBOOK_APP_ID', 'FACEBOOK_CLIENT_ID', 'FACEBOOK_ID', 'FB_APP_ID', 'FB_CLIENT_ID'],
+                   'secret' => ['FACEBOOK_APP_SECRET', 'FACEBOOK_CLIENT_SECRET', 'FACEBOOK_SECRET', 'FB_APP_SECRET', 'FB_CLIENT_SECRET']],
+];
+
+/** The first of these names that has a value, as [name, value]; ['', ''] when none. */
+function aw_social_key(array $names) {
+    foreach ($names as $n) { $v = aw_env($n); if ($v !== '') return [$n, $v]; }
+    return ['', ''];
+}
+
 function aw_social_providers() {
-    $env = function ($k) { return trim((string)getenv($k)); };
     $all = [
-        'Google'    => ['label' => 'Google',    'icon' => 'fab fa-google',    'id' => $env('GOOGLE_CLIENT_ID'),    'secret' => $env('GOOGLE_CLIENT_SECRET'),    'scope' => 'openid email profile'],
-        'Facebook'  => ['label' => 'Facebook',  'icon' => 'fab fa-facebook-f', 'id' => $env('FACEBOOK_APP_ID'),     'secret' => $env('FACEBOOK_APP_SECRET'),     'scope' => 'email, public_profile'],
-        'GitHub'    => ['label' => 'GitHub',    'icon' => 'fab fa-github',    'id' => $env('GITHUB_CLIENT_ID'),    'secret' => $env('GITHUB_CLIENT_SECRET'),    'scope' => 'user:email'],
-        'MicrosoftGraph' => ['label' => 'Microsoft', 'icon' => 'fab fa-microsoft', 'id' => $env('MICROSOFT_CLIENT_ID'), 'secret' => $env('MICROSOFT_CLIENT_SECRET'), 'scope' => 'openid user.read', 'tenant' => 'common'],
-        'Telegram'  => ['label' => 'Telegram',  'icon' => 'fab fa-telegram',  'id' => $env('TELEGRAM_CLIENT_ID'),  'secret' => $env('TELEGRAM_CLIENT_SECRET'),  'scope' => 'openid profile'],
-        'TikTok'    => ['label' => 'TikTok',    'icon' => 'fab fa-tiktok',    'id' => $env('TIKTOK_CLIENT_KEY'),   'secret' => $env('TIKTOK_CLIENT_SECRET'),    'scope' => 'user.info.basic', 'adapter' => 'AngelWritesTikTok'],
+        'Google'   => ['label' => 'Google',   'icon' => 'fab fa-google',     'scope' => 'openid email profile'],
+        'Facebook' => ['label' => 'Facebook', 'icon' => 'fab fa-facebook-f', 'scope' => 'email, public_profile'],
     ];
+    foreach ($all as $k => &$p) { $p['id'] = aw_social_key(AW_SOCIAL_KEY_NAMES[$k]['id'])[1]; $p['secret'] = aw_social_key(AW_SOCIAL_KEY_NAMES[$k]['secret'])[1]; }
+    unset($p);
     return array_filter($all, function ($p) { return $p['id'] !== '' && $p['secret'] !== ''; });
 }
 
@@ -58,8 +65,7 @@ function aw_social_buttons($intent = 'login') {
 .aw-social-btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border, #e5d5d5); background: var(--card-bg, #fff); color: var(--text, #3d2e2e); font-weight: 600; text-decoration: none; transition: transform .2s, box-shadow .2s, border-color .2s; }
 .aw-social-btn:hover { transform: translateY(-1px); border-color: #c48f91; box-shadow: 0 6px 18px rgba(156,84,87,.14); color: var(--text, #3d2e2e); }
 .aw-social-btn i { font-size: 1.05rem; }
-.aw-social-google i { color: #ea4335; } .aw-social-facebook i { color: #1877f2; } .aw-social-microsoft i { color: #00a4ef; }
-.aw-social-telegram i { color: #229ed9; } .aw-social-github i, .aw-social-tiktok i { color: var(--text, #24292f); }
+.aw-social-google i { color: #ea4335; } .aw-social-facebook i { color: #1877f2; }
 @media (prefers-reduced-motion: reduce) { .aw-social-btn { transition: none; } .aw-social-btn:hover { transform: none; } }
 </style>';
     }
@@ -106,8 +112,6 @@ function aw_social_config($key) {
     if (!isset($ps[$key])) return null;
     $p = $ps[$key];
     $cfg = ['enabled' => true, 'keys' => ['id' => $p['id'], 'secret' => $p['secret']], 'scope' => $p['scope']];
-    if (!empty($p['tenant'])) $cfg['tenant'] = $p['tenant'];
-    if (!empty($p['adapter'])) { require_once __DIR__ . '/social_tiktok.php'; $cfg['adapter'] = $p['adapter']; }
     return ['callback' => SITE_URL . '/social_login.php', 'providers' => [$key => $cfg]];
 }
 

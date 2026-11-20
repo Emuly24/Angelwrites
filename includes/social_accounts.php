@@ -152,7 +152,7 @@ HTML;
 /* ---------- sign-in details (encrypted) ---------- */
 
 function aw_social_vault_key() {
-    $env = trim((string)getenv('SOCIAL_VAULT_KEY'));
+    $env = trim((string)aw_env('SOCIAL_VAULT_KEY'));
     if ($env !== '') return sodium_crypto_generichash($env, '', SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
     $file = dirname(__DIR__) . '/data/social_vault.key';
     if (!is_file($file)) {

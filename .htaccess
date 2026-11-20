@@ -1,4 +1,5 @@
-<FilesMatch "\.env$">
+# private settings, whatever the file is called (.env, env, .env.txt, .env.bak…)
+<FilesMatch "(^|\.)env(\..*)?$">
     Order allow,deny
     Deny from all
 </FilesMatch>

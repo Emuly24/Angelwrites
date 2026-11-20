@@ -23,9 +23,9 @@ require_once __DIR__ . '/load_env.php';
  */
 function aw_mail_config(): array
 {
-    $env = function ($k, $default = '') { $v = trim((string)getenv($k)); return $v !== '' ? $v : $default; };
+    $env = function ($k, $default = '') { $v = trim((string)aw_env($k)); return $v !== '' ? $v : $default; };
     $user = $env('ZOHO_USERNAME', 'angelwrites@zohomail.com');
-    $pass = (string)getenv('ZOHO_APP_PASSWORD');
+    $pass = (string)aw_env('ZOHO_APP_PASSWORD');
     $from = $env('ZOHO_FROM_ADDRESS', $user);
     if ($pass === '' || trim($pass) === '') {
         return ['ok' => false, 'provider' => 'zoho',
@@ -86,7 +86,7 @@ function aw_mail_send(PHPMailer $mail, array $cfg): bool
  */
 function aw_mail_noreply_address(string $from): string
 {
-    $override = trim((string)getenv('MAIL_NOREPLY_ADDRESS'));
+    $override = trim((string)aw_env('MAIL_NOREPLY_ADDRESS'));
     if ($override !== '' && filter_var($override, FILTER_VALIDATE_EMAIL)) return $override;
     $domain = strtolower((string)substr((string)strrchr($from, '@'), 1));
     $shared = ['zohomail.com', 'zohomail.eu', 'zohomail.in', 'zoho.com', 'zoho.eu', 'zoho.in', 'gmail.com', 'googlemail.com',

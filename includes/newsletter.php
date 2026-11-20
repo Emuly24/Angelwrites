@@ -64,7 +64,7 @@ function aw_nl_secret(PDO $db) {
         }
         $secret = (string)$s;
     } catch (Throwable $e) {
-        $secret = hash('sha256', __FILE__ . (getenv('ZOHO_APP_PASSWORD') ?: (getenv('GMAIL_APP_PASSWORD') ?: 'aw'))); // settings table missing: still unguessable per install
+        $secret = hash('sha256', __FILE__ . (aw_env('ZOHO_APP_PASSWORD') ?: (aw_env('GMAIL_APP_PASSWORD') ?: 'aw'))); // settings table missing: still unguessable per install
     }
     return $secret;
 }

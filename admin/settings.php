@@ -481,27 +481,35 @@ $pageTitle = 'Site Settings';
                         [data-theme="dark"] .aw-relay-state.is-off{background:#33260f;border-color:#7a5a1e;color:#f6deb0}
                     </style>
 
-                    <h3 id="sign-in" style="margin:28px 0 10px;">Sign in with Google, Facebook…</h3>
+                    <h3 id="sign-in" style="margin:28px 0 10px;">Sign in with Google or Facebook</h3>
                     <?php
                         require_once __DIR__ . '/../includes/social_auth.php';
-                        $aw_env_file = is_file(__DIR__ . '/../.env');
-                        $aw_si_rows = [['Google', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'], ['Facebook', 'FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET'], ['GitHub', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'],
-                                       ['Microsoft', 'MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'], ['Telegram', 'TELEGRAM_CLIENT_ID', 'TELEGRAM_CLIENT_SECRET'], ['TikTok', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET']];
+                        $aw_er = aw_env_report();
+                        // key NAMES in .env that look like Google or Facebook keys (never their values), to spot a spelling difference
+                        $aw_like = array_values(array_filter($aw_er['names'], function ($n) { return preg_match('/GOOGLE|FACEBOOK|^FB_|OAUTH/i', $n); }));
                     ?>
-                    <p style="color:var(--text-light);margin:0 0 10px;">A button appears on the login and sign-up pages only when both of its keys are in the <code>.env</code> file on the server. This shows whether each key is there, never the key itself.</p>
-                    <?php if (!$aw_env_file): ?><div class="aw-relay-state is-off" role="status"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>No .env file on the server.</strong> No sign-in buttons, and no Zoho email password, can be read until it exists.</span></div><?php endif; ?>
+                    <p style="color:var(--text-light);margin:0 0 10px;">A button appears on the login and sign-up pages only when the site can read both of its keys. This shows where the settings file was found and which key <em>names</em> it holds. Values are never shown.</p>
+                    <?php if ($aw_er['file'] !== ''): ?>
+                        <div class="aw-relay-state is-on" role="status"><i class="fas fa-circle-check" aria-hidden="true"></i><span><strong>Settings file found:</strong> <?php echo htmlspecialchars($aw_er['file']); ?> (<?php echo (int)$aw_er['count']; ?> settings read).</span></div>
+                    <?php else: ?>
+                        <div class="aw-relay-state is-off" role="status"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>The site could not read a settings file</strong> in any of these places: <?php echo htmlspecialchars(implode(' · ', $aw_er['looked'])); ?>. If yours is somewhere else, or has another name, move or rename it to <code>.env</code> in the site folder (next to index.php).</span></div>
+                    <?php endif; ?>
                     <div class="table-responsive"><table class="admin-table">
-                        <thead><tr><th scope="col">Provider</th><th scope="col">Keys in .env</th><th scope="col">Button</th></tr></thead>
+                        <thead><tr><th scope="col">Provider</th><th scope="col">Key</th><th scope="col">Found as</th><th scope="col">Button</th></tr></thead>
                         <tbody>
-                        <?php foreach ($aw_si_rows as [$aw_pn, $aw_k1, $aw_k2]): $aw_h1 = trim((string)getenv($aw_k1)) !== ''; $aw_h2 = trim((string)getenv($aw_k2)) !== ''; ?>
-                            <tr><td><?php echo $aw_pn; ?></td>
-                                <td><code><?php echo $aw_k1; ?></code> <?php echo $aw_h1 ? '✓' : '<strong style="color:#a8432f">missing</strong>'; ?><br><code><?php echo $aw_k2; ?></code> <?php echo $aw_h2 ? '✓' : '<strong style="color:#a8432f">missing</strong>'; ?></td>
-                                <td><?php echo ($aw_h1 && $aw_h2) ? '<span style="color:#1d5130;font-weight:600">Shown</span>' : 'Hidden'; ?></td></tr>
+                        <?php foreach (AW_SOCIAL_KEY_NAMES as $aw_pn => $aw_kn): [$aw_n1] = aw_social_key($aw_kn['id']); [$aw_n2] = aw_social_key($aw_kn['secret']); ?>
+                            <tr><td rowspan="2"><strong><?php echo $aw_pn; ?></strong></td><td>ID</td>
+                                <td><?php echo $aw_n1 !== '' ? '<code>' . htmlspecialchars($aw_n1) . '</code> ✓' : '<strong style="color:#a8432f">not found</strong> (expected <code>' . $aw_kn['id'][0] . '</code>)'; ?></td>
+                                <td rowspan="2"><?php echo ($aw_n1 !== '' && $aw_n2 !== '') ? '<span style="color:#1d5130;font-weight:600">Shown</span>' : 'Hidden'; ?></td></tr>
+                            <tr><td>Secret</td><td><?php echo $aw_n2 !== '' ? '<code>' . htmlspecialchars($aw_n2) . '</code> ✓' : '<strong style="color:#a8432f">not found</strong> (expected <code>' . $aw_kn['secret'][0] . '</code>)'; ?></td></tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table></div>
+                    <?php if ($aw_like): ?><p style="margin:8px 0 0;">Names in your file that look like sign-in keys: <?php echo implode(', ', array_map(function ($n) { return '<code>' . htmlspecialchars($n) . '</code>'; }, $aw_like)); ?>. If a key above says “not found”, rename the line in the file to the expected name.</p>
+                    <?php elseif ($aw_er['file'] !== ''): ?><p style="margin:8px 0 0;">Your file has no lines that look like Google or Facebook keys yet.</p><?php endif; ?>
                     <details class="aw-relay-help" style="margin-top:10px"><summary>How to add the keys</summary>
                         <ol>
+                            <li>Each line looks like <code>GOOGLE_CLIENT_ID=123-abc.apps.googleusercontent.com</code>: the name, an equals sign, the value, no spaces around the equals sign.</li>
                             <li>On Google (console.cloud.google.com → Credentials) and Facebook (developers.facebook.com → Facebook Login → Settings), add this redirect address: <code><?php echo htmlspecialchars(rtrim(SITE_URL, '/')); ?>/social_login.php</code></li>
                             <li><strong>Easiest:</strong> on GitHub, open the repository → Settings → Secrets and variables → Actions → New repository secret. Name it <code>DOTENV</code> and paste your whole <code>.env</code> file (every line, including <code>ZOHO_APP_PASSWORD</code>, because it replaces the file on the server). The next deploy puts it on the server.</li>
                             <li><strong>Or</strong> upload <code>.env</code> to <code>htdocs</code> with the InfinityFree file manager. <code>docs/env.sample</code> lists every line.</li>
