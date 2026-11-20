@@ -16,7 +16,7 @@ function newsletter_request_optin($db, $email, $name = '') {
 
     // N6: the answer no longer says whether an address is on the list, and a confirmation email is
     // sent at most once every 10 minutes per address (the form could be used to flood an inbox).
-    $neutral = ['ok' => true, 'message' => 'Thank you! Please check your inbox and click the confirmation link. (If you are already subscribed, there is nothing more to do.)'];
+    $neutral = ['ok' => true, 'message' => 'Thank you! Please check your inbox (and your Junk or Spam folder) and click the confirmation link. (If you are already subscribed, there is nothing more to do.)'];
     if ($existing && $existing['is_active'] == 1) {
         return $neutral;
     }
