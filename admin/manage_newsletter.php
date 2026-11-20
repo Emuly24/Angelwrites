@@ -330,8 +330,20 @@ $segments = $db->query("SELECT s.*, (SELECT COUNT(*) FROM subscriber_segment_ass
 $templates = $db->query("SELECT id, name, subject, content FROM newsletter_templates ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $queue_count = (int)$db->query("SELECT COUNT(*) FROM email_queue")->fetchColumn();
 $last = $db->query("SELECT id FROM email_queue WHERE status = 'sent' ORDER BY sent_at DESC, id DESC LIMIT 5")->fetchAll(PDO::FETCH_COLUMN);
+// dashboard figures: growth (new in 30 days, 12 weeks of active subscribers), clicks, unsubscribes, what is next
+$nl_q1 = function ($sql, $args = []) use ($db) { try { $st = $db->prepare($sql); $st->execute($args); return $st->fetchColumn(); } catch (Throwable $e) { return 0; } };
+$nl_new30 = (int)$nl_q1("SELECT COUNT(*) FROM newsletter WHERE is_active = 1 AND subscribed_at >= datetime('now', '-30 days')");
+$nl_unsub30 = (int)$nl_q1("SELECT COUNT(*) FROM newsletter WHERE unsubscribed_at >= datetime('now', '-30 days')");
+$nl_weeks = [];
+for ($w = 11; $w >= 0; $w--) {
+    $end = date('Y-m-d 23:59:59', strtotime('-' . ($w * 7) . ' days'));
+    $nl_weeks[] = (int)$nl_q1("SELECT COUNT(*) FROM newsletter WHERE subscribed_at <= ? AND (is_active = 1 OR (unsubscribed_at IS NOT NULL AND unsubscribed_at > ?))", [$end, $end]);
+}
+$nl_next = $nl_q1("SELECT scheduled_at FROM email_queue WHERE status = 'pending' ORDER BY scheduled_at LIMIT 1");
+$nl_lastsent = $nl_q1("SELECT sent_at FROM email_queue WHERE status = 'sent' ORDER BY sent_at DESC LIMIT 1");
+$avg_click = null;
 $avg_open = null;
-if ($last) { $rates = array_map(function ($id) use ($db) { return aw_nl_report($db, $id)['open_rate']; }, $last); $avg_open = round(array_sum($rates) / count($rates)); }
+if ($last) { $rates = array_map(function ($id) use ($db) { return aw_nl_report($db, $id)['click_rate']; }, $last); $avg_click = round(array_sum($rates) / count($rates)); }
 
 // Subscribers: search, status and segment filters, paged in SQL (P18).
 $f_q = trim((string)($_GET['q'] ?? ''));
@@ -348,7 +360,7 @@ $st->execute($params);
 $sub_total = (int)$st->fetchColumn();
 [$sub_page, $sub_per] = aw_page(25, 'spage');
 [$sub_page, $sub_off] = aw_clamp($sub_total, $sub_page, $sub_per);
-$st = $db->prepare("SELECT n.*, (SELECT MAX(s.opened_at) FROM newsletter_stats s WHERE lower(s.recipient_email) = lower(n.email)) AS last_open, (SELECT COUNT(*) FROM newsletter_stats s WHERE lower(s.recipient_email) = lower(n.email) AND s.status = 'sent') AS received FROM newsletter n WHERE $where ORDER BY n.subscribed_at DESC, n.id DESC LIMIT ? OFFSET ?");
+$st = $db->prepare("SELECT n.*, (SELECT MAX(s.clicked_at) FROM newsletter_stats s WHERE lower(s.recipient_email) = lower(n.email)) AS last_open, (SELECT COUNT(*) FROM newsletter_stats s WHERE lower(s.recipient_email) = lower(n.email) AND s.status = 'sent') AS received FROM newsletter n WHERE $where ORDER BY n.subscribed_at DESC, n.id DESC LIMIT ? OFFSET ?");
 $st->execute(array_merge($params, [$sub_per, $sub_off]));
 $subscribers = $st->fetchAll(PDO::FETCH_ASSOC);
 $segment_names_by_subscriber = [];
@@ -392,20 +404,34 @@ require_once '../includes/header.php';
 
 <div class="admin-newsletter">
     <div class="container">
-        <div class="admin-header">
-            <h1>Newsletter</h1>
+        <div class="admin-header nlh">
+            <div>
+                <p class="nlh-kicker"><i class="fas fa-envelope-open-text" aria-hidden="true"></i> The <?php echo htmlspecialchars(aw_site_name()); ?> Letter</p>
+                <h1>Newsletter</h1>
+                <p class="nlh-sub"><?php echo $nl_lastsent ? 'Last letter sent ' . htmlspecialchars(date('j F', strtotime($nl_lastsent))) . '.' : 'No letter sent yet.'; ?><?php echo $nl_next ? ' Next one scheduled for ' . htmlspecialchars(date('j F, H:i', strtotime($nl_next))) . '.' : ''; ?></p>
+            </div>
             <div class="admin-actions">
-                <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export all</a>
-                <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php?status=active" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export active</a>
-                <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Dashboard</a>
+                <a href="?tab=send" class="btn btn-primary btn-sm"><i class="fas fa-pen-nib"></i> Write a letter</a>
+                <a href="<?php echo SITE_URL; ?>/newsletter.php?about=1" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i class="fas fa-up-right-from-square"></i> Sign-up page</a>
+                <a href="<?php echo SITE_URL; ?>/admin/export_subscribers.php?status=active" class="btn btn-outline btn-sm"><i class="fas fa-file-csv"></i> Export</a>
             </div>
         </div>
 
-        <div class="nl-stats" role="list">
-            <div role="listitem"><strong><?php echo number_format($active_count); ?></strong><span>Active subscribers</span></div>
-            <div role="listitem"><strong><?php echo number_format((int)$counts['p']); ?></strong><span>Awaiting confirmation</span></div>
-            <div role="listitem"><strong><?php echo number_format((int)$counts['u']); ?></strong><span>Unsubscribed</span></div>
-            <div role="listitem"><strong><?php echo $avg_open === null ? '–' : $avg_open . '%'; ?></strong><span>Open rate (last 5)</span></div>
+        <div class="nlk" role="list">
+            <div class="nlk-card nlk-wide" role="listitem">
+                <div><span class="nlk-label">Active subscribers</span><strong><?php echo number_format($active_count); ?></strong>
+                    <span class="nlk-delta<?php echo $nl_new30 ? ' is-up' : ''; ?>"><?php echo $nl_new30 ? '+' . $nl_new30 . ' in 30 days' : 'no new ones in 30 days'; ?></span></div>
+                <?php // 12 weeks of subscribers, drawn as a small line (no library)
+                $mx = max(1, max($nl_weeks)); $mn = min($nl_weeks); $rng = max(1, $mx - $mn); $pts = [];
+                foreach ($nl_weeks as $i => $v) $pts[] = round($i * (220 / 11), 1) . ',' . round(52 - (($v - $mn) / $rng) * 44, 1); ?>
+                <svg class="nlk-spark" viewBox="0 0 220 56" role="img" aria-label="Subscribers over the last 12 weeks: from <?php echo $nl_weeks[0]; ?> to <?php echo end($nl_weeks); ?>">
+                    <polyline points="<?php echo '0,56 ' . implode(' ', $pts) . ' 220,56'; ?>" fill="rgba(219,161,162,.25)" stroke="none"></polyline>
+                    <polyline points="<?php echo implode(' ', $pts); ?>" fill="none" stroke="#9c5457" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                </svg>
+            </div>
+            <div class="nlk-card" role="listitem"><span class="nlk-label">Click rate</span><strong><?php echo $avg_click === null ? '–' : $avg_click . '%'; ?></strong><span class="nlk-note">average of the last 5 letters</span></div>
+            <div class="nlk-card" role="listitem"><span class="nlk-label">Awaiting confirmation</span><strong><?php echo number_format((int)$counts['p']); ?></strong><span class="nlk-note">sent a confirmation email</span></div>
+            <div class="nlk-card" role="listitem"><span class="nlk-label">Unsubscribed</span><strong><?php echo number_format((int)$counts['u']); ?></strong><span class="nlk-note"><?php echo $nl_unsub30; ?> in the last 30 days</span></div>
         </div>
 
         <?php if ($error): ?><div class="alert alert-error" role="alert"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
@@ -502,6 +528,20 @@ require_once '../includes/header.php';
     .tab { padding: 8px 12px; font-size: 0.85rem; }
 }
 
+.nlh{background:linear-gradient(135deg,#fbf1f0,#f3e1e0);border:1px solid var(--border);border-radius:22px;padding:24px 28px!important}
+.nlh h1{font-family:'Playfair Display',Georgia,serif;margin:2px 0 4px!important}.nlh-kicker{margin:0;font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9c5457}
+.nlh-sub{margin:0;color:var(--text-light)}
+.nlk{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:14px;margin:0 0 22px}
+.nlk-card{background:var(--card-bg);border:1px solid var(--border);border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;box-shadow:0 2px 10px rgba(61,46,46,.04)}
+.nlk-wide{flex-direction:row;justify-content:space-between;align-items:center;gap:12px}
+.nlk-wide>div{display:flex;flex-direction:column;gap:4px}
+.nlk-label{font-size:.8rem;color:var(--text-light);font-weight:600}
+.nlk-card strong{font:700 2rem/1.1 'Playfair Display',Georgia,serif;color:var(--text)}
+.nlk-delta{font-size:.82rem;font-weight:700;color:var(--text-light)}.nlk-delta.is-up{color:#2f7a4a}
+.nlk-note{font-size:.78rem;color:var(--text-light)}
+.nlk-spark{width:220px;max-width:50%;height:56px}
+html[data-theme="dark"] .nlh{background:linear-gradient(135deg,#2e2224,#3a2a2c)}
+@media (max-width:900px){.nlk{grid-template-columns:1fr 1fr}.nlk-wide{grid-column:1/-1}}
 .nl-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
 .nl-stats > div { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:14px 16px; box-shadow:var(--shadow); }
 .nl-stats strong { display:block; font-size:1.6rem; color:var(--rose-dark, #c08a8b); font-family:'Playfair Display',Georgia,serif; }

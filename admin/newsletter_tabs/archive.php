@@ -7,7 +7,7 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
 ?>
     <div class="card-header"><h2>📊 Sent issues &amp; reports</h2></div>
     <div class="card-body">
-        <p class="field-hint" style="margin-top:0;">Opens are counted when the reader's email app shows images, so the real number is usually higher. Clicks are counted exactly.</p>
+        <p class="field-hint" style="margin-top:0;">Clicks are counted exactly. Opens are not counted: that needs a hidden tracking picture, which sends letters to Junk (and this host could not serve it to mail apps anyway).</p>
         <?php if ($archive): ?>
             <?php foreach ($archive as $item):
                 $r = $item['email_queue_id'] ? aw_nl_report($db, $item['email_queue_id']) : null; ?>
@@ -23,7 +23,6 @@ if (!defined('AW_NEWSLETTER_ADMIN') && basename($_SERVER['SCRIPT_FILENAME'] ?? '
                     <?php if ($r): ?>
                         <div class="nl-report" style="margin-top:10px;">
                             <div><b><?php echo $r['sent']; ?></b>delivered</div>
-                            <div><b><?php echo $r['opened']; ?> · <?php echo $r['open_rate']; ?>%</b>opened</div>
                             <div><b><?php echo $r['clicked']; ?> · <?php echo $r['click_rate']; ?>%</b>clicked</div>
                             <div><b><?php echo $r['failed']; ?></b>failed</div>
                             <div><b><?php echo $r['skipped']; ?></b>skipped</div>

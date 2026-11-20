@@ -78,7 +78,7 @@ $filters = array_filter(['q' => $f_q, 'status' => $f_status, 'segment' => $f_seg
                     <table class="admin-table">
                         <thead><tr>
                             <th><input type="checkbox" id="selectAllSubscribers" aria-label="Select all on this page"></th>
-                            <th>Subscriber</th><th>Status</th><th>Segments</th><th>Received</th><th>Last opened</th><th>Joined</th><th>Actions</th>
+                            <th>Subscriber</th><th>Status</th><th>Segments</th><th>Received</th><th>Last clicked</th><th>Joined</th><th>Actions</th>
                         </tr></thead>
                         <tbody>
                         <?php foreach ($subscribers as $sub):
