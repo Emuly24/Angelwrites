@@ -29,6 +29,7 @@ jobs:
             README.md
             docs/**
             tools/**
+            wrangler.toml
             storage/**
             *.sql
             *.db

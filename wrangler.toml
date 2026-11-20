@@ -1,0 +1,8 @@
+# Cloudflare Worker: the link-preview relay (tools/share-relay/README.md).
+# The "angelwrites-share" Worker is connected to this repository, so Cloudflare runs
+# `npx wrangler deploy` here on every push to main. Without this file Wrangler looked for a static
+# website and stopped. The name must stay the same as the Worker's name in the Cloudflare dashboard.
+name = "angelwrites-share"
+main = "tools/share-relay/worker.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
