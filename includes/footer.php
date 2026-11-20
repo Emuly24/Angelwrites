@@ -426,6 +426,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <?php // owners and admins: the "Edit page text" button and editor (includes/site_texts.php)
-if (function_exists('aw_text_editor_ui')) echo aw_text_editor_ui(); ?>
+if (function_exists('aw_text_editor_ui')) echo aw_text_editor_ui();
+// the daily database copy, made after this page has been sent (includes/auto_backup.php)
+require_once __DIR__ . '/auto_backup.php'; aw_auto_backup_maybe(); ?>
 </body>
 </html>

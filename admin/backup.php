@@ -18,6 +18,7 @@ require_once '../includes/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/csrf.php';
 require_once '../includes/components.php'; // A1
+require_once '../includes/auto_backup.php'; // the automatic daily copies
 
 aw_require('backup'); // K1
 
@@ -151,6 +152,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['make_backup'])) {
     }
 }
 
+// ===== AUTOMATIC COPIES: download one, make one now, switch on or off =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['auto_download']) || isset($_POST['auto_now']) || isset($_POST['auto_toggle']))) {
+    $st = $db->prepare("SELECT password FROM users WHERE id = ? AND role = 'admin'");
+    $st->execute([(int)$_SESSION['user_id']]);
+    $hash = (string)$st->fetchColumn();
+    $st->closeCursor();
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $error = 'Your session expired. Please reload the page and try again.';
+    } elseif (isset($_POST['auto_toggle'])) {
+        $on = $_POST['auto_toggle'] === '1' ? '1' : '0';
+        $db->prepare("INSERT INTO settings (key, value) VALUES ('auto_backup_enabled', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute([$on]);
+        if (function_exists('aw_audit')) aw_audit('auto_backup_' . ($on === '1' ? 'on' : 'off'), 'settings', 0, '');
+        header('Location: ' . SITE_URL . '/admin/backup.php?auto=' . ($on === '1' ? 'on' : 'off'));
+        exit;
+    } elseif (isset($_POST['auto_now'])) {
+        $r = aw_auto_backup_run(true);
+        header('Location: ' . SITE_URL . '/admin/backup.php?auto=' . (!empty($r['ok']) ? 'made' : 'failed&why=' . rawurlencode((string)($r['error'] ?? ''))));
+        exit;
+    } elseif ($hash === '' || !password_verify((string)($_POST['password'] ?? ''), $hash)) {
+        $error = 'That password is not correct. Nothing was downloaded.';
+    } else {
+        $want = basename((string)$_POST['auto_download']);
+        $pick = null;
+        foreach (aw_auto_backup_list() as $b) if ($b['file'] === $want) $pick = $b;
+        if (!$pick) {
+            $error = 'That copy is no longer there.';
+        } else {
+            // sent as a plain .db file, ready to restore (the copy on the server stays compressed)
+            if (function_exists('aw_audit')) aw_audit('auto_backup_download', 'backup', 0, $pick['file']);
+            $db->prepare("INSERT INTO settings (key, value) VALUES ('last_backup_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute([date('Y-m-d H:i:s')]);
+            while (ob_get_level() > 0) ob_end_clean();
+            header('Content-Type: application/octet-stream');
+            header('Content-Disposition: attachment; filename="angelwrites-backup-' . date('Y-m-d_Hi', $pick['at']) . '.db"');
+            header('Cache-Control: no-store, private');
+            header('X-Content-Type-Options: nosniff');
+            $gz = gzopen($pick['path'], 'rb');
+            while ($gz && !gzeof($gz)) { echo gzread($gz, 1 << 20); flush(); }
+            if ($gz) gzclose($gz);
+            exit;
+        }
+    }
+}
+
 // ===== DELETE RETIRED POINTS AND STREAKS DATA (C1) =====
 $notice = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['drop_retired'])) {
@@ -224,6 +268,46 @@ require_once '../includes/header.php';
             <div class="alert alert-success">Last backup: <?php echo htmlspecialchars(date('F j, Y, g:i a', strtotime($last))); ?><?php echo $days === 0 ? ' (today)' : ' (' . $days . ' day' . ($days === 1 ? '' : 's') . ' ago)'; ?>.</div>
         <?php endif; ?>
 
+        <?php
+        $auto = aw_auto_backup_list();
+        $auto_on = (string)aw_setting('auto_backup_enabled', '1') !== '0';
+        $auto_err = (string)aw_setting('auto_backup_error', '');
+        $auto_msg = ['made' => ['success', 'A new copy was made.'], 'failed' => ['error', 'The copy could not be made: ' . (string)($_GET['why'] ?? '')],
+                     'on' => ['success', 'Automatic daily copies are on.'], 'off' => ['success', 'Automatic daily copies are off.']][$_GET['auto'] ?? ''] ?? null;
+        if ($auto_msg) echo aw_alert($auto_msg[0], $auto_msg[1]);
+        ?>
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-body">
+                <h2 style="font-size:1.25rem;margin:0 0 6px;"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Automatic daily copies</h2>
+                <p style="color:var(--text);margin:0 0 10px;line-height:1.6;"><?php if ($auto_on): ?>Every day the site makes a checked copy of the database by itself and keeps it safely on the server (never on the web). The last <?php echo AW_AUTO_BACKUP_DAILY; ?> days are kept, plus one a week for the <?php echo AW_AUTO_BACKUP_WEEKLY; ?> weeks before.<?php else: ?><strong>Automatic copies are off.</strong> Only the backups you download are kept.<?php endif; ?>
+                    These protect against mistakes; they live on the same server, so still download one now and then and keep it somewhere safe.</p>
+                <?php if ($auto_err !== ''): ?><div class="alert alert-warning">The last automatic copy failed (<?php echo htmlspecialchars($auto_err); ?>). The site tries again tomorrow, or press "Make a copy now".</div><?php endif; ?>
+                <?php if (!$auto): ?>
+                    <p class="field-hint">No automatic copies yet. The first one is made within a day of this update, or press "Make a copy now".</p>
+                <?php else: ?>
+                <form method="POST" autocomplete="off" data-no-loading>
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                    <ul class="aw-auto-list">
+                        <?php foreach ($auto as $i => $b): ?>
+                        <li><span><strong><?php echo htmlspecialchars(date('l j F Y, H:i', $b['at'])); ?></strong><?php echo $i === 0 ? ' <em>newest</em>' : ''; ?><small><?php echo htmlspecialchars(aw_backup_size($b['size'])); ?> compressed</small></span>
+                            <button type="submit" name="auto_download" value="<?php echo htmlspecialchars($b['file']); ?>" class="btn btn-sm btn-outline"><i class="fas fa-download" aria-hidden="true"></i> Download</button></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="form-group" style="margin-top:12px;">
+                        <label for="auto_password">Confirm your password to download a copy</label>
+                        <input type="password" id="auto_password" name="password" autocomplete="current-password" style="max-width:340px;">
+                    </div>
+                </form>
+                <?php endif; ?>
+                <form method="POST" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                    <button type="submit" name="auto_now" value="1" class="btn btn-outline btn-sm"><i class="fas fa-plus" aria-hidden="true"></i> Make a copy now</button>
+                    <button type="submit" name="auto_toggle" value="<?php echo $auto_on ? '0' : '1'; ?>" class="btn btn-outline btn-sm"><?php echo $auto_on ? 'Turn automatic copies off' : 'Turn automatic copies on'; ?></button>
+                </form>
+            </div>
+        </div>
+        <style>.aw-auto-list { list-style: none; margin: 0; padding: 0; } .aw-auto-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); flex-wrap: wrap; } .aw-auto-list li:first-child { border-top: 0; } .aw-auto-list small { display: block; color: var(--text-light); } .aw-auto-list em { font-style: normal; font-size: .78rem; padding: 2px 8px; border-radius: 999px; background: #e3efe6; color: #24452f; margin-left: 6px; }</style>
+
         <div class="card" style="margin-bottom:20px;">
             <div class="card-body">
                 <h2 style="font-size:1.25rem;margin:0 0 6px;">Download a backup now</h2>
@@ -245,7 +329,7 @@ require_once '../includes/header.php';
             <div class="card-body">
                 <h2 style="font-size:1.25rem;margin:0 0 10px;">Keeping it safe</h2>
                 <ul style="margin:0 0 0 20px;line-height:1.8;">
-                    <li>Take a backup <strong>once a week</strong>, and before merging any update to the site.</li>
+                    <li>Download a backup <strong>at least once a month</strong> (the automatic copies cover the days in between), and before merging any update to the site.</li>
                     <li>The file holds members' names, email addresses and private writing. Keep it on a device with a passcode, never in a shared folder, and never send it by email or chat.</li>
                     <li>Keep the last four files and delete older ones.</li>
                     <li><strong>Not included:</strong> uploaded pictures, recordings and book files (the <code>assets/uploads</code> folder). Copy that folder with the host's file manager or FTP from time to time.</li>

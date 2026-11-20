@@ -55,7 +55,11 @@ foreach ([
 }
 $lastBackup = (string)aw_setting('last_backup_at', '');
 $backupDays = $lastBackup !== '' ? (int)floor((time() - strtotime($lastBackup)) / 86400) : null;
-if (aw_can('backup') && ($backupDays === null || $backupDays >= 7)) $attention[] = [$backupDays === null ? 'No backup yet: download one' : 'days since the last backup', $backupDays === null ? '!' : $backupDays, 'backup.php'];
+// automatic daily copies (includes/auto_backup.php) cover the days in between; a downloaded copy is still needed now and then
+$autoAt = strtotime((string)aw_setting('auto_backup_at', '')) ?: 0;
+$autoOk = (string)aw_setting('auto_backup_error', '') === '' && time() - $autoAt < 2 * 86400;
+if (aw_can('backup') && (string)aw_setting('auto_backup_enabled', '1') !== '0' && !$autoOk && $autoAt > 0) $attention[] = ['Automatic backup needs a look', '!', 'backup.php'];
+if (aw_can('backup') && ($backupDays === null || $backupDays >= 30)) $attention[] = [$backupDays === null ? 'No backup downloaded yet' : 'days since a backup was downloaded', $backupDays === null ? '!' : $backupDays, 'backup.php'];
 
 // ----- most viewed this week (from the view log) -----
 $top = aw_dsh_q($db, "SELECT v.target_type, v.target_id, COUNT(*) AS n,
