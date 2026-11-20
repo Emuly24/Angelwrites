@@ -106,7 +106,7 @@ if (aw_can('moderate')) {
         'Asked for help, no reply yet', 'fa-hand-holding-heart', function ($r) { return '../story.php?id=' . (int)$r['id']; });
     $td_add(aw_dsh_q($db, "SELECT id, title, created_at AS since FROM questions q WHERE NOT EXISTS (SELECT 1 FROM answers a WHERE a.question_id = q.id) ORDER BY created_at LIMIT 15"),
         'Question with no answer', 'fa-circle-question', function ($r) { return '../community.php?id=' . (int)$r['id']; });
-    $td_add(aw_dsh_q($db, "SELECT COALESCE(NULLIF(request_type, ''), 'Prayer request') AS title, created_at AS since FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed' ORDER BY created_at LIMIT 15"),
+    $td_add(aw_dsh_q($db, "SELECT COALESCE(NULLIF(request_type, ''), 'Prayer request') AS title, created_at AS since FROM prayer_requests WHERE COALESCE(status, 'pending') NOT IN ('prayed', 'answered', 'removed') ORDER BY created_at LIMIT 15"),
         'Prayer request', 'fa-hands-praying', 'manage_prayer_requests.php');
     $td_add(aw_dsh_q($db, "SELECT substr(testimony, 1, 80) AS title, created_at AS since FROM testimonials WHERE approved = 0 AND is_public = 1 ORDER BY created_at LIMIT 15"),
         'Testimonial to review', 'fa-quote-left', 'manage_testimonials.php');

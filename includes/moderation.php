@@ -37,6 +37,9 @@ function aw_report_types() {
         'community_reply'    => ['community_replies', 'author_id', 'body', "'story.php?id=' || post_id || '#reply-' || id", 'status'],
         // I1: a private message; moderators see only the reported message, never the conversation
         'message'            => ['messages', 'sender_id', 'body', "'admin/moderation.php'", 'status'],
+        // the prayer wall (includes/prayer.php): a request is hidden (status 'removed'); an encouragement is archived
+        'prayer'             => ['prayer_requests', 'user_id', "COALESCE(title, '') || ' — ' || COALESCE(message, '')", "'prayer.php#p' || id", 'status'],
+        'prayer_update'      => ['prayer_updates', 'user_id', 'body', "'prayer.php#p' || request_id", 'archive'],
     ];
 }
 

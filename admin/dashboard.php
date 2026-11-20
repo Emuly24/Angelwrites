@@ -42,7 +42,7 @@ foreach ([
     ['Session requests', "SELECT COUNT(*) FROM sessions WHERE status = 'pending'", 'manage_sessions.php?status=pending', 'manage_members'],
     ['Unread messages', "SELECT COUNT(*) FROM contact_messages WHERE is_read = 0", 'inbox.php', 'team_inbox'],
     ['Team conversations waiting', "SELECT COUNT(*) FROM msg_threads t WHERE t.kind = 'team' AND COALESCE(t.team_read_id, 0) < (SELECT COALESCE(MAX(id), 0) FROM messages m WHERE m.thread_id = t.id)", '../messages.php?view=team', 'team_inbox'],
-    ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') != 'prayed'", 'manage_prayer_requests.php', 'moderate'],
+    ['Open prayer requests', "SELECT COUNT(*) FROM prayer_requests WHERE COALESCE(status, 'pending') NOT IN ('prayed', 'answered', 'removed')", 'manage_prayer_requests.php', 'moderate'],
     ['Testimonials to review', "SELECT COUNT(*) FROM testimonials WHERE approved = 0 AND is_public = 1", 'manage_testimonials.php', 'moderate'],
     ['Reports to review', "SELECT COUNT(DISTINCT target_type || ':' || target_id) FROM reports WHERE status = 'pending'", 'moderation.php', 'moderate'],
     ['Stories waiting for a first read', "SELECT COUNT(*) FROM community_posts WHERE status = 'held' AND visibility <> 'team'", 'community.php', 'moderate'],
@@ -259,6 +259,7 @@ require_once '../includes/header.php';
             <a class="dsh-tile" href="editor.php"><i class="fas fa-pen-fancy" aria-hidden="true"></i>Blog editor</a>
             <a class="dsh-tile" href="manage_videos.php"><i class="fas fa-video" aria-hidden="true"></i>Videos</a>
             <a class="dsh-tile" href="site_texts.php"><i class="fas fa-font" aria-hidden="true"></i>Page text</a>
+            <a class="dsh-tile" href="devotionals.php"><i class="fas fa-sun" aria-hidden="true"></i>Devotionals</a>
         </div></section>
         <section class="dsh-card dsh-reveal" style="--i:3"><h3>Community &amp; care</h3><div class="dsh-tiles">
             <a class="dsh-tile" href="community.php"><i class="fas fa-seedling" aria-hidden="true"></i>Stories &amp; Help</a>
