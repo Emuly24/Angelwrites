@@ -662,8 +662,7 @@ function aw_cp_crisis_contacts() {
 function aw_cp_crisis_block($compact = false) {
     $items = '';
     foreach (aw_cp_crisis_contacts() as [$label, $num]) {
-        $tel = preg_replace('/[^0-9+]/', '', $num);
-        $items .= '<li><span>' . htmlspecialchars($label) . '</span> <a href="tel:' . htmlspecialchars($tel) . '">' . htmlspecialchars($num) . '</a></li>';
+        $items .= '<li><span>' . htmlspecialchars($label) . '</span> ' . aw_call_button($num, 'Call', $label) . '</li>';
     }
     $u = htmlspecialchars(SITE_URL);
     return '<aside class="cp-crisis' . ($compact ? ' cp-crisis-compact' : '') . '" role="note" aria-label="If you need help now">'

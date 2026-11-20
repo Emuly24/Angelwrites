@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/mail_helper.php';
@@ -52,35 +53,35 @@ $pageTitle = htmlspecialchars($terms_content['title'] ?? 'Terms of Service');
 
         <!-- Page Header -->
         <div class="terms-header">
-            <h1><?php echo htmlspecialchars($terms_content['title'] ?? 'Terms of Service'); ?></h1>
-            <p>Please read these terms carefully before using AngelWrites.</p>
+            <h1><?php echo aw_text('terms.title', (string)($terms_content['title'] ?? 'Terms of Service'), 'line'); ?></h1>
+            <p><?php echo aw_text('terms.p1', 'Please read these terms carefully before using AngelWrites.', 'text'); ?></p>
             <div class="header-decoration">
                 <span class="decoration-line"></span>
             </div>
-            <p class="last-updated">Last updated: 6 November 2026</p><!-- F222: a fixed date (it used to print today's date on every visit) -->
+            <p class="last-updated"><?php echo aw_text('terms.p2', 'Last updated: 6 November 2026', 'text'); ?></p><!-- F222: a fixed date (it used to print today's date on every visit) -->
         </div>
 
         <!-- Main Content -->
         <div class="terms-content" id="termsContent">
             <?php if (isset($terms_content['sections']) && is_array($terms_content['sections'])): ?>
-                <?php foreach ($terms_content['sections'] as $section): ?>
+                <?php foreach ($terms_content['sections'] as $aw_i => $section): /* each section can be changed on the page (Edit page text) */ ?>
                     <div class="terms-section">
-                        <h2><?php echo htmlspecialchars($section['heading'] ?? ''); ?></h2>
-                        <p><?php echo nl2br(htmlspecialchars($section['content'] ?? '')); ?></p>
+                        <h2><?php echo aw_text('terms.s' . ($aw_i + 1) . '.heading', (string)($section['heading'] ?? ''), 'line'); ?></h2>
+                        <p><?php echo aw_text('terms.s' . ($aw_i + 1) . '.text', (string)($section['content'] ?? ''), 'para'); ?></p>
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
                 <div class="terms-section">
-                    <h2>Terms of Service</h2>
-                    <p>Content coming soon.</p>
+                    <h2><?php echo aw_text('terms.h21', 'Terms of Service', 'line'); ?></h2>
+                    <p><?php echo aw_text('terms.p3', 'Content coming soon.', 'text'); ?></p>
                 </div>
             <?php endif; ?>
         </div>
 
         <!-- Newsletter -->
         <div class="terms-newsletter">
-            <h3>Stay Updated</h3>
-            <p>Join the newsletter to receive the latest updates from AngelWrites.</p>
+            <h3><?php echo aw_text('terms.h31', 'Stay Updated', 'line'); ?></h3>
+            <p><?php echo aw_text('terms.p4', 'Join the newsletter to receive the latest updates from AngelWrites.', 'text'); ?></p>
             <form action="<?php echo SITE_URL; ?>/newsletter.php" method="POST" class="newsletter-form">
                 <input type="email" name="email" placeholder="Your email address" required>
                 <input type="hidden" name="redirect" value="/terms.php">

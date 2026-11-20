@@ -110,7 +110,7 @@ function aw_social_soon_dialog() {
   <p>In the meantime, we would love to hear from you:</p>
   <div class="aw-soon-actions">
     <a class="aw-soon-btn aw-soon-primary" href="{$msg}"><i class="fas fa-comment-dots" aria-hidden="true"></i> Send us a message in the app</a>
-    <a class="aw-soon-btn" href="mailto:{$mail}"><i class="fas fa-envelope" aria-hidden="true"></i> {$mail}</a>
+    <a class="aw-soon-btn" href="mailto:{$mail}" aria-label="Email us ({$mail})"><i class="fas fa-envelope" aria-hidden="true"></i> Email us</a>
   </div>
 </dialog>
 <style>

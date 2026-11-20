@@ -100,7 +100,7 @@ function aw_hc_assets() {
     return <<<'HTML'
 <style>
 .aw-hc-trap { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; overflow: hidden; }
-.aw-hc-status { display: flex; align-items: center; gap: 8px; margin: 6px 0 12px; font-size: .86rem; color: var(--text-light, #6b5a5a); }
+.aw-hc-status { display: flex; align-items: center; gap: 8px; margin: 6px 0 12px; font-size: .86rem; color: var(--text, #3a2629); }
 .aw-hc-dot { width: 10px; height: 10px; border-radius: 50%; background: #c48f91; animation: awHcPulse 1s ease-in-out infinite; }
 .aw-hc.is-done .aw-hc-dot { background: #2f6b45; animation: none; }
 .aw-hc.is-done .aw-hc-status { color: #2f6b45; }

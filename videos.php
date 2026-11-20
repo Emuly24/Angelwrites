@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
@@ -107,8 +108,8 @@ $pageTitle = 'Videos';
     <div class="container">
         <!-- Page Header -->
         <div class="videos-header">
-            <h1>Videos</h1>
-            <p>Watch, learn, and be inspired — AngelWrites video messages and teachings.</p>
+            <h1><?php echo aw_text('videos.h11', 'Videos', 'line'); ?></h1>
+            <p><?php echo aw_text('videos.p1', 'Watch, learn, and be inspired — AngelWrites video messages and teachings.', 'text'); ?></p>
         </div>
 
         <!-- Search Bar -->
@@ -237,7 +238,7 @@ $pageTitle = 'Videos';
         <?php else: ?>
             <div class="empty-state">
                 <i class="fas fa-video" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
-                <h3>No videos found</h3>
+                <h3><?php echo aw_text('videos.h31', 'No videos found', 'line'); ?></h3>
                 <p><?php echo $search ? 'Try adjusting your search.' : 'Check back soon for new videos from AngelWrites.'; ?></p>
             </div>
         <?php endif; ?>

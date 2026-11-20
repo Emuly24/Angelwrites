@@ -1,6 +1,7 @@
 <?php
 // D2: Stories & Help, the list (PROGRAM_PLAN.md Phase 3). One entry point: "Get help · Offer help".
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/csrf.php';
@@ -34,8 +35,8 @@ echo aw_cp_assets();
 <div class="container">
     <header class="cp-head">
         <div>
-            <p class="cp-eyebrow">Community</p>
-            <h1>Stories &amp; Help</h1>
+            <p class="cp-eyebrow"><?php echo aw_text('stories.p1', 'Community', 'text'); ?></p>
+            <h1><?php echo aw_text('stories.h11', 'Stories & Help', 'line'); ?></h1>
             <p>A gentle place to share what you are carrying, ask, and help one another. No judging, only love, respect and understanding. <a href="<?php echo SITE_URL; ?>/community_guidelines.php">How we look after each other</a>.</p>
         </div>
         <?php if (isLoggedIn()): ?><div class="cp-submit"><a class="cp-btn cp-btn-quiet" href="<?php echo SITE_URL; ?>/my_stories.php">My posts &amp; choices</a><a class="cp-btn" href="<?php echo SITE_URL; ?>/story_write.php"><i class="fas fa-feather" aria-hidden="true"></i> Share something</a></div><?php endif; ?>

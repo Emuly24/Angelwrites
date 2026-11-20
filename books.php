@@ -141,7 +141,7 @@ $pageTitle = 'Books';
                 <div class="empty-state-icon">
                     <i class="fas fa-book"></i>
                 </div>
-                <h3>No Books Found</h3>
+                <h3><?php echo aw_text('books.h31', 'No Books Found', 'line'); ?></h3>
                 <p><?php echo $search ? 'Try adjusting your search terms.' : 'Check back soon for new releases from Angella.'; ?></p>
                 <?php if ($search): ?>
                     <a href="<?php echo SITE_URL; ?>/books.php" class="btn btn-outline">Clear Search</a>
@@ -157,7 +157,7 @@ $pageTitle = 'Books';
         <button type="button" class="modal-close" onclick="closePaymentModal()" aria-label="Close">&times;</button><!-- A1: was a clickable span -->
         <div class="modal-header">
             <i class="fas fa-lock modal-lock-icon"></i>
-            <h3>Order this book</h3>
+            <h3><?php echo aw_text('books.h32', 'Order this book', 'line'); ?></h3>
             <p class="modal-sub">Order <strong id="modalBookTitle"></strong>. Choose how you will pay; you will then be shown where to send the money. The book unlocks once we confirm your payment.</p>
         </div>
         

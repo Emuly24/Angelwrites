@@ -110,7 +110,7 @@ $greet = $h < 12 ? 'Good morning' : ($h < 17 ? 'Good afternoon' : 'Good evening'
 $pageTitle = 'Admin Dashboard';
 require_once '../includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=3">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=4">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">
@@ -121,6 +121,7 @@ require_once '../includes/header.php';
             </div>
             <div class="dsh-hero-actions">
                 <?php if (aw_can('manage_content')): ?><button type="button" class="dsh-pill dsh-pill-solid" onclick="openQuickModal()"><i class="fas fa-plus" aria-hidden="true"></i> Create</button><?php endif; ?>
+                <a class="dsh-pill" href="team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i> Team desk</a>
                 <?php if (aw_can('moderate')): ?><a class="dsh-pill" href="moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i> Moderation</a><?php endif; ?>
                 <a class="dsh-pill" href="<?php echo SITE_URL; ?>/index.php"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> View site</a>
             </div>
@@ -311,7 +312,7 @@ require_once '../includes/header.php';
         </div>
     </div>
 </main>
-<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=1" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=2" defer></script>
 <script>
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
 function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }

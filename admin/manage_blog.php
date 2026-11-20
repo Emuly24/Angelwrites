@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/admin_bulk.php'; // bulk actions: safe deletes, the result shown after the redirect
 require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/mail_helper.php';
 
@@ -25,28 +26,20 @@ if (isset($_GET['delete'])) {
 
 // ===== BULK ACTIONS =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
-    $ids = isset($_POST['selected_ids']) ? explode(',', $_POST['selected_ids']) : [];
-    $action = $_POST['bulk_action'];
-
-    if (!empty($ids) && $action === 'delete') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("DELETE FROM blog_posts WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' blog posts deleted.';
-    } elseif (!empty($ids) && $action === 'publish') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE blog_posts SET status = 'published' WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' blog posts published.';
-    } elseif (!empty($ids) && $action === 'draft') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE blog_posts SET status = 'draft' WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' blog posts moved to draft.';
+    $ids = aw_bulk_ids();
+    $action = (string)$_POST['bulk_action'];
+    if (!$ids) aw_bulk_done('manage_blog', '', 'Select at least one post.');
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    if ($action === 'delete') {
+        [$done, $failed] = aw_bulk_delete($db, 'blog_posts', $ids);
+        aw_bulk_done('manage_blog', aw_bulk_n($done, 'post') . ' deleted.', $failed ? aw_bulk_n($failed, 'post') . ' could not be deleted; please try again.' : '');
+    } elseif ($action === 'publish' || $action === 'draft') {
+        $db->prepare("UPDATE blog_posts SET status = ? WHERE id IN ($in)")->execute(array_merge([$action === 'publish' ? 'published' : 'draft'], $ids));
+        aw_bulk_done('manage_blog', aw_bulk_n(count($ids), 'post') . ($action === 'publish' ? ' published.' : ' moved to draft.'));
     }
-    header('Location: ' . SITE_URL . '/admin/manage_blog.php');
-    exit;
+    aw_bulk_done('manage_blog', '', 'Choose an action.');
 }
+aw_bulk_take('manage_blog', $success, $error);
 
 // ===== FETCH TOTAL POSTS =====
 $count_sql = "SELECT COUNT(*) FROM blog_posts";
@@ -134,7 +127,8 @@ $pageTitle = 'Manage Blog';
                     <form method="POST" id="bulkForm">
                         <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
                         <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
-                        <div class="table-responsive">
+                    </form><!-- the bulk form only carries the choice: it must not wrap the table (row forms inside it were dropped by browsers) -->
+<div class="table-responsive">
                             <table class="admin-table">
                                 <thead>
                                     <tr>
@@ -181,7 +175,7 @@ $pageTitle = 'Manage Blog';
                                 </tbody>
                             </table>
                         </div>
-                    </form>
+                    <!-- end of list -->
 
                     <!-- Pagination -->
                     <?php if ($total_pages > 1): ?>

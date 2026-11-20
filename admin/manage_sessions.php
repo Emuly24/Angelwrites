@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/admin_bulk.php'; // bulk actions: safe deletes, the result shown after the redirect
 require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/csrf.php';
 
@@ -79,30 +80,26 @@ if (isset($_GET['delete']) && validate_csrf_token($_GET['csrf'] ?? '')) {
 
 // ===== BULK ACTIONS =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
-    $ids = isset($_POST['selected_ids']) ? explode(',', $_POST['selected_ids']) : [];
-    $action = $_POST['bulk_action'];
-
-    if (!empty($ids) && $action === 'delete') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("DELETE FROM sessions WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' sessions deleted.';
-    } elseif (!empty($ids) && $action === 'confirm') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE sessions SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        foreach ($ids as $sid) { aw_notify_session_member($db, $sid, 'confirmed'); } // F188
-        $success = count($ids) . ' sessions confirmed.';
-    } elseif (!empty($ids) && $action === 'cancel') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE sessions SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        foreach ($ids as $sid) { aw_notify_session_member($db, $sid, 'cancelled'); } // F188
-        $success = count($ids) . ' sessions cancelled.';
+    $ids = aw_bulk_ids();
+    $action = (string)$_POST['bulk_action'];
+    if (!$ids) aw_bulk_done('manage_sessions', '', 'Select at least one session.');
+    if ($action === 'delete') {
+        [$done, $failed] = aw_bulk_delete($db, 'sessions', $ids);
+        aw_bulk_done('manage_sessions', aw_bulk_n($done, 'session') . ' deleted.', $failed ? aw_bulk_n($failed, 'session') . ' could not be deleted; please try again.' : '');
+    } elseif ($action === 'confirm' || $action === 'cancel') {
+        $new = $action === 'confirm' ? 'confirmed' : 'cancelled';
+        $n = 0;
+        foreach ($ids as $sid) {
+            // only sessions whose status really changes; members are told once (F188)
+            $st = $db->prepare("UPDATE sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> ?");
+            $st->execute([$new, $sid, $new]);
+            if ($st->rowCount() > 0) { $n++; aw_notify_session_member($db, $sid, $new); }
+        }
+        aw_bulk_done('manage_sessions', aw_bulk_n($n, 'session') . ' ' . $new . ($n < count($ids) ? ' (' . (count($ids) - $n) . ' already were).' : '.'));
     }
-    header('Location: ' . SITE_URL . '/admin/manage_sessions.php');
-    exit;
+    aw_bulk_done('manage_sessions', '', 'Choose an action.');
 }
+aw_bulk_take('manage_sessions', $success, $error);
 
 // ===== FETCH TOTAL SESSIONS =====
 $count_sql = "SELECT COUNT(*) FROM sessions s JOIN users u ON s.user_id = u.id WHERE 1=1";
@@ -236,7 +233,8 @@ $pageTitle = 'Manage Sessions';
                     <form method="POST" id="bulkForm">
                         <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
                         <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
-                        <div class="table-responsive">
+                    </form><!-- the bulk form only carries the choice: it must not wrap the table (row forms inside it were dropped by browsers) -->
+<div class="table-responsive">
                             <table class="admin-table">
                                 <thead>
                                     <tr>
@@ -283,7 +281,7 @@ $pageTitle = 'Manage Sessions';
                                 </tbody>
                             </table>
                         </div>
-                    </form>
+                    <!-- end of list -->
 
                     <!-- Pagination -->
                     <?php if ($total_pages > 1): ?>

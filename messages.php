@@ -232,7 +232,7 @@ require_once 'includes/header.php';
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="action" value="team">
                 <label for="msgTeam">Your message</label>
                 <textarea id="msgTeam" name="body" rows="5" maxlength="<?php echo AW_MSG_LIMITS['body']; ?>" required></textarea>
-                <p class="msg-hint">The team reads every message and answers as “AngelWrites Team”. If you are in danger, please call someone now: <?php foreach (aw_cp_crisis_contacts() as [$l, $n]) echo htmlspecialchars($l) . ' <a href="tel:' . htmlspecialchars(preg_replace('/[^0-9+]/', '', $n)) . '">' . htmlspecialchars($n) . '</a> '; ?></p>
+                <p class="msg-hint">The team reads every message and answers as “AngelWrites Team”. If you are in danger, please call someone now: </p><p class="msg-hint aw-cbtns"><?php foreach (aw_cp_crisis_contacts() as [$l, $n]) echo aw_call_button($n, 'Call ' . $l, $l) . ' '; ?></p>
                 <button type="submit" class="msg-btn">Send to the team</button>
             </form>
 

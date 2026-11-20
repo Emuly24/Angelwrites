@@ -20,9 +20,16 @@
   }
   if (calm || !('IntersectionObserver' in window)) { items.forEach(show); }
   else {
-    var io = new IntersectionObserver(function (entries) { entries.forEach(function (en) { if (en.isIntersecting) { show(en.target); io.unobserve(en.target); } }); }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-    items.forEach(function (el) { io.observe(el); });
-    setTimeout(function () { items.forEach(function (el) { if (el.getBoundingClientRect().top < innerHeight) show(el); }); }, 1200); // safety net
+    try {
+      // cards in view now are shown at once; the rest fade in as they scroll into view
+      items.forEach(function (el) { if (el.getBoundingClientRect().top < innerHeight) show(el); });
+      root.classList.add('dsh-anim');
+      var io = new IntersectionObserver(function (entries) { entries.forEach(function (en) { if (en.isIntersecting) { show(en.target); io.unobserve(en.target); } }); }, { threshold: 0 });
+      items.forEach(function (el) { if (!el.classList.contains('is-in')) io.observe(el); });
+      // safety nets: some browsers miss cards in column layouts; nothing stays hidden for long
+      window.addEventListener('scroll', function () { items.forEach(function (el) { var r = el.getBoundingClientRect(); if (r.top < innerHeight && r.bottom > 0) show(el); }); }, { passive: true });
+      setTimeout(function () { items.forEach(show); }, 2500);
+    } catch (e) { root.classList.remove('dsh-anim'); items.forEach(show); }
   }
   if (!calm) root.addEventListener('pointermove', function (e) {
     var c = e.target.closest && e.target.closest('.dsh-card'); if (!c) return;

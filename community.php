@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/views.php'; // one way to count views
@@ -416,13 +417,13 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <div class="empty-state"><p>No answers yet. Be the first to answer!</p></div>
+                        <div class="empty-state"><p><?php echo aw_text('community.p1', 'No answers yet. Be the first to answer!', 'text'); ?></p></div>
                     <?php endif; ?>
 
                     <!-- Answer Form -->
                     <?php if ($user_id): ?>
                         <div class="answer-form-container">
-                            <h4>Write an Answer</h4>
+                            <h4><?php echo aw_text('community.h41', 'Write an Answer', 'line'); ?></h4>
                             <form method="POST" class="answer-form">
                                 <input type="hidden" name="question_id" value="<?php echo $single_question['id']; ?>">
                                 <div class="form-group">
@@ -473,7 +474,7 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                         </div>
                         <div class="ask-form-wrapper" id="askFormWrapper" style="display: none;">
                             <div class="card">
-                                <div class="card-header"><h3>Ask a Question</h3></div>
+                                <div class="card-header"><h3><?php echo aw_text('community.h31', 'Ask a Question', 'line'); ?></h3></div>
                                 <div class="card-body">
                                     <form method="POST" class="ask-form">
                                         <div class="form-group">
@@ -552,8 +553,8 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                     <?php else: ?>
                         <div class="empty-state">
                             <i class="fas fa-comments" style="font-size: 3rem; color: var(--rose); margin-bottom: 16px;"></i>
-                            <h3>No Questions Yet</h3>
-                            <p>Be the first to ask a question and start the conversation!</p>
+                            <h3><?php echo aw_text('community.h32', 'No Questions Yet', 'line'); ?></h3>
+                            <p><?php echo aw_text('community.p2', 'Be the first to ask a question and start the conversation!', 'text'); ?></p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -578,7 +579,7 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
 <div id="reportModal" class="modal" style="display:none;">
     <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
-            <h3>🚩 Report Content</h3>
+            <h3><?php echo aw_text('community.h33', '🚩 Report Content', 'line'); ?></h3>
             <button class="modal-close">&times;</button>
         </div>
         <div class="modal-body">

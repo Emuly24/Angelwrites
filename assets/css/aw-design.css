@@ -983,3 +983,13 @@ html[data-theme="dark"].aw-ui :is(input:not([type]), input[type="text"], input[t
     border-color: var(--border);
 }
 html[data-theme="dark"].aw-ui ::placeholder { color: #a08a8a; }
+
+/* Contact buttons (aw_call_button / aw_mail_button): numbers and addresses are not shown, a tap calls or writes */
+.aw-cbtn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1.5px solid #9c5457; background: #fff; color: #7d3f43; font-weight: 600; font-size: .92rem; text-decoration: none; line-height: 1; transition: background-color .2s, color .2s, transform .2s; vertical-align: middle; }
+.aw-cbtn i { width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 50%; background: #9c5457; color: #fff; font-size: .78rem; margin-left: -8px; }
+.aw-cbtn:hover, .aw-cbtn:focus-visible { background: #9c5457; color: #fff; text-decoration: none; transform: translateY(-1px); }
+.aw-cbtn:hover i, .aw-cbtn:focus-visible i { background: #fff; color: #9c5457; }
+html[data-theme="dark"] .aw-cbtn { background: transparent; border-color: #f0c4c5; color: #f6dede; }
+html[data-theme="dark"] .aw-cbtn i { background: #f0c4c5; color: #2c1e1e; }
+html[data-theme="dark"] .aw-cbtn:hover, html[data-theme="dark"] .aw-cbtn:focus-visible { background: #f0c4c5; color: #2c1e1e; }
+.aw-cbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

@@ -53,9 +53,10 @@ html[data-theme="dark"] .dsh {
 .dsh-hero-strip strong { font-size: 1.05rem; }
 
 /* ---------- reveal on scroll (staggered) ---------- */
-.dsh-reveal { opacity: 0; transform: translateY(18px) scale(.985); transition: opacity .7s cubic-bezier(.2, .8, .2, 1), transform .7s cubic-bezier(.2, .8, .2, 1); transition-delay: calc(var(--i, 0) * 70ms); }
-.dsh-reveal.is-in { opacity: 1; transform: none; }
-.no-js .dsh-reveal { opacity: 1; transform: none; }
+/* Cards are always visible; they only fade in when the dashboard script is running (it adds .dsh-anim
+   to the page), so a slow, blocked or unsupported script can never leave a card invisible. */
+.dsh-reveal { transition: opacity .7s cubic-bezier(.2, .8, .2, 1), transform .7s cubic-bezier(.2, .8, .2, 1); transition-delay: calc(var(--i, 0) * 70ms); }
+.dsh-anim .dsh-reveal:not(.is-in) { opacity: 0; transform: translateY(18px) scale(.985); }
 
 /* ---------- cards ---------- */
 .dsh-card { position: relative; background: var(--d-card); border: 1px solid var(--d-line); border-radius: 22px; padding: 20px 22px; box-shadow: var(--d-shadow); transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s ease, border-color .3s ease; overflow: hidden; }
@@ -79,10 +80,12 @@ html[data-theme="dark"] .dsh {
 .dsh-kpi .dsh-spark { grid-column: 2; grid-row: 1 / 3; align-self: end; width: 110px; height: 40px; }
 .is-up { color: var(--d-up); } .is-down { color: var(--d-down); } .is-flat { color: var(--d-muted); }
 .dsh-kpi .is-up::before { content: '▲ '; font-size: .7em; } .dsh-kpi .is-down::before { content: '▼ '; font-size: .7em; }
-.dsh-spark-line { fill: none; stroke: var(--kc, var(--d-accent)); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
-.dsh-spark-area { fill: var(--kc, var(--d-accent)); opacity: 0; }
-.is-in .dsh-spark-line { animation: dshDraw 1.4s cubic-bezier(.4, 0, .2, 1) forwards; animation-delay: calc(var(--i, 0) * 70ms + .2s); }
-.is-in .dsh-spark-area { animation: dshFade .9s ease forwards; animation-delay: calc(var(--i, 0) * 70ms + .7s); }
+.dsh-spark-line { fill: none; stroke: var(--kc, var(--d-accent)); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100; }
+.dsh-spark-area { fill: var(--kc, var(--d-accent)); opacity: .12; }
+/* drawn in place without the script; animated only while it runs */
+.dsh-anim .dsh-spark-line { stroke-dashoffset: 100; } .dsh-anim .dsh-spark-area { opacity: 0; }
+.dsh-anim .is-in .dsh-spark-line { animation: dshDraw 1.4s cubic-bezier(.4, 0, .2, 1) forwards; animation-delay: calc(var(--i, 0) * 70ms + .2s); }
+.dsh-anim .is-in .dsh-spark-area { animation: dshFade .9s ease forwards; animation-delay: calc(var(--i, 0) * 70ms + .7s); }
 @keyframes dshDraw { to { stroke-dashoffset: 0; } }
 @keyframes dshFade { to { opacity: .12; } }
 
@@ -114,17 +117,18 @@ html[data-theme="dark"] .dsh {
 .dsh-chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .dsh-grid { stroke: var(--d-line); stroke-width: 1; stroke-dasharray: 3 5; }
 .dsh-axis { fill: var(--d-muted); font-size: 11px; font-family: inherit; }
-.dsh-line { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
-.dsh-area { opacity: 0; }
+.dsh-line { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 100; }
+.dsh-area { opacity: .1; }
+.dsh-anim .dsh-line { stroke-dashoffset: 100; } .dsh-anim .dsh-area { opacity: 0; } .dsh-anim .dsh-dot { opacity: 0; }
 .dsh-line.s1, .dsh-dot.s1 { stroke: var(--s1); } .dsh-area.s1 { fill: var(--s1); }
 .dsh-line.s2, .dsh-dot.s2 { stroke: var(--s2); } .dsh-area.s2 { fill: var(--s2); }
 .dsh-line.s3, .dsh-dot.s3 { stroke: var(--s3); } .dsh-area.s3 { fill: var(--s3); }
 .dsh-line.s4, .dsh-dot.s4 { stroke: var(--s4); } .dsh-area.s4 { fill: var(--s4); }
-.dsh-dot { fill: var(--d-card); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; transition: transform .15s ease; }
+.dsh-dot { fill: var(--d-card); stroke-width: 2; transform-box: fill-box; transform-origin: center; transition: transform .15s ease; }
 .dsh-dot:hover { transform: scale(1.6); }
-.is-in .dsh-line { animation: dshDraw 1.8s cubic-bezier(.4, 0, .2, 1) forwards; animation-delay: calc(var(--k, 0) * .25s + .2s); }
-.is-in .dsh-area { animation: dshFadeArea 1.2s ease forwards .9s; }
-.is-in .dsh-dot { animation: dshPop .4s ease forwards 1.7s; }
+.dsh-anim .is-in .dsh-line { animation: dshDraw 1.8s cubic-bezier(.4, 0, .2, 1) forwards; animation-delay: calc(var(--k, 0) * .25s + .2s); }
+.dsh-anim .is-in .dsh-area { animation: dshFadeArea 1.2s ease forwards .9s; }
+.dsh-anim .is-in .dsh-dot { animation: dshPop .4s ease forwards 1.7s; }
 @keyframes dshFadeArea { to { opacity: .1; } }
 @keyframes dshPop { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: scale(1); } }
 .dsh-table { margin-top: 10px; font-size: .86rem; }
@@ -136,8 +140,8 @@ html[data-theme="dark"] .dsh {
 /* ---------- activity feed ---------- */
 .dsh-feed { list-style: none; margin: 0; padding: 0 0 0 6px; position: relative; max-height: 560px; overflow-y: auto; }
 .dsh-feed::before { content: ''; position: absolute; left: 21px; top: 8px; bottom: 8px; width: 2px; background: linear-gradient(var(--d-line), transparent); }
-.dsh-feed li { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 9px 4px 9px 0; opacity: 0; transform: translateX(-8px); transition: opacity .5s ease, transform .5s ease; transition-delay: calc(var(--i, 0) * 50ms + .2s); }
-.is-in .dsh-feed li { opacity: 1; transform: none; }
+.dsh-feed li { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 9px 4px 9px 0; transition: opacity .5s ease, transform .5s ease; transition-delay: calc(var(--i, 0) * 50ms + .2s); }
+.dsh-anim .dsh-reveal:not(.is-in) .dsh-feed li { opacity: 0; transform: translateX(-8px); }
 .dsh-feed .dsh-fico { position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: .78rem; color: #fff; background: var(--tc, var(--d-accent)); box-shadow: 0 0 0 4px var(--d-card); }
 .dsh-feed .t-member { --tc: var(--t-member); } .dsh-feed .t-comment { --tc: var(--t-comment); } .dsh-feed .t-community { --tc: var(--t-community); } .dsh-feed .t-care { --tc: var(--t-care); } .dsh-feed .t-money { --tc: var(--t-money); }
 .dsh-feed .dsh-ftext { font-size: .9rem; line-height: 1.45; min-width: 0; }
@@ -154,8 +158,8 @@ html[data-theme="dark"] .dsh {
 .dsh-rank a:hover { color: var(--d-accent); }
 .dsh-rank .dsh-rn { font-weight: 700; font-variant-numeric: tabular-nums; font-size: .88rem; }
 .dsh-rank .dsh-bar { grid-column: 2 / -1; height: 6px; border-radius: 6px; background: var(--d-line); overflow: hidden; }
-.dsh-rank .dsh-bar span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--d-accent), var(--d-accent-2)); transition: width 1.2s cubic-bezier(.2, .8, .2, 1); transition-delay: calc(var(--i, 0) * 90ms + .3s); }
-.is-in .dsh-rank .dsh-bar span { width: var(--w); }
+.dsh-rank .dsh-bar span { display: block; height: 100%; width: var(--w); border-radius: inherit; background: linear-gradient(90deg, var(--d-accent), var(--d-accent-2)); transition: width 1.2s cubic-bezier(.2, .8, .2, 1); transition-delay: calc(var(--i, 0) * 90ms + .3s); }
+.dsh-anim .dsh-reveal:not(.is-in) .dsh-rank .dsh-bar span { width: 0; }
 .dsh-rank .dsh-kind { grid-column: 2 / -1; font-size: .74rem; color: var(--d-muted); margin-top: -4px; }
 
 /* ---------- simple lists ---------- */

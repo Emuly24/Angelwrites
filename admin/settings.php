@@ -28,7 +28,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
 }
 
 $site_name = $settings['site_name'] ?? 'AngelWrites';
-$admin_email = $settings['admin_email'] ?? 'admin@angelwrites.gt.tc';
+$admin_email = aw_admin_email(); // a placeholder address (no mailbox) shows as the team inbox
 $site_description = $settings['site_description'] ?? 'Writing with purpose, faith, and passion.';
 $logo_path = $settings['logo_path'] ?? '';
 
@@ -56,6 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
         $error = 'Site name is required.';
     } elseif (!filter_var($admin_email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
+    } elseif (aw_email_is_placeholder($admin_email)) {
+        $error = 'That address has no mailbox behind it. Use the inbox the team reads, for example ' . AW_TEAM_EMAIL . '.';
     } else {
         $settings_data = [
             'site_name' => $site_name,

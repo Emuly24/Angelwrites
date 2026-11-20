@@ -5,6 +5,7 @@
 // ============================================================
 
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/site_texts.php'; // page text can be changed on the site
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/reading_groups.php';
@@ -88,7 +89,7 @@ $pageTitle = 'My Reading Groups';
     <div class="container">
         <!-- ===== PAGE HEADER ===== -->
         <div class="page-header">
-            <h1>My Reading Groups</h1>
+            <h1><?php echo aw_text('groups.h11', 'My Reading Groups', 'line'); ?></h1>
             <div class="header-actions">
                 <a href="create_group.php" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Create New Group
@@ -110,8 +111,8 @@ $pageTitle = 'My Reading Groups';
         <?php if (empty($groups)): ?>
             <div class="empty-state">
                 <div class="empty-icon">📖</div>
-                <h2>No groups yet</h2>
-                <p>A reading group lets you read a book, poem or reflection together: share notes, discuss chapters and keep a reading schedule.</p>
+                <h2><?php echo aw_text('groups.h21', 'No groups yet', 'line'); ?></h2>
+                <p><?php echo aw_text('groups.p1', 'A reading group lets you read a book, poem or reflection together: share notes, discuss chapters and keep a reading schedule.', 'text'); ?></p>
                 <p>Start one with friends, join one with an invite code<?php if (!empty($public_groups)): ?>, or join an open group below<?php endif; ?>.</p><!-- Q16 -->
                 <div class="empty-actions">
                     <a href="create_group.php" class="btn btn-primary">Create Your First Group</a>
@@ -230,11 +231,11 @@ $pageTitle = 'My Reading Groups';
 <div id="joinModal" class="modal" style="display:none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h2>🔑 Join a Reading Group</h2>
+            <h2><?php echo aw_text('groups.h22', '🔑 Join a Reading Group', 'line'); ?></h2>
             <button onclick="closeJoinModal()" class="close-btn">&times;</button>
         </div>
         <div class="modal-body">
-            <p>Enter the invite code provided by the group creator.</p>
+            <p><?php echo aw_text('groups.p2', 'Enter the invite code provided by the group creator.', 'text'); ?></p>
             <form method="POST" onsubmit="closeJoinModal()"><!-- F49: called an undefined closeJoinModalAfterSubmit() -->
                 <div class="form-group">
                     <label for="invite_code">Invite Code</label>

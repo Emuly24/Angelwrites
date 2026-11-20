@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/admin_bulk.php'; // bulk actions: safe deletes, the result shown after the redirect
 require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
 require_once '../includes/commerce.php'; // Q21: aw_mwk()
 require_once '../includes/mail_helper.php';
@@ -19,31 +20,32 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit = 10;
 $offset = ($page - 1) * $limit;
 
-// ===== HANDLE DELETE =====
-if (isset($_GET['delete'])) {
-    $id = (int)$_GET['delete'];
-    $stmt = $db->prepare("SELECT cover_path, file_path FROM books WHERE id = ?");
-    $stmt->execute([$id]);
-    $book = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($book) {
-        $doc_root = $_SERVER['DOCUMENT_ROOT'];
-        if (!empty($book['cover_path']) && file_exists($doc_root . '/' . $book['cover_path'])) {
-            @unlink($doc_root . '/' . $book['cover_path']);
-        }
-        if (!empty($book['file_path']) && file_exists($doc_root . '/' . $book['file_path'])) {
-            @unlink($doc_root . '/' . $book['file_path']);
-        }
-        aw_safe_delete($db, 'books', $id); // a book with readers, notes or reading groups used to be refused
-        // a book a member shared: their own list now says it was taken down
-        try {
-            aw_mb_tables($db);
-            $db->prepare("UPDATE member_books SET status = 'removed', review_note = COALESCE(NULLIF(review_note, ''), 'Removed by the team.'), file_path = '', cover_path = '', updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'published'")->execute([$id]);
-        } catch (Throwable $e) { error_log('manage books member book: ' . $e->getMessage()); }
-        $success = 'Book deleted successfully.';
-    } else {
-        $error = 'Book not found.';
+// ===== DELETE (one book, or several with the bulk action) =====
+// The row goes first (aw_safe_delete tidies what points to it); its files are removed only when that
+// worked, so a refused delete no longer leaves a book without its file. Paths are relative to the site.
+function aw_book_delete(PDO $db, $id) {
+    $st = $db->prepare("SELECT cover_path, file_path FROM books WHERE id = ?");
+    $st->execute([(int)$id]);
+    $book = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$book) return false;
+    $r = aw_safe_delete($db, 'books', (int)$id); // a book with readers, notes or reading groups used to be refused
+    if (empty($r['ok'])) { error_log('book delete ' . $id . ': ' . ($r['error'] ?? '')); return false; }
+    $root = dirname(__DIR__);
+    foreach (['cover_path', 'file_path'] as $k) {
+        $rel = ltrim((string)($book[$k] ?? ''), '/');
+        if ($rel !== '' && strpos($rel, 'assets/uploads/') === 0 && is_file($root . '/' . $rel)) @unlink($root . '/' . $rel);
     }
+    // a book a member shared: their own list now says it was taken down
+    try {
+        aw_mb_tables($db);
+        $db->prepare("UPDATE member_books SET status = 'removed', review_note = COALESCE(NULLIF(review_note, ''), 'Removed by the team.'), file_path = '', cover_path = '', updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND status = 'published'")->execute([(int)$id]);
+    } catch (Throwable $e) { error_log('manage books member book: ' . $e->getMessage()); }
+    if (function_exists('aw_audit')) aw_audit('book_delete', 'book', (int)$id, '');
+    return true;
+}
+if (isset($_GET['delete'])) {
+    $ok = aw_book_delete($db, (int)$_GET['delete']);
+    $_SESSION['aw_books_flash'] = $ok ? ['ok', 'The book was deleted.'] : ['error', 'That book could not be deleted (it may already be gone).'];
     header('Location: ' . SITE_URL . '/admin/manage_books.php');
     exit;
 }
@@ -78,6 +80,19 @@ foreach (['book_file'] as $aw_f) {
         $aw_upload_error = 'The file "' . $_FILES[$aw_f]['name'] . '" is larger than this host accepts (' . $aw_upload_limit_mb . ' MB). Nothing was saved.';
     }
 }
+
+// ===== BULK ACTIONS (the list offered "Delete selected" but nothing handled it) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
+    $aw_ids = aw_bulk_ids();
+    if (!$aw_ids) aw_bulk_done('manage_books', '', 'Select at least one book.');
+    if ((string)$_POST['bulk_action'] === 'delete') {
+        $aw_done = 0; $aw_failed = 0;
+        foreach ($aw_ids as $aw_id) { if (aw_book_delete($db, $aw_id)) $aw_done++; else $aw_failed++; }
+        aw_bulk_done('manage_books', aw_bulk_n($aw_done, 'book') . ' deleted.', $aw_failed ? aw_bulk_n($aw_failed, 'book') . ' could not be deleted; please try again.' : '');
+    }
+    aw_bulk_done('manage_books', '', 'Choose an action.');
+}
+aw_bulk_take('manage_books', $success, $error);
 
 // ===== MISSING COVERS (books saved before covers were made automatically) =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['make_covers'])) {
@@ -181,6 +196,11 @@ if ($aw_upload_error !== '') {
                 $body .= "<p><strong>Author:</strong> " . $author . "</p>";
                 $body .= "<p><a href='" . SITE_URL . "/admin/manage_books.php'>View all books</a></p>";
                 sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
+            }
+            // Downloads: Angella's choice for her own books; a member's book keeps its author's choice
+            if (!empty($aw_book_id) && isset($_POST['allow_download']) && empty($edit_book['submitted_by'])) {
+                aw_mb_tables($db); // the allow_download column
+                $db->prepare("UPDATE books SET allow_download = ? WHERE id = ?")->execute([$_POST['allow_download'] === '1' ? 1 : 0, $aw_book_id]);
             }
             // The automatic cover: made when there is none, and renewed (only when it is an automatic
             // one) after the title, author or file changed, or when "Make a fresh cover" was ticked.
@@ -352,6 +372,18 @@ $pageTitle = 'Manage Books';
                             </div>
                         </div>
 
+                        <!-- Downloads: the author's decision (member books keep what their author chose) -->
+                        <?php $aw_dl_member = $edit_book && !empty($edit_book['submitted_by']); $aw_dl_on = $edit_book && !empty($edit_book['allow_download']); ?>
+                        <fieldset class="form-group aw-dl-choice">
+                            <legend>Downloads</legend>
+                            <?php if ($aw_dl_member): ?>
+                                <p class="aw-dl-note"><i class="fas fa-user-pen" aria-hidden="true"></i> A member shared this book. <?php echo $aw_dl_on ? 'Its author lets readers download it.' : 'It is read on AngelWrites only.'; ?> Only the author can change this, in their "Books you have shared".</p>
+                            <?php else: ?>
+                                <label><input type="radio" name="allow_download" value="0"<?php echo !$aw_dl_on ? ' checked' : ''; ?>> <span><strong>Read on AngelWrites only</strong> (the file is never sent)</span></label>
+                                <label><input type="radio" name="allow_download" value="1"<?php echo $aw_dl_on ? ' checked' : ''; ?>> <span><strong>Readers may download it</strong>: only for a book Angella wrote or holds the rights to. Signed-in readers who may read it (free, or bought) get a Download button.</span></label>
+                            <?php endif; ?>
+                        </fieldset>
+
                         <!-- Book File Upload -->
                         <div class="form-group">
                             <label for="book_file">Book file (PDF, EPUB, DOCX, ODT, RTF or TXT)</label>
@@ -405,7 +437,8 @@ $pageTitle = 'Manage Books';
                         <form method="POST" id="bulkForm">
                             <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
                             <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
-                            <div class="table-responsive">
+                    </form><!-- the bulk form only carries the choice: it must not wrap the table (row forms inside it were dropped by browsers) -->
+<div class="table-responsive">
                                 <table class="admin-table">
                                     <thead>
                                         <tr>
@@ -483,7 +516,7 @@ $pageTitle = 'Manage Books';
                                     </tbody>
                                 </table>
                             </div>
-                        </form>
+                        <!-- end of list -->
 
                         <!-- ===== PAGINATION ===== -->
                         <?php if ($total_pages > 1): ?>
@@ -718,6 +751,11 @@ document.addEventListener('DOMContentLoaded', function() {
 .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.9rem; }
 .admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
 .admin-table .check-col { width: 40px; }
+.aw-dl-choice { border: 1px solid var(--border); border-radius: 16px; padding: 12px 16px; }
+.aw-dl-choice legend { font-weight: 600; padding: 0 6px; }
+.aw-dl-choice label { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; line-height: 1.5; cursor: pointer; }
+.aw-dl-choice input { margin-top: 4px; accent-color: #9c5457; width: 18px; height: 18px; flex: none; }
+.aw-dl-note { margin: 0; line-height: 1.5; }
 .aw-autocover-label { display: block; font-weight: 600; margin-bottom: 6px; }
 .aw-autocover-box { display: flex; gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--fantasy); }
 .aw-autocover-box img { width: 72px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 12px rgba(44,30,30,.18); flex: none; }
