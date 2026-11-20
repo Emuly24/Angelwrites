@@ -79,7 +79,7 @@ FOOTER – Brand, Links, Social
         <div class="footer-bottom">
             <p>
                 &copy; <?php echo date('Y'); ?> <?php echo SITE_NAME; ?>. All rights reserved.
-                <span class="footer-heart">Made with <i class="fas fa-heart" style="color: var(--rose);"></i> in Malawi.</span>
+                <span class="footer-heart">Made with <i class="fas fa-heart" aria-hidden="true" style="color: #f0a8ab;"></i> in Malawi, for readers everywhere.</span>
             </p>
             
             <!-- ===== ADDED: Terms & Privacy Links ===== -->

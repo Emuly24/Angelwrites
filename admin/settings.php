@@ -101,6 +101,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_upload_quota']))
 }
 if (!empty($_SESSION['aw_quota_flash'])) { $aw_quota_msg = ['ok' => true, 'msg' => $_SESSION['aw_quota_flash']]; unset($_SESSION['aw_quota_flash']); }
 
+// ===== Prices: an approximate US dollar amount beside MWK, for readers outside Malawi =====
+$aw_usd_msg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_usd_rate'])) {
+    $aw_rate = trim(str_replace(',', '', (string)($_POST['usd_rate'] ?? '')));
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
+        $aw_usd_msg = ['ok' => false, 'msg' => 'Your session expired. Please reload the page and try again.'];
+    } elseif ($aw_rate !== '' && (!is_numeric($aw_rate) || (float)$aw_rate <= 0 || (float)$aw_rate > 1000000)) {
+        $aw_usd_msg = ['ok' => false, 'msg' => 'Enter how many Malawi Kwacha make one US dollar (for example 1750), or leave it empty.'];
+    } else {
+        $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")->execute(['usd_rate', $aw_rate === '' ? '0' : (string)(float)$aw_rate]);
+        if (function_exists('aw_audit')) aw_audit('settings_changed', 'settings', null, 'usd_rate ' . ($aw_rate === '' ? 'cleared' : $aw_rate));
+        $_SESSION['aw_usd_flash'] = $aw_rate === '' ? 'Saved. Prices show in MWK only.' : 'Saved. Prices now show an approximate US dollar amount beside MWK.';
+        header('Location: ' . SITE_URL . '/admin/settings.php#prices');
+        exit;
+    }
+}
+if (!empty($_SESSION['aw_usd_flash'])) { $aw_usd_msg = ['ok' => true, 'msg' => $_SESSION['aw_usd_flash']]; unset($_SESSION['aw_usd_flash']); }
+
 // ===== Link previews: the address of the free preview relay (tools/share-relay/README.md) =====
 $aw_share_msg = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_share_base'])) {
@@ -399,6 +417,18 @@ $pageTitle = 'Site Settings';
                         <div class="form-actions">
                             <button type="submit" name="send_test_email" value="1" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send test email</button>
                         </div>
+                    </form>
+
+                    <h3 id="prices" style="margin:28px 0 10px;">Prices for readers abroad</h3>
+                    <?php if ($aw_usd_msg): ?><div class="alert <?php echo $aw_usd_msg['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_usd_msg['msg']); ?></div><?php endif; ?>
+                    <p style="color:var(--text-light);margin:0 0 12px;">Prices are charged in Malawi Kwacha. To help readers in other countries, an approximate US dollar amount can be shown beside each price. Enter today's rate (how many MWK make one US dollar) and update it now and then. Leave it empty to show MWK only.</p>
+                    <form method="POST" class="admin-form" action="<?php echo SITE_URL; ?>/admin/settings.php#prices">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <div class="form-group">
+                            <label for="usd_rate">MWK for one US dollar</label>
+                            <input type="text" inputmode="decimal" id="usd_rate" name="usd_rate" placeholder="e.g. 1750" value="<?php $aw_r = (float)aw_setting('usd_rate', '0'); echo $aw_r > 0 ? htmlspecialchars((string)$aw_r) : ''; ?>">
+                        </div>
+                        <button type="submit" name="save_usd_rate" value="1" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
                     </form>
 
                     <h3 id="link-previews" style="margin:28px 0 10px;">Link previews (WhatsApp, Telegram, X…)</h3>

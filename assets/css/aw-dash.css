@@ -33,9 +33,9 @@ html[data-theme="dark"] .dsh {
 
 /* ---------- hero: a slowly moving glow behind frosted glass ---------- */
 .dsh-hero { position: relative; overflow: hidden; isolation: isolate; border-radius: 28px; padding: 34px 34px 30px; margin-bottom: 22px; color: #fff;
-    background: linear-gradient(120deg, #6e2f3c, #9c5457 38%, #c48f91 70%, #e6b8a2); background-size: 220% 220%; animation: dshShift 18s ease-in-out infinite alternate; box-shadow: var(--d-shadow-hi); }
+    background: linear-gradient(120deg, #5c2632, #84414a 38%, #9c5457 70%, #a8676a); background-size: 220% 220%; animation: dshShift 18s ease-in-out infinite alternate; box-shadow: var(--d-shadow-hi); }
 .dsh-hero::before, .dsh-hero::after { content: ''; position: absolute; z-index: -1; border-radius: 50%; filter: blur(46px); opacity: .55; }
-.dsh-hero::before { width: 380px; height: 380px; right: -80px; top: -140px; background: #ffd6c9; animation: dshFloat 14s ease-in-out infinite alternate; }
+.dsh-hero::before { width: 380px; height: 380px; right: -80px; top: -140px; background: #c97a7f; animation: dshFloat 14s ease-in-out infinite alternate; }
 .dsh-hero::after { width: 300px; height: 300px; left: 30%; bottom: -170px; background: #7d4f9e; opacity: .35; animation: dshFloat 17s ease-in-out infinite alternate-reverse; }
 @keyframes dshShift { from { background-position: 0% 40%; } to { background-position: 100% 60%; } }
 @keyframes dshFloat { from { transform: translate(0, 0) scale(1); } to { transform: translate(-40px, 30px) scale(1.12); } }
@@ -232,3 +232,25 @@ html[data-theme="dark"] .dsh {
     .dsh-card, .dsh-tile, .dsh-book-cover, .dsh-pill { transition: none !important; }
     .dsh-card:hover, .dsh-tile:hover, .dsh-book:hover .dsh-book-cover { transform: none !important; }
 }
+
+/* ===== No empty gaps between cards =====
+   Cards used to sit in rows stretched to the tallest card, which left tall empty cards and lone cards
+   on a new row. They now flow into columns like a masonry wall: each card is as tall as its content
+   and the next one follows straight below it. Pairs side by side (chart and live feed; where you
+   left off and the verse) share one height, and a long feed scrolls inside its card. */
+.dsh-row-3, .dsh-tools { display: block; columns: 4 270px; column-gap: 16px; }
+.dsh-row-3 > *, .dsh-tools > * { break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; width: 100%; margin: 0 0 16px; }
+.dsh-row-3 > .dsh-card, .dsh-tools > .dsh-card { height: auto; }
+.dsh-row-2 { align-items: stretch; }
+.dsh-row-2 > * { min-width: 0; }
+.dsh-row-2 .dsh-feed { max-height: 420px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+@media (max-width: 600px) { .dsh-row-3, .dsh-tools { columns: 1; } }
+
+/* readable on the banner and on the coloured feed circles in every theme */
+.dsh-hero { text-shadow: 0 1px 2px rgba(40, 16, 22, .25); }
+.dsh-pill { border-color: rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .2); }
+html[data-theme="dark"] .dsh-feed .dsh-fico { color: #1d1314; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not([data-theme="dark"]) .dsh-feed .dsh-fico { color: #1d1314; } }
+.dsh-pill { background: rgba(40, 12, 20, .26); }
+.dsh-card h2 .dsh-ico { color: #8a4448; }
+html[data-theme="dark"] .dsh-card h2 .dsh-ico { color: #f0c4c5; }

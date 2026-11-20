@@ -324,7 +324,7 @@ $pageTitle = 'My Profile';
                     
                     <div class="form-group">
                         <label for="contact_number">Contact Number</label>
-                        <input type="text" id="contact_number" name="contact_number" value="<?php echo htmlspecialchars($user['contact_number'] ?? ''); ?>" placeholder="e.g. +265 999 123 456">
+                        <input type="text" id="contact_number" name="contact_number" value="<?php echo htmlspecialchars($user['contact_number'] ?? ''); ?>" placeholder="with your country code, e.g. +44 20 7946 0000">
                     </div>
                     
                     <div class="form-group">

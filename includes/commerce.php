@@ -21,6 +21,21 @@ function aw_mwk($amount) {
     return 'MWK ' . number_format($a, floor($a) == $a ? 0 : 2);
 }
 
+// Readers come from everywhere: prices stay in MWK (the price actually charged), with an approximate
+// US dollar amount beside them once the admin sets the rate (Admin > Settings > Prices). No rate is
+// guessed: with none set, only MWK is shown.
+function aw_usd_rate() {
+    $r = function_exists('aw_setting') ? (float)aw_setting('usd_rate', '0') : 0;
+    return $r > 0 ? $r : 0;
+}
+function aw_usd_note($mwk) {
+    $r = aw_usd_rate();
+    $mwk = (float)$mwk;
+    if (!$r || $mwk <= 0) return '';
+    $u = $mwk / $r;
+    return '≈ US$' . number_format($u, $u < 100 ? 2 : 0);
+}
+
 // F35: the price a member is charged for a book, from the database (never from the browser).
 // F79: the sale price while the book is on sale.
 function aw_book_price(array $book) {

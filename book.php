@@ -207,6 +207,9 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                         <?php else: ?>
                             <span class="regular-price"><?php echo aw_mwk($book['price']); ?></span>
                         <?php endif; ?>
+                        <?php if (empty($book['is_free']) && (float)$book['price'] > 0 && ($aw_usd = aw_usd_note(aw_book_price($book))) !== ''): ?>
+                            <small class="book-usd"><?php echo $aw_usd; ?></small>
+                        <?php endif; ?>
                     </div>
 
                     <div class="action-buttons">
@@ -543,7 +546,7 @@ p { line-height:1.6; }
 .book-cover-card { position:relative; aspect-ratio:2 / 3; border-radius:5px 12px 12px 5px; overflow:hidden; box-shadow:0 2px 4px rgba(44,30,30,.10), 0 22px 50px rgba(44,30,30,.24); background:none; border:0; padding:0; }
 .book-cover-card::after { content:''; position:absolute; inset:0; pointer-events:none; z-index:2; background:linear-gradient(90deg, rgba(0,0,0,.18) 0, rgba(255,255,255,.18) 2.5%, rgba(0,0,0,0) 6%); }
 .cover-image { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:0; z-index:1; }
-.placeholder-cover { position:absolute; inset:0; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:24px; text-align:center; border-radius:0; background:linear-gradient(160deg, #e9c9c9 0%, #c48f91 100%); color:#fff; font-size:1rem; }
+.placeholder-cover { position:absolute; inset:0; height:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:24px; text-align:center; border-radius:0; background:linear-gradient(160deg, #a8676a 0%, #6e3a40 100%); color:#fff; font-size:1rem; }
 .placeholder-cover span { font-family:'Playfair Display', Georgia, serif; font-size:1.5rem; line-height:1.3; font-weight:600; }
 .placeholder-cover small { font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; opacity:.9; }
 html[data-theme="dark"] .book-cover-card { box-shadow:0 22px 50px rgba(0,0,0,.6); }

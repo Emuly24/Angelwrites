@@ -103,6 +103,7 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" /><!-- R13: easy-to-read font -->
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-icons.css?v=1" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/book-reader.css?v=3" />
 <?php echo aw_save_assets(); ?><!-- the reader's look: a quiet, page-first design -->

@@ -50,14 +50,17 @@ if ($isLoggedIn) {
     <script>
     // D8: apply the saved theme before the page paints, so dark mode no longer flashes light first.
     (function () { try {
-        var t = localStorage.getItem('angelwrites_theme');
-        var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var t = localStorage.getItem('angelwrites_theme') || 'system'; // new visitors follow their device
+        var dark = t === 'dark' || (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     } catch (e) {} })();
     </script>
     <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' : ''; ?><?php echo htmlspecialchars(aw_site_name()); /* F191 */ ?></title>
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-icons.css?v=1"><!-- the site's own pen, reflections and community icons -->
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-theme.css?v=1"><!-- readable brand colours in every theme, brand form fields -->
+    <script src="<?php echo SITE_URL; ?>/assets/js/aw-guard.js?v=1" defer></script><!-- no text or symbol disappears when the theme changes -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     
@@ -273,7 +276,14 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                         </div>
                     </div>
                 <?php endif; ?>
-                <button type="button" class="awh-icon theme-toggle" id="themeToggle" aria-label="Change theme (light, dark or your device's setting)" title="Theme"><i class="fas fa-moon"></i></button>
+                <div class="awh-wrap">
+                    <button type="button" class="awh-icon theme-toggle" id="themeToggle" aria-label="Theme: light, dark or your device's setting" title="Theme" aria-haspopup="true" aria-expanded="false" aria-controls="awhTheme" onclick="awToggleMenu(this, 'awhTheme')"><i class="fas fa-circle-half-stroke"></i></button>
+                    <div class="awh-menu awh-theme" id="awhTheme" role="group" aria-label="Theme">
+                        <button type="button" data-theme-choice="light" aria-pressed="false"><i class="fas fa-sun" aria-hidden="true"></i><span>Light</span></button>
+                        <button type="button" data-theme-choice="dark" aria-pressed="false"><i class="fas fa-moon" aria-hidden="true"></i><span>Dark</span></button>
+                        <button type="button" data-theme-choice="system" aria-pressed="false"><i class="fas fa-circle-half-stroke" aria-hidden="true"></i><span>Follow my device</span></button>
+                    </div>
+                </div>
                 <?php if ($isLoggedIn): ?>
                     <div class="awh-wrap awh-hide-md">
                         <button type="button" class="awh-me" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" onclick="awToggleMenu(this, 'userDropdown')">
@@ -441,9 +451,10 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
         header.addEventListener('focusin', function () { header.classList.remove('is-away'); });
 
         // ----- theme: light, dark, or the device's setting -----
-        var themeToggle = document.getElementById('themeToggle'), html = document.documentElement, themes = ['light', 'dark', 'system'], idx = 0;
+        var themeToggle = document.getElementById('themeToggle'), html = document.documentElement, themes = ['light', 'dark', 'system'], idx = 2;
         try { var st = localStorage.getItem('angelwrites_theme'); if (st && themes.indexOf(st) > -1) idx = themes.indexOf(st); } catch (e) {}
         function applyTheme(theme) {
+            document.querySelectorAll('[data-theme-choice]').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-theme-choice') === theme ? 'true' : 'false'); });
             html.setAttribute('data-theme', theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme);
             document.cookie = 'theme=' + theme + '; path=/; max-age=' + (365 * 24 * 60 * 60);
             try { localStorage.setItem('angelwrites_theme', theme); } catch (e) {}
@@ -451,7 +462,10 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
             if (i) i.className = theme === 'dark' ? 'fas fa-sun' : (theme === 'light' ? 'fas fa-moon' : 'fas fa-circle-half-stroke');
         }
         applyTheme(themes[idx]);
-        if (themeToggle) themeToggle.addEventListener('click', function () { idx = (idx + 1) % themes.length; applyTheme(themes[idx]); });
+        // the theme button opens a small menu: Light, Dark, Follow my device
+        document.querySelectorAll('[data-theme-choice]').forEach(function (b) {
+            b.addEventListener('click', function () { applyTheme(b.getAttribute('data-theme-choice')); awCloseMenu('awhTheme'); if (themeToggle) themeToggle.focus(); });
+        });
         if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
             try { if (localStorage.getItem('angelwrites_theme') === 'system') html.setAttribute('data-theme', e.matches ? 'dark' : 'light'); } catch (er) {}
         });

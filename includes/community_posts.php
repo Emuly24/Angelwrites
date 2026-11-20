@@ -669,6 +669,8 @@ function aw_cp_crisis_block($compact = false) {
     return '<aside class="cp-crisis' . ($compact ? ' cp-crisis-compact' : '') . '" role="note" aria-label="If you need help now">'
         . '<p class="cp-crisis-lead"><i class="fas fa-hand-holding-heart" aria-hidden="true"></i> <strong>If you are in danger or thinking of harming yourself, please reach someone now.</strong> This community is here to listen, but it is not an emergency service.</p>'
         . ($items !== '' ? '<ul class="cp-crisis-list">' . $items . '</ul>' : '')
+        // readers are all over the world: a free, confidential helpline in their own country
+        . '<p class="cp-crisis-world"><i class="fas fa-earth-africa" aria-hidden="true"></i> Anywhere in the world: find a free, confidential helpline in your country at <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>, or call your local emergency number.</p>'
         . '<p class="cp-crisis-more"><a href="' . $u . '/story_write.php?type=help&amp;visibility=team&amp;pray=1">Ask the team to pray with me</a> · <a href="' . $u . '/book_session.php">Book a free one-to-one</a></p>'
         . '</aside>';
 }
