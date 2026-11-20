@@ -240,6 +240,8 @@ require_once 'includes/header.php';
         <a href="<?php echo SITE_URL; ?>/prayer.php"><i class="fas fa-hands-praying" aria-hidden="true"></i> Prayer wall</a>
         <a href="<?php echo SITE_URL; ?>/plans.php"><i class="fas fa-sun" aria-hidden="true"></i> Devotionals</a>
         <a href="<?php echo SITE_URL; ?>/mentoring.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i> Mentoring</a>
+        <a href="<?php echo SITE_URL; ?>/prompts.php"><i class="fas fa-feather-pointed" aria-hidden="true"></i> Writing prompts</a>
+        <a href="<?php echo SITE_URL; ?>/events.php"><i class="fas fa-calendar-days" aria-hidden="true"></i> Events</a>
         <a href="<?php echo SITE_URL; ?>/books.php"><i class="fas fa-book" aria-hidden="true"></i> Books</a>
         <a href="<?php echo SITE_URL; ?>/poetry.php"><i class="fas fa-feather" aria-hidden="true"></i> Poetry</a>
         <a href="<?php echo SITE_URL; ?>/reflections.php"><i class="fas fa-dove" aria-hidden="true"></i> Reflections</a>

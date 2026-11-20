@@ -260,6 +260,8 @@ require_once '../includes/header.php';
             <a class="dsh-tile" href="manage_videos.php"><i class="fas fa-video" aria-hidden="true"></i>Videos</a>
             <a class="dsh-tile" href="site_texts.php"><i class="fas fa-font" aria-hidden="true"></i>Page text</a>
             <a class="dsh-tile" href="devotionals.php"><i class="fas fa-sun" aria-hidden="true"></i>Devotionals</a>
+            <a class="dsh-tile" href="prompts.php"><i class="fas fa-feather-pointed" aria-hidden="true"></i>Writing prompts</a>
+            <a class="dsh-tile" href="events.php"><i class="fas fa-calendar-days" aria-hidden="true"></i>Events</a>
             <?php if (aw_can('manage_members')): ?><a class="dsh-tile" href="mentoring.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i>Mentoring</a><?php endif; ?>
         </div></section>
         <section class="dsh-card dsh-reveal" style="--i:3"><h3>Community &amp; care</h3><div class="dsh-tiles">
