@@ -70,6 +70,12 @@ function aw_nl_inline($html) {
         'h3' => "margin:24px 0 10px;font:700 19px/1.35 $serif;color:{$c['ink']};",
         'h4' => "margin:20px 0 8px;font:700 16px/1.4 $sans;color:{$c['rose']};text-transform:uppercase;letter-spacing:1px;",
         'a' => "color:{$c['rose']};text-decoration:underline;",
+        // emphasis in the brand colour: bold words, italics and highlighted text
+        'strong' => "color:{$c['rose']};font-weight:700;",
+        'b' => "color:{$c['rose']};font-weight:700;",
+        'em' => "color:{$c['rose']};font-style:italic;",
+        'i' => "color:{$c['rose']};font-style:italic;",
+        'mark' => "background:{$c['blush']};color:{$c['rose']};padding:0 3px;border-radius:3px;",
         'ul' => "margin:0 0 18px;padding-left:22px;font:17px/1.7 $sans;color:{$c['ink']};",
         'ol' => "margin:0 0 18px;padding-left:22px;font:17px/1.7 $sans;color:{$c['ink']};",
         'li' => "margin:0 0 6px;",
@@ -85,6 +91,7 @@ function aw_nl_inline($html) {
         'aw-btn' => "display:inline-block;background:{$c['rose']};color:#FFFFFF;text-decoration:none;font:700 16px/1 $sans;padding:15px 30px;border-radius:999px;",
         'aw-callout' => "margin:24px 0;padding:20px 22px;background:{$c['blush']};border:1px solid {$c['line']};border-radius:14px;font:16px/1.65 $sans;color:{$c['ink']};",
         'aw-verse-ref' => "display:block;margin-top:8px;font:700 13px/1.4 $sans;color:{$c['rose']};font-style:normal;letter-spacing:.5px;",
+        'aw-name' => "color:{$c['rose']};font-weight:700;", // the reader's name, filled in for each person
         'aw-quote-ref' => "display:block;margin-top:8px;font:700 13px/1.4 $sans;color:{$c['rose']};font-style:normal;",
     ];
     if (trim((string)$html) === '' || !class_exists('DOMDocument')) return (string)$html;
@@ -98,6 +105,12 @@ function aw_nl_inline($html) {
         $tag = strtolower($el->nodeName);
         $classes = preg_split('/\s+/', (string)$el->getAttribute('class'));
         $add = $rules[$tag] ?? '';
+        // inside a button the text stays white
+        if (in_array($tag, ['strong', 'b', 'em', 'i', 'mark', 'span'], true)) {
+            for ($up = $el->parentNode; $up instanceof DOMElement; $up = $up->parentNode) {
+                if (strpos((string)$up->getAttribute('class'), 'aw-btn') !== false) continue 2;
+            }
+        }
         foreach ($classes as $cl) if (isset($byClass[$cl])) $add .= $byClass[$cl];
         // a paragraph that only holds a button is centred
         if ($tag === 'p' && $el->childNodes->length === 1 && $el->firstChild instanceof DOMElement && strpos((string)$el->firstChild->getAttribute('class'), 'aw-btn') !== false) $add .= 'text-align:center;margin:26px 0;';
@@ -119,7 +132,7 @@ function aw_nl_layout(array $o) {
     $e = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
     $site = function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites';
     $base = rtrim(SITE_URL, '/');
-    $logo = $base . '/' . ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/');
+    $logo = $base . '/' . (function_exists('aw_nl_logo_rel') ? aw_nl_logo_rel() : ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/'));
     $serif = "Georgia,'Times New Roman',serif"; $sans = "'Helvetica Neue',Helvetica,Arial,sans-serif";
     $pre = trim((string)($o['preheader'] ?? ''));
     $h = '<!doctype html><html lang="en" xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -139,11 +152,14 @@ function aw_nl_layout(array $o) {
     // the card
     $h .= '<tr><td class="nl-card" style="background:' . $c['card'] . ';border-radius:22px;overflow:hidden;border:1px solid ' . $c['line'] . ';">'
         . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
-        // header
-        . '<tr><td align="center" style="background:' . $c['blush'] . ';background-image:linear-gradient(135deg,#F9EDEC 0%,#F1DCDB 100%);padding:34px 28px 26px;border-bottom:1px solid ' . $c['line'] . ';">'
-        . '<a href="' . $e($base) . '" style="text-decoration:none;"><img src="' . $e($logo) . '" width="132" alt="' . $e($site) . '" style="display:block;width:132px;max-width:132px;height:auto;border:0;margin:0 auto;"></a>'
-        . '<div style="margin-top:14px;font:700 11px/1 ' . $sans . ';letter-spacing:4px;text-transform:uppercase;color:' . $c['rose'] . ';">The ' . $e($site) . ' Letter</div>'
-        . (!empty($o['issue']) ? '<div style="margin-top:8px;font:12px/1 ' . $sans . ';color:' . $c['soft'] . ';letter-spacing:.5px;">' . $e($o['issue']) . '</div>' : '')
+        // header: one slim row, the small logo on the left and the letter's name and issue on the right
+        . '<tr><td style="background:' . $c['blush'] . ';background-image:linear-gradient(135deg,#F9EDEC 0%,#F1DCDB 100%);padding:10px 24px;border-bottom:1px solid ' . $c['line'] . ';">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        . '<td style="vertical-align:middle;"><a href="' . $e($base) . '" style="text-decoration:none;"><img src="' . $e($logo) . '" height="36" alt="' . $e($site) . '" style="display:block;height:36px;width:auto;max-width:150px;border:0;"></a></td>'
+        . '<td align="right" style="vertical-align:middle;padding-left:12px;">'
+        . '<div style="font:700 10px/1.3 ' . $sans . ';letter-spacing:3px;text-transform:uppercase;color:' . $c['rose'] . ';">The ' . $e($site) . ' Letter</div>'
+        . (!empty($o['issue']) ? '<div style="margin-top:3px;font:11px/1.3 ' . $sans . ';color:' . $c['soft'] . ';letter-spacing:.3px;">' . $e($o['issue']) . '</div>' : '')
+        . '</td></tr></table>'
         . '</td></tr>'
         // title
         . '<tr><td class="nl-pad" style="padding:38px 46px 6px;">'
