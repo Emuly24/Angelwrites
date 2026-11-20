@@ -114,6 +114,27 @@ $cover_path = $book['cover_path'] ? SITE_URL . '/' . $book['cover_path'] : '';
 <body>
 <div id="reader-app">
     <div id="awPageAnnounce" class="aw-sr-only" aria-live="polite" aria-atomic="true"></div><!-- R12 -->
+    <?php // book clubs this member belongs to that are reading this book: their goal, at a glance (includes/book_club.php)
+    require_once __DIR__ . '/../includes/book_club.php';
+    $aw_clubs = !empty($_SESSION['user_id']) ? array_values(array_filter(aw_club_for_book($db, (int)$_SESSION['user_id'], (int)$book_id), function ($c) { return !empty($c['goal']); })) : [];
+    if ($aw_clubs): $aw_c = $aw_clubs[0]; ?>
+    <div class="aw-club-strip" id="awClubStrip" role="status">
+        <i class="fas fa-book-open-reader" aria-hidden="true"></i>
+        <span><strong><?php echo htmlspecialchars($aw_c['name']); ?>:</strong> read to <?php echo htmlspecialchars(aw_club_chapter_title($db, (int)$book_id, (int)$aw_c['goal']['chapter_index'])); ?> <?php echo htmlspecialchars(aw_club_when($aw_c['goal'])); ?> · <?php echo (int)$aw_c['there']; ?> of <?php echo (int)$aw_c['members']; ?> there</span>
+        <a href="<?php echo SITE_URL; ?>/group.php?id=<?php echo (int)$aw_c['id']; ?>&amp;chapter=<?php echo (int)$aw_c['goal']['chapter_index']; ?>#tab-discussions">Discuss</a>
+        <button type="button" aria-label="Hide" onclick="this.parentNode.remove();try{sessionStorage.setItem('awClubHide<?php echo (int)$book_id; ?>','1')}catch(e){}">&times;</button>
+    </div>
+    <script>try{if(sessionStorage.getItem('awClubHide<?php echo (int)$book_id; ?>'))document.getElementById('awClubStrip').remove();}catch(e){}</script>
+    <style>
+    .aw-club-strip { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); padding: 8px 8px 8px 14px; border-radius: 999px;
+        background: #3b2b4f; color: #fff; font: 500 .86rem/1.3 Inter, system-ui, sans-serif; box-shadow: 0 10px 26px rgba(30, 18, 30, .3); animation: awClubIn .5s ease both; }
+    .aw-club-strip i { color: #ffe2b0; } .aw-club-strip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .aw-club-strip a { color: #3b2b4f; background: #ffe2b0; border-radius: 999px; padding: 6px 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+    .aw-club-strip button { width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-size: 1.1rem; cursor: pointer; }
+    @keyframes awClubIn { from { opacity: 0; transform: translate(-50%, -8px); } }
+    @media (max-width: 560px) { .aw-club-strip { top: 58px; font-size: .8rem; } }
+    </style>
+    <?php endif; ?>
     <!-- Top bar: back, contents, title, then Aa (themes & settings), search, bookmark and the "…" menu.
          It fades away while you read; tap the page to bring it back. -->
     <div id="toolbar">

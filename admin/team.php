@@ -128,6 +128,8 @@ if (aw_can('manage_content')) {
 }
 if (aw_can('manage_members')) {
     $td_add(aw_dsh_q($db, "SELECT 'Session on ' || date || ' at ' || time AS title, created_at AS since FROM sessions WHERE status = 'pending' ORDER BY created_at LIMIT 15"), 'Session request', 'fa-calendar-check', 'manage_sessions.php?status=pending');
+    $td_add(aw_dsh_q($db, "SELECT CASE status WHEN 'proposed' THEN 'Waiting for a mentor to answer' ELSE 'Asked for a mentor' END AS title, created_at AS since FROM mentor_requests WHERE status IN ('waiting', 'proposed') ORDER BY created_at LIMIT 15"), 'Mentoring request', 'fa-hands-holding-circle', 'mentoring.php');
+    $td_add(aw_dsh_q($db, "SELECT 'Offered to mentor' AS title, created_at AS since FROM mentors WHERE status = 'pending' ORDER BY created_at LIMIT 15"), 'Mentor offer', 'fa-hand-holding-heart', 'mentoring.php');
 }
 if (aw_can('manage_payments')) {
     $td_add(aw_dsh_q($db, "SELECT 'Order #' || id || ' · ' || COALESCE(payment_method, '') AS title, created_at AS since FROM payments WHERE status = 'pending' ORDER BY created_at LIMIT 15"), 'Order to confirm', 'fa-receipt', 'manage_payments.php');
