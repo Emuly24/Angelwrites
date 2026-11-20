@@ -373,6 +373,10 @@ try {
         error_log('VX1: ' . (int)$aw_n . ' existing account(s) marked verified (one-time).');
     }
 
+    // Scheduled newsletters send themselves: a cheap check, the sending runs after the page is sent.
+    require_once __DIR__ . '/newsletter_auto.php';
+    aw_nl_auto_maybe($db);
+
     // Q50: daily clean-up of tables that only grow (see includes/housekeeping.php).
     if (mt_rand(1, 100) === 1) {
         require_once __DIR__ . '/housekeeping.php';
