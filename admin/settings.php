@@ -121,6 +121,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_usd_rate'])) {
 }
 if (!empty($_SESSION['aw_usd_flash'])) { $aw_usd_msg = ['ok' => true, 'msg' => $_SESSION['aw_usd_flash']]; unset($_SESSION['aw_usd_flash']); }
 
+// ===== Search engines: Google Search Console and Bing Webmaster Tools verification codes (public, not secrets) =====
+$aw_seo_msg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_seo']) && validate_csrf_token($_POST['csrf_token'] ?? '')) {
+    $aw_clean = function ($v) {
+        $v = trim((string)$v);
+        if (preg_match('/content=["\']([^"\']+)["\']/i', $v, $m)) $v = $m[1]; // the whole <meta> tag was pasted
+        return preg_match('/^[A-Za-z0-9_\-]{0,100}$/', $v) ? $v : null;
+    };
+    $g = $aw_clean($_POST['seo_google_verify'] ?? ''); $b = $aw_clean($_POST['seo_bing_verify'] ?? '');
+    if ($g === null || $b === null) $aw_seo_msg = ['ok' => false, 'msg' => 'Please paste only the code (or the whole meta tag) that Google or Bing gives you.'];
+    else {
+        $st = $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+        $st->execute(['seo_google_verify', $g]); $st->execute(['seo_bing_verify', $b]);
+        if (function_exists('aw_audit')) aw_audit('settings_changed', 'settings', null, 'search engine verification');
+        $_SESSION['aw_seo_flash'] = 'Saved. Now press Verify on Google or Bing.';
+        header('Location: ' . SITE_URL . '/admin/settings.php?tab=email#search-engines'); exit;
+    }
+}
+if (!empty($_SESSION['aw_seo_flash'])) { $aw_seo_msg = ['ok' => true, 'msg' => $_SESSION['aw_seo_flash']]; unset($_SESSION['aw_seo_flash']); }
+
 // ===== Link previews: the address of the free preview relay (tools/share-relay/README.md) =====
 $aw_share_msg = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_share_base'])) {
@@ -202,7 +222,7 @@ $pageTitle = 'Site Settings';
         <div class="settings-tabs">
             <button class="tab-btn active" data-tab="general">General</button>
             <button class="tab-btn" data-tab="branding">Branding</button>
-            <button class="tab-btn<?php echo ($aw_mail_test || $aw_mail_check || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
+            <button class="tab-btn<?php echo ($aw_mail_test || $aw_mail_check || $aw_seo_msg || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
             <button class="tab-btn<?php echo ($aw_quota_msg || ($_GET['tab'] ?? '') === 'uploads') ? ' aw-open-email' : ''; ?>" data-tab="uploads">Uploads</button><!-- R13 -->
         </div>
 
@@ -499,6 +519,25 @@ $pageTitle = 'Site Settings';
                         [data-theme="dark"] .aw-relay-state.is-on{background:#16301f;border-color:#2f6b43;color:#cdeed7}
                         [data-theme="dark"] .aw-relay-state.is-off{background:#33260f;border-color:#7a5a1e;color:#f6deb0}
                     </style>
+
+                    <h3 id="search-engines" style="margin:28px 0 10px;">Search engines (Google, Bing)</h3>
+                    <?php if ($aw_seo_msg): ?><div class="alert <?php echo $aw_seo_msg['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_seo_msg['msg']); ?></div><?php endif; ?>
+                    <p style="color:var(--text-light);margin:0 0 8px;">The site now tells search engines about every poem, book, post, reflection, video and event in <a href="<?php echo SITE_URL; ?>/sitemap.xml" target="_blank" rel="noopener">sitemap.xml</a>, and keeps members' own pages and the team pages out. Google and Bing (which also feeds DuckDuckGo, Yahoo and Ecosia) find it faster when you register the site with them, once:</p>
+                    <details class="aw-relay-help" open><summary>How to get AngelWrites into Google and Bing</summary>
+                        <ol>
+                            <li><strong>Google:</strong> open <a href="https://search.google.com/search-console" target="_blank" rel="noopener">Google Search Console</a>, sign in, choose <em>Add property → URL prefix</em>, type <code><?php echo htmlspecialchars(rtrim(SITE_URL, '/')); ?>/</code>, choose <em>HTML tag</em>, copy the tag, paste it below and Save, then press <em>Verify</em> on Google. Then open <em>Sitemaps</em> and submit <code>sitemap.xml</code>.</li>
+                            <li><strong>Bing:</strong> open <a href="https://www.bing.com/webmasters" target="_blank" rel="noopener">Bing Webmaster Tools</a>, sign in, and choose <em>Import from Google Search Console</em> (easiest), or add the site and use the <em>Meta tag</em> option the same way. Submit <code>sitemap.xml</code> there too.</li>
+                            <li>New pages usually appear in results within a few days to a few weeks. Searching <code>site:angelwrites.gt.tc</code> on Google shows what is already found.</li>
+                        </ol>
+                    </details>
+                    <form method="POST" class="admin-form" action="<?php echo SITE_URL; ?>/admin/settings.php?tab=email#search-engines">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <div class="form-group"><label for="seo_google_verify">Google verification code (or the whole tag)</label>
+                            <input type="text" id="seo_google_verify" name="seo_google_verify" placeholder='&lt;meta name="google-site-verification" content="…"&gt;' value="<?php echo htmlspecialchars((string)aw_setting('seo_google_verify', '')); ?>"></div>
+                        <div class="form-group"><label for="seo_bing_verify">Bing verification code (or the whole tag)</label>
+                            <input type="text" id="seo_bing_verify" name="seo_bing_verify" placeholder='&lt;meta name="msvalidate.01" content="…"&gt;' value="<?php echo htmlspecialchars((string)aw_setting('seo_bing_verify', '')); ?>"></div>
+                        <button type="submit" name="save_seo" value="1" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
+                    </form>
 
                     <h3 id="sign-in" style="margin:28px 0 10px;">Sign in with Google or Facebook</h3>
                     <?php

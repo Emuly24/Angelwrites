@@ -1,0 +1,36 @@
+# AngelWrites: what search engines may read.
+# Public writing (poems, books, posts, reflections, videos, events) is open; members' own pages,
+# the team pages and private tools are not.
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /reader/
+Disallow: /data/
+Disallow: /includes/
+Disallow: /vendor/
+Disallow: /_h/
+Disallow: /dashboard.php
+Disallow: /library.php
+Disallow: /journal.php
+Disallow: /messages.php
+Disallow: /my_messages.php
+Disallow: /notifications.php
+Disallow: /profile.php
+Disallow: /account_security.php
+Disallow: /my_stories.php
+Disallow: /my_purchases.php
+Disallow: /story_write.php
+Disallow: /stories.php
+Disallow: /story.php
+Disallow: /staff_invite.php
+Disallow: /tour.php
+Disallow: /recover.php
+Disallow: /reset_password.php
+Disallow: /forgot_password.php
+Disallow: /verify.php
+Disallow: /human_check.php
+Disallow: /search_results.php
+Disallow: /*ajax*
+Disallow: /og_image.php
+
+Sitemap: https://angelwrites.gt.tc/sitemap.xml
