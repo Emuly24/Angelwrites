@@ -60,7 +60,7 @@ $jn_all = aw_journal_list($db, $jn_uid, $jn_q);
 $jn_edit = isset($_GET['edit']) ? aw_journal_get($db, $jn_uid, (int)$_GET['edit']) : null;
 $jn_new = isset($_GET['new']) || $jn_edit || $jn_err !== '' || (!$jn_all && $jn_q === '');
 $jn_v = $jn_err !== '' ? ['id' => (int)($_POST['id'] ?? 0), 'title' => (string)($_POST['title'] ?? ''), 'body' => (string)($_POST['body'] ?? ''), 'verse' => (string)($_POST['verse'] ?? ''), 'mood' => (string)($_POST['mood'] ?? ''), 'entry_date' => (string)($_POST['entry_date'] ?? date('Y-m-d'))]
-    : ($jn_edit ?: ['id' => 0, 'title' => '', 'body' => '', 'verse' => '', 'mood' => '', 'entry_date' => date('Y-m-d')]);
+    : ($jn_edit ?: ['id' => 0, 'title' => mb_substr(trim(strip_tags((string)($_GET['prompt'] ?? ''))), 0, 160), 'body' => '', 'verse' => '', 'mood' => '', 'entry_date' => date('Y-m-d')]);
 $jn_open = (int)($_GET['open'] ?? 0);
 // entries grouped by month
 $jn_months = [];
