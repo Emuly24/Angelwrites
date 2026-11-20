@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $content = trim((string)($_POST['content'] ?? ''));
         $send_to = in_array($_POST['send_to'] ?? '', ['all', 'segment', 'selected', 'single'], true) ? $_POST['send_to'] : 'all';
         $segment_id = (int)($_POST['segment_id'] ?? 0);
-        $_SESSION['aw_nl_draft'] = ['subject' => $subject, 'content' => $content];
+        $_SESSION['aw_nl_draft'] = ['subject' => $subject, 'content' => $content, 'preheader' => (string)($_POST['preheader'] ?? '')];
         if ($subject === '' || trim(strip_tags($content, '<img>')) === '') {
             aw_nl_flash('error', 'Please write a subject and a message.');
             aw_nl_back('send');
@@ -70,6 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!empty($_POST['add_signature'])) $content .= AW_NL_SIG_MARK; // E2
         $qid = aw_nl_queue($db, $subject, $content, $recipients, $send_to, $send_to === 'segment' ? $segment_id : null, $scheduled_at, $files);
+        // the inbox preview line and the 'New on AngelWrites' section (includes/newsletter_design.php)
+        $db->prepare("UPDATE email_queue SET preheader = ?, options = ? WHERE id = ?")->execute([mb_substr(trim((string)($_POST['preheader'] ?? '')), 0, 150), json_encode(['latest' => !empty($_POST['add_latest'])]), $qid]);
         aw_nl_audit($db, $scheduled_at ? 'schedule_newsletter' : 'send_newsletter', "Campaign #$qid \"$subject\" to " . count($recipients) . " ($send_to)");
         unset($_SESSION['aw_nl_draft']);
         if ($scheduled_at) {
@@ -90,7 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif (!aw_nl_rate_ok('test_' . ($_SESSION['user_id'] ?? 0), 10, 600)) $msg = 'Too many test emails; please wait a few minutes.';
         else {
             $sub = aw_nl_subscriber($db, $to) ?: ['email' => $to, 'name' => 'Angella', 'unsubscribe_token' => ''];
-            $m = aw_nl_render($db, '[Test] ' . $subject, $content, $sub, ['preview' => true, 'signature' => !empty($_POST['add_signature'])]);
+            $m = aw_nl_render($db, '[Test] ' . $subject, $content, $sub, ['preview' => true, 'signature' => !empty($_POST['add_signature']),
+                'preheader' => trim((string)($_POST['preheader'] ?? '')), 'latest' => !empty($_POST['add_latest']), 'junk_note' => true]);
+            $_SESSION['aw_nl_tested'] = md5($subject . '|' . $content); // the checklist knows a test was sent
             $ok = aw_nl_mail($to, '[Test] ' . $subject, $m['html'], $m['text']);
             $msg = $ok ? "Test email sent to $to." : "The test email to $to could not be sent. Check the mail settings.";
             aw_nl_audit($db, 'test_send', "To $to: $subject");
@@ -368,7 +372,16 @@ $archive = $st->fetchAll(PDO::FETCH_ASSOC);
 
 $audit_log = $db->query("SELECT l.*, u.name AS user_name FROM newsletter_audit_log l LEFT JOIN users u ON u.id = l.user_id ORDER BY l.created_at DESC, l.id DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
 
-$draft = $_SESSION['aw_nl_draft'] ?? ['subject' => '', 'content' => ''];
+aw_nl_queue_columns($db);
+$draft = ($_SESSION['aw_nl_draft'] ?? []) + ['subject' => '', 'content' => '', 'preheader' => ''];
+$preheader = (string)$draft['preheader'];
+// for the composer's 'Featured' block: the newest pieces to link to
+$featured = [];
+foreach ([['poems', "SELECT id, title FROM poems ORDER BY id DESC LIMIT 8", 'Poem', '/poem_view.php?id='], ['blog_posts', "SELECT slug AS id, title FROM blog_posts WHERE status = 'published' AND slug <> '' ORDER BY id DESC LIMIT 8", 'Post', '/blog_post.php?slug='],
+          ['books', "SELECT id, title FROM books ORDER BY id DESC LIMIT 8", 'Book', '/book.php?id=']] as [$t, $sql, $kind, $path]) {
+    try { foreach ($db->query($sql)->fetchAll(PDO::FETCH_ASSOC) as $r) $featured[] = ['kind' => $kind, 'title' => (string)$r['title'], 'url' => rtrim(SITE_URL, '/') . $path . rawurlencode((string)$r['id'])]; }
+    catch (Throwable $e) { /* that table is not there yet */ }
+}
 $subject = $draft['subject'];
 $content = $draft['content'];
 $prefill_email = filter_var($_GET['to'] ?? '', FILTER_VALIDATE_EMAIL) ? $_GET['to'] : '';
