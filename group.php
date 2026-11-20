@@ -10,6 +10,7 @@ require_once 'includes/auth.php';
 require_once 'includes/saves.php'; // F2: the Save control
 require_once 'includes/messaging.php'; // I2: Message buttons
 require_once 'includes/reading_groups.php';
+require_once 'includes/book_club.php'; // the club's goal, chapters and spoiler shield
 
 redirectIfNotLoggedIn();
 $user_id = $_SESSION['user_id'];
@@ -44,6 +45,9 @@ $notes = getGroupNotes($group_id);
 // P15: discussions and notes were shown in full. Each tab is paged (10 at a time) with its own
 // parameter (dpage / npage), and the pager links reopen the same tab.
 require_once __DIR__ . '/includes/pagination.php';
+// book clubs: ?chapter=N shows only that chapter's conversations (Chapters tab)
+$club_filter = isset($_GET['chapter']) && $_GET['chapter'] !== '' ? (int)$_GET['chapter'] : null;
+if ($club_filter !== null) $discussions = array_values(array_filter($discussions, function ($d) use ($club_filter) { return $d['chapter_index'] !== null && (int)$d['chapter_index'] === $club_filter; }));
 [$dpage, $dper] = aw_page(10, 'dpage');
 $discussions_total = count($discussions);
 [$dpage, $doffset] = aw_clamp($discussions_total, $dpage, $dper);
@@ -90,6 +94,22 @@ switch ($content_type) {
         $content_title = 'Unknown';
         $content_author = '';
 }
+
+// ===== BOOK CLUB: goal, where members are, a conversation per chapter, spoiler shield =====
+$club = null;
+if ($content_type === 'book' && $content_id) {
+    $club_chapters = aw_club_chapters($db, (int)$content_id);
+    $club_goal = aw_club_goal($db, $group_id);
+    $club_pos = aw_club_positions($db, $group_id, (int)$content_id);
+    $club_mine = $club_pos[(int)$user_id] ?? -1;
+    $club_threads = aw_club_threads($db, $group_id);
+    $club_there = $club_goal ? count(array_filter($club_pos, function ($c) use ($club_goal) { return $c >= (int)$club_goal['chapter_index']; })) : 0;
+    $club = true;
+    if ($club_chapters) $total_chapters = count($club_chapters);
+}
+$chapter_label = function ($i) use ($club, $db, $content_id, $content_type) {
+    return $club ? aw_club_chapter_title($db, (int)$content_id, (int)$i) : ($content_type === 'book' ? 'Chapter ' : 'Section ') . ((int)$i + 1);
+};
 
 // Helper for displaying content type badge
 $type_icon = [
@@ -138,9 +158,31 @@ $pageTitle = htmlspecialchars($group['name']);
             </div>
         </div>
 
+        <?php if ($club): ?>
+        <!-- ===== BOOK CLUB ===== -->
+        <section class="club" aria-labelledby="clubT">
+            <div class="club-main">
+                <p class="club-kicker"><i class="fas fa-book-open-reader" aria-hidden="true"></i> Book club</p>
+                <?php if ($club_goal): $gi = (int)$club_goal['chapter_index']; ?>
+                    <h2 id="clubT">Read to <em><?php echo htmlspecialchars($chapter_label($gi)); ?></em> <?php echo htmlspecialchars(aw_club_when($club_goal)); ?></h2>
+                    <div class="club-bar" role="progressbar" aria-valuemin="0" aria-valuemax="<?php echo count($club_pos); ?>" aria-valuenow="<?php echo $club_there; ?>" aria-label="Members who have reached it"><span style="width:<?php echo count($club_pos) ? round($club_there / count($club_pos) * 100) : 0; ?>%"></span></div>
+                    <p class="club-sub"><?php echo $club_there; ?> of <?php echo count($club_pos); ?> members are there<?php echo $club_mine >= $gi ? ', you included' : ($club_mine >= 0 ? ' · you are at ' . htmlspecialchars($chapter_label($club_mine)) : ''); ?>.</p>
+                <?php else: ?>
+                    <h2 id="clubT">Reading together</h2>
+                    <p class="club-sub"><?php echo $is_admin ? 'Set a goal in the Schedule tab (for example "Chapter 3 by Sunday") so everyone reads at the same pace.' : 'The group has not set a reading goal yet.'; ?></p>
+                <?php endif; ?>
+            </div>
+            <div class="club-acts">
+                <a class="btn btn-primary btn-sm" href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo (int)$content_id; ?>"><i class="fas fa-book-open" aria-hidden="true"></i> <?php echo $club_mine >= 0 ? 'Continue reading' : 'Start reading'; ?></a>
+                <?php if ($club_goal): ?><button type="button" class="btn btn-outline btn-sm" onclick="showCreateDiscussion(<?php echo (int)$club_goal['chapter_index']; ?>)"><i class="fas fa-comments" aria-hidden="true"></i> Talk about <?php echo htmlspecialchars($chapter_label((int)$club_goal['chapter_index'])); ?></button><?php endif; ?>
+            </div>
+        </section>
+        <?php endif; ?>
+
         <!-- ===== TABS ===== -->
         <div class="group-tabs">
             <button class="tab-btn active" data-tab="discussions">💬 Discussions</button>
+            <?php if ($club): ?><button class="tab-btn" data-tab="chapters">📚 Chapters</button><?php endif; ?>
             <button class="tab-btn" data-tab="notes">📝 Notes</button>
             <button class="tab-btn" data-tab="progress">📊 Progress</button>
             <button class="tab-btn" data-tab="members">👥 Members</button>
@@ -156,12 +198,16 @@ $pageTitle = htmlspecialchars($group['name']);
                     <i class="fas fa-plus"></i> New Discussion
                 </button>
             </div>
+            <?php if ($club_filter !== null): ?><p class="club-filter">Conversations about <strong><?php echo htmlspecialchars($chapter_label($club_filter)); ?></strong>. <a class="btn btn-sm btn-outline" href="?id=<?php echo (int)$group_id; ?>#tab-chapters">All chapters</a> <a class="btn btn-sm btn-outline" href="?id=<?php echo (int)$group_id; ?>">All conversations</a></p><?php endif; ?>
             <div class="discussions-list">
                 <?php if (empty($discussions)): ?>
                     <p class="empty-message">No discussions yet. Start one!</p>
                 <?php else: ?>
                     <?php foreach ($discussions as $disc): ?>
-                        <div class="discussion-item <?php echo $disc['is_pinned'] ? 'pinned' : ''; ?>">
+                        <?php $spoil = $club && $disc['chapter_index'] !== null && (int)$disc['chapter_index'] > $club_mine; ?>
+                        <div class="discussion-item <?php echo $disc['is_pinned'] ? 'pinned' : ''; ?><?php echo $spoil ? ' aw-spoiler' : ''; ?>" id="discussion-<?php echo (int)$disc['id']; ?>" data-chapter="<?php echo $disc['chapter_index'] === null ? '' : (int)$disc['chapter_index']; ?>">
+                            <?php if ($spoil): ?><div class="aw-spoiler-veil"><p><i class="fas fa-eye-slash" aria-hidden="true"></i> About <strong><?php echo htmlspecialchars($chapter_label((int)$disc['chapter_index'])); ?></strong>, which you have not reached yet.</p><button type="button" class="btn btn-sm btn-outline" onclick="this.closest('.aw-spoiler').classList.remove('aw-spoiler'); this.parentNode.remove();">Show anyway</button></div><?php endif; ?>
+                            <?php if ($club && $disc['chapter_index'] !== null): ?><span class="club-chip"><?php echo htmlspecialchars($chapter_label((int)$disc['chapter_index'])); ?></span><?php endif; ?>
                             <div class="discussion-header">
                                 <h4><?php echo htmlspecialchars($disc['title']); ?></h4>
                                 <span class="discussion-meta">
@@ -204,6 +250,28 @@ $pageTitle = htmlspecialchars($group['name']);
         </div>
 
         <!-- ===== NOTES TAB ===== -->
+        <?php if ($club): ?>
+        <!-- ===== CHAPTERS TAB: a conversation for each chapter ===== -->
+        <div class="tab-content" id="tab-chapters">
+            <h3>Chapters</h3>
+            <p class="club-sub">Each chapter has its own conversation. Chapters you have not reached yet are marked, so nothing is spoiled.</p>
+            <ol class="club-chapters">
+                <?php foreach ($club_chapters as $ci => $c): $ahead = $ci > $club_mine; $goalHere = $club_goal && (int)$club_goal['chapter_index'] === $ci; $nThreads = $club_threads[$ci] ?? 0;
+                      $readers = count(array_filter($club_pos, function ($p) use ($ci) { return $p >= $ci; })); ?>
+                <li class="<?php echo $ahead ? 'is-ahead' : 'is-read'; ?><?php echo $goalHere ? ' is-goal' : ''; ?>">
+                    <span class="club-ci" aria-hidden="true"><?php echo $ahead ? ($ci + 1) : '<i class="fas fa-check"></i>'; ?></span>
+                    <span class="club-ct"><strong><?php echo htmlspecialchars($c['title']); ?></strong>
+                        <small><?php echo $readers; ?> of <?php echo count($club_pos); ?> have read it<?php echo $goalHere ? ' · the club\'s goal ' . htmlspecialchars(aw_club_when($club_goal)) : ''; ?><?php echo $ahead ? ' · you have not reached it' : ''; ?></small></span>
+                    <span class="club-cacts">
+                        <?php if ($nThreads): ?><button type="button" class="btn btn-sm btn-outline" onclick="awClubShow(<?php echo $ci; ?>)"><?php echo $nThreads; ?> conversation<?php echo $nThreads === 1 ? '' : 's'; ?><?php echo $ahead ? ' (spoilers)' : ''; ?></button><?php endif; ?>
+                        <button type="button" class="btn btn-sm <?php echo $nThreads ? 'btn-outline' : 'btn-primary'; ?>" onclick="showCreateDiscussion(<?php echo $ci; ?>)"><?php echo $nThreads ? 'Add' : 'Start the conversation'; ?></button>
+                    </span>
+                </li>
+                <?php endforeach; ?>
+            </ol>
+        </div>
+        <?php endif; ?>
+
         <div class="tab-content" id="tab-notes">
             <div class="notes-header">
                 <h3>Group Notes</h3>
@@ -351,7 +419,7 @@ $pageTitle = htmlspecialchars($group['name']);
                         <?php foreach ($schedule as $item): ?>
                             <li>
                                 <strong>
-                                    <?php echo $content_type === 'book' ? 'Chapter ' . ($item['chapter_index'] + 1) : 'Section ' . ($item['chapter_index'] + 1); ?>
+                                    <?php echo htmlspecialchars($chapter_label((int)$item['chapter_index'])); ?>
                                 </strong>
                                 – Due: <?php echo date('F j, Y', strtotime($item['due_date'])); ?>
                                 <?php if ($is_admin): ?>
@@ -417,7 +485,7 @@ $pageTitle = htmlspecialchars($group['name']);
                     <select id="discussion_chapter" name="chapter_index">
                         <option value="">No specific chapter</option>
                         <?php for ($i = 0; $i < $total_chapters; $i++): ?>
-                            <option value="<?php echo $i; ?>"><?php echo $content_type === 'book' ? 'Chapter ' . ($i + 1) : 'Section ' . ($i + 1); ?></option>
+                            <option value="<?php echo $i; ?>"><?php echo htmlspecialchars($chapter_label($i)); ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -445,7 +513,7 @@ $pageTitle = htmlspecialchars($group['name']);
                     <select id="note_chapter" name="chapter_index">
                         <option value="">No specific chapter</option>
                         <?php for ($i = 0; $i < $total_chapters; $i++): ?>
-                            <option value="<?php echo $i; ?>"><?php echo $content_type === 'book' ? 'Chapter ' . ($i + 1) : 'Section ' . ($i + 1); ?></option>
+                            <option value="<?php echo $i; ?>"><?php echo htmlspecialchars($chapter_label($i)); ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -474,7 +542,7 @@ $pageTitle = htmlspecialchars($group['name']);
                     <label for="schedule_chapter">Chapter</label>
                     <select id="schedule_chapter" name="chapter_index" required>
                         <?php for ($i = 0; $i < $total_chapters; $i++): ?>
-                            <option value="<?php echo $i; ?>"><?php echo $content_type === 'book' ? 'Chapter ' . ($i + 1) : 'Section ' . ($i + 1); ?></option>
+                            <option value="<?php echo $i; ?>"><?php echo htmlspecialchars($chapter_label($i)); ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -551,9 +619,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 })();
 
 // ===== DISCUSSIONS =====
-function showCreateDiscussion() {
+function showCreateDiscussion(chapter) {
     document.getElementById('createDiscussionModal').style.display = 'flex';
+    const sel = document.getElementById('discussion_chapter');
+    if (sel && typeof chapter === 'number') { sel.value = String(chapter); const t = document.getElementById('discussion_title'); if (t && !t.value && sel.selectedOptions[0]) t.value = sel.selectedOptions[0].textContent.trim(); }
 }
+// Chapters tab: show that chapter's conversations in the Discussions tab (they appear even if spoilers)
+function awClubShow(ci) { location.href = '?id=<?php echo (int)$group_id; ?>&chapter=' + ci + '#tab-discussions'; }
 function closeCreateDiscussion() {
     document.getElementById('createDiscussionModal').style.display = 'none';
 }
@@ -983,4 +1055,29 @@ document.querySelectorAll('.modal').forEach(modal => {
 }
 </style>
 
+
+<style>
+.club { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin: 0 0 18px; padding: 20px 22px; border-radius: 22px; color: #fff;
+        background: radial-gradient(110% 140% at 100% 0%, rgba(214, 168, 92, .4), transparent 55%), linear-gradient(135deg, #3b2b4f, #9c5457); box-shadow: 0 14px 32px rgba(59, 43, 79, .22); }
+.club-main { flex: 1 1 320px; } .club-kicker { margin: 0; text-transform: uppercase; letter-spacing: .12em; font-size: .74rem; font-weight: 700; opacity: .9; }
+.club h2 { margin: 6px 0 10px; color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 1.4rem; } .club h2 em { font-style: normal; color: #ffe2b0; }
+.club-bar { height: 8px; border-radius: 8px; background: rgba(255, 255, 255, .25); overflow: hidden; max-width: 420px; } .club-bar span { display: block; height: 100%; background: #ffe2b0; border-radius: inherit; }
+.club .club-sub { color: #fff; opacity: .92; margin: 8px 0 0; }
+.club-acts { display: flex; gap: 8px; flex-wrap: wrap; } .club-acts .btn-outline { color: #fff; border-color: rgba(255, 255, 255, .6); } .club-acts .btn-outline:hover { background: #fff; color: #3b2b4f; }
+.club-sub { color: var(--text-light); }
+.club-chapters { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.club-chapters li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); background: var(--card-bg); }
+.club-chapters li.is-goal { border-color: #d6a85c; box-shadow: inset 4px 0 0 #d6a85c; }
+.club-ci { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: rgba(156, 84, 87, .1); color: #9c5457; }
+.club-chapters li.is-read .club-ci { background: #9c5457; color: #fff; }
+.club-ct { display: grid; min-width: 0; } .club-ct small { color: var(--text-light); }
+.club-cacts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.club-chip { display: inline-block; margin-bottom: 6px; padding: 2px 10px; border-radius: 999px; background: rgba(156, 84, 87, .1); color: #7d3f43; font-size: .78rem; font-weight: 700; }
+html[data-theme="dark"] .club-chip { background: rgba(240, 196, 197, .14); color: #f6dede; }
+.club-filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-radius: 12px; background: rgba(156, 84, 87, .06); }
+.aw-spoiler { position: relative; } .aw-spoiler > *:not(.aw-spoiler-veil) { filter: blur(6px); pointer-events: none; user-select: none; }
+.aw-spoiler-veil { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; align-content: center; gap: 8px; text-align: center; padding: 12px; border-radius: inherit; background: color-mix(in srgb, var(--card-bg, #fff) 70%, transparent); }
+.aw-spoiler-veil p { margin: 0; }
+@media (max-width: 640px) { .club-chapters li { grid-template-columns: 36px minmax(0, 1fr); } .club-cacts { grid-column: 2; justify-content: flex-start; } }
+</style>
 <?php require_once 'includes/footer.php'; ?>
