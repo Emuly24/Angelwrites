@@ -110,7 +110,7 @@ $greet = $h < 12 ? 'Good morning' : ($h < 17 ? 'Good afternoon' : 'Good evening'
 $pageTitle = 'Admin Dashboard';
 require_once '../includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=3">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=4">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">
@@ -311,7 +311,7 @@ require_once '../includes/header.php';
         </div>
     </div>
 </main>
-<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=1" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=2" defer></script>
 <script>
 function openQuickModal() { document.getElementById('quickModal').classList.add('active'); }
 function closeQuickModal() { document.getElementById('quickModal').classList.remove('active'); }

@@ -102,7 +102,7 @@ $token = generate_csrf_token();
 $pageTitle = 'My Dashboard';
 require_once 'includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=3">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-dash.css?v=4">
 <main class="dsh" id="main">
     <section class="dsh-hero dsh-reveal is-in" aria-labelledby="dshTitle">
         <div class="dsh-hero-top">
@@ -247,5 +247,5 @@ require_once 'includes/header.php';
         <a href="<?php echo SITE_URL; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i> Profile</a>
     </nav>
 </main>
-<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=1" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-dash.js?v=2" defer></script>
 <?php require_once 'includes/footer.php'; ?>
