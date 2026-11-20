@@ -481,6 +481,33 @@ $pageTitle = 'Site Settings';
                         [data-theme="dark"] .aw-relay-state.is-off{background:#33260f;border-color:#7a5a1e;color:#f6deb0}
                     </style>
 
+                    <h3 id="sign-in" style="margin:28px 0 10px;">Sign in with Google, Facebook…</h3>
+                    <?php
+                        require_once __DIR__ . '/../includes/social_auth.php';
+                        $aw_env_file = is_file(__DIR__ . '/../.env');
+                        $aw_si_rows = [['Google', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'], ['Facebook', 'FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET'], ['GitHub', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'],
+                                       ['Microsoft', 'MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'], ['Telegram', 'TELEGRAM_CLIENT_ID', 'TELEGRAM_CLIENT_SECRET'], ['TikTok', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET']];
+                    ?>
+                    <p style="color:var(--text-light);margin:0 0 10px;">A button appears on the login and sign-up pages only when both of its keys are in the <code>.env</code> file on the server. This shows whether each key is there, never the key itself.</p>
+                    <?php if (!$aw_env_file): ?><div class="aw-relay-state is-off" role="status"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><strong>No .env file on the server.</strong> No sign-in buttons, and no Zoho email password, can be read until it exists.</span></div><?php endif; ?>
+                    <div class="table-responsive"><table class="admin-table">
+                        <thead><tr><th scope="col">Provider</th><th scope="col">Keys in .env</th><th scope="col">Button</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($aw_si_rows as [$aw_pn, $aw_k1, $aw_k2]): $aw_h1 = trim((string)getenv($aw_k1)) !== ''; $aw_h2 = trim((string)getenv($aw_k2)) !== ''; ?>
+                            <tr><td><?php echo $aw_pn; ?></td>
+                                <td><code><?php echo $aw_k1; ?></code> <?php echo $aw_h1 ? '✓' : '<strong style="color:#a8432f">missing</strong>'; ?><br><code><?php echo $aw_k2; ?></code> <?php echo $aw_h2 ? '✓' : '<strong style="color:#a8432f">missing</strong>'; ?></td>
+                                <td><?php echo ($aw_h1 && $aw_h2) ? '<span style="color:#1d5130;font-weight:600">Shown</span>' : 'Hidden'; ?></td></tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table></div>
+                    <details class="aw-relay-help" style="margin-top:10px"><summary>How to add the keys</summary>
+                        <ol>
+                            <li>On Google (console.cloud.google.com → Credentials) and Facebook (developers.facebook.com → Facebook Login → Settings), add this redirect address: <code><?php echo htmlspecialchars(rtrim(SITE_URL, '/')); ?>/social_login.php</code></li>
+                            <li><strong>Easiest:</strong> on GitHub, open the repository → Settings → Secrets and variables → Actions → New repository secret. Name it <code>DOTENV</code> and paste your whole <code>.env</code> file (every line, including <code>ZOHO_APP_PASSWORD</code>, because it replaces the file on the server). The next deploy puts it on the server.</li>
+                            <li><strong>Or</strong> upload <code>.env</code> to <code>htdocs</code> with the InfinityFree file manager. <code>docs/env.sample</code> lists every line.</li>
+                        </ol>
+                    </details>
+
                     <h3 style="margin:28px 0 10px;">Recent failed emails</h3>
                     <?php if (!$aw_mail_failures): ?>
                         <p class="no-items">No failed emails recorded.</p>
