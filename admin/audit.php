@@ -12,10 +12,13 @@ aw_require('audit_log');
 
 $rows = []; $total = 0;
 $filter = trim((string)($_GET['action'] ?? ''));
+$aw_actor = (int)($_GET['actor'] ?? 0); // everything one person did (Team desk, Members)
 try {
     aw_audit_table($db);
-    $where = $filter !== '' ? ' WHERE a.action = ?' : '';
-    $params = $filter !== '' ? [$filter] : [];
+    $conds = []; $params = [];
+    if ($filter !== '') { $conds[] = 'a.action = ?'; $params[] = $filter; }
+    if ($aw_actor) { $conds[] = 'a.actor_id = ?'; $params[] = $aw_actor; }
+    $where = $conds ? ' WHERE ' . implode(' AND ', $conds) : '';
     $c = $db->prepare("SELECT COUNT(*) FROM audit_log a" . $where);
     $c->execute($params);
     $total = (int)$c->fetchColumn();
@@ -36,7 +39,7 @@ require_once '../includes/header.php';
 <div class="admin-page">
     <div class="container">
         <div class="admin-header">
-            <div><h1>Audit Log</h1><p>Every staff action that changes something, and refused attempts.</p></div>
+            <div><h1>Audit Log</h1><p>Every staff action that changes something, and refused attempts.<?php if ($aw_actor): $aw_an = $db->prepare("SELECT name, first_name, last_name, username FROM users WHERE id = ?"); $aw_an->execute([$aw_actor]); $aw_ar = $aw_an->fetch(PDO::FETCH_ASSOC); ?> <strong>Showing everything <?php echo htmlspecialchars($aw_ar ? awDisplayName($aw_ar) : 'this person'); ?> did.</strong> <a href="audit.php">Show everyone</a><?php endif; ?></p></div>
             <div class="admin-actions"><?php echo aw_link_btn(SITE_URL . '/admin/dashboard.php', 'Back to Dashboard', 'outline', ['icon' => 'fa-arrow-left']); ?></div>
         </div>
         <form method="GET" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">

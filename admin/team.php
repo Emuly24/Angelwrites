@@ -162,6 +162,10 @@ if (function_exists('aw_social_accounts')) {
 // ----- notes and your week --------------------------------------------------------------------
 $td_notes = aw_dsh_q($db, "SELECT n.*, u.name, u.first_name, u.last_name, u.username FROM team_notes n LEFT JOIN users u ON u.id = n.user_id
                            WHERE n.done_at IS NULL OR n.done_at >= datetime('now', '-3 days') ORDER BY (n.done_at IS NULL) DESC, n.pinned DESC, n.created_at DESC LIMIT 30");
+// owner and admins see what every member of the team did lately (the audit log, newest first)
+$td_team_log = aw_can('audit_log') ? aw_dsh_q($db, "SELECT a.action, a.target_type, a.target_id, a.created_at, a.actor_role, a.actor_id, u.name, u.first_name, u.last_name, u.username
+    FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id WHERE a.actor_id IS NOT NULL AND a.action NOT LIKE 'staff_%' AND a.created_at >= datetime('now', '-7 days')
+    ORDER BY a.id DESC LIMIT 14") : [];
 $td_week = aw_dsh_q($db, "SELECT action, COUNT(*) AS n FROM audit_log WHERE actor_id = ? AND created_at >= datetime('now', '-7 days')
                           AND action NOT LIKE 'staff_%' AND action <> 'access_denied' GROUP BY action ORDER BY n DESC LIMIT 8", [$td_me]);
 $td_week_total = array_sum(array_map(function ($r) { return (int)$r['n']; }, $td_week));
@@ -192,7 +196,9 @@ require_once '../includes/header.php';
             <?php if (aw_can('moderate')): ?><a href="moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i> Moderation</a><?php endif; ?>
             <?php if (aw_can('team_inbox')): ?><a href="inbox.php"><i class="fas fa-inbox" aria-hidden="true"></i> Team inbox</a><?php endif; ?>
             <?php if (aw_can('moderate')): ?><a href="community.php"><i class="fas fa-seedling" aria-hidden="true"></i> Stories &amp; Help</a><?php endif; ?>
-            <a href="dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i> <?php echo aw_can('manage_content') ? 'Admin dashboard' : 'Staff dashboard'; ?></a>
+            <?php // the right dashboard for each person: admins to the admin dashboard, other staff to their own member dashboard ?>
+            <?php if (aw_can('manage_members')): ?><a href="dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i> Admin dashboard</a>
+            <?php else: ?><a href="<?php echo SITE_URL; ?>/dashboard.php"><i class="fas fa-house-user" aria-hidden="true"></i> My dashboard</a><?php endif; ?>
         </nav>
     </header>
 
@@ -288,6 +294,17 @@ require_once '../includes/header.php';
                 <?php endif; ?>
             </section>
 
+            <?php if ($td_team_log): ?>
+            <section class="td-card" aria-labelledby="tdTeamLog">
+                <div class="td-card-head"><h2 id="tdTeamLog"><i class="fas fa-eye" aria-hidden="true"></i> What the team did</h2><a class="td-btn" href="audit.php">Full log</a></div>
+                <ul class="td-log">
+                    <?php foreach ($td_team_log as $l): ?>
+                    <li><b><?php echo htmlspecialchars(awDisplayName($l)); ?></b> <small><?php echo htmlspecialchars(aw_role_label((string)$l['actor_role'])); ?></small><br><span><?php echo htmlspecialchars($td_words($l['action'])); ?><?php echo $l['target_type'] ? ' · ' . htmlspecialchars($l['target_type']) . ($l['target_id'] ? ' #' . (int)$l['target_id'] : '') : ''; ?></span> <small><?php echo htmlspecialchars(date('j M, H:i', strtotime($l['created_at']))); ?></small>
+                        <a class="td-log-who" href="audit.php?actor=<?php echo (int)$l['actor_id']; ?>" aria-label="Everything <?php echo htmlspecialchars(awDisplayName($l)); ?> did">all</a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </section>
+            <?php endif; ?>
             <section class="td-card" aria-labelledby="tdGuide">
                 <div class="td-card-head"><h2 id="tdGuide"><i class="fas fa-compass" aria-hidden="true"></i> Good to have at hand</h2></div>
                 <ul class="td-guide">
@@ -372,7 +389,8 @@ html[data-theme="dark"] .td-notes li { background: #2e2620; border-color: #4a3d2
 .td-mine, .td-week, .td-guide { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
 .td-mine li { display: flex; gap: 10px; align-items: center; } .td-mine li span { flex: 1; } .td-mine small { color: var(--td-mute); margin-left: 6px; } .td-mine i { color: var(--td-rose); width: 20px; text-align: center; }
 .td-week li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--td-line); } .td-week b { color: var(--td-rose); }
-.td-guide a { color: var(--td-rose); font-weight: 600; } .td-guide small { display: block; color: var(--td-mute); }
+.td-guide a { color: var(--td-rose); font-weight: 600; }
+.td-log { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; font-size: .88rem; } .td-log li { padding-bottom: 8px; border-bottom: 1px dashed var(--td-line); } .td-log small { color: var(--td-mute); } .td-log-who { float: right; color: var(--td-rose); font-weight: 600; } .td-guide small { display: block; color: var(--td-mute); }
 @media (max-width: 900px) { .td-grid { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .td-list li { grid-template-columns: 34px minmax(0, 1fr) auto; } .td-list .td-btn { grid-column: 2 / -1; justify-self: start; } .td-hero { padding: 22px 18px; } }
 @media (prefers-reduced-motion: reduce) { .td-list li { animation: none; } }
