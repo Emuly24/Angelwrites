@@ -214,6 +214,7 @@ require_once '../includes/header.php';
                 <a href="<?php echo SITE_URL . '/' . $td_pu; ?>"><i class="fas <?php echo AW_POSITIONS[$td_a]['icon']; ?>" aria-hidden="true"></i> <?php echo htmlspecialchars($td_pl); ?></a>
             <?php } } ?>
             <?php if (function_exists('aw_user_areas') && aw_user_areas($td_me)): ?><a href="<?php echo SITE_URL; ?>/staff_invite.php"><i class="fas fa-id-badge" aria-hidden="true"></i> My roles</a><?php endif; ?>
+            <a href="meetings.php"><i class="fas fa-calendar-days" aria-hidden="true"></i> Team meetings</a>
             <?php if (aw_can('invite_staff')): ?><a href="invite_staff.php"><i class="fas fa-user-plus" aria-hidden="true"></i> Invite to the team</a><?php endif; ?>
             <?php // the right dashboard for each person: admins to the admin dashboard, other staff to their own member dashboard ?>
             <?php if (aw_can('manage_members')): ?><a href="dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i> Admin dashboard</a>
@@ -221,6 +222,15 @@ require_once '../includes/header.php';
         </nav>
     </header>
 
+    <?php // an open monthly check-in, and the next meeting this person is invited to
+    require_once __DIR__ . '/../includes/team_care.php';
+    $td_ci = null; $td_next = null;
+    if (aw_care_tables($db)) {
+        try { $td_cs = $db->prepare("SELECT id FROM staff_checkins WHERE user_id = ? AND answered_at IS NULL ORDER BY id DESC LIMIT 1"); $td_cs->execute([$td_me]); $td_ci = $td_cs->fetchColumn() ?: null; } catch (Throwable $e) { error_log('team desk checkin: ' . $e->getMessage()); }
+        foreach (aw_meetings_for($db, $td_me, aw_can('invite_staff')) as $td_m) if (empty($td_m['cancelled_at'])) { $td_next = $td_m; break; }
+    }
+    if ($td_ci): ?><div class="td-alert is-train" role="status"><i class="fas fa-heart" aria-hidden="true"></i><span><strong>Your monthly check-in:</strong> how is your role going? <a href="checkin.php?id=<?php echo (int)$td_ci; ?>">Answer in one minute</a></span></div><?php endif; ?>
+    <?php if ($td_next): ?><div class="td-alert is-ok" role="status"><i class="fas fa-calendar-days" aria-hidden="true"></i> Next team meeting: <strong><?php echo htmlspecialchars($td_next['title']); ?></strong>, <?php echo htmlspecialchars(aw_event_local($td_next['starts_at'])->format('l j F, H:i')); ?>. <a href="meetings.php#m<?php echo (int)$td_next['id']; ?>"><?php echo $td_next['my'] === '' ? 'Can you come?' : 'Details'; ?></a></div><?php endif; ?>
     <?php $td_train = function_exists('aw_training_pending') ? aw_training_pending() : []; if ($td_train): ?>
     <div class="td-alert is-train" role="status"><i class="fas fa-graduation-cap" aria-hidden="true"></i>
         <span><strong>Before you start:</strong> a short training (about 10 minutes) opens your tools.
