@@ -98,7 +98,11 @@ function aw_text($key, $default, $mode = 'text') {
     $db = $GLOBALS['db'] ?? null;
     $key = (string)$key;
     $map = $db instanceof PDO ? aw_text_all($db) : [];
-    $value = array_key_exists($key, $map) ? $map[$key] : (string)$default;
+    // the site in Chichewa (includes/i18n.php): "key@ny" when it has been translated, else the English
+    $lang = function_exists('aw_lang') ? aw_lang() : 'en';
+    $english = array_key_exists($key, $map) ? $map[$key] : (string)$default;
+    $lkey = $lang !== 'en' ? $key . '@' . $lang : $key;
+    $value = array_key_exists($lkey, $map) ? $map[$lkey] : $english;
     $html = aw_text_render($value, $mode);
     if (!aw_text_editing()) return $html;
     // editing: remember this text for Admin > Page text, and mark it so a click opens the editor
@@ -112,8 +116,9 @@ function aw_text($key, $default, $mode = 'text') {
                ->execute([$key, $page, $mode, (string)$default]);
         } catch (Throwable $e) { error_log('site text key: ' . $e->getMessage()); }
     }
-    $changed = array_key_exists($key, $map) ? ' data-changed="1"' : '';
-    return '<span class="aw-et" data-aw-text="' . htmlspecialchars($key) . '" data-mode="' . $mode . '"' . $changed
+    $changed = array_key_exists($lkey, $map) ? ' data-changed="1"' : '';
+    return '<span class="aw-et" data-aw-text="' . htmlspecialchars($lkey) . '" data-mode="' . $mode . '"' . $changed
+        . ($lang !== 'en' ? ' data-english="' . htmlspecialchars($english) . '"' : '')
         . ' data-raw="' . htmlspecialchars($value) . '" data-default="' . htmlspecialchars((string)$default) . '" tabindex="0" role="button" aria-label="Change this text">'
         . $html . '</span>';
 }
@@ -121,14 +126,23 @@ function aw_text($key, $default, $mode = 'text') {
 /** Save (or with $value === null, put back the original wording). Returns ['ok' => bool, 'html' => ..., 'error' => ...]. */
 function aw_text_save(PDO $db, $key, $value, $mode, $user_id) {
     if (!aw_text_tables($db)) return ['ok' => false, 'error' => 'The text could not be saved.'];
-    if (!preg_match('/^[a-z0-9_.-]{2,80}$/', (string)$key)) return ['ok' => false, 'error' => 'Unknown text.'];
+    if (!preg_match('/^[a-z0-9_.-]{2,80}(@[a-z]{2})?$/', (string)$key)) return ['ok' => false, 'error' => 'Unknown text.'];
+    $base = preg_replace('/@[a-z]{2}$/', '', (string)$key);
     if (!in_array($mode, ['line', 'text', 'para', 'list'], true)) $mode = 'text';
     try {
         if ($value === null) {
             $db->prepare("DELETE FROM site_texts WHERE text_key = ?")->execute([$key]);
+            if ($base !== $key) { // a translation removed: the English (as edited) shows again
+                $st = $db->prepare("SELECT value FROM site_texts WHERE text_key = ?");
+                $st->execute([$base]);
+                $value = $st->fetchColumn();
+                if ($value === false) { $st = $db->prepare("SELECT default_value FROM site_text_keys WHERE text_key = ?"); $st->execute([$base]); $value = (string)$st->fetchColumn(); }
+                $value = (string)$value;
+            } else {
             $st = $db->prepare("SELECT default_value FROM site_text_keys WHERE text_key = ?");
             $st->execute([$key]);
             $value = (string)$st->fetchColumn();
+            }
         } else {
             $value = str_replace("\r\n", "\n", (string)$value);
             if ($mode === 'line') $value = trim(preg_replace('/\s+/u', ' ', $value));
@@ -182,7 +196,9 @@ function aw_text_editor_ui() {
     ta.value = el.getAttribute('data-raw');
     var mode = el.getAttribute('data-mode');
     ta.rows = mode === 'line' ? 2 : 7;
-    document.getElementById('awEtHint').textContent = (mode === 'line' ? 'One line. ' : (mode === 'list' ? 'One item per line. ' : 'A blank line starts a new paragraph. ')) + '*one asterisk* = highlight colour, **two** = bold, [words](/page.php) = a link.';
+    var en = el.getAttribute('data-english');
+    document.getElementById('awEtHint').textContent = (en ? 'Chichewa version. In English: \u201C' + en + '\u201D. ' : '') + (mode === 'line' ? 'One line. ' : (mode === 'list' ? 'One item per line. ' : 'A blank line starts a new paragraph. ')) + '*one asterisk* = highlight colour, **two** = bold, [words](/page.php) = a link.';
+    document.getElementById('awEtTitle').textContent = en ? 'Translate this text' : 'Change this text';
     dlg.showModal(); ta.focus();
   }
   document.addEventListener('click', function (e) { var el = e.target.closest && e.target.closest('.aw-et'); if (!el) return; e.preventDefault(); e.stopPropagation(); open(el); }, true);

@@ -35,7 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $dv_uid && validate_csrf_token($_PO
     header('Location: ' . $dv_self); exit;
 }
 
-$dv_v = (string)($_GET['v'] ?? ($_COOKIE['aw_bible_v'] ?? 'KJV'));
+require_once __DIR__ . '/includes/i18n.php';
+$dv_v = (string)($_GET['v'] ?? ($_COOKIE['aw_bible_v'] ?? (aw_lang() === 'ny' ? 'NYA' : 'KJV'))); // the site in Chichewa: the Chichewa Bible first
 if (!isset(aw_bible_versions()[$dv_v])) $dv_v = (string)(array_key_first(aw_bible_versions()) ?? 'KJV');
 $dv_plan = isset($_GET['plan']) ? aw_devo_plan($db, (int)$_GET['plan']) : null;
 if ($dv_plan && $dv_plan['status'] !== 'published' && !$dv_team) $dv_plan = null;

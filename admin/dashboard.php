@@ -259,6 +259,7 @@ require_once '../includes/header.php';
             <a class="dsh-tile" href="editor.php"><i class="fas fa-pen-fancy" aria-hidden="true"></i>Blog editor</a>
             <a class="dsh-tile" href="manage_videos.php"><i class="fas fa-video" aria-hidden="true"></i>Videos</a>
             <a class="dsh-tile" href="site_texts.php"><i class="fas fa-font" aria-hidden="true"></i>Page text</a>
+            <a class="dsh-tile" href="translations.php"><i class="fas fa-language" aria-hidden="true"></i>Translations</a>
             <a class="dsh-tile" href="devotionals.php"><i class="fas fa-sun" aria-hidden="true"></i>Devotionals</a>
             <a class="dsh-tile" href="prompts.php"><i class="fas fa-feather-pointed" aria-hidden="true"></i>Writing prompts</a>
             <a class="dsh-tile" href="events.php"><i class="fas fa-calendar-days" aria-hidden="true"></i>Events</a>

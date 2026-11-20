@@ -116,7 +116,8 @@ foreach ($search_configs as $config) {
 }
 
 // ----- one box for everything: the Bible, Stories & Help, Community Q&A and the text inside books -----
-$aw_bible_v = (string)($_GET['v'] ?? 'KJV');
+require_once __DIR__ . '/includes/i18n.php';
+$aw_bible_v = (string)($_GET['v'] ?? (aw_lang() === 'ny' ? 'NYA' : 'KJV')); // the site in Chichewa: search the Chichewa Bible first
 if (!isset(aw_bible_versions()[$aw_bible_v])) $aw_bible_v = (string)(array_key_first(aw_bible_versions()) ?? '');
 if ($q !== '' && mb_strlen($q) >= 3 && $aw_bible_v !== '' && ($type === 'all' || $type === 'bible')) {
     // the whole phrase, then (if nothing) the longest word

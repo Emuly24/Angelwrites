@@ -42,8 +42,9 @@ if ($isLoggedIn) {
     }
 }
 ?>
+<?php require_once __DIR__ . '/i18n.php'; $aw_lang = aw_lang(); /* English or Chichewa (includes/i18n.php) */ ?>
 <!DOCTYPE html>
-<html lang="en" class="aw-ui" data-aw-page="<?php echo htmlspecialchars(basename($_SERVER['PHP_SELF'] ?? '', '.php')); ?>"><!-- D1 -->
+<html lang="<?php echo aw_lang_attr(); ?>" class="aw-ui" data-aw-page="<?php echo htmlspecialchars(basename($_SERVER['PHP_SELF'] ?? '', '.php')); ?>"><!-- D1 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -131,7 +132,7 @@ if ($isLoggedIn) {
         .breadcrumb-sep { color: var(--text-light); margin: 0 4px; }
     </style>
     <!-- D1: site-wide design layer, after the base styles so it applies on every page -->
-    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=3">
+    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-design.css?v=4">
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-header.css?v=1"><!-- the header -->
     <script src="<?php echo SITE_URL; ?>/assets/js/aw-motion.js?v=1" defer></script><!-- D2 -->
 <?php echo function_exists('aw_staff_csrf_script') ? aw_staff_csrf_script() : ''; /* K3: staff forms and fetches carry the CSRF token */ ?>
@@ -224,38 +225,38 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                 <span class="awh-ink" aria-hidden="true"></span>
                 <ul class="awh-links" id="navLinks">
                     <?php if (!$isLoggedIn): ?>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/index.php"<?php echo $aw_cur('index.php'); ?>>Home</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>>Books</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>>Poems</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>>Reflections</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/blog.php"<?php echo $aw_cur(['blog.php', 'blog_post.php']); ?>>Blog</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/about.php"<?php echo $aw_cur('about.php'); ?>>About</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/contact.php"<?php echo $aw_cur('contact.php'); ?>>Contact</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/index.php"<?php echo $aw_cur('index.php'); ?>><?php echo aw_t('Home'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>><?php echo aw_t('Books'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>><?php echo aw_t('Poems'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>><?php echo aw_t('Reflections'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/blog.php"<?php echo $aw_cur(['blog.php', 'blog_post.php']); ?>><?php echo aw_t('Blog'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/about.php"<?php echo $aw_cur('about.php'); ?>><?php echo aw_t('About'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/contact.php"<?php echo $aw_cur('contact.php'); ?>><?php echo aw_t('Contact'); ?></a></li>
                     <?php elseif ($isAdmin): ?>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/dashboard.php"<?php echo $aw_cur('admin/dashboard.php'); ?>>Dashboard</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_books.php"<?php echo $aw_cur('admin/manage_books.php'); ?>>Books</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_poems.php"<?php echo $aw_cur('admin/manage_poems.php'); ?>>Poems</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_sessions.php"<?php echo $aw_cur('admin/manage_sessions.php'); ?>>Sessions</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_users.php"<?php echo $aw_cur('admin/manage_users.php'); ?>>Members</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/settings.php"<?php echo $aw_cur('admin/settings.php'); ?>>Settings</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/dashboard.php"<?php echo $aw_cur('admin/dashboard.php'); ?>><?php echo aw_t('Dashboard'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_books.php"<?php echo $aw_cur('admin/manage_books.php'); ?>><?php echo aw_t('Books'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_poems.php"<?php echo $aw_cur('admin/manage_poems.php'); ?>><?php echo aw_t('Poems'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_sessions.php"<?php echo $aw_cur('admin/manage_sessions.php'); ?>><?php echo aw_t('Sessions'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/manage_users.php"<?php echo $aw_cur('admin/manage_users.php'); ?>><?php echo aw_t('Members'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/settings.php"<?php echo $aw_cur('admin/settings.php'); ?>><?php echo aw_t('Settings'); ?></a></li>
                     <?php else: ?>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/index.php"<?php echo $aw_cur('index.php'); ?>>Home</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/library.php"<?php echo $aw_cur('library.php'); ?>>My library</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>>Books</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>>Poems</a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>>Reflections</a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/index.php"<?php echo $aw_cur('index.php'); ?>><?php echo aw_t('Home'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/library.php"<?php echo $aw_cur('library.php'); ?>><?php echo aw_t('My library'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>><?php echo aw_t('Books'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>><?php echo aw_t('Poems'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>><?php echo aw_t('Reflections'); ?></a></li>
                         <li>
-                            <button type="button" class="awh-link<?php echo $aw_is($aw_community_pages) ? ' is-active' : ''; ?>" aria-haspopup="true" aria-expanded="false" aria-controls="awhCommunity" onclick="awToggleMenu(this, 'awhCommunity')">Community <i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                            <button type="button" class="awh-link<?php echo $aw_is($aw_community_pages) ? ' is-active' : ''; ?>" aria-haspopup="true" aria-expanded="false" aria-controls="awhCommunity" onclick="awToggleMenu(this, 'awhCommunity')"><?php echo aw_t('Community'); ?> <i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                             <div class="awh-menu" id="awhCommunity">
-                                <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/stories.php"><i class="fas fa-seedling" aria-hidden="true"></i><span>Stories &amp; Help<small>Get help · Offer help</small></span></a><?php endif; ?>
-                                <a href="<?php echo $aw_u; ?>/prayer.php"><i class="fas fa-hands-praying" aria-hidden="true"></i><span>Prayer wall<small>Ask for prayer · Pray for others</small></span></a>
-                                <a href="<?php echo $aw_u; ?>/plans.php"><i class="fas fa-sun" aria-hidden="true"></i><span>Devotionals<small>A few minutes with God each day</small></span></a>
-                                <a href="<?php echo $aw_u; ?>/community.php"><i class="fas fa-circle-question" aria-hidden="true"></i><span>Community Q&amp;A<small>Ask and answer</small></span></a>
-                                <a href="<?php echo $aw_u; ?>/groups.php"><i class="fas fa-user-group" aria-hidden="true"></i><span>Reading groups<small>Read a book together</small></span></a>
-                                <a href="<?php echo $aw_u; ?>/prompts.php"><i class="fas fa-feather-pointed" aria-hidden="true"></i><span>Writing prompts<small>Write with us each week</small></span></a>
-                                <a href="<?php echo $aw_u; ?>/events.php"><i class="fas fa-calendar-days" aria-hidden="true"></i><span>Events<small>Readings, prayer, workshops</small></span></a>
-                                <a href="<?php echo $aw_u; ?>/mentoring.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><span>Mentoring<small>Find a mentor · Be one</small></span></a>
-                                <a href="<?php echo $aw_u; ?>/book_session.php"><i class="fas fa-calendar-check" aria-hidden="true"></i><span>Book a session<small>Talk with Angella</small></span></a>
+                                <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/stories.php"><i class="fas fa-seedling" aria-hidden="true"></i><span><?php echo aw_t('Stories & Help'); ?><small><?php echo aw_t('Get help · Offer help'); ?></small></span></a><?php endif; ?>
+                                <a href="<?php echo $aw_u; ?>/prayer.php"><i class="fas fa-hands-praying" aria-hidden="true"></i><span><?php echo aw_t('Prayer wall'); ?><small><?php echo aw_t('Ask for prayer · Pray for others'); ?></small></span></a>
+                                <a href="<?php echo $aw_u; ?>/plans.php"><i class="fas fa-sun" aria-hidden="true"></i><span><?php echo aw_t('Devotionals'); ?><small><?php echo aw_t('A few minutes with God each day'); ?></small></span></a>
+                                <a href="<?php echo $aw_u; ?>/community.php"><i class="fas fa-circle-question" aria-hidden="true"></i><span><?php echo aw_t('Community Q&A'); ?><small><?php echo aw_t('Ask and answer'); ?></small></span></a>
+                                <a href="<?php echo $aw_u; ?>/groups.php"><i class="fas fa-user-group" aria-hidden="true"></i><span><?php echo aw_t('Reading groups'); ?><small><?php echo aw_t('Read a book together'); ?></small></span></a>
+                                <a href="<?php echo $aw_u; ?>/prompts.php"><i class="fas fa-feather-pointed" aria-hidden="true"></i><span><?php echo aw_t('Writing prompts'); ?><small><?php echo aw_t('Write with us each week'); ?></small></span></a>
+                                <a href="<?php echo $aw_u; ?>/events.php"><i class="fas fa-calendar-days" aria-hidden="true"></i><span><?php echo aw_t('Events'); ?><small><?php echo aw_t('Readings, prayer, workshops'); ?></small></span></a>
+                                <a href="<?php echo $aw_u; ?>/mentoring.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><span><?php echo aw_t('Mentoring'); ?><small><?php echo aw_t('Find a mentor · Be one'); ?></small></span></a>
+                                <a href="<?php echo $aw_u; ?>/book_session.php"><i class="fas fa-calendar-check" aria-hidden="true"></i><span><?php echo aw_t('Book a session'); ?><small><?php echo aw_t('Talk with Angella'); ?></small></span></a>
                             </div>
                         </li>
                     <?php endif; ?>
@@ -299,27 +300,27 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                         <div class="awh-menu" id="userDropdown">
                             <div class="awh-menu-head"><strong><?php echo htmlspecialchars($aw_me['name']); ?></strong><span><?php echo htmlspecialchars($aw_me['email']); ?></span></div>
                             <?php if ($isAdmin): ?>
-                                <a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i>Admin dashboard</a>
-                                <a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i>Team desk</a>
-                                <a href="<?php echo $aw_u; ?>/admin/moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Moderation</a>
-                                <a href="<?php echo $aw_u; ?>/index.php"><i class="fas fa-house" aria-hidden="true"></i>View the site</a>
-                                <a href="<?php echo $aw_u; ?>/account_security.php"><i class="fas fa-lock" aria-hidden="true"></i>Account security</a>
+                                <a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i><?php echo aw_t('Admin dashboard'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><?php echo aw_t('Team desk'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/admin/moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i><?php echo aw_t('Moderation'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/index.php"><i class="fas fa-house" aria-hidden="true"></i><?php echo aw_t('View the site'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/account_security.php"><i class="fas fa-lock" aria-hidden="true"></i><?php echo aw_t('Account security'); ?></a>
                             <?php else: ?>
-                                <a href="<?php echo $aw_u; ?>/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i>Dashboard</a>
-                                <a href="<?php echo $aw_u; ?>/library.php"><i class="fas fa-bookmark" aria-hidden="true"></i>My library</a>
-                                <a href="<?php echo $aw_u; ?>/journal.php"><i class="fas fa-book-open" aria-hidden="true"></i>My journal</a>
-                                <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i>My Stories &amp; Help</a><?php endif; ?>
-                                <a href="<?php echo $aw_u; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i>My shared books</a>
-                                <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i>Profile</a>
-                                <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i>Team desk</a><a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Staff dashboard</a><?php endif; ?>
+                                <a href="<?php echo $aw_u; ?>/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i><?php echo aw_t('Dashboard'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/library.php"><i class="fas fa-bookmark" aria-hidden="true"></i><?php echo aw_t('My library'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/journal.php"><i class="fas fa-book-open" aria-hidden="true"></i><?php echo aw_t('My journal'); ?></a>
+                                <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i><?php echo aw_t('My Stories & Help'); ?></a><?php endif; ?>
+                                <a href="<?php echo $aw_u; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i><?php echo aw_t('My shared books'); ?></a>
+                                <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i><?php echo aw_t('Profile'); ?></a>
+                                <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i><?php echo aw_t('Team desk'); ?></a><a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i><?php echo aw_t('Staff dashboard'); ?></a><?php endif; ?>
                             <?php endif; ?>
                             <hr>
-                            <a class="awh-out" href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i>Log out</a>
+                            <a class="awh-out" href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><?php echo aw_t('Log out'); ?></a>
                         </div>
                     </div>
                 <?php else: ?>
-                    <a class="awh-login awh-hide-md" href="<?php echo $aw_u; ?>/login.php">Log in</a>
-                    <a class="awh-join" href="<?php echo $aw_u; ?>/register.php">Join free</a>
+                    <a class="awh-login awh-hide-md" href="<?php echo $aw_u; ?>/login.php"><?php echo aw_t('Log in'); ?></a>
+                    <a class="awh-join" href="<?php echo $aw_u; ?>/register.php"><?php echo aw_t('Join free'); ?></a>
                 <?php endif; ?>
                 <button type="button" class="awh-icon awh-burger" id="hamburger" aria-label="Menu" aria-expanded="false" aria-controls="awhDrawer" onclick="toggleMobileMenu()"><span></span><span></span><span></span></button>
             </div>
@@ -337,19 +338,20 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                 <div class="awh-drawer-me"><span class="awh-avatar" aria-hidden="true"><?php if ($aw_me['avatar']): ?><img src="<?php echo htmlspecialchars($aw_me['avatar']); ?>" alt="" onerror="this.remove()"><?php endif; ?><?php echo htmlspecialchars($aw_me['initial']); ?></span><span><strong><?php echo htmlspecialchars($aw_me['name']); ?></strong><span><?php echo htmlspecialchars($aw_me['email']); ?></span></span></div>
             <?php endif; ?>
             <?php $aw_i = 0; foreach ($aw_groups as $aw_g => $aw_items): ?>
-                <p class="awh-group"><?php echo htmlspecialchars($aw_g); ?></p>
+                <p class="awh-group"><?php echo aw_t($aw_g); ?></p>
                 <?php foreach ($aw_items as $it): ?>
-                    <a class="awh-dlink" style="--i:<?php echo $aw_i++; ?>" href="<?php echo htmlspecialchars($it[2]); ?>"<?php echo $aw_cur($it[3]); ?>><i class="fas <?php echo $it[1]; ?>" aria-hidden="true"></i><?php echo htmlspecialchars($it[0]); ?><?php if (!empty($it[4])): ?><span class="awh-count"><?php echo (int)$it[4]; ?><span class="sr-only"> new</span></span><?php endif; ?></a>
+                    <a class="awh-dlink" style="--i:<?php echo $aw_i++; ?>" href="<?php echo htmlspecialchars($it[2]); ?>"<?php echo $aw_cur($it[3]); ?>><i class="fas <?php echo $it[1]; ?>" aria-hidden="true"></i><?php echo aw_t($it[0]); ?><?php if (!empty($it[4])): ?><span class="awh-count"><?php echo (int)$it[4]; ?><span class="sr-only"> new</span></span><?php endif; ?></a>
                 <?php endforeach; ?>
             <?php endforeach; ?>
         </div>
         <div class="awh-drawer-foot">
+            <nav class="awh-langs" aria-label="<?php echo aw_t('Language'); ?>"><i class="fas fa-language" aria-hidden="true"></i><?php foreach (AW_LANGS as $aw_lk => $aw_lv): ?><a href="<?php echo htmlspecialchars(aw_lang_url($aw_lk)); ?>" hreflang="<?php echo $aw_lk; ?>" lang="<?php echo $aw_lk; ?>"<?php echo $aw_lang === $aw_lk ? ' aria-current="true" class="is-on"' : ''; ?>><?php echo htmlspecialchars($aw_lv[1]); ?></a><?php endforeach; ?></nav>
             <?php if ($isLoggedIn): ?>
-                <a href="<?php echo $aw_u; ?>/search_results.php"><i class="fas fa-magnifying-glass" aria-hidden="true"></i> Search</a>
-                <a href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i> Log out</a>
+                <a href="<?php echo $aw_u; ?>/search_results.php"><i class="fas fa-magnifying-glass" aria-hidden="true"></i> <?php echo aw_t('Search'); ?></a>
+                <a href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i> <?php echo aw_t('Log out'); ?></a>
             <?php else: ?>
-                <a href="<?php echo $aw_u; ?>/login.php">Log in</a>
-                <a class="awh-join" href="<?php echo $aw_u; ?>/register.php">Join free</a>
+                <a href="<?php echo $aw_u; ?>/login.php"><?php echo aw_t('Log in'); ?></a>
+                <a class="awh-join" href="<?php echo $aw_u; ?>/register.php"><?php echo aw_t('Join free'); ?></a>
             <?php endif; ?>
         </div>
     </div>
