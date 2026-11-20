@@ -170,6 +170,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_email']) && val
     $aw_mail_check = aw_mail_diagnose(); // each step of sending, in plain words (never the password)
 }
 $aw_mail_test = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_plain_test']) && validate_csrf_token($_POST['csrf_token'] ?? '')) {
+    $aw_to = trim($_POST['test_to'] ?? '');
+    if (!filter_var($aw_to, FILTER_VALIDATE_EMAIL)) $aw_mail_test = ['ok' => false, 'msg' => 'Please enter a valid email address to send the test to.'];
+    else {
+        $ok = aw_mail_send_plain($aw_to, 'Plain test from AngelWrites, ' . date('j F'),
+            "Hello,\n\nThis is a plain test from AngelWrites, with no pictures and no links, sent on " . date('l j F Y') . ".\n\nIf this one reached your inbox but the normal test went to junk, the cause is the design or the links in our emails. If both went to junk, it is the sender's reputation.\n\nWith love and blessings,\nAngella Bottoman\nWriting with purpose and grace.");
+        $aw_mail_test = $ok ? ['ok' => true, 'msg' => 'Plain test sent to ' . $aw_to . '. Compare where it lands with the normal test email.']
+                            : ['ok' => false, 'msg' => 'The plain test could not be sent. Reason: ' . ($GLOBALS['aw_mail_last_error'] ?? 'unknown')];
+    }
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test_email'])) {
     $aw_to = trim($_POST['test_to'] ?? '');
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -464,10 +474,11 @@ $pageTitle = 'Site Settings';
                             <label for="test_to">Send a test email to</label>
                             <input type="email" id="test_to" name="test_to" value="<?php echo htmlspecialchars($_POST['test_to'] ?? $admin_email); ?>" required>
                             <small class="field-hint">If it fails, the reason is shown here, word for word.</small>
-                            <small class="field-hint" style="display:block;margin-top:6px;"><strong>Landing in junk?</strong> Open <a href="https://www.mail-tester.com" target="_blank" rel="noopener">mail-tester.com</a>, copy the address it shows, send the test email to that address, then press “Then check your score” there. It gives a score out of 10 and the exact reasons, so you know what to fix.</small>
+                            <small class="field-hint" style="display:block;margin-top:6px;"><strong>Landing in junk?</strong> Open <a href="https://www.mail-tester.com" target="_blank" rel="noopener">mail-tester.com</a>, copy the address it shows, send the test email to that address, wait about a minute, then press “Then check your score” on mail-tester's first page (the waiting page only finishes when the email has arrived; the free check allows 3 tests a day). It gives a score out of 10 and the exact reasons, so you know what to fix.</small>
                         </div>
                         <div class="form-actions">
                             <button type="submit" name="send_test_email" value="1" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send test email</button>
+                            <button type="submit" name="send_plain_test" value="1" class="btn btn-outline"><i class="fas fa-align-left"></i> Send a plain test (no pictures, no links)</button>
                         </div>
                     </form>
 

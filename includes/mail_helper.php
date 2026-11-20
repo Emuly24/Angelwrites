@@ -421,3 +421,33 @@ function aw_mail_diagnose(): array
     }
     return $out;
 }
+
+/**
+ * A plain test email: text only, no logo, no links, no layout. Sent next to the normal test email it
+ * shows where junk-marking comes from: if this one reaches the inbox and the normal one does not, the
+ * content or the links (the free gt.tc address) are the cause; if both go to junk, it is the sender's
+ * reputation. Returns true when sent; the reason is in $GLOBALS['aw_mail_last_error'] otherwise.
+ */
+function aw_mail_send_plain(string $to, string $subject, string $text): bool
+{
+    $GLOBALS['aw_mail_last_error'] = '';
+    try {
+        $cfg = aw_mail_config();
+        if (empty($cfg['ok'])) throw new \RuntimeException($cfg['error']);
+        $mail = new PHPMailer(true);
+        aw_mail_transport($mail, $cfg);
+        $mail->setFrom($cfg['from'], $cfg['from_name']);
+        $mail->Sender = $cfg['from'];
+        $mail->addReplyTo($cfg['from'], $cfg['from_name']);
+        $mail->addAddress($to);
+        $mail->Subject = $subject;
+        $mail->isHTML(false);
+        $mail->Body = $text;
+        if (function_exists('aw_mail_test_sink')) return (bool)aw_mail_test_sink(['to' => $to, 'subject' => $subject, 'mime' => ($mail->preSend() ? $mail->getSentMIMEMessage() : '')]);
+        return aw_mail_send($mail, $cfg);
+    } catch (\Throwable $e) {
+        $GLOBALS['aw_mail_last_error'] = $e->getMessage();
+        aw_mail_log_failure($to, $subject, $e->getMessage());
+        return false;
+    }
+}
