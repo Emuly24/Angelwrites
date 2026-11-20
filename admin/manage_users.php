@@ -179,6 +179,7 @@ require_once '../includes/header.php';
     <?php if (!$mu_rows): ?>
         <div class="mu-empty"><i class="fas fa-users" aria-hidden="true"></i><h2>No one here</h2><p><?php echo $mu_q !== '' ? 'Nobody matches "' . htmlspecialchars($mu_q) . '".' : 'No members in this view yet.'; ?></p></div>
     <?php else: ?>
+    <?php if (aw_can('contact_members')): ?><p class="mu-legend"><span class="mu-lg mu-lg-wa"><i class="fab fa-whatsapp" aria-hidden="true"></i> WhatsApp</span><span class="mu-lg mu-lg-call"><i class="fas fa-phone" aria-hidden="true"></i> Call</span><span class="mu-lg mu-lg-mail"><i class="fas fa-envelope" aria-hidden="true"></i> Email</span><span class="mu-lg mu-lg-no"><span class="mu-dot" aria-hidden="true"></span> Amber dot: they have not said yes to that way (members who joined before the question was asked have not answered yet)</span></p><?php endif; ?>
     <ul class="mu-list">
         <?php foreach ($mu_rows as $i => $u):
             $role = aw_role_of($u);
@@ -342,6 +343,9 @@ html[data-theme="dark"] .mu-tag.is-admin { background: #f0c4c5; color: #2c1e1e; 
 html[data-theme="dark"] .mu-tag.is-wait { background: #4a3a20; color: #ffe2b0; }
 .mu-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--mu-mute); font-size: .86rem; }
 .mu-meta .mu-email { overflow-wrap: anywhere; }
+.mu-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 0 0 12px; font-size: .82rem; color: var(--text-light, #6b5a5a); }
+.mu-lg { display: inline-flex; align-items: center; gap: 6px; } .mu-lg-wa i { color: #1a7a43; } .mu-lg-call i { color: #2f5f9c; } .mu-lg-mail i { color: #9c5457; }
+.mu-dot { width: 9px; height: 9px; border-radius: 50%; background: #d99a2b; display: inline-block; }
 .mu-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .mu-acts form { margin: 0; display: contents; }
 .mu-icon { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--mu-line);
