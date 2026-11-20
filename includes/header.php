@@ -195,7 +195,7 @@ if (!$isLoggedIn) {
     $aw_groups['AngelWrites'] = [['About Angella', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Contact', 'fa-envelope', $aw_u . '/contact.php', ['contact.php']]];
 } elseif ($isAdmin) {
     $aw_groups['Admin'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']], ['Books', 'fa-book', $aw_u . '/admin/manage_books.php', ['admin/manage_books.php']], ['Poems', 'fa-feather', $aw_u . '/admin/manage_poems.php', ['admin/manage_poems.php']],
-        ['Sessions', 'fa-calendar-check', $aw_u . '/admin/manage_sessions.php', ['admin/manage_sessions.php']], ['Members', 'fa-users', $aw_u . '/admin/manage_users.php', ['admin/manage_users.php']], ['Moderation', 'fa-shield-heart', $aw_u . '/admin/moderation.php', ['admin/moderation.php']],
+        ['Sessions', 'fa-calendar-check', $aw_u . '/admin/manage_sessions.php', ['admin/manage_sessions.php']], ['Members', 'fa-users', $aw_u . '/admin/manage_users.php', ['admin/manage_users.php']], ['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']], ['Moderation', 'fa-shield-heart', $aw_u . '/admin/moderation.php', ['admin/moderation.php']],
         ['Stories & Help', 'fa-seedling', $aw_u . '/admin/community.php', ['admin/community.php']], ['Settings', 'fa-sliders', $aw_u . '/admin/settings.php', ['admin/settings.php']]];
     $aw_groups['Site'] = [['View the site', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_unread], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
 } else {
@@ -208,7 +208,7 @@ if (!$isLoggedIn) {
         $aw_stories_on ? ['My Stories & Help', 'fa-pen', $aw_u . '/my_stories.php', ['my_stories.php']] : null,
         isLoggedIn() ? ['Share your book', 'fa-book-medical', $aw_u . '/share_book.php', ['share_book.php']] : null,
         ['Community Q&A', 'fa-circle-question', $aw_u . '/community.php', ['community.php']], ['Reading groups', 'fa-user-group', $aw_u . '/groups.php', ['groups.php', 'group.php']], ['Book a session', 'fa-calendar-check', $aw_u . '/book_session.php', ['book_session.php']]]));
-    if ($aw_is_staff) $aw_groups['Team'] = [['Staff dashboard', 'fa-shield-heart', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']]];
+    if ($aw_is_staff) $aw_groups['Team'] = [['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']], ['Staff dashboard', 'fa-shield-heart', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']]];
 }
 $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_stories.php', 'community.php', 'groups.php', 'group.php', 'book_session.php'];
 ?>
@@ -294,6 +294,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                             <div class="awh-menu-head"><strong><?php echo htmlspecialchars($aw_me['name']); ?></strong><span><?php echo htmlspecialchars($aw_me['email']); ?></span></div>
                             <?php if ($isAdmin): ?>
                                 <a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-gauge-high" aria-hidden="true"></i>Admin dashboard</a>
+                                <a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i>Team desk</a>
                                 <a href="<?php echo $aw_u; ?>/admin/moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Moderation</a>
                                 <a href="<?php echo $aw_u; ?>/index.php"><i class="fas fa-house" aria-hidden="true"></i>View the site</a>
                                 <a href="<?php echo $aw_u; ?>/account_security.php"><i class="fas fa-lock" aria-hidden="true"></i>Account security</a>
@@ -303,7 +304,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                                 <?php if ($aw_stories_on): ?><a href="<?php echo $aw_u; ?>/my_stories.php"><i class="fas fa-seedling" aria-hidden="true"></i>My Stories &amp; Help</a><?php endif; ?>
                                 <a href="<?php echo $aw_u; ?>/share_book.php"><i class="fas fa-book-medical" aria-hidden="true"></i>My shared books</a>
                                 <a href="<?php echo $aw_u; ?>/profile.php"><i class="fas fa-user" aria-hidden="true"></i>Profile</a>
-                                <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Staff dashboard</a><?php endif; ?>
+                                <?php if ($aw_is_staff): ?><a href="<?php echo $aw_u; ?>/admin/team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i>Team desk</a><a href="<?php echo $aw_u; ?>/admin/dashboard.php"><i class="fas fa-shield-heart" aria-hidden="true"></i>Staff dashboard</a><?php endif; ?>
                             <?php endif; ?>
                             <hr>
                             <a class="awh-out" href="<?php echo $aw_u; ?>/logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i>Log out</a>

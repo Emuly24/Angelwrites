@@ -121,6 +121,7 @@ require_once '../includes/header.php';
             </div>
             <div class="dsh-hero-actions">
                 <?php if (aw_can('manage_content')): ?><button type="button" class="dsh-pill dsh-pill-solid" onclick="openQuickModal()"><i class="fas fa-plus" aria-hidden="true"></i> Create</button><?php endif; ?>
+                <a class="dsh-pill" href="team.php"><i class="fas fa-hands-holding-circle" aria-hidden="true"></i> Team desk</a>
                 <?php if (aw_can('moderate')): ?><a class="dsh-pill" href="moderation.php"><i class="fas fa-shield-heart" aria-hidden="true"></i> Moderation</a><?php endif; ?>
                 <a class="dsh-pill" href="<?php echo SITE_URL; ?>/index.php"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> View site</a>
             </div>
