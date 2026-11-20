@@ -161,6 +161,7 @@ $audUrl = $f['audio'] !== '' ? SITE_URL . '/' . ltrim($f['audio'], '/') : '';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-writer-tools.js?v=1"></script><!-- Bible verse and Research buttons in the editor -->
 <script>
 (function () {
     var form = document.getElementById('poemForm');

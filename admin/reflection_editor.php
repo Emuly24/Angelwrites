@@ -344,12 +344,13 @@ $pageTitle = $id > 0 ? 'Edit Reflection' : 'Add New Reflection';
 
 <!-- ===== TINYMCE EDITOR ===== -->
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/aw-writer-tools.js?v=1"></script><!-- Bible verse and Research buttons in the editor -->
 <script>
     tinymce.init({
         selector: '#editor',
         height: 600,
         menubar: true,
-        plugins: 'anchor autolink charmap codesample emoticons image imagetools link lists media searchreplace table visualblocks wordcount',
+        plugins: 'anchor autolink charmap codesample emoticons image link lists media searchreplace table visualblocks wordcount',
         toolbar: 'undo redo | styleselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image media | table | code',
         content_style: 'body { font-family: Inter, sans-serif; font-size: 16px; line-height: 1.8; }',
         forced_root_block: 'p',
