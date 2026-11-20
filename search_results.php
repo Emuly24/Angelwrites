@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/poem_card.php'; // M1: poems use the shared poem card
+require_once 'includes/bible_versions.php'; // search the Bible too
 
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $type = isset($_GET['type']) ? trim($_GET['type']) : 'all';
@@ -114,11 +115,67 @@ foreach ($search_configs as $config) {
     }
 }
 
+// ----- one box for everything: the Bible, Stories & Help, Community Q&A and the text inside books -----
+$aw_bible_v = (string)($_GET['v'] ?? 'KJV');
+if (!isset(aw_bible_versions()[$aw_bible_v])) $aw_bible_v = (string)(array_key_first(aw_bible_versions()) ?? '');
+if ($q !== '' && mb_strlen($q) >= 3 && $aw_bible_v !== '' && ($type === 'all' || $type === 'bible')) {
+    // the whole phrase, then (if nothing) the longest word
+    $hits = aw_bible_search($aw_bible_v, $q);
+    if (!$hits && count($search_terms) > 1) { $long = $search_terms; usort($long, function ($a, $b) { return mb_strlen($b) <=> mb_strlen($a); }); $hits = aw_bible_search($aw_bible_v, $long[0]); }
+    $vshort = aw_bible_versions()[$aw_bible_v]['short'] ?? $aw_bible_v;
+    foreach (array_slice($hits, 0, $type === 'bible' ? 50 : 12) as $h) {
+        $results[] = ['type' => 'bible', 'id' => 0, 'title' => $h['book'] . ' ' . (int)$h['chapter'] . ':' . (int)$h['verse'] . ' (' . $vshort . ')', 'author' => null,
+            'description' => (string)$h['text'], 'image' => '', 'created_at' => '', 'slug' => null, 'content' => null, 'excerpt' => null,
+            'link' => SITE_URL . '/bible_reader.php?v=' . urlencode($aw_bible_v) . '&b=' . urlencode($h['book']) . '&c=' . (int)$h['chapter'] . '&vs=' . (int)$h['verse']];
+    }
+}
+if ($q !== '' && $like_terms && ($type === 'all' || $type === 'stories')) {
+    // only published public stories; a pseudonym is shown, never the person behind it
+    $w = buildSearchWhere(['p.title', 'p.body'], $like_terms);
+    try {
+        $st = $db->prepare("SELECT p.id, p.title, p.body, p.visibility, p.pseudonym, p.created_at, u.name, u.first_name, u.last_name, u.username
+                            FROM community_posts p LEFT JOIN users u ON u.id = p.author_id
+                            WHERE p.status = 'published' AND p.visibility IN ('named', 'pseudo') AND " . $w['where'] . " ORDER BY p.created_at DESC LIMIT 40");
+        $st->execute($w['params']);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $results[] = ['type' => 'story', 'id' => (int)$r['id'], 'title' => $r['title'], 'author' => $r['visibility'] === 'pseudo' ? $r['pseudonym'] : awDisplayName($r),
+                'description' => $r['body'], 'image' => '', 'created_at' => $r['created_at'], 'slug' => null, 'content' => null, 'excerpt' => null, 'link' => SITE_URL . '/story.php?id=' . (int)$r['id']];
+        }
+    } catch (Throwable $e) { error_log('search stories: ' . $e->getMessage()); }
+}
+if ($q !== '' && $like_terms && ($type === 'all' || $type === 'questions')) {
+    $w = buildSearchWhere(['title', 'body'], $like_terms);
+    try {
+        $st = $db->prepare("SELECT id, title, body, created_at FROM questions WHERE COALESCE(status, 'published') NOT IN ('removed', 'hidden', 'deleted') AND " . $w['where'] . " ORDER BY created_at DESC LIMIT 40");
+        $st->execute($w['params']);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $results[] = ['type' => 'question', 'id' => (int)$r['id'], 'title' => $r['title'], 'author' => null, 'description' => $r['body'], 'image' => '',
+                'created_at' => $r['created_at'], 'slug' => null, 'content' => null, 'excerpt' => null, 'link' => SITE_URL . '/community.php?id=' . (int)$r['id']];
+        }
+    } catch (Throwable $e) { error_log('search questions: ' . $e->getMessage()); }
+}
+if ($q !== '' && mb_strlen($q) >= 3 && ($type === 'all' || $type === 'inside')) {
+    // words inside the books themselves (their reader text): the book is found, with the passage
+    $w = buildSearchWhere(['c.content_html'], array_map(function ($t) { return '%' . $t . '%'; }, array_filter($search_terms, function ($t) { return mb_strlen($t) >= 3; })) ?: ['%' . $q . '%']);
+    try {
+        $st = $db->prepare("SELECT b.id, b.title, b.author, b.cover_path, b.created_at, c.content_html FROM book_content c JOIN books b ON b.id = c.book_id
+                            WHERE c.is_processed = 1 AND " . $w['where'] . " LIMIT 20");
+        $st->execute($w['params']);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $results[] = ['type' => 'inside', 'id' => (int)$r['id'], 'title' => $r['title'], 'author' => $r['author'], 'description' => $r['content_html'],
+                'image' => $r['cover_path'], 'created_at' => $r['created_at'], 'slug' => null, 'content' => null, 'excerpt' => null, 'link' => SITE_URL . '/book.php?id=' . (int)$r['id']];
+        }
+    } catch (Throwable $e) { error_log('search inside books: ' . $e->getMessage()); }
+}
+// how many of each kind (for the tabs)
+$aw_kind_counts = [];
+foreach ($results as $r) $aw_kind_counts[$r['type']] = ($aw_kind_counts[$r['type']] ?? 0) + 1;
+
 // Sorting
 if ($sort === 'newest') {
-    usort($results, function($a, $b) { return strtotime($b['created_at']) - strtotime($a['created_at']); });
+    usort($results, function($a, $b) { return (int)strtotime((string)$b['created_at']) - (int)strtotime((string)$a['created_at']); });
 } elseif ($sort === 'oldest') {
-    usort($results, function($a, $b) { return strtotime($a['created_at']) - strtotime($b['created_at']); });
+    usort($results, function($a, $b) { return (int)strtotime((string)$a['created_at']) - (int)strtotime((string)$b['created_at']); });
 } else {
     // F59: "Relevance" was the default but did nothing (results stayed in fetch order).
     // Score = term matches in the title × 3 + matches in the other text; ties go to the newest.
@@ -137,7 +194,7 @@ if ($sort === 'newest') {
     foreach ($results as &$r) { $r['_score'] = $score($r); }
     unset($r);
     usort($results, function ($a, $b) {
-        return ($b['_score'] <=> $a['_score']) ?: (strtotime($b['created_at']) <=> strtotime($a['created_at']));
+        return ($b['_score'] <=> $a['_score']) ?: ((int)strtotime((string)$b['created_at']) <=> (int)strtotime((string)$a['created_at']));
     });
 }
 
@@ -146,7 +203,7 @@ $total_results = count($results);
 $results = array_slice($results, $offset, $limit);
 $total_pages = ceil($total_results / $limit);
 $current_page = $page;
-$query_params = http_build_query(['q' => $q, 'type' => $type, 'sort' => $sort]);
+$query_params = http_build_query(['q' => $q, 'type' => $type, 'sort' => $sort, 'v' => $aw_bible_v]);
 
 // Q18: snippet = plain text (tags stripped, entities decoded) around the first matching term, up to
 // ~200 characters, instead of the first 200 bytes of raw HTML; matched terms are wrapped in <mark>.
@@ -199,13 +256,21 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
         <div class="search-header">
             <?php if ($q === ''): ?>
                 <h1>Search</h1>
-                <p>Search books, poems, blog posts, reflections and videos.</p>
+                <p>One box for everything: books (and the words inside them), poems, reflections, blog posts, videos, the Bible, Stories &amp; Help and Community Q&amp;A.</p>
             <?php else: ?>
             <h1>Search Results</h1>
             <p>Showing results for "<strong><?php echo htmlspecialchars($q); ?></strong>"</p>
             <div class="search-meta">
                 <span><?php echo number_format($total_results); ?> result<?php echo $total_results != 1 ? 's' : ''; ?> found</span>
             </div>
+            <?php $aw_kind_names = ['book' => ['Books', 'books'], 'inside' => ['Inside books', 'inside'], 'poem' => ['Poems', 'poems'], 'reflection' => ['Reflections', 'reflections'], 'blog' => ['Blog', 'blog'], 'video' => ['Videos', 'videos'], 'bible' => ['Bible', 'bible'], 'story' => ['Stories & Help', 'stories'], 'question' => ['Q&A', 'questions']]; ?>
+            <?php if ($type === 'all' && count($aw_kind_counts) > 1): ?>
+            <nav class="aw-kinds" aria-label="Show only">
+                <?php foreach ($aw_kind_names as $k => [$label, $tv]): if (empty($aw_kind_counts[$k])) continue; ?>
+                <a href="?<?php echo htmlspecialchars(http_build_query(['q' => $q, 'type' => $tv, 'sort' => $sort, 'v' => $aw_bible_v])); ?>"><?php echo htmlspecialchars($label); ?> <b><?php echo (int)$aw_kind_counts[$k] . (($k === 'bible' && $aw_kind_counts[$k] >= 12) ? '+' : ''); ?></b></a>
+                <?php endforeach; ?>
+            </nav>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
 
@@ -225,8 +290,18 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                         <option value="blog" <?php echo $type === 'blog' ? 'selected' : ''; ?>>Blog Posts</option>
                         <option value="reflections" <?php echo $type === 'reflections' ? 'selected' : ''; ?>>Reflections</option>
                         <option value="videos" <?php echo $type === 'videos' ? 'selected' : ''; ?>>Videos</option>
+                        <option value="bible" <?php echo $type === 'bible' ? 'selected' : ''; ?>>The Bible</option>
+                        <option value="inside" <?php echo $type === 'inside' ? 'selected' : ''; ?>>Inside books</option>
+                        <option value="stories" <?php echo $type === 'stories' ? 'selected' : ''; ?>>Stories &amp; Help</option>
+                        <option value="questions" <?php echo $type === 'questions' ? 'selected' : ''; ?>>Community Q&amp;A</option>
                     </select>
                 </div>
+                <?php if (count(aw_bible_versions()) > 1): ?>
+                <div class="filter-group">
+                    <label for="v">Bible version</label>
+                    <select id="v" name="v"><?php foreach (aw_bible_versions() as $vc => $vv): ?><option value="<?php echo htmlspecialchars($vc); ?>"<?php echo $vc === $aw_bible_v ? ' selected' : ''; ?>><?php echo htmlspecialchars($vv['short'] . ' · ' . $vv['language']); ?></option><?php endforeach; ?></select>
+                </div>
+                <?php endif; ?>
                 <div class="filter-group">
                     <label for="sort">Sort By</label>
                     <select id="sort" name="sort">
@@ -282,6 +357,8 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                         case 'video':
                             $link = SITE_URL . '/video_watch.php?id=' . $item['id'];
                             break;
+                        default: // bible, inside, story, question carry their own link
+                            $link = $item['link'] ?? SITE_URL . '/search_results.php';
                     }
                     if ($item['type'] === 'poem') {
                         // M1: a poem looks the same here as on the home page and Poetry
@@ -297,10 +374,10 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                                 <img src="<?php echo $image; ?>" alt="<?php echo $title; ?>" loading="lazy">
                             <?php else: ?>
                                 <div class="result-image-placeholder">
-                                    <i class="fas fa-<?php echo $item['type'] === 'book' ? 'book' : ($item['type'] === 'poem' ? 'pen' : ($item['type'] === 'blog' ? 'blog' : ($item['type'] === 'reflection' ? 'church' : 'video'))); ?>"></i>
+                                    <i class="fas fa-<?php echo ['book' => 'book', 'inside' => 'book-open', 'poem' => 'pen', 'blog' => 'pen-nib', 'reflection' => 'lightbulb', 'video' => 'circle-play', 'bible' => 'book-bible', 'story' => 'people-group', 'question' => 'circle-question'][$item['type']] ?? 'file'; ?>" aria-hidden="true"></i>
                                 </div>
                             <?php endif; ?>
-                            <span class="result-type-badge"><?php echo ucfirst($item['type']); ?></span>
+                            <span class="result-type-badge"><?php echo htmlspecialchars(['inside' => 'Inside a book', 'bible' => 'Bible', 'story' => 'Stories & Help', 'question' => 'Q&A'][$item['type']] ?? ucfirst($item['type'])); ?></span>
                         </div>
                         <div class="result-content">
                             <div class="result-meta">
@@ -310,7 +387,7 @@ $pageTitle = 'Search Results: ' . htmlspecialchars($q);
                                 <?php if ($read_time): ?>
                                     <span class="result-reading-time"><i class="fas fa-clock"></i> <?php echo $read_time; ?></span>
                                 <?php endif; ?>
-                                <span class="result-date"><?php echo date('M j, Y', strtotime($item['created_at'])); ?></span>
+                                <?php if (!empty($item['created_at'])): ?><span class="result-date"><?php echo date('M j, Y', strtotime($item['created_at'])); ?></span><?php endif; ?>
                             </div>
                             <h3><a href="<?php echo $link; ?>"><?php echo $title_marked; ?></a></h3>
                             <p class="result-description"><?php echo $description; ?></p>
@@ -441,6 +518,10 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+.aw-kinds { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.aw-kinds a { display: inline-flex; gap: 6px; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(156, 84, 87, .25); background: var(--card-bg, #fff); color: var(--text); text-decoration: none; font-weight: 600; font-size: .9rem; }
+.aw-kinds a b { color: #9c5457; } html[data-theme="dark"] .aw-kinds a b { color: #f0c4c5; }
+.aw-kinds a:hover { border-color: #9c5457; }
 /* ===== BASE ===== */
 /* M1: colours come from the site theme (style.css), so this page follows light and dark mode. */
 body { background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
