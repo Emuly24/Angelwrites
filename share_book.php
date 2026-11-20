@@ -19,7 +19,7 @@ $uid = (int)$_SESSION['user_id'];
 aw_mb_tables($db);
 
 $errors = [];
-$v = ['title' => '', 'author_name' => '', 'description' => '', 'why' => '', 'kind' => 'file', 'rights' => '', 'rights_detail' => '', 'link' => '', 'attest' => []];
+$v = ['title' => '', 'author_name' => '', 'description' => '', 'why' => '', 'kind' => 'file', 'rights' => '', 'rights_detail' => '', 'link' => '', 'allow_download' => '0', 'attest' => []];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -29,9 +29,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['aw_mb_flash'] = $ok ? 'Done. Your book has been removed from AngelWrites and its file deleted.' : 'That book could not be removed. Please try again.';
         header('Location: ' . SITE_URL . '/share_book.php#mine');
         exit;
+    } elseif (($_POST['action'] ?? '') === 'download') {
+        // the author changes whether members may download their book
+        $on = ($_POST['allow'] ?? '') === '1';
+        $ok = aw_mb_set_download($db, $uid, (int)($_POST['id'] ?? 0), $on);
+        $_SESSION['aw_mb_flash'] = $ok ? ($on ? 'Done. Members who can read your book can now download a copy.' : 'Done. Your book is read on AngelWrites only; nobody can download it.') : 'That could not be changed. Please try again.';
+        header('Location: ' . SITE_URL . '/share_book.php#mine');
+        exit;
     } else {
         $v = ['attest' => (array)($_POST['attest'] ?? [])];
-        foreach (['title', 'author_name', 'description', 'why', 'kind', 'rights', 'rights_detail', 'link'] as $f) $v[$f] = (string)($_POST[$f] ?? '');
+        foreach (['title', 'author_name', 'description', 'why', 'kind', 'rights', 'rights_detail', 'link', 'allow_download'] as $f) $v[$f] = (string)($_POST[$f] ?? '');
         $r = aw_mb_submit($db, $uid, $v, $v['kind'] === 'suggestion' ? null : ($_FILES['book_file'] ?? null));
         if (!empty($r['ok'])) {
             $_SESSION['aw_mb_flash'] = 'Thank you! "' . trim($v['title']) . '" is with the team for review. We will let you know here and in your notifications.';
@@ -56,6 +63,7 @@ require_once 'includes/header.php';
 echo aw_cp_assets();
 ?>
 <style>
+.mb-dl { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0 0; }
 .mb-steps { list-style: none; margin: 0 0 22px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
 .mb-steps li { background: var(--cp-card); border: 1px solid var(--cp-line); border-radius: 16px; padding: 14px; font-size: .9rem; line-height: 1.5; }
 .mb-steps strong { display: block; margin-bottom: 2px; }
@@ -147,6 +155,14 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
                 <textarea id="mbDetail" name="rights_detail" maxlength="500" rows="2"<?php echo $desc('rights_detail', 'mbDetailHint'); ?>><?php echo htmlspecialchars($v['rights_detail']); ?></textarea>
                 <?php echo $err('rights_detail'); ?>
             </div>
+            <fieldset class="cp-field" id="mbDownloadPart">
+                <legend class="cp-label">You wrote it: may members download a copy?</legend>
+                <span class="cp-hint">You can change this later in "Books you have shared".</span>
+                <div class="cp-options">
+                    <label class="cp-option"><input type="radio" name="allow_download" value="0"<?php echo $v['allow_download'] !== '1' ? ' checked' : ''; ?>><span><strong>No, read on AngelWrites only</strong><small>Members read it in the reader here; the file is never sent to anyone.</small></span></label>
+                    <label class="cp-option"><input type="radio" name="allow_download" value="1"<?php echo $v['allow_download'] === '1' ? ' checked' : ''; ?>><span><strong>Yes, members may download it</strong><small>Signed-in members get a Download button on the book's page and can keep a copy to read offline.</small></span></label>
+                </div>
+            </fieldset>
             <div class="cp-field mb-file<?php echo $cls('book_file'); ?>">
                 <label for="mbFile">The book file</label>
                 <span class="cp-hint" id="mbFileHint"><?php echo htmlspecialchars(aw_upload_hint('book')); ?>. It must have real text (a scanned PDF of page pictures cannot be read).</span>
@@ -185,6 +201,7 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
             document.getElementById('mbFilePart').hidden = !isFile;
             var r = form.querySelector('input[name="rights"]:checked');
             document.getElementById('mbDetailPart').hidden = !(isFile && r && r.dataset.detail === '1');
+            document.getElementById('mbDownloadPart').hidden = !(isFile && r && r.value === 'own'); // only the author decides
         }
         form.addEventListener('change', sync); sync();
     })();
@@ -204,6 +221,14 @@ html[data-theme="dark"] .mb-state.declined, html[data-theme="dark"] .mb-state.re
                 <span class="mb-meta">by <?php echo htmlspecialchars($m['author_name']); ?> · <?php echo htmlspecialchars(aw_mb_rights_label((string)($m['rights'] ?? '')) ?: 'Shared'); ?> · <?php echo htmlspecialchars(date('j M Y', strtotime($m['created_at']))); ?><?php if ($m['words']): ?> · <?php echo number_format((int)$m['words']); ?> words<?php endif; ?></span>
                 <?php if (trim((string)$m['review_note']) !== ''): ?><div class="mb-note"><strong>From the team:</strong> <?php echo htmlspecialchars($m['review_note']); ?></div>
                 <?php elseif ($m['status'] === 'removed'): ?><div class="mb-meta">You removed this book; its file was deleted.</div><?php endif; ?>
+                <?php if (in_array($m['status'], ['waiting', 'published'], true) && ($m['rights'] ?? '') === 'own' && ($m['kind'] ?? 'file') !== 'suggestion'): $dl = !empty($m['allow_download']); ?>
+                <form method="post" class="mb-dl">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                    <input type="hidden" name="action" value="download"><input type="hidden" name="id" value="<?php echo (int)$m['id']; ?>"><input type="hidden" name="allow" value="<?php echo $dl ? '0' : '1'; ?>">
+                    <span class="mb-meta"><i class="fas <?php echo $dl ? 'fa-download' : 'fa-book-open-reader'; ?>" aria-hidden="true"></i> <?php echo $dl ? 'Members may download it.' : 'Read on AngelWrites only.'; ?></span>
+                    <button type="submit" class="cp-btn cp-btn-sm cp-btn-soft"><?php echo $dl ? 'Stop downloads' : 'Allow downloads'; ?></button>
+                </form>
+                <?php endif; ?>
                 <?php if (in_array($m['status'], ['waiting', 'published'], true)): ?>
                 <form method="post" onsubmit="return confirm(<?php echo htmlspecialchars(json_encode($m['status'] === 'published' ? 'Remove this book from AngelWrites? Members will no longer be able to read it, and its file is deleted.' : 'Withdraw this book? Its file is deleted.'), ENT_QUOTES); ?>);" style="margin:4px 0 0;">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">

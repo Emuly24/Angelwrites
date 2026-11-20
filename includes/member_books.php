@@ -44,7 +44,7 @@ const AW_MB_RIGHTS = [
 const AW_MB_ATTEST = [
     'rights' => 'I may share this book in the way I chose: I upload a file only when sharing it is allowed, as I explained.',
     'rules'  => 'It fits the community guidelines and will help others here.',
-    'online' => 'I understand the team reviews it first, and that shared books are read on AngelWrites only (members cannot download them).',
+    'online' => 'I understand the team reviews it first, and that shared books are read on AngelWrites only, unless I wrote it and chose to let members download it.',
 ];
 
 function aw_mb_tables(PDO $db) {
@@ -83,6 +83,10 @@ function aw_mb_tables(PDO $db) {
         $cols = [];
         foreach ($db->query("PRAGMA table_info(books)") as $c) $cols[$c['name']] = true;
         if ($cols && !isset($cols['submitted_by'])) $db->exec("ALTER TABLE books ADD COLUMN submitted_by INTEGER");
+        // downloads: only when the book's author allows it (aw_book_download_ok)
+        if ($cols && !isset($cols['allow_download'])) $db->exec("ALTER TABLE books ADD COLUMN allow_download INTEGER NOT NULL DEFAULT 0");
+        if ($cols && !isset($cols['download_count'])) $db->exec("ALTER TABLE books ADD COLUMN download_count INTEGER NOT NULL DEFAULT 0");
+        if (!isset($mcols['allow_download'])) $db->exec("ALTER TABLE member_books ADD COLUMN allow_download INTEGER NOT NULL DEFAULT 0");
         $done = true;
         return true;
     } catch (Throwable $e) {
@@ -245,11 +249,14 @@ function aw_mb_submit(PDO $db, $uid, array $in, $file, $cover = null) {
     }
 
     $attest_text = implode("\n", AW_MB_ATTEST);
+    // only the author decides whether members may download a copy; for any other book it stays off
+    $allow_dl = ($rights === 'own' && (string)($in['allow_download'] ?? '0') === '1') ? 1 : 0;
     try {
         $db->prepare("INSERT INTO member_books (user_id, title, author_name, description, cover_path, file_path, file_type, file_size, words, pages, kind, rights, rights_detail, why, link, attest_text, attest_at, status)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'file', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'waiting')")
            ->execute([(int)$uid, $title, $author, $desc, $cover_path, $up['path'], $ex['type'] ?? '', (int)($up['bytes'] ?? 0), (int)$ex['words'], count($ex['pages']), $rights, $detail, $why, $link, $attest_text]);
         $id = (int)$db->lastInsertId();
+        if ($allow_dl) $db->prepare("UPDATE member_books SET allow_download = 1 WHERE id = ?")->execute([$id]);
     } catch (Throwable $e) {
         error_log('member book submit: ' . $e->getMessage());
         aw_mb_unlink($up['path'], $cover_path);
@@ -312,7 +319,8 @@ function aw_mb_decide(PDO $db, $id, $action, $reason, $staff_id) {
             $db->prepare("INSERT INTO books (title, author, description, price, is_free, is_sale, cover_path, file_path, file_type, file_size, file_author, release_date) VALUES (?, ?, ?, 0, 1, 0, ?, ?, ?, ?, ?, ?)")
                ->execute([$mb['title'], $mb['author_name'], $mb['description'], $mb['cover_path'], $is_file ? $mb['file_path'] : '', $is_file ? $mb['file_type'] : '', $is_file ? (int)$mb['file_size'] : 0, $mb['author_name'], date('Y-m-d')]);
             $book_id = (int)$db->lastInsertId();
-            $db->prepare("UPDATE books SET submitted_by = ? WHERE id = ?")->execute([(int)$mb['user_id'], $book_id]);
+            $db->prepare("UPDATE books SET submitted_by = ?, allow_download = ? WHERE id = ?")
+               ->execute([(int)$mb['user_id'], ($is_file && ($mb['rights'] ?? '') === 'own' && !empty($mb['allow_download'])) ? 1 : 0, $book_id]);
             $db->prepare("UPDATE member_books SET status = 'published', book_id = ?, review_note = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                ->execute([$book_id, $reason, (int)$staff_id, (int)$id]);
             $db->commit();
@@ -367,3 +375,36 @@ function aw_mb_rights_label($rights) {
     if ($rights === 'suggest') return 'Suggested by a member';
     return isset(AW_MB_RIGHTS[$rights]) ? ['own' => 'Shared by its author', 'public_domain' => 'Public domain', 'free_licence' => 'Free to share', 'permission' => 'Shared with permission'][$rights] : '';
 }
+
+/**
+ * The author changes their mind about downloads (their own book, "I wrote it", waiting or on the site).
+ * Returns true when saved.
+ */
+function aw_mb_set_download(PDO $db, $uid, $id, $allow) {
+    $mb = aw_mb_get($db, $id);
+    if (!$mb || (int)$mb['user_id'] !== (int)$uid || ($mb['rights'] ?? '') !== 'own' || ($mb['kind'] ?? 'file') === 'suggestion') return false;
+    if (!in_array($mb['status'], ['waiting', 'published'], true)) return false;
+    try {
+        $v = $allow ? 1 : 0;
+        $db->prepare("UPDATE member_books SET allow_download = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$v, (int)$id]);
+        if (!empty($mb['book_id'])) $db->prepare("UPDATE books SET allow_download = ? WHERE id = ?")->execute([$v, (int)$mb['book_id']]);
+        if (function_exists('aw_audit')) aw_audit('member_book_download_' . ($v ? 'on' : 'off'), 'member_book', (int)$id, '');
+        return true;
+    } catch (Throwable $e) {
+        error_log('member book download setting: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * May this visitor download this book's file? Only when its author allowed downloads, the book has a
+ * file, and the visitor is signed in and may read it (a free book, or one they bought; staff always).
+ */
+function aw_book_download_ok(PDO $db, array $book) {
+    if (empty($book['allow_download']) || trim((string)($book['file_path'] ?? '')) === '') return false;
+    if (!function_exists('isLoggedIn') || !isLoggedIn()) return false;
+    if (function_exists('isAdmin') && isAdmin()) return true;
+    if (!empty($book['is_free'])) return true;
+    return function_exists('aw_has_purchased') && aw_has_purchased($db, (int)$_SESSION['user_id'], (int)$book['id']);
+}
+

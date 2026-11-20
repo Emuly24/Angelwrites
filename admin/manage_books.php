@@ -197,6 +197,11 @@ if ($aw_upload_error !== '') {
                 $body .= "<p><a href='" . SITE_URL . "/admin/manage_books.php'>View all books</a></p>";
                 sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
             }
+            // Downloads: Angella's choice for her own books; a member's book keeps its author's choice
+            if (!empty($aw_book_id) && isset($_POST['allow_download']) && empty($edit_book['submitted_by'])) {
+                aw_mb_tables($db); // the allow_download column
+                $db->prepare("UPDATE books SET allow_download = ? WHERE id = ?")->execute([$_POST['allow_download'] === '1' ? 1 : 0, $aw_book_id]);
+            }
             // The automatic cover: made when there is none, and renewed (only when it is an automatic
             // one) after the title, author or file changed, or when "Make a fresh cover" was ticked.
             if (!empty($aw_book_id)) {
@@ -366,6 +371,18 @@ $pageTitle = 'Manage Books';
                                 <?php if ($edit_book): ?><label class="aw-autocover-new"><input type="checkbox" name="new_cover" value="1"> Make a fresh cover when saving</label><?php endif; ?>
                             </div>
                         </div>
+
+                        <!-- Downloads: the author's decision (member books keep what their author chose) -->
+                        <?php $aw_dl_member = $edit_book && !empty($edit_book['submitted_by']); $aw_dl_on = $edit_book && !empty($edit_book['allow_download']); ?>
+                        <fieldset class="form-group aw-dl-choice">
+                            <legend>Downloads</legend>
+                            <?php if ($aw_dl_member): ?>
+                                <p class="aw-dl-note"><i class="fas fa-user-pen" aria-hidden="true"></i> A member shared this book. <?php echo $aw_dl_on ? 'Its author lets readers download it.' : 'It is read on AngelWrites only.'; ?> Only the author can change this, in their "Books you have shared".</p>
+                            <?php else: ?>
+                                <label><input type="radio" name="allow_download" value="0"<?php echo !$aw_dl_on ? ' checked' : ''; ?>> <span><strong>Read on AngelWrites only</strong> (the file is never sent)</span></label>
+                                <label><input type="radio" name="allow_download" value="1"<?php echo $aw_dl_on ? ' checked' : ''; ?>> <span><strong>Readers may download it</strong>: only for a book Angella wrote or holds the rights to. Signed-in readers who may read it (free, or bought) get a Download button.</span></label>
+                            <?php endif; ?>
+                        </fieldset>
 
                         <!-- Book File Upload -->
                         <div class="form-group">
@@ -734,6 +751,11 @@ document.addEventListener('DOMContentLoaded', function() {
 .admin-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text); font-size: 0.9rem; }
 .admin-table tbody tr:hover { background: rgba(219,161,162,0.08); }
 .admin-table .check-col { width: 40px; }
+.aw-dl-choice { border: 1px solid var(--border); border-radius: 16px; padding: 12px 16px; }
+.aw-dl-choice legend { font-weight: 600; padding: 0 6px; }
+.aw-dl-choice label { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0; line-height: 1.5; cursor: pointer; }
+.aw-dl-choice input { margin-top: 4px; accent-color: #9c5457; width: 18px; height: 18px; flex: none; }
+.aw-dl-note { margin: 0; line-height: 1.5; }
 .aw-autocover-label { display: block; font-weight: 600; margin-bottom: 6px; }
 .aw-autocover-box { display: flex; gap: 14px; align-items: flex-start; border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--fantasy); }
 .aw-autocover-box img { width: 72px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 12px rgba(44,30,30,.18); flex: none; }

@@ -229,6 +229,14 @@ $aw_share_url = aw_share_url('book', (int)$book_id);
                             <a href="<?php echo SITE_URL; ?>/reader/reader.php?id=<?php echo $book_id; ?>" class="btn btn-primary btn-lg">
                                 <i class="fas fa-book-open"></i> Read Book
                             </a>
+                            <?php if (!empty($book['allow_download']) && !empty($book['file_path'])): // the author allows downloads ?>
+                                <?php if (aw_book_download_ok($db, $book)): ?>
+                                <a href="<?php echo SITE_URL; ?>/download.php?id=<?php echo (int)$book_id; ?>&amp;file=1" class="btn btn-outline btn-lg" rel="nofollow"><i class="fas fa-download" aria-hidden="true"></i> Download</a>
+                                <?php else: ?>
+                                <a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo $back_here; ?>" class="btn btn-outline btn-lg"><i class="fas fa-download" aria-hidden="true"></i> Sign in to download</a>
+                                <?php endif; ?>
+                                <p class="book-owned"><i class="fas fa-feather-pointed" aria-hidden="true"></i> The author lets readers download this book.</p>
+                            <?php endif; ?>
                         <?php elseif ($aw_suggested): // suggested without a file: members bring their own copy ?>
                             <?php if (trim((string)$aw_sharer['link']) !== ''): ?>
                             <a href="<?php echo htmlspecialchars($aw_sharer['link']); ?>" class="btn btn-primary btn-lg" target="_blank" rel="noopener nofollow"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> Get a copy</a>
