@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/admin_bulk.php'; // safe deletes
 require_once '../includes/mail_helper.php';
 
 aw_require('manage_content'); // K1
@@ -30,10 +31,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $scope = " AND category = 'Christian Reflections'";
     switch ($act) {
         case 'delete':
-            $db->prepare("DELETE FROM reflection_comments WHERE reflection_id IN ($in)")->execute($ids);
-            $db->prepare("DELETE FROM reactions WHERE target_type = 'reflection' AND target_id IN ($in)")->execute($ids);
-            $db->prepare("DELETE FROM blog_posts WHERE id IN ($in)$scope")->execute($ids);
-            aw_refl_back('success', count($ids) . ' reflection(s) deleted.');
+            // only reflections (not other blog posts); each delete tidies everything pointing at it
+            $st = $db->prepare("SELECT id FROM blog_posts WHERE id IN ($in)$scope");
+            $st->execute($ids);
+            $mine = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+            if ($mine) {
+                $db->prepare("DELETE FROM reflection_comments WHERE reflection_id IN (" . implode(',', $mine) . ")")->execute();
+                $db->prepare("DELETE FROM reactions WHERE target_type = 'reflection' AND target_id IN (" . implode(',', $mine) . ")")->execute();
+            }
+            [$done, $failed] = aw_bulk_delete($db, 'blog_posts', $mine);
+            aw_refl_back($failed ? 'error' : 'success', $done . ' reflection(s) deleted.' . ($failed ? ' ' . $failed . ' could not be deleted; please try again.' : ''));
         case 'publish':
             $db->prepare("UPDATE blog_posts SET status = 'published', published_at = COALESCE(published_at, CURRENT_TIMESTAMP) WHERE id IN ($in)$scope")->execute($ids);
             aw_refl_back('success', count($ids) . ' reflection(s) published.');

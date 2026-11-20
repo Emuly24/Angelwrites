@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/admin_bulk.php'; // bulk actions: safe deletes, the result shown after the redirect
 require_once '../includes/mail_helper.php';
 
 aw_require('moderate'); // K1
@@ -86,39 +87,19 @@ if (isset($_GET['unanswer'])) {
 
 // ===== BULK ACTIONS =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
-    $ids = isset($_POST['selected_ids']) ? explode(',', $_POST['selected_ids']) : [];
-    $action = $_POST['bulk_action'];
-
-    if (!empty($ids)) {
-        if ($action === 'delete') {
-            try {
-                $db->beginTransaction();
-                $placeholders = implode(',', array_fill(0, count($ids), '?'));
-                $stmt = $db->prepare("DELETE FROM answers WHERE question_id IN ($placeholders)");
-                $stmt->execute($ids);
-                $stmt = $db->prepare("DELETE FROM questions WHERE id IN ($placeholders)");
-                $stmt->execute($ids);
-                $db->commit();
-                $success = count($ids) . ' questions deleted.';
-            } catch (PDOException $e) {
-                $db->rollBack();
-                $error = 'Database error: ' . $e->getMessage();
-            }
-        } elseif ($action === 'answer') {
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = $db->prepare("UPDATE questions SET is_answered = 1 WHERE id IN ($placeholders)");
-            $stmt->execute($ids);
-            $success = count($ids) . ' questions marked as answered.';
-        } elseif ($action === 'unanswer') {
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = $db->prepare("UPDATE questions SET is_answered = 0 WHERE id IN ($placeholders)");
-            $stmt->execute($ids);
-            $success = count($ids) . ' questions marked as unanswered.';
-        }
+    $ids = aw_bulk_ids();
+    $action = (string)$_POST['bulk_action'];
+    if (!$ids) aw_bulk_done('manage_questions', '', 'Select at least one question.');
+    if ($action === 'delete') {
+        [$done, $failed] = aw_bulk_delete($db, 'questions', $ids); // their answers go with them
+        aw_bulk_done('manage_questions', aw_bulk_n($done, 'question') . ' deleted.', $failed ? aw_bulk_n($failed, 'question') . ' could not be deleted; please try again.' : '');
+    } elseif ($action === 'answer' || $action === 'unanswer') {
+        $db->prepare("UPDATE questions SET is_answered = ? WHERE id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")")->execute(array_merge([$action === 'answer' ? 1 : 0], $ids));
+        aw_bulk_done('manage_questions', aw_bulk_n(count($ids), 'question') . ($action === 'answer' ? ' marked as answered.' : ' marked as unanswered.'));
     }
-    header('Location: ' . SITE_URL . '/admin/manage_questions.php');
-    exit;
+    aw_bulk_done('manage_questions', '', 'Choose an action.');
 }
+aw_bulk_take('manage_questions', $success, $error);
 
 // ===== FETCH TOTAL QUESTIONS =====
 $count_sql = "
@@ -248,7 +229,8 @@ $pageTitle = 'Manage Questions';
                     <form method="POST" id="bulkForm">
                         <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
                         <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
-                        <div class="table-responsive">
+                    </form><!-- the bulk form only carries the choice: it must not wrap the table (row forms inside it were dropped by browsers) -->
+<div class="table-responsive">
                             <table class="admin-table">
                                 <thead>
                                     <tr>
@@ -306,7 +288,7 @@ $pageTitle = 'Manage Questions';
                                 </tbody>
                             </table>
                         </div>
-                    </form>
+                    <!-- end of list -->
 
                     <!-- Pagination -->
                     <?php if ($total_pages > 1): ?>
