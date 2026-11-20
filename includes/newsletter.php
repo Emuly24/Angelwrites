@@ -157,7 +157,9 @@ function aw_nl_render(PDO $db, $subject, $content, array $sub, array $opts = [])
         'signature' => $sig,
         'web_url' => $web,
         'kicker' => $site . ' Newsletter',
-        'pixel' => $track ? aw_nl_open_url($db, $qid, $sub['email'] ?? '') : '',
+        // no tracking image: hidden one-pixel images are a junk signal, and on this host the image address
+        // answers mail services with a browser check, so opens could not be counted anyway
+        'pixel' => '',
         'footer' => 'You are receiving this because you subscribed to the ' . $e($site) . ' newsletter at <a href="' . $e($base) . '" style="color:#c08a8b;">' . $e(preg_replace('#^https?://#', '', $base)) . '</a>.<br>'
             . ($unsub ? '<a href="' . $e($unsub) . '" style="color:#c08a8b;">Unsubscribe</a> · ' : '')
             . '<a href="' . $e($base) . '/contact.php" style="color:#c08a8b;">Contact us</a>'
@@ -198,6 +200,9 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
         $mail->addAddress($to);
         $mail->Subject = $subject;
         $mail->isHTML(true);
+        // the logo inside the email rather than fetched from the site (see aw_mail_embed_logo())
+        $nl_logo = rtrim(SITE_URL, '/') . '/' . ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/');
+        if (strpos($html, $nl_logo) !== false && function_exists('aw_mail_embed_logo') && aw_mail_embed_logo($mail)) $html = str_replace('src="' . htmlspecialchars($nl_logo, ENT_QUOTES) . '"', 'src="cid:awlogo"', $html);
         $mail->Body = $html;
         $mail->AltBody = $text;
         if ($unsubscribe_url) {

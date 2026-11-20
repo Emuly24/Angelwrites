@@ -464,6 +464,7 @@ $pageTitle = 'Site Settings';
                             <label for="test_to">Send a test email to</label>
                             <input type="email" id="test_to" name="test_to" value="<?php echo htmlspecialchars($_POST['test_to'] ?? $admin_email); ?>" required>
                             <small class="field-hint">If it fails, the reason is shown here, word for word.</small>
+                            <small class="field-hint" style="display:block;margin-top:6px;"><strong>Landing in junk?</strong> Open <a href="https://www.mail-tester.com" target="_blank" rel="noopener">mail-tester.com</a>, copy the address it shows, send the test email to that address, then press “Then check your score” there. It gives a score out of 10 and the exact reasons, so you know what to fix.</small>
                         </div>
                         <div class="form-actions">
                             <button type="submit" name="send_test_email" value="1" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send test email</button>

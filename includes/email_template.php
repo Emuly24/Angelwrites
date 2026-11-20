@@ -36,16 +36,17 @@ function aw_email_signature_html() {
 function aw_email_layout(array $o) {
     $site = function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites';
     $base = rtrim(defined('SITE_URL') ? SITE_URL : '', '/');
-    $logo = $base . '/' . ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/');
+    // the logo travels inside the email (cid:) when the sender embeds it: fetched from the site, mail
+    // services' image fetchers meet the free host's browser check instead of a picture (a junk signal)
+    $logo = !empty($GLOBALS['AW_EMAIL_INLINE_LOGO']) ? 'cid:awlogo' : $base . '/' . ltrim(function_exists('aw_logo_path') ? aw_logo_path() : 'assets/images/logo.png', '/');
     $e = 'aw_email_e';
     $font = "'Inter',Arial,Helvetica,sans-serif";
     $serif = "'Playfair Display',Georgia,'Times New Roman',serif";
     return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
         . '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>' . $e($o['subject'] ?? $site) . '</title>'
-        . '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">'
         . '<style>body{margin:0;padding:0;background:#F7F3ED;} a{color:#c08a8b;} .aw-body p{margin:0 0 14px;} .aw-body h2,.aw-body h3{font-family:' . $serif . ';color:#2c1e1e;} @media (max-width:620px){.aw-pad{padding-left:20px!important;padding-right:20px!important;}}</style>'
         . '</head><body style="margin:0;padding:0;background:#F7F3ED;">'
-        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F7F3ED;">' . $e($o['preheader'] ?? '') . '</div>'
+        . (trim((string)($o['preheader'] ?? '')) !== '' ? '<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">' . $e($o['preheader']) . '</div>' : '')
         . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F3ED;"><tr><td align="center" style="padding:24px 12px;">'
         . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #EFD8D6;">'
         . (!empty($o['web_url']) ? '<tr><td style="padding:10px 24px;background:#F7F3ED;font:12px ' . $font . ';color:#6b5a5a;text-align:right;"><a href="' . $e($o['web_url']) . '" style="color:#c08a8b;">View in your browser</a></td></tr>' : '')
