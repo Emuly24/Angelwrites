@@ -4,6 +4,7 @@ use PHPMailer\PHPMailer\Exception;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/load_env.php';
+require_once __DIR__ . '/inbox_help.php';
 
 /**
  * ET1: the site's mail goes through Zoho Mail, and only Zoho (the old Gmail route is removed).

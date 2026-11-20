@@ -127,6 +127,24 @@ require_once 'includes/header.php';
         </div>
     </section>
 
+    <?php // our emails may be in Junk: ask once, kindly, until the member says it is done (includes/inbox_help.php)
+    require_once __DIR__ . '/includes/inbox_help.php';
+    if (aw_inbox_help_due($db, (int)$_SESSION['user_id'])): ?>
+    <section class="dsh-invite dsh-inbox" aria-labelledby="dInbox">
+        <span class="dsh-invite-ico" aria-hidden="true"><i class="fas fa-envelope-open-text"></i></span>
+        <div>
+            <h2 id="dInbox">Are our emails in your Junk or Spam folder?</h2>
+            <p>Some mailboxes hide AngelWrites emails in Junk. Please find one, mark it <strong>Not spam</strong>, and add <strong><?php echo htmlspecialchars(aw_inbox_address()); ?></strong> to your contacts, so you never miss a reply, a code or the newsletter.</p>
+        </div>
+        <form method="POST" action="<?php echo SITE_URL; ?>/email_help.php" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>"><input type="hidden" name="back" value="dashboard">
+            <a class="dsh-pill dsh-pill-solid" href="<?php echo SITE_URL; ?>/email_help.php">Show me how</a>
+            <button type="submit" name="inbox_help" value="done" class="dsh-pill">Done</button>
+            <button type="submit" name="inbox_help" value="later" class="dsh-pill">Later</button>
+        </form>
+    </section>
+    <?php endif; ?>
+
     <?php // details the team relies on (country, phone, age range, sex, recovery question): ask until they are given
     require_once __DIR__ . '/includes/member_profile.php';
     $aw_miss = [];

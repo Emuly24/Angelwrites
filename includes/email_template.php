@@ -61,7 +61,10 @@ function aw_email_layout(array $o) {
         . '</td></tr>'
         . '<tr><td class="aw-pad" style="padding:20px 28px;background:#F7F3ED;border-top:1px solid #EFD8D6;font:12px/1.6 ' . $font . ';color:#6b5a5a;text-align:center;">'
         . ($o['footer'] ?? ('You received this email from ' . $e($site) . ' (<a href="' . $e($base) . '" style="color:#c08a8b;">' . $e(preg_replace('#^https?://#', '', $base)) . '</a>). Questions? Just reply to this email.'))
-        . '<br>' . $e($site) . ', Malawi</td></tr>'
+        . '<br>' . $e($site) . ', Malawi'
+        // found this in Junk? one line on how to keep the next ones in the inbox
+        . '<br><span style="color:#8a7676;">To make sure our emails reach your inbox, add ' . $e(function_exists('aw_inbox_address') ? aw_inbox_address() : 'angelwrites@zohomail.com') . ' to your contacts. <a href="' . $e($base) . '/email_help.php" style="color:#c08a8b;">How</a></span>'
+        . '</td></tr>'
         . '</table></td></tr></table>'
         . (!empty($o['pixel']) ? '<img src="' . $e($o['pixel']) . '" width="1" height="1" alt="" style="display:block;border:0;width:1px;height:1px;">' : '')
         . '</body></html>';
