@@ -39,6 +39,11 @@ Every poem and book now has a 1200×630 JPEG preview (`og_image.php`) at a stabl
 6. Open it with `/p/1` on the end in your browser: you should land on poem 1.
 7. On AngelWrites, go to **Admin → Settings → Link previews**, paste the address, and save.
 
+**If the Worker is connected to this GitHub repository** (Cloudflare "Builds"), it deploys by
+itself on every push to `main`, using `wrangler.toml` at the top of the repository (it points at
+`tools/share-relay/worker.js`). The Worker's name in Cloudflare must stay `angelwrites-share`, as in
+that file. Leave the build's root directory empty and the deploy command `npx wrangler deploy`.
+
 From then on the share buttons (Facebook, X, WhatsApp, copy link, the poem reader's Share) use the
 relay link. To stop using it, clear the field and save.
 
