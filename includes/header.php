@@ -56,7 +56,10 @@ if ($isLoggedIn) {
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     } catch (e) {} })();
     </script>
-    <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' : ''; ?><?php echo htmlspecialchars(aw_site_name()); /* F191 */ ?></title>
+    <?php // the site's name once, at the end (Google shows the title as the blue link in results)
+    $aw_sn = aw_site_name();
+    $aw_title = isset($pageTitle) && $pageTitle !== '' ? (stripos((string)$pageTitle, $aw_sn) !== false ? (string)$pageTitle : $pageTitle . ' | ' . htmlspecialchars($aw_sn)) : htmlspecialchars($aw_sn); ?>
+    <title><?php echo $aw_title; ?></title>
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-icons.css?v=1"><!-- the site's own pen, reflections and community icons -->
@@ -65,7 +68,11 @@ if ($isLoggedIn) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     
-    <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : 'AngelWrites — Christian writing and community platform by Angella Bottoman.'; ?>">
+    <?php // the description Google shows under the title (Admin > Settings > Email > Search engines, or this default)
+    $aw_site_desc = function_exists('aw_setting') ? trim((string)aw_setting('seo_description', '')) : '';
+    if ($aw_site_desc === '') $aw_site_desc = 'AngelWrites is the home of Angella Bottoman\'s Christian writing: poems, books, reflections and devotionals, the Bible in English and Chichewa, prayer and a caring community.';
+    if (!isset($og_description) && !isset($metaDescription)) $og_description = $aw_site_desc; ?>
+    <meta name="description" content="<?php echo isset($metaDescription) ? $metaDescription : (isset($og_description) ? htmlspecialchars($og_description) : htmlspecialchars($aw_site_desc)); ?>">
     <meta name="keywords" content="AngelWrites, Christian writing, faith, poetry, books, reflections, Angella Bottoman">
     <?php
     // search engines: members' own pages, team pages and tools are never listed (robots.txt says the same)
@@ -107,9 +114,14 @@ if ($isLoggedIn) {
 <link rel="canonical" href="<?php echo htmlspecialchars(rtrim(preg_replace('/([?&])(utm_[a-z]+|fbclid|preview|aw_t)=[^&]*(&|$)/', '$1', html_entity_decode($og_url, ENT_QUOTES)), '?&'), ENT_QUOTES); ?>">
 <?php
     // structured data for search engines: the site (with its search box) everywhere; the writing itself on its own pages
-    $aw_ld = [['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => aw_site_name(), 'url' => rtrim(SITE_URL, '/') . '/',
+    $aw_ld = [['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => aw_site_name(), 'alternateName' => ['Angel Writes', 'Angelwrites', 'AngelWrites by Angella Bottoman'], 'url' => rtrim(SITE_URL, '/') . '/',
+               'description' => $aw_site_desc,
                'potentialAction' => ['@type' => 'SearchAction', 'target' => rtrim(SITE_URL, '/') . '/search_results.php?q={search_term_string}', 'query-input' => 'required name=search_term_string']]];
     if ($aw_seo_here === 'index.php' || $aw_seo_here === '' || $aw_seo_here === 'about.php') {
+        $aw_same = [];
+        try { if (isset($GLOBALS['db'])) foreach ($GLOBALS['db']->query("SELECT url FROM social_accounts WHERE COALESCE(url, '') <> ''")->fetchAll(PDO::FETCH_COLUMN) as $aw_su) if (preg_match('#^https://#', (string)$aw_su)) $aw_same[] = (string)$aw_su; } catch (Throwable $e) { /* no social accounts table yet */ }
+        $aw_ld[] = array_filter(['@context' => 'https://schema.org', '@type' => 'Organization', 'name' => aw_site_name(), 'url' => rtrim(SITE_URL, '/') . '/', 'logo' => rtrim(SITE_URL, '/') . '/assets/images/og-logo.jpg',
+                    'description' => $aw_site_desc, 'founder' => ['@type' => 'Person', 'name' => 'Angella Bottoman'], 'sameAs' => $aw_same]);
         $aw_ld[] = ['@context' => 'https://schema.org', '@type' => 'Person', 'name' => 'Angella Bottoman', 'url' => rtrim(SITE_URL, '/') . '/about.php', 'jobTitle' => 'Christian writer and poet', 'nationality' => 'Malawi'];
     }
     $aw_ld_type = ['poem_view.php' => 'CreativeWork', 'book.php' => 'Book', 'blog_post.php' => 'BlogPosting', 'video_watch.php' => 'VideoObject'][$aw_seo_here] ?? '';

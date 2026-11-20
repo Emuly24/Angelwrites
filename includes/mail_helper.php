@@ -75,6 +75,12 @@ function aw_mail_transport(PHPMailer $mail, array $cfg): void
     $mail->Port       = (int)$cfg['port'];
     $mail->Timeout    = 12; // PHPMailer's default is 300 s, longer than the host allows a request to run
     $mail->CharSet    = 'UTF-8';
+    // inbox, not junk: no "X-Mailer: PHPMailer" header (spam filters score it), and a Message-ID from the
+    // sending mailbox's own domain rather than the hosting server's name
+    $mail->XMailer    = ' ';
+    $dom = strtolower((string)substr((string)strrchr((string)($cfg['from'] ?? $cfg['username']), '@'), 1));
+    if ($dom !== '') $mail->Hostname = $dom;
+    $mail->Encoding   = PHPMailer::ENCODING_QUOTED_PRINTABLE;
 }
 
 /**
@@ -163,7 +169,7 @@ function aw_mail_automated_note(): string
  * shared by sendEmail(), sendConversationalEmail() and sendEmailWithAttachment().
  *
  * $m: to, subject, message, is_html, from_name,
- *     kind  'transactional' (default): From "<name> (no reply)", automated-message footer
+ *     kind  'transactional' (default): automated-message footer
  *           'conversational': From "<name>", a button to $m['reply_url'] and a "not monitored" note
  *     reply_url, reply_label, attachment ['path' =>, 'name' =>], opts (passed to the template)
  * Throws on a configuration problem; callers catch.
@@ -182,10 +188,11 @@ function aw_mail_prepare(array $m): PHPMailer
 
     $mail = new PHPMailer(true);
     aw_mail_transport($mail, $cfg);
-    // From is always the mailbox we sign in as (SPF/DKIM align). Transactional mail says so in the name.
-    $mail->setFrom($cfg['from'], $kind === 'transactional' ? $fromName . ' (no reply)' : $fromName);
+    // From is always the mailbox we sign in as (SPF/DKIM align). Replies go back to that same mailbox:
+    // a Reply-To on another domain without a mailbox, or "(no reply)" in the name, sends mail to junk.
+    $mail->setFrom($cfg['from'], $fromName);
     $mail->Sender = $cfg['from'];
-    $mail->addReplyTo(aw_mail_noreply_address($cfg['from']), $kind === 'transactional' ? $fromName . ' (no reply)' : $fromName . ' (replies not monitored)');
+    $mail->addReplyTo($cfg['from'], $fromName);
     $mail->addAddress((string)$m['to']);
     $mail->Subject = (string)$m['subject'];
 
@@ -252,8 +259,8 @@ function aw_mail_deliver(array $m, string $fn): bool
  * Send a TRANSACTIONAL email (the default): codes, receipts, alerts, confirmations. Nobody is
  * expected to answer it.
  *
- *   From      the site's mailbox, shown as "<fromName> (no reply)"
- *   Reply-To  a no-reply address (see aw_mail_noreply_address())
+ *   From      the site's mailbox, shown as "<fromName>"
+ *   Reply-To  the same mailbox (a no-reply address on another domain made mail land in junk)
  *   Footer    "This is an automated message from AngelWrites. Please do not reply to this email."
  *
  * Returns true on success and false on failure. It never stops the page: callers have usually

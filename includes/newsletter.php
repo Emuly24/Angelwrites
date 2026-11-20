@@ -190,11 +190,11 @@ function aw_nl_mail($to, $subject, $html, $text, $unsubscribe_url = '', array $a
         }
         aw_mail_transport($mail, $cfg);
         $from = $cfg['from'];
-        // ET2: newsletters are transactional mail: "(no reply)" in the name, replies pointed at no-reply
-        $nl_name = (function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites') . ' Newsletter (no reply)';
+        // the sender's own mailbox as From and Reply-To (a no-reply address on another domain sends mail to junk)
+        $nl_name = function_exists('aw_site_name') ? aw_site_name() : 'AngelWrites';
         $mail->setFrom($from, $nl_name);
         $mail->Sender = $from;
-        $mail->addReplyTo(aw_mail_noreply_address($from), $nl_name);
+        $mail->addReplyTo($from, $nl_name);
         $mail->addAddress($to);
         $mail->Subject = $subject;
         $mail->isHTML(true);
