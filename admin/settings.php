@@ -142,6 +142,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_seo']) && valida
 }
 if (!empty($_SESSION['aw_seo_flash'])) { $aw_seo_msg = ['ok' => true, 'msg' => $_SESSION['aw_seo_flash']]; unset($_SESSION['aw_seo_flash']); }
 
+// ===== Angella's handwritten signature for emails (includes/email_signature.php) =====
+$aw_sig_msg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_signature']) || isset($_POST['remove_signature'])) && validate_csrf_token($_POST['csrf_token'] ?? '')) {
+    require_once __DIR__ . '/../includes/email_signature.php';
+    if (isset($_POST['remove_signature'])) {
+        $aw_sig_msg = aw_signature_remove() ? ['ok' => true, 'msg' => 'The signature was removed. Emails show your typed name.'] : ['ok' => false, 'msg' => 'The signature could not be removed.'];
+    } else {
+        $aw_src = (string)($_POST['signature_data'] ?? '');
+        if ($aw_src === '' && !empty($_FILES['signature_file']['tmp_name']) && is_uploaded_file($_FILES['signature_file']['tmp_name'])) $aw_src = (string)file_get_contents($_FILES['signature_file']['tmp_name']);
+        $aw_err = $aw_src === '' ? 'Please sign in the box, or choose a photo of your signature.' : aw_signature_save($aw_src);
+        $aw_sig_msg = $aw_err === '' ? ['ok' => true, 'msg' => 'Saved. Your signature now appears in signed emails. Send yourself a test email to see it.'] : ['ok' => false, 'msg' => $aw_err];
+    }
+}
+
 // ===== Link previews: the address of the free preview relay (tools/share-relay/README.md) =====
 $aw_share_msg = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_share_base'])) {
@@ -252,7 +266,7 @@ $pageTitle = 'Site Settings';
         <!-- ===== SETTINGS TABS ===== -->
         <div class="settings-tabs">
             <button class="tab-btn active" data-tab="general">General</button>
-            <button class="tab-btn" data-tab="branding">Branding</button>
+            <button class="tab-btn<?php echo ($aw_sig_msg || ($_GET['tab'] ?? '') === 'branding') ? ' aw-open-email' : ''; ?>" data-tab="branding">Branding</button>
             <button class="tab-btn<?php echo ($aw_mail_test || $aw_ih_msg || $aw_mail_check || $aw_seo_msg || $aw_share_msg || ($_GET['tab'] ?? '') === 'email') ? ' aw-open-email' : ''; ?>" data-tab="email">Email</button><!-- VF3 -->
             <button class="tab-btn<?php echo ($aw_quota_msg || ($_GET['tab'] ?? '') === 'uploads') ? ' aw-open-email' : ''; ?>" data-tab="uploads">Uploads</button><!-- R13 -->
         </div>
@@ -347,6 +361,67 @@ $pageTitle = 'Site Settings';
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+            <div class="card" id="signature" style="margin-top:20px;">
+                <div class="card-header"><h2><i class="fas fa-signature"></i> Your signature in emails</h2></div>
+                <div class="card-body">
+                    <?php require_once __DIR__ . '/../includes/email_signature.php'; $aw_sig_now = aw_signature_data_uri(); ?>
+                    <?php if ($aw_sig_msg): ?><div class="alert <?php echo $aw_sig_msg['ok'] ? 'alert-success' : 'alert-error'; ?>"><?php echo htmlspecialchars($aw_sig_msg['msg']); ?></div><?php endif; ?>
+                    <p style="color:var(--text-light);margin:0 0 12px;">Your handwritten signature appears under “With love and blessings,” in the emails that are signed by you (newsletters you sign, welcome and other site emails, and your own replies in the Team inbox). Replies by others on the team are signed “AngelWrites Team”.</p>
+                    <?php if ($aw_sig_now !== ''): ?>
+                        <div class="aw-sig-now"><span>Current signature</span><img src="<?php echo $aw_sig_now; ?>" alt="Your current signature"></div>
+                    <?php endif; ?>
+                    <form method="POST" enctype="multipart/form-data" id="sigForm" action="<?php echo SITE_URL; ?>/admin/settings.php?tab=branding#signature">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+                        <input type="hidden" name="signature_data" id="sigData" value="">
+                        <p style="margin:0 0 6px;font-weight:600;">Sign here with your finger, a stylus or the mouse</p>
+                        <div class="aw-sig-pad-wrap"><canvas id="sigPad" class="aw-sig-pad" aria-label="Signature pad: draw your signature here"></canvas><span class="aw-sig-line" aria-hidden="true">✕</span></div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px;">
+                            <button type="button" class="btn btn-outline btn-sm" id="sigClear"><i class="fas fa-eraser"></i> Clear</button>
+                            <button type="button" class="btn btn-outline btn-sm" id="sigUndo"><i class="fas fa-rotate-left"></i> Undo last stroke</button>
+                        </div>
+                        <div class="form-group"><label for="sigFile">Or upload a photo of your signature <small>(dark ink on white paper works best)</small></label>
+                            <input type="file" id="sigFile" name="signature_file" accept="image/png,image/jpeg,image/webp"></div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <button type="submit" name="save_signature" value="1" class="btn btn-primary"><i class="fas fa-save"></i> Save signature</button>
+                            <?php if ($aw_sig_now !== ''): ?><button type="submit" name="remove_signature" value="1" class="btn btn-outline" onclick="return confirm('Remove your signature from emails?');">Remove signature</button><?php endif; ?>
+                        </div>
+                        <p class="field-hint" style="margin-top:8px;">The paper is made see-through and the picture is cropped to your signature automatically.</p>
+                    </form>
+                    <style>
+                        .aw-sig-now{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-bottom:16px}
+                        .aw-sig-now span{color:#6b5757;font-size:.9rem}.aw-sig-now img{max-width:240px;height:auto}
+                        .aw-sig-pad-wrap{position:relative;border:2px dashed #d9b3b4;border-radius:14px;background:#fff;max-width:560px}
+                        .aw-sig-pad{display:block;width:100%;height:180px;touch-action:none;cursor:crosshair;border-radius:12px}
+                        .aw-sig-line{position:absolute;left:16px;right:16px;bottom:40px;border-bottom:1px solid #e3cfcf;color:#c9a9aa;font-size:.9rem;line-height:1;pointer-events:none}
+                    </style>
+                    <script>
+                    (function () {
+                      var c = document.getElementById('sigPad'); if (!c) return;
+                      var ctx = c.getContext('2d'), strokes = [], cur = null, dpr = Math.max(1, window.devicePixelRatio || 1);
+                      function size() { var r = c.getBoundingClientRect(); c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); draw(); }
+                      function draw() {
+                        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height); ctx.scale(dpr, dpr);
+                        ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1f2a44';
+                        strokes.forEach(function (s) {
+                          for (var i = 1; i < s.length; i++) { ctx.lineWidth = s[i].w; ctx.beginPath(); ctx.moveTo(s[i - 1].x, s[i - 1].y); ctx.lineTo(s[i].x, s[i].y); ctx.stroke(); }
+                          if (s.length === 1) { ctx.beginPath(); ctx.arc(s[0].x, s[0].y, 1.4, 0, 7); ctx.fillStyle = '#1f2a44'; ctx.fill(); }
+                        });
+                      }
+                      function pt(e) { var r = c.getBoundingClientRect(); var p = e.pressure && e.pointerType === 'pen' ? e.pressure : .5; return { x: e.clientX - r.left, y: e.clientY - r.top, w: 1.6 + p * 2.6 }; }
+                      c.addEventListener('pointerdown', function (e) { c.setPointerCapture(e.pointerId); cur = [pt(e)]; strokes.push(cur); draw(); e.preventDefault(); });
+                      c.addEventListener('pointermove', function (e) { if (!cur) return; var p = pt(e), l = cur[cur.length - 1], d = Math.hypot(p.x - l.x, p.y - l.y); p.w = Math.max(1.4, Math.min(4.2, (l.w * .7) + (3.6 - Math.min(d, 20) / 8) * .3)); cur.push(p); draw(); e.preventDefault(); });
+                      ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { c.addEventListener(t, function () { cur = null; }); });
+                      document.getElementById('sigClear').addEventListener('click', function () { strokes = []; draw(); });
+                      document.getElementById('sigUndo').addEventListener('click', function () { strokes.pop(); draw(); });
+                      document.getElementById('sigForm').addEventListener('submit', function (e) {
+                        if (e.submitter && e.submitter.name === 'remove_signature') return;
+                        document.getElementById('sigData').value = strokes.length ? c.toDataURL('image/png') : '';
+                      });
+                      window.addEventListener('resize', size); size();
+                    })();
+                    </script>
                 </div>
             </div>
         </div>

@@ -5,6 +5,7 @@ use PHPMailer\PHPMailer\Exception;
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/load_env.php';
 require_once __DIR__ . '/inbox_help.php';
+require_once __DIR__ . '/email_signature.php';
 
 /**
  * ET1: the site's mail goes through Zoho Mail, and only Zoho (the old Gmail route is removed).
@@ -222,6 +223,7 @@ function aw_mail_prepare(array $m): PHPMailer
     $GLOBALS['AW_EMAIL_INLINE_LOGO'] = aw_mail_embed_logo($mail);
     [$html, $text] = aw_email_brand((string)$m['subject'], (string)$m['message'], !empty($m['is_html']), $opts);
     $GLOBALS['AW_EMAIL_INLINE_LOGO'] = false;
+    $html = aw_signature_apply($mail, $html); // her handwritten signature, when this email is signed
     $mail->isHTML(true);
     $mail->Body    = $html;
     $mail->AltBody = $text;
