@@ -1,536 +1,359 @@
 <?php
+/**
+ * Members: find people, see who still has to verify, verify by hand, message or delete.
+ *
+ * Redesigned as a list of member cards (no wide table): every action, Delete included, is always in
+ * view on any screen, with no sideways scrolling.
+ *
+ * What changed and why:
+ *  - Bulk actions work. The old bulk form wrapped the table and each row's role picker was a form
+ *    inside it; browsers drop nested forms, so a bulk "Apply" sent a role change instead.
+ *  - Roles are no longer changed here. "Promote to admin" let any admin make admins or demote the
+ *    owner; staff roles belong to the owner's Staff & roles page (admin/staff.php), linked from here.
+ *  - Every change is a POST with the CSRF token (added by the staff script), deletes included, and
+ *    the result is shown after the redirect.
+ *  - Owner and admin accounts are never deleted here (their writing would go with them).
+ */
 require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
-require_once '../includes/safe_delete.php'; // deletes that tidy everything pointing at the row
+require_once '../includes/admin_bulk.php'; // safe deletes, results after the redirect
 require_once '../includes/mail_helper.php';
-require_once '../includes/csrf.php'; // VF3
 
-aw_require('manage_members'); // K1
+aw_require('manage_members'); // K1 (checks the CSRF token on every POST)
 
 $error = '';
 $success = '';
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$aw_filter = (($_GET['filter'] ?? '') === 'unverified') ? 'unverified' : ''; // VF3
-$limit = 10;
-$offset = ($page - 1) * $limit;
+$mu_me = (int)$_SESSION['user_id'];
 
-// ===== HANDLE DELETE =====
-if (isset($_GET['delete'])) {
-    $id = (int)$_GET['delete'];
-    if ($id === $_SESSION['user_id']) {
-        $error = 'You cannot delete your own account.';
-    } else {
-        $stmt = $db->prepare("SELECT name, first_name, last_name, username, email, role FROM users WHERE id = ?");
-        $stmt->execute([$id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$user) {
-            $_SESSION['aw_users_flash'] = ['error', 'That account was already deleted.'];
-        } elseif (in_array($user['role'], ['owner', 'admin'], true)) {
-            // their books, poems and posts would be deleted with them: change the role to member first
-            $_SESSION['aw_users_flash'] = ['error', 'Admin and owner accounts cannot be deleted here. Change the role to member first (Staff & roles), then delete.'];
-        } else {
-            // the database refused to delete members with any activity (foreign keys): aw_safe_delete tidies it
-            $r = aw_safe_delete($db, 'users', $id);
-            if (!empty($r['ok'])) {
-                if (function_exists('aw_audit')) aw_audit('user_delete', 'user', $id, (string)$user['email']);
-                $aw_name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) ?: ($user['name'] ?: $user['username']);
-                $_SESSION['aw_users_flash'] = ['ok', $aw_name . ' (' . $user['email'] . ') was deleted.'];
-                $body = "<h2>Member account deleted</h2><p><strong>Name:</strong> " . htmlspecialchars($aw_name) . "</p><p><strong>Email:</strong> " . htmlspecialchars($user['email']) . "</p>";
-                @sendEmail(aw_admin_email(), 'Member deleted: ' . $aw_name, $body, 'angelwrites@zohomail.com', 'AngelWrites');
-            } else {
-                $_SESSION['aw_users_flash'] = ['error', $r['error']];
-            }
+/** Delete one member. Returns [ok, message]. */
+function aw_mu_delete(PDO $db, $id, $me) {
+    $id = (int)$id;
+    if ($id === (int)$me) return [false, 'You cannot delete your own account.'];
+    $st = $db->prepare("SELECT id, name, first_name, last_name, username, email, role FROM users WHERE id = ?");
+    $st->execute([$id]);
+    $u = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$u) return [false, 'That account was already deleted.'];
+    if (in_array(aw_role_of($u), ['owner', 'admin'], true)) return [false, awDisplayName($u) . ' is an admin. Admin and owner accounts are not deleted here: make them a member in Staff & roles first.'];
+    $r = aw_safe_delete($db, 'users', $id); // tidies everything that pointed at the member
+    if (empty($r['ok'])) return [false, awDisplayName($u) . ' could not be deleted just now: ' . ($r['error'] ?? 'please try again.')];
+    if (function_exists('aw_audit')) aw_audit('user_delete', 'user', $id, (string)$u['email']);
+    return [true, awDisplayName($u)];
+}
+
+// ===== ACTIONS (all POST) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $act = (string)($_POST['bulk_action'] ?? $_POST['row_action'] ?? '');
+    $ids = isset($_POST['row_id']) ? aw_bulk_ids('row_id') : aw_bulk_ids();
+    if (!$ids) aw_bulk_done('manage_users', '', 'Select at least one member.');
+
+    if ($act === 'delete') {
+        $done = []; $problems = [];
+        foreach ($ids as $id) { [$ok, $msg] = aw_mu_delete($db, $id, $mu_me); if ($ok) $done[] = $msg; else $problems[] = $msg; }
+        if ($done) {
+            $body = '<h2>Member account' . (count($done) > 1 ? 's' : '') . ' deleted</h2><p>' . implode('<br>', array_map('htmlspecialchars', $done)) . '</p>';
+            @sendEmail(aw_admin_email(), count($done) === 1 ? 'Member deleted: ' . $done[0] : count($done) . ' members deleted', $body, 'angelwrites@zohomail.com', 'AngelWrites');
         }
-        header('Location: ' . SITE_URL . '/admin/manage_users.php');
-        exit;
+        aw_bulk_done('manage_users', $done ? (count($done) === 1 ? $done[0] . ' was deleted.' : count($done) . ' members were deleted.') : '', implode(' ', $problems));
     }
-}
-
-if (!empty($_SESSION['aw_users_flash'])) {
-    if ($_SESSION['aw_users_flash'][0] === 'ok') $success = $_SESSION['aw_users_flash'][1]; else $error = $_SESSION['aw_users_flash'][1];
-    unset($_SESSION['aw_users_flash']);
-}
-
-// ===== VF3: VERIFY BY HAND, OR SEND A NEW CODE =====
-// For members whose verification email did not arrive.
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aw_user_action'])) {
-    [$aw_act, $aw_uid] = array_pad(explode(':', (string)$_POST['aw_user_action'], 2), 2, '');
-    $aw_uid = (int)$aw_uid;
-    $stmt = $db->prepare("SELECT id, email, first_name, name, is_verified FROM users WHERE id = ?");
-    $stmt->execute([$aw_uid]);
-    $aw_u = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) {
-        $error = 'Your session expired. Please reload the page and try again.';
-    } elseif (!$aw_u) {
-        $error = 'That account no longer exists.';
-    } elseif ($aw_act === 'verify') {
-        $db->prepare("UPDATE users SET is_verified = 1, verification_code = NULL, verification_code_expiry = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$aw_uid]);
-        $success = $aw_u['email'] . ' is now verified and can log in.';
-    } elseif ($aw_act === 'code' && (int)$aw_u['is_verified'] === 0) {
-        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $db->prepare("UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE id = ?")
-           ->execute([$code, date('Y-m-d H:i:s', strtotime('+24 hours')), $aw_uid]);
-        $greet = trim((string)($aw_u['first_name'] ?: $aw_u['name'] ?: 'there'));
-        $body = "Hello $greet,\n\nYour AngelWrites verification code is: $code\n\nEnter it at " . SITE_URL . "/verify.php?email=" . rawurlencode($aw_u['email']) . "\n\nThis code will expire in 24 hours.\n\n— AngelWrites Team";
-        if (sendEmail($aw_u['email'], 'Your AngelWrites verification code', $body, 'angelwrites@zohomail.com', 'AngelWrites')) {
-            $success = 'A new verification code was sent to ' . $aw_u['email'] . '.';
-        } else {
-            $error = 'The code could not be emailed to ' . $aw_u['email'] . '. Reason: ' . ($GLOBALS['aw_mail_last_error'] ?? 'unknown')
-                   . ' You can verify this member by hand instead.';
-        }
+    if ($act === 'verify') {
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $st = $db->prepare("UPDATE users SET is_verified = 1, verification_code = NULL, verification_code_expiry = NULL, updated_at = CURRENT_TIMESTAMP WHERE is_verified = 0 AND id IN ($in)");
+        $st->execute($ids);
+        $n = $st->rowCount();
+        aw_bulk_done('manage_users', $n ? aw_bulk_n($n, 'member') . ' marked as verified.' : 'Everyone selected was already verified.');
     }
+    aw_bulk_done('manage_users', '', 'Choose an action.');
 }
+aw_bulk_take('manage_users', $success, $error);
 
-// ===== HANDLE ROLE CHANGE =====
-if (isset($_POST['change_role'])) {
-    $user_id = (int)$_POST['user_id'];
-    $new_role = $_POST['role'];
-    
-    if ($user_id === $_SESSION['user_id']) {
-        $error = 'You cannot change your own role.';
-    } elseif (!in_array($new_role, ['reader', 'admin'])) {
-        $error = 'Invalid role.';
-    } else {
-        $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
-        $stmt->execute([$user_id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        $stmt = $db->prepare("UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        $stmt->execute([$new_role, $user_id]);
-        $success = 'User role updated successfully.';
-        
-        $admin_email = aw_admin_email();
-        $subject = '🔄 Role Changed: ' . $user['name'];
-        $body = "<h2>User Role Updated</h2>";
-        $body .= "<p><strong>Name:</strong> " . $user['name'] . "</p>";
-        $body .= "<p><strong>Email:</strong> " . $user['email'] . "</p>";
-        $body .= "<p><strong>New Role:</strong> " . ucfirst($new_role) . "</p>";
-        sendEmail($admin_email, $subject, $body, 'angelwrites@zohomail.com', 'AngelWrites');
-        
-        header('Location: ' . SITE_URL . '/admin/manage_users.php');
-        exit;
-    }
+// ===== THE LIST =====
+$mu_q = trim((string)($_GET['search'] ?? ''));
+$mu_filter = (string)($_GET['filter'] ?? '');
+if (!in_array($mu_filter, ['unverified', 'staff', 'members', 'new'], true)) $mu_filter = '';
+$mu_per = 20;
+$mu_page = max(1, (int)($_GET['page'] ?? 1));
+
+$mu_where = []; $mu_args = [];
+if ($mu_filter === 'unverified') $mu_where[] = "is_verified = 0 AND role NOT IN ('admin', 'moderator')";
+if ($mu_filter === 'staff') $mu_where[] = "role IN ('admin', 'moderator')";
+if ($mu_filter === 'members') $mu_where[] = "role NOT IN ('admin', 'moderator')";
+if ($mu_filter === 'new') $mu_where[] = "created_at >= datetime('now', '-30 days')";
+if ($mu_q !== '') {
+    $mu_where[] = "(name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR username LIKE ? OR country LIKE ?)";
+    array_push($mu_args, ...array_fill(0, 6, '%' . $mu_q . '%'));
 }
-
-// ===== BULK ACTIONS =====
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
-    $ids = isset($_POST['selected_ids']) ? explode(',', $_POST['selected_ids']) : [];
-    $action = $_POST['bulk_action'];
-
-    if (!empty($ids) && $action === 'delete') {
-        // Filter out current admin
-        $ids = array_filter($ids, function($id) { return $id != $_SESSION['user_id']; });
-        if (!empty($ids)) {
-            $done = 0; $skipped = 0; $failed = 0;
-            foreach ($ids as $aw_id) {
-                $st = $db->prepare("SELECT role, email FROM users WHERE id = ?");
-                $st->execute([(int)$aw_id]);
-                $aw_row = $st->fetch(PDO::FETCH_ASSOC);
-                if (!$aw_row) continue;
-                if (in_array($aw_row['role'], ['owner', 'admin'], true)) { $skipped++; continue; }
-                $r = aw_safe_delete($db, 'users', (int)$aw_id);
-                if (!empty($r['ok'])) { $done++; if (function_exists('aw_audit')) aw_audit('user_delete', 'user', (int)$aw_id, (string)$aw_row['email']); } else $failed++;
-            }
-            $success = $done . ' member' . ($done === 1 ? '' : 's') . ' deleted.' . ($skipped ? ' ' . $skipped . ' admin or owner account' . ($skipped === 1 ? ' was' : 's were') . ' left (change the role first).' : '');
-            if ($failed) $error = $failed . ' could not be deleted just now; please try again.';
-        } else {
-            $error = 'You cannot delete your own account.';
-        }
-    } elseif (!empty($ids) && $action === 'make_admin') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE users SET role = 'admin', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' users promoted to admin.';
-    } elseif (!empty($ids) && $action === 'make_reader') {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $db->prepare("UPDATE users SET role = 'reader', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
-        $stmt->execute($ids);
-        $success = count($ids) . ' users demoted to reader.';
-    }
-    header('Location: ' . SITE_URL . '/admin/manage_users.php');
-    exit;
+$mu_sql_where = $mu_where ? ' WHERE ' . implode(' AND ', $mu_where) : '';
+$mu_counts = ['all' => 0, 'unverified' => 0, 'staff' => 0, 'members' => 0, 'new' => 0];
+$mu_total = 0; $mu_rows = [];
+try {
+    $c = $db->query("SELECT COUNT(*) AS a,
+                            SUM(CASE WHEN is_verified = 0 AND role NOT IN ('admin','moderator') THEN 1 ELSE 0 END) AS u,
+                            SUM(CASE WHEN role IN ('admin','moderator') THEN 1 ELSE 0 END) AS s,
+                            SUM(CASE WHEN created_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END) AS n FROM users")->fetch(PDO::FETCH_ASSOC);
+    $mu_counts = ['all' => (int)$c['a'], 'unverified' => (int)$c['u'], 'staff' => (int)$c['s'], 'members' => (int)$c['a'] - (int)$c['s'], 'new' => (int)$c['n']];
+    $st = $db->prepare("SELECT COUNT(*) FROM users" . $mu_sql_where);
+    $st->execute($mu_args);
+    $mu_total = (int)$st->fetchColumn();
+    $mu_pages = max(1, (int)ceil($mu_total / $mu_per));
+    $mu_page = min($mu_page, $mu_pages);
+    $st = $db->prepare("SELECT id, name, first_name, last_name, username, email, role, country, is_verified, created_at, last_login, avatar, profile_pic, social_provider
+                        FROM users" . $mu_sql_where . " ORDER BY created_at DESC, id DESC LIMIT " . $mu_per . " OFFSET " . (($mu_page - 1) * $mu_per));
+    $st->execute($mu_args);
+    $mu_rows = $st->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    error_log('manage users list: ' . $e->getMessage());
+    $error = $error ?: 'The member list could not be loaded just now.';
 }
+$mu_pages = $mu_pages ?? 1;
+$mu_link = function (array $over = []) use ($mu_q, $mu_filter, $mu_page) {
+    $q = array_filter(array_merge(['search' => $mu_q, 'filter' => $mu_filter, 'page' => $mu_page > 1 ? $mu_page : ''], $over), function ($v) { return $v !== '' && $v !== null; });
+    return SITE_URL . '/admin/manage_users.php' . ($q ? '?' . http_build_query($q) : '');
+};
+$mu_ago = function ($when) {
+    $t = $when ? strtotime((string)$when) : 0;
+    if (!$t) return 'never';
+    $d = time() - $t;
+    if ($d < 3600) return 'just now';
+    if ($d < 86400) return floor($d / 3600) . ' h ago';
+    if ($d < 86400 * 30) return floor($d / 86400) . ' d ago';
+    return date('j M Y', $t);
+};
+$mu_can_staff = aw_can('manage_staff');
 
-// ===== FETCH TOTAL USERS =====
-$count_sql = "SELECT COUNT(*) FROM users";
-$count_params = [];
-$aw_where = $aw_filter ? " WHERE is_verified = 0" : ""; // VF3
-$count_sql .= $aw_where;
-if ($search) {
-    $count_sql .= ($aw_where ? " AND (" : " WHERE (") . "name LIKE ? OR email LIKE ? OR username LIKE ?)";
-    $count_params[] = "%$search%";
-    $count_params[] = "%$search%";
-    $count_params[] = "%$search%";
-}
-$stmt = $db->prepare($count_sql);
-$stmt->execute($count_params);
-$total_users = $stmt->fetchColumn();
-$total_pages = ceil($total_users / $limit);
-
-// ===== FETCH USERS =====
-$sql = "SELECT * FROM users" . $aw_where;
-$params = [];
-if ($search) {
-    $sql .= ($aw_where ? " AND (" : " WHERE (") . "name LIKE ? OR email LIKE ? OR username LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-}
-$sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
-$params[] = $limit;
-$params[] = $offset;
-
-$stmt = $db->prepare($sql);
-$stmt->execute($params);
-$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$pageTitle = 'Manage Users';
+$pageTitle = 'Members';
+require_once '../includes/header.php';
 ?>
-<?php require_once '../includes/header.php'; ?>
-
-<div class="admin-page">
-    <div class="container">
-        <!-- ===== HERO / HEADER ===== -->
-        <div class="admin-hero">
-            <div class="admin-hero-content">
-                <h1>Manage Users</h1>
-                <p class="admin-hero-sub">View, edit, and manage all user accounts on AngelWrites.</p>
-            </div>
-            <div class="admin-hero-actions">
-                <a href="<?php echo SITE_URL; ?>/admin/dashboard.php" class="btn btn-outline">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
-                </a>
-            </div>
+<div class="mu">
+    <header class="mu-head">
+        <div>
+            <p class="mu-kicker">Community</p>
+            <h1>Members</h1>
+            <p class="mu-lead"><?php echo number_format($mu_counts['all']); ?> accounts · <?php echo number_format($mu_counts['new']); ?> joined in the last 30 days</p>
         </div>
-
-        <!-- ===== ALERT MESSAGES ===== -->
-        <?php if ($error): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
-
-        <!-- ===== SEARCH BAR ===== -->
-        <div class="search-bar">
-            <form method="GET" class="search-form">
-                <input type="text" name="search" placeholder="Search users by name, email, or username..." value="<?php echo htmlspecialchars($search); ?>">
-                <?php if ($aw_filter): ?><input type="hidden" name="filter" value="unverified"><?php endif; ?>
-                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Search</button>
-                <?php if (!empty($search)): ?>
-                    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Clear</a>
-                <?php endif; ?>
-            </form>
+        <div class="mu-head-acts">
+            <?php if ($mu_can_staff): ?><a class="mu-btn" href="<?php echo SITE_URL; ?>/admin/staff.php"><i class="fas fa-user-shield" aria-hidden="true"></i> Staff &amp; roles</a><?php endif; ?>
+            <a class="mu-btn" href="<?php echo SITE_URL; ?>/admin/dashboard.php"><i class="fas fa-arrow-left" aria-hidden="true"></i> Dashboard</a>
         </div>
+    </header>
 
-        <!-- VF3: who still needs to verify -->
-        <?php $aw_unv = (int)$db->query("SELECT COUNT(*) FROM users WHERE is_verified = 0")->fetchColumn(); ?>
-        <div class="aw-user-filter" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px;">
-            <a class="btn btn-sm <?php echo $aw_filter ? 'btn-outline' : 'btn-primary'; ?>" href="<?php echo SITE_URL; ?>/admin/manage_users.php">All users</a>
-            <a class="btn btn-sm <?php echo $aw_filter ? 'btn-primary' : 'btn-outline'; ?>" href="<?php echo SITE_URL; ?>/admin/manage_users.php?filter=unverified"><i class="fas fa-user-clock"></i> Unverified (<?php echo $aw_unv; ?>)</a>
-        </div>
-        <form method="POST" id="awUserAction" action="<?php echo SITE_URL; ?>/admin/manage_users.php<?php echo $aw_filter ? '?filter=unverified' : ''; ?>">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
+    <?php if ($error): ?><div class="mu-alert is-error" role="alert"><i class="fas fa-circle-exclamation" aria-hidden="true"></i> <?php echo htmlspecialchars($error); ?></div><?php endif; ?>
+    <?php if ($success): ?><div class="mu-alert is-ok" role="status"><i class="fas fa-circle-check" aria-hidden="true"></i> <?php echo htmlspecialchars($success); ?></div><?php endif; ?>
+
+    <div class="mu-tools">
+        <form method="get" class="mu-search" role="search">
+            <?php if ($mu_filter): ?><input type="hidden" name="filter" value="<?php echo htmlspecialchars($mu_filter); ?>"><?php endif; ?>
+            <label class="sr-only" for="muQ">Search members</label>
+            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="muQ" name="search" value="<?php echo htmlspecialchars($mu_q); ?>" placeholder="Name, email, username or country">
+            <button type="submit" class="mu-btn mu-primary">Search</button>
+            <?php if ($mu_q !== ''): ?><a class="mu-btn" href="<?php echo htmlspecialchars($mu_link(['search' => '', 'page' => ''])); ?>">Clear</a><?php endif; ?>
         </form>
+        <nav class="mu-chips" aria-label="Show">
+            <?php foreach (['' => ['All', 'all'], 'members' => ['Members', 'members'], 'staff' => ['Staff', 'staff'], 'unverified' => ['Not verified', 'unverified'], 'new' => ['New this month', 'new']] as $f => [$label, $ck]): ?>
+                <a href="<?php echo htmlspecialchars($mu_link(['filter' => $f, 'page' => ''])); ?>" class="mu-chip<?php echo $mu_filter === $f ? ' is-on' : ''; ?>"<?php echo $mu_filter === $f ? ' aria-current="page"' : ''; ?>><?php echo $label; ?> <span><?php echo number_format($mu_counts[$ck]); ?></span></a>
+            <?php endforeach; ?>
+        </nav>
+    </div>
 
-        <!-- ===== USERS TABLE ===== -->
-        <div class="card">
-            <div class="card-header">
-                <h2>All Users <span class="count-badge"><?php echo $total_users; ?></span></h2>
-                <div class="card-header-actions">
-                    <select id="bulkActionSelect" class="bulk-select">
-                        <option value="">Bulk Actions</option>
-                        <option value="make_admin">👑 Promote to Admin</option>
-                        <option value="make_reader">📖 Demote to Reader</option>
-                        <option value="delete">🗑️ Delete Selected</option>
-                    </select>
-                    <button id="executeBulkAction" class="btn btn-sm btn-primary" disabled>Apply</button>
-                </div>
+    <!-- the bulk form only carries the choice and the ticked ids; it does not wrap the list -->
+    <form method="post" id="muBulk" class="mu-bulk" aria-label="With the selected members">
+        <input type="hidden" name="selected_ids" id="muIds" value="">
+        <label class="mu-check"><input type="checkbox" id="muAll"> <span>Select all on this page</span></label>
+        <span class="mu-picked" id="muPicked" aria-live="polite">None selected</span>
+        <span class="mu-bulk-acts">
+            <button type="submit" name="bulk_action" value="verify" class="mu-btn" disabled data-bulk><i class="fas fa-user-check" aria-hidden="true"></i> Mark verified</button>
+            <button type="submit" name="bulk_action" value="delete" class="mu-btn mu-danger" disabled data-bulk data-confirm="delete"><i class="fas fa-trash" aria-hidden="true"></i> Delete</button>
+        </span>
+    </form>
+
+    <?php if (!$mu_rows): ?>
+        <div class="mu-empty"><i class="fas fa-users" aria-hidden="true"></i><h2>No one here</h2><p><?php echo $mu_q !== '' ? 'Nobody matches "' . htmlspecialchars($mu_q) . '".' : 'No members in this view yet.'; ?></p></div>
+    <?php else: ?>
+    <ul class="mu-list">
+        <?php foreach ($mu_rows as $i => $u):
+            $role = aw_role_of($u);
+            $name = awDisplayName($u);
+            $pic = trim((string)($u['avatar'] ?: $u['profile_pic']));
+            $pic = ($pic !== '' && strpos($pic, '..') === false) ? (preg_match('#^https?://#i', $pic) ? $pic : SITE_URL . '/' . ltrim($pic, '/')) : '';
+            $is_me = (int)$u['id'] === $mu_me;
+            $staff = in_array($role, ['owner', 'admin', 'moderator'], true);
+            $protected = in_array($role, ['owner', 'admin'], true);
+            $verified = (int)$u['is_verified'] === 1 || $staff;
+        ?>
+        <li class="mu-card" style="--i:<?php echo $i; ?>">
+            <label class="mu-pick"><input type="checkbox" class="mu-row" value="<?php echo (int)$u['id']; ?>"<?php echo ($is_me || $protected) ? ' data-protected="1"' : ''; ?> aria-label="Select <?php echo htmlspecialchars($name); ?>"></label>
+            <span class="mu-av" aria-hidden="true" data-initial="<?php echo htmlspecialchars(mb_strtoupper(mb_substr($name, 0, 1))); ?>"><?php if ($pic): ?><img src="<?php echo htmlspecialchars($pic); ?>" alt="" loading="lazy" onerror="this.parentNode.textContent=this.parentNode.dataset.initial"><?php else: echo htmlspecialchars(mb_strtoupper(mb_substr($name, 0, 1))); endif; ?></span>
+            <div class="mu-who">
+                <p class="mu-name"><?php echo htmlspecialchars($name); ?><?php if ($is_me): ?> <span class="mu-tag is-you">You</span><?php endif; ?>
+                    <span class="mu-tag is-<?php echo $role; ?>"><?php echo htmlspecialchars(aw_role_label($role)); ?></span>
+                    <?php if (!$verified): ?><span class="mu-tag is-wait"><i class="fas fa-clock" aria-hidden="true"></i> Not verified</span><?php endif; ?>
+                </p>
+                <p class="mu-meta">
+                    <span>@<?php echo htmlspecialchars((string)$u['username']); ?></span>
+                    <span class="mu-email"><?php echo htmlspecialchars((string)$u['email']); ?></span>
+                    <?php if (!empty($u['country'])): ?><span><i class="fas fa-earth-africa" aria-hidden="true"></i> <?php echo htmlspecialchars((string)$u['country']); ?></span><?php endif; ?>
+                    <span>Joined <?php echo htmlspecialchars(date('j M Y', strtotime((string)$u['created_at']))); ?></span>
+                    <span>Last seen <?php echo htmlspecialchars($mu_ago($u['last_login'] ?? '')); ?></span>
+                    <?php if (!empty($u['social_provider'])): ?><span>Signs in with <?php echo htmlspecialchars(ucfirst((string)$u['social_provider'])); ?></span><?php endif; ?>
+                </p>
             </div>
-            <div class="card-body">
-                <?php if (count($users) > 0): ?>
-                    <form method="POST" id="bulkForm">
-                        <input type="hidden" name="bulk_action" id="bulkActionInput" value="">
-                        <input type="hidden" name="selected_ids" id="selectedIdsInput" value="">
-                        <div class="table-responsive">
-                            <table class="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th class="check-col"><input type="checkbox" id="selectAllRows" class="styled-checkbox"></th>
-                                        <th>ID</th>
-                                        <th>Name</th>
-                                        <th>Username</th>
-                                        <th>Email</th>
-                                        <th>Verified</th>
-                                        <th>Role</th>
-                                        <th>Joined</th>
-                                        <th class="actions-col">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($users as $user): ?>
-                                        <tr>
-                                            <td><input type="checkbox" class="row-select styled-checkbox" value="<?php echo $user['id']; ?>"></td>
-                                            <td><span class="user-id"><?php echo $user['id']; ?></span></td>
-                                            <td>
-                                                <div class="user-name-cell">
-                                                    <strong><?php echo htmlspecialchars($user['name']); ?></strong>
-                                                    <?php if ($user['id'] === $_SESSION['user_id']): ?>
-                                                        <span class="badge-you">You</span>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($user['username']); ?></td>
-                                            <td><?php echo htmlspecialchars($user['email']); ?></td>
-                                            <td>
-                                                <?php if ((int)($user['is_verified'] ?? 0) === 1): ?>
-                                                    <span class="aw-verified yes"><i class="fas fa-circle-check"></i> Yes</span>
-                                                <?php elseif (($user['role'] ?? '') === 'admin'): ?>
-                                                    <span class="aw-verified admin" title="Admins do not need to verify">Not needed</span>
-                                                <?php else: ?>
-                                                    <span class="aw-verified no"><i class="fas fa-clock"></i> Waiting</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?php if ($user['id'] === $_SESSION['user_id']): ?>
-                                                    <span class="role-badge admin">Admin</span>
-                                                <?php else: ?>
-                                                    <form method="POST" class="role-form" style="display:inline;">
-                                                        <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                                        <select name="role" onchange="this.form.submit()" class="role-select <?php echo $user['role']; ?>">
-                                                            <option value="reader" <?php echo $user['role'] === 'reader' ? 'selected' : ''; ?>>Reader</option>
-                                                            <option value="admin" <?php echo $user['role'] === 'admin' ? 'selected' : ''; ?>>Admin</option>
-                                                        </select>
-                                                        <input type="hidden" name="change_role" value="1">
-                                                    </form>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
-                                            <td class="actions-cell">
-                                                <?php if ((int)($user['is_verified'] ?? 0) !== 1 && ($user['role'] ?? '') !== 'admin'): ?>
-                                                    <button type="submit" form="awUserAction" name="aw_user_action" value="verify:<?php echo (int)$user['id']; ?>" class="btn btn-sm btn-success action-btn" title="Mark as verified" aria-label="Mark as verified" onclick="return confirm('Mark <?php echo htmlspecialchars(addslashes($user['email']), ENT_QUOTES); ?> as verified?');"><i class="fas fa-user-check"></i></button>
-                                                    <button type="submit" form="awUserAction" name="aw_user_action" value="code:<?php echo (int)$user['id']; ?>" class="btn btn-sm btn-outline action-btn" title="Email a new verification code" aria-label="Email a new verification code"><i class="fas fa-paper-plane"></i></button>
-                                                <?php endif; ?>
-                                                <?php if ($user['id'] !== $_SESSION['user_id']): ?>
-                                                    <a href="<?php echo SITE_URL; ?>/admin/manage_users.php?delete=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Delete this user?');" title="Delete">
-                                                        <i class="fas fa-trash"></i>
-                                                    </a>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </form>
-
-                    <!-- ===== PAGINATION ===== -->
-                    <?php if ($total_pages > 1): ?>
-                        <div class="pagination">
-                            <?php if ($page > 1): ?>
-                                <a href="?page=<?php echo $page - 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $aw_filter ? '&filter=unverified' : ''; ?>" class="page-link">
-                                    <i class="fas fa-chevron-left"></i>
-                                </a>
-                            <?php endif; ?>
-                            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                                <a href="?page=<?php echo $i; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $aw_filter ? '&filter=unverified' : ''; ?>" class="page-link <?php echo $i === $page ? 'active' : ''; ?>">
-                                    <?php echo $i; ?>
-                                </a>
-                            <?php endfor; ?>
-                            <?php if ($page < $total_pages): ?>
-                                <a href="?page=<?php echo $page + 1; ?><?php echo $search ? '&search=' . urlencode($search) : ''; ?><?php echo $aw_filter ? '&filter=unverified' : ''; ?>" class="page-link">
-                                    <i class="fas fa-chevron-right"></i>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-users empty-icon"></i>
-                        <h3>No users found</h3>
-                        <p>Try adjusting your search.</p>
-                    </div>
+            <div class="mu-acts">
+                <?php if (!$is_me): ?><a class="mu-icon" href="<?php echo SITE_URL; ?>/messages.php?to=<?php echo (int)$u['id']; ?>" title="Message <?php echo htmlspecialchars($name); ?>" aria-label="Message <?php echo htmlspecialchars($name); ?>"><i class="fas fa-comment-dots" aria-hidden="true"></i></a><?php endif; ?>
+                <?php if (!$verified): ?>
+                    <form method="post"><input type="hidden" name="row_id" value="<?php echo (int)$u['id']; ?>"><button type="submit" name="row_action" value="verify" class="mu-icon" title="Mark <?php echo htmlspecialchars($name); ?> as verified" aria-label="Mark <?php echo htmlspecialchars($name); ?> as verified"><i class="fas fa-user-check" aria-hidden="true"></i></button></form>
+                <?php endif; ?>
+                <?php if ($staff && $mu_can_staff && !$is_me): ?><a class="mu-icon" href="<?php echo SITE_URL; ?>/admin/staff.php" title="Change role in Staff &amp; roles" aria-label="Change <?php echo htmlspecialchars($name); ?>'s role in Staff &amp; roles"><i class="fas fa-user-shield" aria-hidden="true"></i></a><?php endif; ?>
+                <?php if (!$is_me && !$protected): ?>
+                    <form method="post"><input type="hidden" name="row_id" value="<?php echo (int)$u['id']; ?>"><button type="submit" name="row_action" value="delete" class="mu-icon mu-del" data-confirm="delete" data-name="<?php echo htmlspecialchars($name); ?>" title="Delete <?php echo htmlspecialchars($name); ?>" aria-label="Delete <?php echo htmlspecialchars($name); ?>"><i class="fas fa-trash" aria-hidden="true"></i><span>Delete</span></button></form>
                 <?php endif; ?>
             </div>
-        </div>
-    </div>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+
+    <?php if ($mu_pages > 1): ?>
+    <nav class="mu-pages" aria-label="Pages">
+        <?php if ($mu_page > 1): ?><a class="mu-btn" href="<?php echo htmlspecialchars($mu_link(['page' => $mu_page - 1])); ?>" rel="prev"><i class="fas fa-chevron-left" aria-hidden="true"></i> Newer</a><?php endif; ?>
+        <span>Page <?php echo $mu_page; ?> of <?php echo $mu_pages; ?> · <?php echo number_format($mu_total); ?> people</span>
+        <?php if ($mu_page < $mu_pages): ?><a class="mu-btn" href="<?php echo htmlspecialchars($mu_link(['page' => $mu_page + 1])); ?>" rel="next">Older <i class="fas fa-chevron-right" aria-hidden="true"></i></a><?php endif; ?>
+    </nav>
+    <?php endif; ?>
+    <?php endif; ?>
 </div>
 
-<!-- ===== JAVASCRIPT ===== -->
+<dialog class="mu-dlg" id="muDlg" aria-labelledby="muDlgT">
+    <form method="dialog">
+        <div class="mu-dlg-ico" aria-hidden="true"><i class="fas fa-triangle-exclamation"></i></div>
+        <h2 id="muDlgT">Delete?</h2>
+        <p id="muDlgP"></p>
+        <div class="mu-dlg-acts"><button value="no" class="mu-btn">Keep</button><button value="yes" class="mu-btn mu-danger" id="muDlgYes">Delete for good</button></div>
+    </form>
+</dialog>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // ===== BULK ACTIONS =====
-    const selectAllRows = document.getElementById('selectAllRows');
-    const rowCheckboxes = document.querySelectorAll('.row-select');
-    const executeBulkBtn = document.getElementById('executeBulkAction');
-    const bulkActionSelect = document.getElementById('bulkActionSelect');
-
-    selectAllRows?.addEventListener('change', function() {
-        rowCheckboxes.forEach(cb => cb.checked = this.checked);
-        updateBulkButton();
-    });
-    rowCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkButton));
-
-    function updateBulkButton() {
-        const checked = document.querySelectorAll('.row-select:checked').length;
-        executeBulkBtn.disabled = (checked === 0);
-    }
-
-    executeBulkBtn?.addEventListener('click', function() {
-        const action = bulkActionSelect.value;
-        const ids = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
-        if (!action || ids.length === 0) {
-            alert('Please select an action and at least one user.');
-            return;
-        }
-        if (!confirm(`Apply "${action}" to ${ids.length} user(s)?`)) return;
-        document.getElementById('bulkActionInput').value = action;
-        document.getElementById('selectedIdsInput').value = ids.join(',');
-        document.getElementById('bulkForm').submit();
-    });
-});
+(function () {
+  var rows = [].slice.call(document.querySelectorAll('.mu-row')), all = document.getElementById('muAll'),
+      ids = document.getElementById('muIds'), picked = document.getElementById('muPicked'), bulk = document.getElementById('muBulk'),
+      btns = [].slice.call(bulk.querySelectorAll('[data-bulk]')), dlg = document.getElementById('muDlg');
+  function sel() { return rows.filter(function (r) { return r.checked; }); }
+  function update() {
+    var s = sel();
+    ids.value = s.map(function (r) { return r.value; }).join(',');
+    picked.textContent = s.length ? s.length + ' selected' : 'None selected';
+    btns.forEach(function (b) { b.disabled = !s.length; });
+    if (all) { all.checked = s.length && s.length === rows.length; all.indeterminate = s.length > 0 && s.length < rows.length; }
+    rows.forEach(function (r) { r.closest('.mu-card').classList.toggle('is-picked', r.checked); });
+  }
+  rows.forEach(function (r) { r.addEventListener('change', update); });
+  if (all) all.addEventListener('change', function () { rows.forEach(function (r) { r.checked = all.checked; }); update(); });
+  update();
+  // a clear confirmation before anything is deleted (the form is sent only after "Delete for good")
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-confirm="delete"]');
+    if (!b || b.dataset.ok) return;
+    e.preventDefault();
+    var s = sel(), single = b.dataset.name, prot = s.filter(function (r) { return r.dataset.protected; }).length;
+    document.getElementById('muDlgT').textContent = single ? 'Delete ' + single + '?' : 'Delete ' + s.length + ' member' + (s.length === 1 ? '' : 's') + '?';
+    document.getElementById('muDlgP').textContent = 'Their account, messages and activity are removed for good. This cannot be undone.'
+      + (!single && prot ? ' ' + prot + ' admin or your own account will be left out.' : '');
+    if (!dlg.showModal) { if (confirm(document.getElementById('muDlgT').textContent)) { b.dataset.ok = 1; b.click(); } return; }
+    dlg.returnValue = ''; dlg.showModal();
+    dlg.onclose = function () { if (dlg.returnValue === 'yes') { b.dataset.ok = 1; b.click(); } };
+  });
+})();
 </script>
 
-<!-- ===== STYLES ===== -->
 <style>
-/* ===== BRAND VARIABLES ===== */
-:root {
-    --rose: #DBA1A2;
-    --rose-dark: #c08a8b;
-    --rose-light: #e8c0c0;
-    --vanilla: #EFD8D6;
-    --fantasy: #F7F3ED;
-    --white: #ffffff;
-    --dark: #2c1e1e;
-    --text: #3d2e2e;
-    --text-light: #6b5a5a;
-    --bg: #F7F3ED;
-    --card-bg: #ffffff;
-    --border: #e5d5d5;
-    --shadow: 0 4px 16px rgba(44,30,30,0.08);
-    --shadow-hover: 0 8px 30px rgba(44,30,30,0.15);
-    --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+.mu { --mu-rose: #9c5457; --mu-rose-2: #b86b6e; --mu-ink: var(--text, #3a2629); --mu-mute: #6d5a5a; --mu-card: var(--card-bg, #fff); --mu-line: rgba(156, 84, 87, .16);
+      max-width: 1100px; margin: 0 auto; padding: 28px 16px 64px; color: var(--mu-ink); }
+html[data-theme="dark"] .mu { --mu-rose: #f0c4c5; --mu-rose-2: #e7aeb0; --mu-mute: #cdb8b8; --mu-line: rgba(240, 196, 197, .16); }
+.mu .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.mu-head { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; padding: 26px 26px 22px; border-radius: 24px; color: #fff;
+           background: radial-gradient(120% 140% at 100% 0%, #c98d8f 0%, transparent 55%), linear-gradient(135deg, #5a2a35, #9c5457); box-shadow: 0 18px 40px rgba(92, 38, 50, .25); }
+.mu-kicker { margin: 0; text-transform: uppercase; letter-spacing: .14em; font-size: .74rem; font-weight: 700; opacity: .85; }
+.mu-head h1 { margin: 4px 0 4px; font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.8rem, 4vw, 2.4rem); color: #fff; }
+.mu-lead { margin: 0; opacity: .92; }
+.mu-head-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.mu-head .mu-btn { background: rgba(255, 255, 255, .14); color: #fff; border-color: rgba(255, 255, 255, .45); }
+.mu-head .mu-btn:hover { background: #fff; color: #5a2a35; }
+.mu-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--mu-rose); background: transparent;
+          color: var(--mu-rose); font: 600 .92rem Inter, system-ui, sans-serif; text-decoration: none; cursor: pointer; transition: background .2s, color .2s, opacity .2s; }
+.mu-btn:hover { background: var(--mu-rose); color: #fff; }
+html[data-theme="dark"] .mu-btn:hover { color: #2c1e1e; }
+.mu-btn:disabled { opacity: .45; cursor: not-allowed; background: transparent; color: var(--mu-rose); }
+.mu-primary { background: var(--mu-rose); color: #fff; }
+html[data-theme="dark"] .mu-primary { color: #2c1e1e; }
+.mu-danger { border-color: #b3261e; color: #b3261e; }
+.mu-danger:hover { background: #b3261e; color: #fff; }
+html[data-theme="dark"] .mu-danger { border-color: #ffb4ab; color: #ffb4ab; }
+html[data-theme="dark"] .mu-danger:hover { background: #ffb4ab; color: #2c1e1e; }
+.mu-alert { display: flex; gap: 10px; align-items: center; margin: 16px 0 0; padding: 12px 16px; border-radius: 14px; font-weight: 500; }
+.mu-alert.is-ok { background: #e3efe6; color: #24452f; } .mu-alert.is-error { background: #f6e1e3; color: #6e2a31; }
+.mu-tools { display: grid; gap: 12px; margin: 18px 0 12px; }
+.mu-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--mu-card); border: 1px solid var(--mu-line); border-radius: 18px; padding: 8px 8px 8px 16px; }
+.mu-search i { color: var(--mu-rose); }
+.mu-search input { flex: 1 1 200px; min-width: 0; min-height: 44px; border: 0 !important; background: transparent !important; box-shadow: none !important; color: inherit; font: inherit; outline: none; }
+.mu-search:focus-within { outline: 3px solid rgba(156, 84, 87, .35); outline-offset: 2px; }
+.mu-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.mu-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--mu-line); background: var(--mu-card); color: var(--mu-ink); text-decoration: none; font-weight: 600; font-size: .9rem; }
+.mu-chip span { min-width: 24px; padding: 2px 8px; border-radius: 999px; background: rgba(156, 84, 87, .12); color: var(--mu-rose); font-size: .78rem; text-align: center; }
+.mu-chip:hover { border-color: var(--mu-rose); }
+.mu-chip.is-on { background: var(--mu-rose); border-color: var(--mu-rose); color: #fff; }
+.mu-chip.is-on span { background: rgba(255, 255, 255, .25); color: #fff; }
+html[data-theme="dark"] .mu-chip.is-on { color: #2c1e1e; } html[data-theme="dark"] .mu-chip.is-on span { color: #2c1e1e; }
+.mu-bulk { position: sticky; top: 76px; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 14px; margin-bottom: 12px; border-radius: 16px;
+           background: color-mix(in srgb, var(--mu-card) 92%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--mu-line); box-shadow: 0 8px 22px rgba(44, 30, 30, .07); }
+.mu-check { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; font-size: .9rem; cursor: pointer; min-height: 44px; }
+.mu-picked { color: var(--mu-mute); font-size: .9rem; }
+.mu-bulk-acts { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.mu input[type=checkbox] { width: 20px; height: 20px; accent-color: #9c5457; cursor: pointer; }
+.mu-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.mu-card { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 18px; background: var(--mu-card);
+           border: 1px solid var(--mu-line); box-shadow: 0 4px 14px rgba(44, 30, 30, .05); transition: border-color .2s, box-shadow .2s, transform .2s;
+           animation: muIn .45s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 35ms); }
+.mu-card:hover { border-color: rgba(156, 84, 87, .4); box-shadow: 0 10px 26px rgba(44, 30, 30, .09); }
+.mu-card.is-picked { border-color: var(--mu-rose); box-shadow: 0 0 0 2px rgba(156, 84, 87, .25); }
+@keyframes muIn { from { opacity: 0; transform: translateY(8px); } }
+.mu-pick { display: grid; place-items: center; width: 32px; height: 44px; cursor: pointer; }
+.mu-av { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; flex: none; font: 700 1.1rem 'Playfair Display', Georgia, serif; color: #fff;
+         background: linear-gradient(135deg, #b86b6e, #6d3a46); box-shadow: 0 4px 10px rgba(92, 38, 50, .25); }
+.mu-av img { width: 100%; height: 100%; object-fit: cover; }
+.mu-who { min-width: 0; }
+.mu-name { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-weight: 700; font-size: 1.02rem; }
+.mu-tag { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: .74rem; font-weight: 700; background: rgba(156, 84, 87, .1); color: #7d3f43; }
+.mu-tag.is-owner { background: #5a2a35; color: #fff; } .mu-tag.is-admin { background: #9c5457; color: #fff; } .mu-tag.is-moderator { background: #e9d7f0; color: #4b2a5c; }
+.mu-tag.is-wait { background: #fbecd4; color: #6b4310; } .mu-tag.is-you { background: #e3efe6; color: #24452f; }
+html[data-theme="dark"] .mu-tag { background: rgba(240, 196, 197, .14); color: #f6dede; }
+html[data-theme="dark"] .mu-tag.is-admin { background: #f0c4c5; color: #2c1e1e; } html[data-theme="dark"] .mu-tag.is-owner { background: #f6dede; color: #2c1e1e; }
+html[data-theme="dark"] .mu-tag.is-wait { background: #4a3a20; color: #ffe2b0; }
+.mu-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--mu-mute); font-size: .86rem; }
+.mu-meta .mu-email { overflow-wrap: anywhere; }
+.mu-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.mu-acts form { margin: 0; display: contents; }
+.mu-icon { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--mu-line);
+           background: transparent; color: var(--mu-rose); font: 600 .88rem Inter, system-ui, sans-serif; cursor: pointer; text-decoration: none; transition: background .2s, color .2s, border-color .2s; }
+.mu-icon:hover, .mu-icon:focus-visible { background: var(--mu-rose); color: #fff; border-color: var(--mu-rose); }
+html[data-theme="dark"] .mu-icon:hover { color: #2c1e1e; }
+.mu-del { color: #b3261e; border-color: rgba(179, 38, 30, .3); }
+.mu-del:hover, .mu-del:focus-visible { background: #b3261e; border-color: #b3261e; color: #fff; }
+html[data-theme="dark"] .mu-del { color: #ffb4ab; } html[data-theme="dark"] .mu-del:hover { background: #ffb4ab; color: #2c1e1e; }
+.mu-empty { text-align: center; padding: 48px 16px; border-radius: 20px; background: var(--mu-card); border: 1px dashed var(--mu-line); }
+.mu-empty i { font-size: 2rem; color: var(--mu-rose); } .mu-empty h2 { font-family: 'Playfair Display', Georgia, serif; margin: 10px 0 4px; }
+.mu-pages { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 18px; color: var(--mu-mute); }
+.mu-dlg { border: 0; border-radius: 22px; padding: 26px; width: min(440px, calc(100vw - 32px)); background: var(--mu-card, #fff); color: var(--text, #3a2629); text-align: center; box-shadow: 0 30px 70px rgba(30, 18, 18, .35); }
+.mu-dlg::backdrop { background: rgba(30, 18, 18, .5); backdrop-filter: blur(3px); }
+.mu-dlg-ico { width: 56px; height: 56px; margin: 0 auto 8px; border-radius: 50%; display: grid; place-items: center; background: #fbe3e1; color: #b3261e; font-size: 1.4rem; }
+.mu-dlg h2 { margin: 0 0 8px; font-family: 'Playfair Display', Georgia, serif; font-size: 1.3rem; }
+.mu-dlg p { margin: 0 0 18px; line-height: 1.55; }
+.mu-dlg-acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+/* phones: the actions sit under the details, always in view */
+@media (max-width: 720px) {
+    .mu-card { grid-template-columns: auto auto minmax(0, 1fr); }
+    .mu-acts { grid-column: 1 / -1; justify-content: flex-start; padding-left: 46px; }
+    .mu-bulk { top: 64px; } .mu-bulk-acts { margin-left: 0; width: 100%; } .mu-bulk-acts .mu-btn { flex: 1; white-space: nowrap; padding: 0 10px; font-size: .88rem; }
+    .mu-head { padding: 22px 18px; }
 }
-
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); transition:background 0.3s, color 0.3s; }
-
-/* ===== TYPOGRAPHY ===== */
-h1, h2, h3, h4 { font-family:'Playfair Display',Georgia,serif; color:var(--dark); line-height:1.3; }
-.rose-text { color:var(--rose); }
-
-/* ===== BUTTONS ===== */
-.btn {
-    display:inline-flex; align-items:center; gap:8px; padding:12px 28px;
-    border-radius:50px; font-weight:700; font-size:0.95rem; border:none;
-    cursor:pointer; text-decoration:none; transition:all var(--transition);
-    box-shadow:0 3px 10px rgba(44,30,30,0.12); letter-spacing:0.3px;
-}
-.btn:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover); }
-.btn-primary { background:var(--rose); color:var(--white); border:2px solid var(--rose); }
-.btn-primary:hover { background:var(--rose-dark); border-color:var(--rose-dark); }
-.btn-secondary { background:var(--vanilla); color:var(--dark); border:2px solid var(--vanilla); }
-.btn-secondary:hover { background:var(--rose-light); border-color:var(--rose-light); }
-.btn-outline { background:transparent; border:2px solid var(--rose); color:var(--rose); }
-.btn-outline:hover { background:var(--rose); color:var(--white); }
-.btn-sm { padding:8px 20px; font-size:0.85rem; }
-.btn-danger { background:#b4505a; color:white; border:2px solid #b4505a; }
-.btn-danger:hover { background:#94404a; border-color:#94404a; }
-
-/* ===== PAGE ===== */
-.admin-page { padding:32px 0 60px; }
-
-/* ===== HERO ===== */
-.admin-hero {
-    background:linear-gradient(135deg, var(--vanilla), var(--fantasy));
-    border-radius:20px; padding:24px 32px; margin-bottom:24px;
-    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;
-    border:1px solid var(--rose-light); box-shadow:var(--shadow);
-}
-.admin-hero-content h1 { font-size:2rem; margin:0 0 4px 0; color:var(--dark); }
-.admin-hero-sub { color:var(--text-light); font-size:1.05rem; margin:0; }
-.admin-hero-actions { display:flex; gap:12px; flex-wrap:wrap; }
-
-/* ===== ALERTS ===== */
-.alert { padding:14px 20px; border-radius:16px; margin-bottom:20px; font-weight:500; }
-.alert-error { background:#f6e1e3; color:#6e2a31; border:1px solid #ecc5c9; }
-.alert-success { background:#e3efe6; color:#2d5039; border:1px solid #c5dccb; }
-
-/* ===== SEARCH BAR ===== */
-.search-bar { margin-bottom:24px; }
-.search-form { display:flex; gap:8px; flex-wrap:wrap; }
-.search-form input { flex:1; min-width:200px; padding:12px 16px; border:1px solid var(--border); border-radius:50px; font-size:0.95rem; background:var(--card-bg); color:var(--text); transition:border-color 0.2s; }
-.search-form input:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.search-form .btn { padding:8px 20px; font-size:0.85rem; border-radius:50px; }
-
-/* ===== CARD ===== */
-.card { background:var(--card-bg); border-radius:20px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; margin-bottom:24px; transition:all var(--transition); }
-.card:hover { box-shadow:var(--shadow-hover); }
-.card-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:var(--vanilla); }
-.card-header h2 { font-size:1.3rem; margin:0; font-family:'Playfair Display',Georgia,serif; color:var(--dark); display:flex; align-items:center; gap:8px; }
-.count-badge { background:var(--rose); color:white; padding:2px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
-.card-header-actions { display:flex; gap:8px; flex-wrap:wrap; }
-.card-body { padding:24px; }
-
-/* ===== TABLE ===== */
-.table-responsive { overflow-x:auto; border-radius:12px; border:1px solid var(--border); }
-.admin-table { width:100%; border-collapse:separate; border-spacing:0; }
-.admin-table thead { background:var(--vanilla); }
-.admin-table th { text-align:left; padding:14px 20px; font-weight:600; color:var(--text); border-bottom:2px solid var(--border); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; }
-.admin-table td { padding:14px 20px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); font-size:0.9rem; }
-.admin-table tbody tr:hover { background:rgba(219,161,162,0.08); }
-.admin-table .check-col { width:40px; }
-.admin-table .actions-col { width:80px; }
-
-.styled-checkbox { width:18px; height:18px; accent-color:var(--rose); cursor:pointer; }
-.user-id { font-weight:500; color:var(--text-light); }
-.user-name-cell { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.badge-you { background:var(--rose); color:white; padding:2px 10px; border-radius:20px; font-size:0.7rem; font-weight:600; }
-
-/* ===== ROLE ===== */
-.aw-verified { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:0.78rem; font-weight:600; white-space:nowrap; }
-.aw-verified.yes { background:#e3efe6; color:#2d5039; }
-.aw-verified.no { background:#f7ecdc; color:#6f4e22; }
-.aw-verified.admin { background:var(--vanilla); color:var(--text-light); }
-.role-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
-.role-badge.admin { background:var(--rose); color:white; }
-.role-badge.reader { background:var(--vanilla); color:var(--text); }
-.role-select { padding:6px 10px; border-radius:8px; border:1px solid var(--border); font-size:0.85rem; cursor:pointer; background:var(--input-bg); color:var(--text); transition:border-color 0.2s; }
-.role-select:focus { outline:none; border-color:var(--rose); box-shadow:0 0 0 3px rgba(219,161,162,0.15); }
-.role-select.reader { border-left:4px solid #8a6f86; }
-.role-select.admin { border-left:4px solid #b4505a; }
-
-/* ===== BULK ===== */
-.bulk-select { padding:6px 12px; border-radius:8px; border:1px solid var(--border); background:var(--card-bg); color:var(--text); font-size:0.85rem; }
-
-/* ===== ACTIONS ===== */
-.actions-cell { display:flex; gap:4px; }
-.action-btn { padding:6px 10px; font-size:0.8rem; border-radius:8px; min-width:32px; justify-content:center; }
-
-/* ===== PAGINATION ===== */
-.pagination { display:flex; justify-content:center; gap:6px; margin-top:20px; flex-wrap:wrap; }
-.page-link { display:inline-flex; align-items:center; justify-content:center; padding:6px 14px; border-radius:8px; background:var(--card-bg); border:1px solid var(--border); color:var(--text); font-size:0.9rem; transition:all 0.2s; min-width:36px; text-decoration:none; }
-.page-link:hover { border-color:var(--rose); }
-.page-link.active { background:var(--rose); color:white; border-color:var(--rose); }
-
-/* ===== EMPTY STATE ===== */
-.empty-state { text-align:center; padding:40px 20px; color:var(--text-light); }
-.empty-icon { font-size:3rem; color:var(--rose); margin-bottom:16px; opacity:0.6; }
-.empty-state h3 { font-size:1.3rem; margin-bottom:4px; color:var(--text); }
-.empty-state p { margin:0; font-size:0.95rem; }
-
-/* ===== RESPONSIVE ===== */
-@media (max-width:992px) {
-    .admin-hero { flex-direction:column; text-align:center; align-items:center; }
-    .admin-hero-actions { justify-content:center; }
-    .admin-hero-content h1 { font-size:1.6rem; }
-}
-@media (max-width:768px) {
-    .admin-table th, .admin-table td { padding:10px 12px; font-size:0.8rem; }
-    .actions-cell { flex-wrap:wrap; }
-}
+@media (prefers-reduced-motion: reduce) { .mu-card { animation: none; } }
 </style>
-
 <?php require_once '../includes/footer.php'; ?>
