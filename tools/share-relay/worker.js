@@ -9,19 +9,36 @@
  *
  *   /p/<id>   a poem   -> https://angelwrites.gt.tc/poem_view.php?id=<id>
  *   /b/<id>   a book   -> https://angelwrites.gt.tc/book.php?id=<id>
+ *   /s/<page>.php?<query>   any public page on the allow-list below (posts, reflections, events,
+ *                           plans, prayer, prompts, videos…) -> https://angelwrites.gt.tc/<page>.php?<query>
+ *   /         the home page
  *   /i?u=/path/on/the/site   a picture from the site (the preview image), passed through
  *
  * It stores nothing and reads only public pages. Responses are cached for an hour (pages) or a
  * month (images; their address changes when the cover changes).
  */
 const SITE = 'https://angelwrites.gt.tc';
+// public pages people share; anything else is sent to the home page
+const PAGES = new Set([
+  'index.php', 'about.php', 'poem_view.php', 'poetry.php', 'book.php', 'books.php', 'blog.php', 'blog_post.php',
+  'reflections.php', 'video_watch.php', 'videos.php', 'events.php', 'plans.php', 'reading_plan.php', 'prayer.php',
+  'prompts.php', 'bible_reader.php', 'contact.php', 'newsletter.php', 'community_guidelines.php',
+]);
 const CRAWLER_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     let m;
-    if ((m = url.pathname.match(/^\/(p|b)\/(\d{1,9})\/?$/))) return page(m[1], m[2], url, ctx);
+    if ((m = url.pathname.match(/^\/(p|b)\/(\d{1,9})\/?$/))) {
+      return page(SITE + (m[1] === 'b' ? '/book.php?id=' : '/poem_view.php?id=') + m[2], url, ctx);
+    }
+    if ((m = url.pathname.match(/^\/s\/([a-z_]{2,40}\.php)$/)) && PAGES.has(m[1])) {
+      // only simple query strings (ids, slugs, dates), never anything that could reach a private page
+      const q = url.search.replace(/^\?/, '');
+      if (q === '' || /^[A-Za-z0-9=&._%-]{1,200}$/.test(q)) return page(SITE + '/' + m[1] + (q ? '?' + q : ''), url, ctx);
+    }
+    if (url.pathname === '/' || url.pathname === '') return page(SITE + '/', url, ctx);
     if (url.pathname === '/i') return image(url, ctx);
     return Response.redirect(SITE + '/', 302);
   },
@@ -36,10 +53,9 @@ function meta(html, prop) {
   return m ? unesc(m[1]) : '';
 }
 
-async function page(kind, id, url, ctx) {
-  const target = SITE + (kind === 'b' ? '/book.php?id=' : '/poem_view.php?id=') + id;
+async function page(target, url, ctx) {
   const cache = caches.default;
-  const key = new Request(url.origin + url.pathname, { method: 'GET' });
+  const key = new Request(url.origin + url.pathname + url.search, { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
 
@@ -60,7 +76,7 @@ async function page(kind, id, url, ctx) {
     }
   } catch (e) { /* keep the defaults; people are still sent on to the page */ }
 
-  const self = url.origin + url.pathname;
+  const self = url.origin + url.pathname + url.search;
   const body = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${esc(title)}</title>
 <meta name="robots" content="noindex">

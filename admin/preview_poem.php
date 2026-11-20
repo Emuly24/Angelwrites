@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/og.php';
 // Item 7 (F127): bare relative includes resolved against admin/ and fatalled on every request.
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -262,13 +263,13 @@ $pageTitle = htmlspecialchars($poem['title']) . ' — Poetry';
         <div class="poem-footer-actions aw-hide-focus">
             <div class="share-section">
                 <span>Share:</span>
-                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>" target="_blank" class="share-btn facebook">
+                <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo urlencode(aw_share_url('poem', (int)$id)); ?>" target="_blank" class="share-btn facebook">
                     <i class="fab fa-facebook-f"></i>
                 </a>
-                <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode($poem['title'] . ' — a poem by Angella Bottoman'); ?>&url=<?php echo urlencode(SITE_URL . '/poem_view.php?id=' . $id); ?>" target="_blank" class="share-btn twitter">
+                <a href="https://twitter.com/intent/tweet?text=<?php echo urlencode($poem['title'] . ' — a poem by Angella Bottoman'); ?>&url=<?php echo urlencode(aw_share_url('poem', (int)$id)); ?>" target="_blank" class="share-btn twitter">
                     <i class="fab fa-twitter"></i>
                 </a>
-                <a href="https://api.whatsapp.com/send?text=<?php echo urlencode($poem['title'] . ' — read this poem: ' . SITE_URL . '/poem_view.php?id=' . $id); ?>" target="_blank" class="share-btn whatsapp">
+                <a href="https://api.whatsapp.com/send?text=<?php echo urlencode($poem['title'] . ' — read this poem: ' . aw_share_url('poem', (int)$id)); ?>" target="_blank" class="share-btn whatsapp">
                     <i class="fab fa-whatsapp"></i>
                 </a>
             </div>

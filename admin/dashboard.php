@@ -63,6 +63,7 @@ $autoAt = strtotime((string)aw_setting('auto_backup_at', '')) ?: 0;
 $autoOk = (string)aw_setting('auto_backup_error', '') === '' && time() - $autoAt < 2 * 86400;
 if (aw_can('backup') && (string)aw_setting('auto_backup_enabled', '1') !== '0' && !$autoOk && $autoAt > 0) $attention[] = ['Automatic backup needs a look', '!', 'backup.php'];
 if (aw_can('backup') && ($backupDays === null || $backupDays >= 30)) $attention[] = [$backupDays === null ? 'No backup downloaded yet' : 'days since a backup was downloaded', $backupDays === null ? '!' : $backupDays, 'backup.php'];
+if (aw_can('manage_members') && trim((string)aw_setting('share_base_url', '')) === '') $attention[] = ['Link previews: paste the relay address so WhatsApp shows pictures', '!', 'settings.php?tab=email#link-previews'];
 
 // ----- most viewed this week (from the view log) -----
 $top = aw_dsh_q($db, "SELECT v.target_type, v.target_id, COUNT(*) AS n,

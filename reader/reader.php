@@ -435,6 +435,8 @@ require_once __DIR__ . '/reader_share.php';
     const pages = <?php echo json_encode($pages); ?>;
     const totalPages = pages.length;
     const bookId = <?php echo $book_id; ?>;
+    // shares go to the book's page (through the preview relay when one is set up), which anyone can open
+    const bookShareUrl = <?php require_once __DIR__ . '/../includes/og.php'; echo json_encode(aw_share_url('book', (int)$book_id), JSON_HEX_TAG | JSON_UNESCAPED_SLASHES); ?>;
     // R5: while the admin previews a draft, nothing is saved (position, session, bookmarks...).
     const userId = <?php echo (isLoggedIn() && empty($preview_version)) ? $_SESSION['user_id'] : 0; ?>;
     // Q7: guest-only actions showed a bare alert; offer to log in and come back to this book.
@@ -1566,7 +1568,7 @@ require_once __DIR__ . '/reader_share.php';
     }
 
     function share(platform) {
-        const url = window.location.origin+'/reader/reader.php?id='+bookId+'&chapter='+currentPage;
+        const url = bookShareUrl;
         let text = '📖 I\'m reading on AngelWrites!';
         if (window.currentQuote && window.currentQuote.trim() !== '') {
             text = '"' + window.currentQuote + '" - Read on AngelWrites!';

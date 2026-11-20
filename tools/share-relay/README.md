@@ -44,8 +44,28 @@ itself on every push to `main`, using `wrangler.toml` at the top of the reposito
 `tools/share-relay/worker.js`). The Worker's name in Cloudflare must stay `angelwrites-share`, as in
 that file. Leave the build's root directory empty and the deploy command `npx wrangler deploy`.
 
-From then on the share buttons (Facebook, X, WhatsApp, copy link, the poem reader's Share) use the
-relay link. To stop using it, clear the field and save.
+**Deploying the Worker is not enough on its own.** The site keeps sharing plain links (with no
+picture in WhatsApp) until the Worker's address is pasted in Admin → Settings → Link previews. The
+admin dashboard shows a reminder while the field is empty. To find the address: Cloudflare dashboard
+→ **Workers & Pages** → **angelwrites-share** → **Settings → Domains & Routes** → the **workers.dev**
+line (press **Enable** if it says Disabled).
+
+From then on every Share button on the site uses the relay link: poems, books, blog posts and
+reflections, the Bible reader's verse share, the book reader, and the iPhone/iPad share sheet that the
+site's own Share button opens. The browser's own share button still shares the plain page address.
+To stop using the relay, clear the field and save.
+
+### What the relay previews
+
+| Relay link | Page |
+|---|---|
+| `/p/12` | poem 12 |
+| `/b/3` | book 3 |
+| `/s/blog_post.php?slug=…` (and other public pages: events, plans, prayer, prompts, videos, the Bible reader…) | that page |
+| `/` | the home page |
+
+The list of pages is `PAGES` in `worker.js`. It must match `AW_SHARE_PAGES` in `includes/og.php`.
+Anything else is sent to the home page.
 
 ## Checking a preview
 

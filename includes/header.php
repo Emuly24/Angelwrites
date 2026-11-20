@@ -107,6 +107,15 @@ if ($isLoggedIn) {
 <meta name="twitter:description" content="<?php echo $og_description; ?>" />
 <meta name="twitter:image" content="<?php echo $og_image; ?>" />
 <meta name="twitter:image:alt" content="<?php echo $og_image_alt; ?>" />
+<?php
+    // every public page shares through the preview relay when one is set up, so WhatsApp & co. show the picture
+    require_once __DIR__ . '/og.php';
+    if (empty($aw_share_url) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && empty($aw_noindex) && function_exists('aw_share_link_here') && aw_share_base() !== '') {
+        $aw_share_here = aw_share_link_here();
+        if (strpos($aw_share_here, aw_share_base()) === 0) $aw_share_url = $aw_share_here;
+    }
+?>
+<?php if (aw_share_base() !== ''): ?><script>window.AW_SHARE_BASE = <?php echo json_encode(aw_share_base(), JSON_HEX_TAG | JSON_UNESCAPED_SLASHES); ?>;</script><?php endif; ?>
 <?php if (!empty($aw_share_url)): /* the share buttons and the reader's Share use the relay link when one is set up */ ?><script>window.AW_SHARE_URL = <?php echo json_encode((string)$aw_share_url, JSON_HEX_TAG | JSON_UNESCAPED_SLASHES); ?>;</script><?php endif; ?>
     
     <style>

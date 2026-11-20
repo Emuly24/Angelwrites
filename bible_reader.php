@@ -253,7 +253,7 @@ window.AW_BIBLE = <?php echo json_encode([
     'csrf' => $csrf,
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
 </script>
-<script src="<?php echo SITE_URL; ?>/assets/js/bible.js?v=3" defer></script>
+<script src="<?php echo SITE_URL; ?>/assets/js/bible.js?v=4" defer></script>
 <script src="<?php echo SITE_URL; ?>/assets/js/aw-listen.js?v=1" defer></script>
 <script>document.addEventListener('DOMContentLoaded', function () { if (!window.AWListen || !AWListen.supported) return;
     // the chapter read aloud, verse by verse, from the chosen verse (or the start); the chapter title first
