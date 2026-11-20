@@ -77,7 +77,8 @@ function aw_profile_columns(PDO $db) {
         $have = [];
         foreach ($db->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC) as $c) $have[$c['name']] = true;
         foreach (['age_range' => 'TEXT', 'whatsapp_number' => 'TEXT', 'contact_ok' => 'TEXT', 'city' => 'TEXT',
-                  'recovery_question' => 'TEXT', 'recovery_answer' => 'TEXT', 'details_updated_at' => 'DATETIME'] as $col => $def) {
+                  'recovery_question' => 'TEXT', 'recovery_answer' => 'TEXT', 'details_updated_at' => 'DATETIME',
+                  'reset_attempts' => 'INTEGER DEFAULT 0', 'recovery_attempts' => 'INTEGER DEFAULT 0', 'recovery_locked_until' => 'DATETIME'] as $col => $def) {
             if (!isset($have[$col])) $db->exec("ALTER TABLE users ADD COLUMN $col $def");
         }
         return $ok = true;
@@ -192,7 +193,7 @@ function aw_profile_fields_html(array $v, array $opts = []) {
     $strip = function ($num) use ($cd) { $d = preg_replace('/[^\d+]/', '', (string)$num); return ($cd !== '' && strpos($d, '+' . $cd) === 0) ? substr($d, strlen($cd) + 1) : (string)$num; };
     $wa = (string)($v['whatsapp'] ?? $v['whatsapp_number'] ?? '');
     $wa_same = isset($v['whatsapp_same']) ? !empty($v['whatsapp_same']) : ($wa === '' || $wa === $phone);
-    $ways = is_array($v['contact_ok'] ?? null) ? $v['contact_ok'] : array_filter(explode(',', (string)($v['contact_ok'] ?? 'whatsapp,call,email')));
+    $ways = is_array($v['contact_ok'] ?? null) ? $v['contact_ok'] : array_filter(explode(',', (string)($v['contact_ok'] ?? '')));
     $sex = (string)($v['sex'] ?? $v['gender'] ?? '');
     $h = '<div class="pf-block">';
     $h .= '<div class="pf-row">';
@@ -259,4 +260,23 @@ function aw_profile_assets() {
 })();
 </script>
 HTML;
+}
+
+/**
+ * After a password is changed by a reset: end "remember me" on every device, clear reset codes, and
+ * tell the member (on the site and by email). Returns nothing; failures are logged.
+ */
+function aw_after_password_reset(PDO $db, $uid, $how) {
+    try { $db->prepare("DELETE FROM remember_tokens WHERE user_id = ?")->execute([(int)$uid]); } catch (Throwable $e) { /* optional table */ }
+    try { $db->prepare("UPDATE users SET reset_code = NULL, reset_code_expiry = NULL, reset_attempts = 0, recovery_attempts = 0, recovery_locked_until = NULL WHERE id = ?")->execute([(int)$uid]); }
+    catch (Throwable $e) { error_log('after reset: ' . $e->getMessage()); }
+    if (function_exists('aw_audit')) aw_audit('password_reset', 'user', (int)$uid, (string)$how);
+    try {
+        $st = $db->prepare("SELECT email, first_name FROM users WHERE id = ?"); $st->execute([(int)$uid]); $u = $st->fetch(PDO::FETCH_ASSOC);
+        if ($u && function_exists('awNotify')) awNotify($db, (int)$uid, 'password_changed', 'Your password was changed', 'If this was not you, contact the AngelWrites team straight away.', SITE_URL . '/contact.php', ['email' => false, 'self_ok' => true, 'actor' => 0]);
+        if ($u && !empty($u['email']) && function_exists('sendEmail')) {
+            sendEmail($u['email'], 'Your AngelWrites password was changed',
+                'Hello ' . htmlspecialchars((string)$u['first_name']) . ',<br><br>The password for your AngelWrites account was just changed ' . ($how === 'recovery' ? 'using your recovery question and phone number' : 'with a reset code') . ' on ' . date('j F Y \a\t H:i') . ' (server time). You have been signed out on other devices.<br><br>If this was you, there is nothing more to do. If it was not, please <a href="' . SITE_URL . '/contact.php">contact us</a> straight away.');
+        }
+    } catch (Throwable $e) { error_log('after reset notice: ' . $e->getMessage()); }
 }

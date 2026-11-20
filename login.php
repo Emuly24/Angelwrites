@@ -191,7 +191,7 @@ $pageTitle = 'Sign In';
                     </div>
 
                     <div class="form-group">
-                        <a href="<?php echo SITE_URL; ?>/forgot_password.php" style="font-size: 0.9rem; color: var(--rose);">Forgot password?</a>
+                        <a href="<?php echo SITE_URL; ?>/forgot_password.php" style="font-size: 0.9rem; color: var(--rose);">Forgot password?</a> <span aria-hidden="true">·</span> <a href="<?php echo SITE_URL; ?>/recover.php" style="font-size: 0.9rem; color: var(--rose);">No access to your email?</a>
                     </div>
 
                     <button type="submit" name="login_submit" class="btn btn-primary btn-block">
