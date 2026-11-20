@@ -98,7 +98,12 @@ if (aw_can('moderate')) {
 }
 
 $sessions = aw_can('manage_members') ? aw_dsh_q($db, "SELECT s.date, s.time, u.name, u.first_name, u.last_name, u.username FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.status = 'pending' ORDER BY s.date, s.time LIMIT 5") : [];
-$messages = aw_can('team_inbox') ? aw_dsh_q($db, "SELECT name, message, created_at FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5") : [];
+$messages = aw_can('team_inbox') ? aw_dsh_q($db, "SELECT id, name, subject, message, created_at, COALESCE(source, 'form') AS source FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5") : [];
+if (aw_can('team_inbox') && !$messages) $messages = aw_dsh_q($db, "SELECT id, name, '' AS subject, message, created_at, 'form' AS source FROM contact_messages WHERE is_read = 0 ORDER BY created_at DESC LIMIT 5"); // before the email columns exist
+// is the Zoho mailbox being read? (emails reach the Team inbox by themselves; includes/inbox_bg.php)
+$zi_err = aw_can('team_inbox') ? (string)aw_setting('zoho_inbox_error', '') : '';
+$zi_last = aw_can('team_inbox') ? (string)aw_setting('zoho_inbox_last', '') : '';
+if ($zi_err !== '') { try { require_once __DIR__ . '/../includes/zoho_inbox.php'; $zi_err = aw_zoho_inbox_advice($zi_err); } catch (Throwable $e) { error_log('dashboard inbox: ' . $e->getMessage()); } }
 $newMembers = aw_can('manage_members') ? aw_dsh_q($db, "SELECT name, first_name, last_name, username, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 5") : [];
 $feed = aw_dsh_feed($db, 16);
 
@@ -219,10 +224,15 @@ require_once '../includes/header.php';
         <?php if (aw_can('team_inbox')): ?>
         <section class="dsh-card dsh-reveal" style="--i:7" aria-labelledby="dshMsg">
             <h2 id="dshMsg"><span class="dsh-ico"><i class="fas fa-envelope-open-text" aria-hidden="true"></i></span> Unread messages <a class="dsh-more" href="inbox.php">Inbox</a></h2>
-            <?php if (!$messages): ?><p class="dsh-empty">No unread messages from the contact form.</p>
+            <?php if (!$messages): ?><p class="dsh-empty">No unread messages or emails.</p>
             <?php else: ?><ul class="dsh-list"><?php foreach ($messages as $m): ?>
-                <li><a href="inbox.php"><?php echo htmlspecialchars($m['name'] ?: 'Someone'); ?><span class="dsh-sub"><?php echo htmlspecialchars(aw_dsh_short($m['message'], 70)); ?></span></a><span class="dsh-meta"><?php echo htmlspecialchars(aw_dsh_ago($m['created_at'])); ?></span></li>
+                <li><a href="inbox.php?id=<?php echo (int)$m['id']; ?>"><i class="fas <?php echo $m['source'] === 'email' ? 'fa-envelope' : 'fa-message'; ?>" aria-hidden="true" style="color:var(--rose,#9c5457);margin-right:6px;"></i><span class="sr-only"><?php echo $m['source'] === 'email' ? 'Email' : 'Contact form'; ?>: </span><?php echo htmlspecialchars($m['name'] ?: 'Someone'); ?><span class="dsh-sub"><?php echo htmlspecialchars(aw_dsh_short(trim(($m['subject'] ? $m['subject'] . ': ' : '') . $m['message']), 70)); ?></span></a><span class="dsh-meta"><?php echo htmlspecialchars(aw_dsh_ago($m['created_at'])); ?></span></li>
             <?php endforeach; ?></ul><?php endif; ?>
+            <?php if ($zi_err !== ''): ?>
+                <p class="dsh-alert" role="status" style="margin:10px 0 0;padding:8px 12px;border-radius:10px;background:#fbe5e3;color:#8a2d23;font-size:.85rem;"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i> Emails from Zoho are not reaching the site: <?php echo htmlspecialchars($zi_err); ?> <a href="inbox.php" style="color:inherit;font-weight:700;">Open the inbox</a></p>
+            <?php elseif ($zi_last !== ''): ?>
+                <p class="dsh-sub" style="margin:10px 0 0;font-size:.8rem;"><i class="fas fa-rotate" aria-hidden="true"></i> Zoho mailbox checked <?php echo htmlspecialchars(aw_dsh_ago($zi_last)); ?>. New emails arrive here by themselves.</p>
+            <?php endif; ?>
         </section>
         <?php endif; ?>
         <?php if (aw_can('manage_members')): ?>

@@ -305,20 +305,28 @@ function aw_contact_buttons(array $u, $context = '') {
         $agreed = in_array($way, $ok, true);
         if (!$agreed && !$admin) continue;
         $title = $label . ' ' . $name . ' (' . $shown . ')' . ($agreed ? '' : '. They have not agreed to be contacted this way');
-        $h .= '<a class="aw-cbtn aw-cbtn-' . $way . ($agreed ? '' : ' is-not-agreed') . '" href="' . $e($href) . '"' . ($way === 'whatsapp' ? ' target="_blank" rel="noopener"' : '')
-            . ' title="' . $e($title) . '" aria-label="' . $e($title) . '" data-contact-way="' . $way . '"><i class="' . $icon . '" aria-hidden="true"></i></a>';
+        // own class (not .aw-cbtn, the pill buttons in aw-design.css), so the two styles never mix
+        $h .= '<a class="aw-reach aw-reach-' . $way . ($agreed ? '' : ' is-not-agreed') . '" href="' . $e($href) . '"' . ($way === 'whatsapp' ? ' target="_blank" rel="noopener"' : '')
+            . ' title="' . $e($title) . '" aria-label="' . $e($title) . '" data-contact-way="' . $way . '"><i class="' . $icon . '" aria-hidden="true"></i>'
+            . ($agreed ? '' : '<span class="aw-reach-flag" aria-hidden="true"></span>') . '</a>';
     }
     if ($h === '') return '';
     static $css = false;
     if (!$css) {
         $css = true;
-        $h .= '<style>.aw-cbtns{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}'
-            . '.aw-cbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;color:#fff;text-decoration:none;font-size:1.05rem;transition:transform .15s}'
-            . '.aw-cbtn:hover{transform:translateY(-1px);color:#fff}.aw-cbtn:focus-visible{outline:3px solid #3d2e2e;outline-offset:2px}'
-            . '.aw-cbtn-whatsapp{background:#1f8a4c}.aw-cbtn-call{background:#2f5f9c}.aw-cbtn-email{background:#9c5457}'
-            . '.aw-cbtn.is-not-agreed{opacity:.55;outline:2px dashed currentColor;outline-offset:-4px}</style>';
+        // soft tinted tiles in each way's colour, filled on hover; "not agreed" = a small amber dot
+        $h .= '<style>.aw-reach-group{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}'
+            . '.aw-reach{position:relative;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;text-decoration:none;font-size:1.1rem;border:1px solid transparent;transition:background-color .15s,color .15s,transform .15s,box-shadow .15s}'
+            . '.aw-reach:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(61,46,46,.12);text-decoration:none}.aw-reach:focus-visible{outline:3px solid #3d2e2e;outline-offset:2px}'
+            . '.aw-reach-whatsapp{background:#e4f4ea;color:#1a7a43;border-color:#c9e8d5}.aw-reach-whatsapp:hover,.aw-reach-whatsapp:focus-visible{background:#1f8a4c;color:#fff}'
+            . '.aw-reach-call{background:#e7eefa;color:#2f5f9c;border-color:#cddcf2}.aw-reach-call:hover,.aw-reach-call:focus-visible{background:#2f5f9c;color:#fff}'
+            . '.aw-reach-email{background:#f8e9e8;color:#9c5457;border-color:#efd3d1}.aw-reach-email:hover,.aw-reach-email:focus-visible{background:#9c5457;color:#fff}'
+            . '.aw-reach-flag{position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:#d99a2b;border:2px solid #fff}'
+            . 'html[data-theme="dark"] .aw-reach-whatsapp{background:#1d3a2a;color:#8fdcae;border-color:#2b5a40}html[data-theme="dark"] .aw-reach-call{background:#1e2c42;color:#a9c4ef;border-color:#2e4466}'
+            . 'html[data-theme="dark"] .aw-reach-email{background:#3a2526;color:#f0c4c5;border-color:#5a3a3b}'
+            . 'html[data-theme="dark"] .aw-reach-flag{border-color:#2c1e1e}</style>';
     }
-    return '<span class="aw-cbtns" role="group" aria-label="Contact ' . $e($name) . '">' . $h . '</span>';
+    return '<span class="aw-reach-group" role="group" aria-label="Contact ' . $e($name) . '">' . $h . '</span>';
 }
 
 /** A short line of the member's details for team screens: phone, age range, sex, town. */
