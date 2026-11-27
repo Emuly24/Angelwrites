@@ -87,3 +87,16 @@ html[data-theme="dark"] .msg { --m-accent: #f0c4c5; --m-on: #2c1e1e; --m-mine: #
     .msg-tabs .msg-new { margin-left: 0; }
     .msg-bubbles { max-height: 62vh; }
 }
+
+/* Quoting a message: the quote inside a bubble, the Quote button, and the preview above the box */
+.msg-quote { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px; padding: 6px 10px; border-left: 3px solid #9c5457; border-radius: 8px; background: rgba(156,84,87,.08); color: inherit; text-decoration: none; font-size: .82rem; line-height: 1.35; }
+.msg-b.is-mine .msg-quote { background: rgba(255,255,255,.18); border-left-color: rgba(255,255,255,.75); }
+a.msg-quote:hover { background: rgba(156,84,87,.14); text-decoration: none; } .msg-b.is-mine a.msg-quote:hover { background: rgba(255,255,255,.26); }
+.msg-quote-who { font-weight: 700; font-size: .74rem; opacity: .9; }
+.msg-quote-text { opacity: .85; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.msg-quoting { width: 100%; display: flex; align-items: center; gap: 8px; }
+.msg-quoting .msg-quote { flex: 1; margin: 0; }
+.msg-quote-x { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--m-line); background: var(--m-card); color: var(--text); cursor: pointer; }
+.msg-quote-x:focus-visible, .msg-quote-btn:focus-visible { outline: 2px solid #9c5457; outline-offset: 2px; }
+.msg-b:target { box-shadow: 0 0 0 3px rgba(156,84,87,.45); transition: box-shadow .3s; }
+html[data-theme="dark"] .msg-quote { background: rgba(240,196,197,.10); border-left-color: #f0c4c5; }
