@@ -73,8 +73,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment']) && isL
     }
 
     if (!empty($comment)) {
-        $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, photo_path) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment, $photo_path]);
+        // a reply: its comment must be on this post
+        require_once __DIR__ . '/includes/comment_threads.php';
+        $aw_parent = null;
+        if (!empty($_POST['parent_id']) && aw_thread_column($db, 'reflection_comments')) {
+            $pp = $db->prepare("SELECT id, user_id FROM reflection_comments WHERE id = ? AND reflection_id = ?");
+            $pp->execute([(int)$_POST['parent_id'], $reflection_id]);
+            $aw_parent = $pp->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        if ($aw_parent) {
+            $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, photo_path, parent_id) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment, $photo_path, (int)$aw_parent['id']]);
+            require_once __DIR__ . '/includes/notifications.php';
+            if (function_exists('awNotify')) {
+                awNotify($db, (int)$aw_parent['user_id'], 'comment_reply', awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']) . ' replied to your comment',
+                    'On “' . mb_substr((string)($post['title'] ?? 'a post'), 0, 80) . '”.', SITE_URL . '/blog_post.php?slug=' . urlencode($slug) . '#comments');
+            }
+        } else {
+            $stmt = $db->prepare("INSERT INTO reflection_comments (reflection_id, user_id, comment, photo_path) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$reflection_id, $_SESSION['user_id'], $comment, $photo_path]);
+        }
         // N2: mentions in the comment
         require_once __DIR__ . '/includes/mentions.php';
         aw_mentions_save($db, $comment, 'reflection_comment', (int)$db->lastInsertId(), '“' . mb_substr((string)($post['title'] ?? 'a reflection'), 0, 80) . '”',
@@ -201,7 +219,7 @@ $related_posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== FETCH COMMENTS WITH REACTIONS =====
 $stmt = $db->prepare("
-    SELECT c.*, u.name AS author_name, u.avatar,
+    SELECT c.*, COALESCE(NULLIF(TRIM(u.name), ''), u.username) AS author_name, u.avatar,
            (SELECT COUNT(*) FROM comment_reactions WHERE comment_id = c.id AND reaction_type = 'like') as likes,
            (SELECT COUNT(*) FROM comment_reactions WHERE comment_id = c.id AND reaction_type = 'love') as loves,
            (SELECT COUNT(*) FROM comment_reactions WHERE comment_id = c.id AND reaction_type = 'pray') as prays
@@ -212,6 +230,10 @@ $stmt = $db->prepare("
 ");
 $stmt->execute([$post['id']]);
 $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// replies sit under their comment (to any depth); pages count whole threads
+require_once __DIR__ . '/includes/comment_threads.php';
+aw_thread_column($db, 'reflection_comments');
+$comments = aw_thread_tree($comments);
 // P13: all comments were shown at once; 10 per page now, newest first.
 require_once __DIR__ . '/includes/pagination.php';
 [$cpage, $cper] = aw_page(10);
@@ -348,7 +370,8 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
             <?php if ($comments_total > 0): ?>
                 <div class="comments-list">
                     <?php require_once __DIR__ . '/includes/moderation.php'; $aw_blocked = aw_blocked_ids($db, (int)($_SESSION['user_id'] ?? 0)); ?>
-                    <?php foreach ($comments as $comment): $aw_fold = isset($aw_blocked[(int)($comment['user_id'] ?? 0)]); /* N4 */ ?>
+                    <?php echo aw_thread_assets();
+                    $aw_bp_render = function ($comment, $depth = 0) use (&$aw_bp_render, $db, $aw_blocked, $post) { $aw_fold = isset($aw_blocked[(int)($comment['user_id'] ?? 0)]); ?>
                         <?php if ($aw_fold): ?><details class="aw-blocked-fold"><summary>A comment from someone you blocked</summary><?php endif; ?>
                         <div class="comment-item <?php echo $comment['is_admin_reply'] ? 'admin-reply' : ''; ?>">
                             <div class="comment-author">
@@ -385,11 +408,15 @@ $pageTitle = htmlspecialchars($post['title']) . ' — Blog';
                                         🙏 <span id="prays-<?php echo $comment['id']; ?>"><?php echo $comment['prays']; ?></span>
                                     </button>
                                 </div>
+                                <?php echo aw_thread_reply_button($comment['id'], $comment['author_name']); ?>
                                 <?php if (!$comment['is_admin_reply']) echo aw_report_controls('reflection_comment', (int)$comment['id'], (int)($comment['user_id'] ?? 0), (string)$comment['author_name']); /* N4 */ ?>
                             </div>
+                            <?php if (isLoggedIn()) echo aw_thread_reply_form($comment['id'], $comment['author_name'], ['reflection_id' => $post['id']]); ?>
+                            <?php if (!empty($comment['children'])): ?><div class="aw-thread-kids"><?php foreach ($comment['children'] as $aw_kid) $aw_bp_render($aw_kid, $depth + 1); ?></div><?php endif; ?>
                         </div>
                         <?php if ($aw_fold): ?></details><?php endif; ?>
-                    <?php endforeach; ?>
+                    <?php };
+                    foreach ($comments as $comment) $aw_bp_render($comment); ?>
                 </div>
                 <?php echo aw_pager($comments_total, $cpage, $cper, 'comments'); // P13 ?>
             <?php else: ?>

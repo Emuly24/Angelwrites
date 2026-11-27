@@ -215,7 +215,7 @@ $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
 $privacy_sql = isAdmin() ? '' : 'AND (r.is_private IS NULL OR r.is_private = 0 OR r.user_id = ?)';
 
 $stmt = $db->prepare("
-    SELECT r.*, u.name AS author_name, u.profile_pic AS author_pic,
+    SELECT r.*, COALESCE(NULLIF(TRIM(u.name), ''), u.username) AS author_name, u.profile_pic AS author_pic,
            (SELECT COUNT(*) FROM reactions WHERE target_type='comment' AND target_id=r.id AND reaction_type='like') AS likes,
            (SELECT COUNT(*) FROM reactions WHERE target_type='comment' AND target_id=r.id) AS total_reactions
     FROM reviews r

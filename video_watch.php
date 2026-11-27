@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/csrf.php'; // comment and reply forms
 require_once 'includes/views.php'; // one way to count views
 require_once 'includes/saves.php'; // F2: the Save control
 require_once __DIR__ . '/reader/reader_functions.php'; // time_ago()
@@ -94,12 +95,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
         header('Location: ' . SITE_URL . '/login.php');
         exit;
     }
-    $content = trim($_POST['comment_content']);
+    if (!validate_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(400); exit('This form has expired. Please go back, reload the page and try again.'); }
+    $content = trim((string)($_POST['comment_content'] ?? ($_POST['comment'] ?? ''))); // the reply box sends "comment"
     if (empty($content)) {
         $error = 'Comment content is required.';
     } else {
-        $stmt = $db->prepare("INSERT INTO video_comments (video_id, user_id, content) VALUES (?, ?, ?)");
-        $stmt->execute([$id, $_SESSION['user_id'], $content]);
+        // a reply: its comment must be under this video; the person replied to is told
+        require_once __DIR__ . '/includes/comment_threads.php';
+        $aw_parent = null;
+        if (!empty($_POST['parent_id']) && aw_thread_column($db, 'video_comments')) {
+            $pp = $db->prepare("SELECT id, user_id FROM video_comments WHERE id = ? AND video_id = ?");
+            $pp->execute([(int)$_POST['parent_id'], $id]);
+            $aw_parent = $pp->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        if ($aw_parent) {
+            $db->prepare("INSERT INTO video_comments (video_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)")->execute([$id, $_SESSION['user_id'], mb_substr($content, 0, 2000), (int)$aw_parent['id']]);
+            require_once __DIR__ . '/includes/notifications.php';
+            if (function_exists('awNotify')) awNotify($db, (int)$aw_parent['user_id'], 'comment_reply', (function_exists('awDisplayName') ? awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']) : 'Someone') . ' replied to your comment',
+                'On the video “' . mb_substr((string)($video['title'] ?? ''), 0, 80) . '”.', SITE_URL . '/video_watch.php?id=' . $id . '#comments');
+        } else {
+            $stmt = $db->prepare("INSERT INTO video_comments (video_id, user_id, content) VALUES (?, ?, ?)");
+            $stmt->execute([$id, $_SESSION['user_id'], mb_substr($content, 0, 2000)]);
+        }
         $success = 'Comment added successfully.';
         header('Location: ' . SITE_URL . '/video_watch.php?id=' . $id);
         exit;
@@ -111,13 +128,15 @@ $order = isset($_GET['order']) && $_GET['order'] === 'oldest' ? 'ASC' : 'DESC';
 // P17: all comments were loaded and shown at once; 10 per page now (the newest/oldest order is kept).
 require_once __DIR__ . '/includes/pagination.php';
 [$cpage, $cper] = aw_page(10);
-$cst = $db->prepare("SELECT COUNT(*) FROM video_comments WHERE video_id = ?");
-$cst->execute([$id]);
-$comments_total = (int)$cst->fetchColumn();
+// replies sit under their comment; pages count whole threads
+require_once __DIR__ . '/includes/comment_threads.php';
+aw_thread_column($db, 'video_comments');
+$stmt = $db->prepare("SELECT c.*, u.username, u.display_name, u.avatar FROM video_comments c JOIN users u ON c.user_id = u.id WHERE c.video_id = ? ORDER BY c.created_at $order, c.id $order");
+$stmt->execute([$id]);
+$comments = aw_thread_tree($stmt->fetchAll(PDO::FETCH_ASSOC));
+$comments_total = count($comments);
 [$cpage, $coffset] = aw_clamp($comments_total, $cpage, $cper);
-$stmt = $db->prepare("SELECT c.*, u.username, u.display_name, u.avatar FROM video_comments c JOIN users u ON c.user_id = u.id WHERE c.video_id = ? ORDER BY c.created_at $order, c.id $order LIMIT ? OFFSET ?");
-$stmt->execute([$id, $cper, $coffset]);
-$comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$comments = array_slice($comments, $coffset, $cper);
 
 // ===== FETCH RELATED VIDEOS =====
 $stmt = $db->prepare("SELECT id, title, thumbnail, view_count FROM videos WHERE id != ? ORDER BY created_at DESC LIMIT 4"); // F64: views column is missing in production
@@ -214,6 +233,7 @@ $pageTitle = htmlspecialchars($video['title']);
                     <?php if (isLoggedIn()): ?>
                         <div class="comment-form-wrapper">
                             <form method="POST" class="comment-form">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generate_csrf_token()); ?>">
                                 <div class="form-group">
                                     <label for="comment_content">Add a comment...</label>
                                     <textarea id="comment_content" name="comment_content" rows="2" placeholder="Share your thoughts..." required></textarea>
@@ -229,7 +249,8 @@ $pageTitle = htmlspecialchars($video['title']);
 
                     <?php if ($comments_total > 0): ?>
                         <div class="comments-list">
-                            <?php foreach ($comments as $comment): ?>
+                            <?php echo aw_thread_assets();
+                            $aw_vw_render = function ($comment) use (&$aw_vw_render) { ?>
                                 <div class="comment-item">
                                     <div class="comment-avatar">
                                         <?php if ($comment['avatar']): ?>
@@ -247,12 +268,14 @@ $pageTitle = htmlspecialchars($video['title']);
                                         </div>
                                         <p class="comment-content"><?php echo nl2br(htmlspecialchars($comment['content'])); ?></p>
                                         <div class="comment-actions">
-                                            <a href="#" class="reply-link"><i class="fas fa-reply"></i> Reply</a>
-                                            <span class="comment-likes"><i class="far fa-thumbs-up"></i> 0</span>
+                                            <?php echo aw_thread_reply_button($comment['id'], $comment['display_name'] ?: $comment['username']); ?>
                                         </div>
+                                        <?php if (isLoggedIn()) echo aw_thread_reply_form($comment['id'], $comment['display_name'] ?: $comment['username'], [], 'submit_comment'); ?>
+                                        <?php if (!empty($comment['children'])): ?><div class="aw-thread-kids"><?php foreach ($comment['children'] as $aw_kid) $aw_vw_render($aw_kid); ?></div><?php endif; ?>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
+                            <?php };
+                            foreach ($comments as $comment) $aw_vw_render($comment); ?>
                         </div>
                         <?php echo aw_pager($comments_total, $cpage, $cper, 'comments'); // P17 ?>
                     <?php else: ?>
