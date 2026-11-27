@@ -626,7 +626,7 @@ if ('serviceWorker' in navigator) {
                 <span class="home-founder-text">
                     <span class="home-founder-kicker">About AngelWrites</span>
                     <span class="home-founder-line"><?php echo aw_text('home.built_by', 'Founded by Angella Bottoman, a Christian writer from Malawi who believes every life holds a story worth telling.', 'line'); ?></span>
-                    <span class="home-founder-go">Read our story <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+                    <span class="home-founder-go">Read her story <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
                 </span>
             </a>
             <div class="about-cta">
