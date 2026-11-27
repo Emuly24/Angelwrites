@@ -32,6 +32,8 @@ function aw_report_types() {
         'review'             => ['reviews', 'user_id', 'comment', "CASE target_type WHEN 'poem' THEN 'poem_view.php?id=' || target_id WHEN 'book' THEN 'book.php?id=' || target_id ELSE 'index.php' END || '#comments'", 'soft'],
         'reflection_comment' => ['reflection_comments', 'user_id', 'comment', "'blog_post.php?slug=' || (SELECT slug FROM blog_posts b WHERE b.id = reflection_id) || '#comments'", 'archive'],
         'video_comment'      => ['video_comments', 'user_id', 'content', "'video_watch.php?id=' || video_id", 'archive'],
+        // the discussion under a Q&A answer (includes/qa.php)
+        'answer_comment'     => ['answer_comments', 'user_id', 'body', "'community.php?id=' || (SELECT question_id FROM answers a WHERE a.id = answer_id) || '#ac' || id", 'archive'],
         // D1: Stories & Help. 'status' mode: removal sets status = 'removed' (kept 90 days, then purged)
         'community_post'     => ['community_posts', 'author_id', "title || ' — ' || body", "'story.php?id=' || id", 'status'],
         'community_reply'    => ['community_replies', 'author_id', 'body', "'story.php?id=' || post_id || '#reply-' || id", 'status'],
