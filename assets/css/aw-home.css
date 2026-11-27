@@ -23,3 +23,17 @@ html[data-theme="dark"] .heart-card h3 { color: #f6ecec; }
 html[data-theme="dark"] .heart-card .aw-li::before { background: #f0c4c5; }
 html[data-theme="dark"] .heart-ico { background: linear-gradient(135deg, #f0c4c5, #d9a2a4); color: #2c1e1e; }
 @media (prefers-reduced-motion: reduce) { .heart-card, .heart-ico { transition: none; } .heart-card:hover { transform: none; } .heart-card:hover .heart-ico { transform: none; } }
+
+/* Home page: the About card in the welcome section (links to about.php) */
+.home-founder { display: flex; align-items: center; gap: 18px; max-width: 640px; margin: 26px auto 22px; padding: 16px 22px 16px 16px; border-radius: 22px; text-align: left;
+    background: var(--card-bg, #fff); border: 1px solid var(--border, #ecdcdc); box-shadow: 0 10px 30px rgba(44,30,30,.08); color: inherit; text-decoration: none; transition: transform .3s, box-shadow .3s, border-color .3s; }
+.home-founder:hover, .home-founder:focus-visible { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(44,30,30,.14); border-color: #c48f91; text-decoration: none; }
+.home-founder:focus-visible { outline: 3px solid #9c5457; outline-offset: 3px; }
+.home-founder img { flex: none; width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 3px solid #f3dede; }
+.home-founder-text { display: flex; flex-direction: column; gap: 4px; }
+.home-founder-kicker { font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #9c5457; }
+.home-founder-line { font-family: 'Playfair Display', Georgia, serif; font-size: 1.08rem; line-height: 1.45; color: var(--dark, #2c1e1e); }
+.home-founder-go { font-weight: 700; color: #9c5457; font-size: .92rem; }
+.home-founder:hover .home-founder-go i { transform: translateX(3px); } .home-founder-go i { transition: transform .2s; }
+@media (max-width: 480px) { .home-founder { flex-direction: column; text-align: center; padding: 20px; } .home-founder-text { align-items: center; } }
+html[data-theme="dark"] .home-founder-line { color: #f6e9e9; } html[data-theme="dark"] .home-founder img { border-color: #4a3434; }
