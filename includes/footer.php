@@ -48,7 +48,6 @@ FOOTER – Brand, Links, Social
                         <li><a href="<?php echo SITE_URL; ?>/poetry.php"><?php echo aw_t('Poems'); ?></a></li>
                         <li><a href="<?php echo SITE_URL; ?>/blog.php"><?php echo aw_t('Blog'); ?></a></li>
                     <?php endif; ?>
-                    <li><a href="<?php echo SITE_URL; ?>/about.php"><?php echo aw_t('About'); ?></a></li>
                     <li><a href="<?php echo SITE_URL; ?>/contact.php"><?php echo aw_t('Contact'); ?></a></li>
                 </ul>
             </div>

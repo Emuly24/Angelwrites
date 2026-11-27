@@ -6,9 +6,55 @@ require_once 'includes/auth.php';
 require_once 'includes/views.php'; // one way to count views
 require_once 'includes/mail_helper.php';
 
+require_once 'includes/csrf.php';
+require_once 'includes/qa.php'; // answer discussions, following, helpful toggle, answer reactions
+require_once 'includes/moderation.php';
+
 $error = '';
 $success = '';
 $user_id = isLoggedIn() ? $_SESSION['user_id'] : null;
+$token = generate_csrf_token();
+
+// Every change on this page carries the page token (none did; another site could post for a member).
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $aw_sent = (string)($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+    if (!validate_csrf_token($aw_sent)) {
+        $aw_ajax = isset($_POST['accept_answer']) || isset($_POST['upvote_answer']) || isset($_POST['reaction_answer']) || isset($_POST['follow_question']);
+        if ($aw_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'This page has expired. Please reload it and try again.']); exit; }
+        http_response_code(400);
+        exit('This form has expired. Please go back, reload the page and try again.');
+    }
+}
+
+// ===== answer discussions, following and answer reactions (includes/qa.php) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id && (isset($_POST['add_answer_comment']) || isset($_POST['qa_reply']))) {
+    $r = aw_qa_add_comment($db, (int)($_POST['answer_id'] ?? 0), (int)$user_id, (string)($_POST['comment'] ?? ''), (int)($_POST['parent_id'] ?? 0));
+    $qid_back = (int)($_POST['question_id'] ?? 0);
+    if (!$r['ok']) $_SESSION['qa_flash'] = $r['message'];
+    header('Location: ' . SITE_URL . '/community.php?id=' . $qid_back . ($r['ok'] ? '#ac' . (int)$r['id'] : '#answer-' . (int)($_POST['answer_id'] ?? 0)));
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id && isset($_POST['delete_answer_comment'])) {
+    aw_qa_delete_comment($db, (int)$_POST['delete_answer_comment'], (int)$user_id, function_exists('aw_cp_staff_mod') && aw_cp_staff_mod());
+    header('Location: ' . SITE_URL . '/community.php?id=' . (int)($_POST['question_id'] ?? 0) . '#answers');
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['follow_question'])) {
+    header('Content-Type: application/json');
+    if (!$user_id) { echo json_encode(['success' => false, 'error' => 'Please sign in to follow questions.']); exit; }
+    $fq = (int)$_POST['follow_question'];
+    $on = !aw_qa_following($db, $fq, (int)$user_id);
+    $ok = aw_qa_follow($db, $fq, (int)$user_id, $on);
+    echo json_encode(['success' => $ok, 'on' => $on, 'count' => aw_qa_follower_count($db, $fq), 'error' => $ok ? null : 'That did not work. Please try again.']);
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reaction_answer'])) {
+    header('Content-Type: application/json');
+    if (!$user_id) { echo json_encode(['success' => false, 'error' => 'Please sign in to react.']); exit; }
+    $r = aw_qa_toggle_reaction($db, (int)($_POST['answer_id'] ?? 0), (int)$user_id, (string)($_POST['reaction_type'] ?? ''));
+    echo json_encode(['success' => $r['ok']] + $r);
+    exit;
+}
 
 // ===== PAGINATION, SEARCH, FILTER, SORT, TAG =====
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -77,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_question'])) {
             if ($stmt->execute([$user_id, $title, $body])) {
                 $question_id = $db->lastInsertId();
                 $success = 'Your question has been posted!';
+                aw_qa_follow($db, (int)$question_id, (int)$user_id); // you hear about answers to your question
                 
                 // Process tags
                 if (!empty($tags)) {
@@ -138,6 +185,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_answer'])) {
                 require_once __DIR__ . '/includes/mentions.php';
                 if ($qrow) aw_mentions_save($db, $body, 'answer', (int)$answer_id, 'the question “' . mb_substr($qrow['title'], 0, 80) . '”',
                     SITE_URL . '/community.php?id=' . $question_id, awDisplayName(['name' => $_SESSION['name'] ?? '', 'username' => $_SESSION['username'] ?? '']));
+                aw_qa_follow($db, (int)$question_id, (int)$user_id); // answering follows the question
+                if ($qrow) aw_qa_tell_followers($db, (int)$question_id, $qrow['title'], (int)$user_id, (int)$qrow['user_id']);
                 if ($qrow && (int)$qrow['user_id'] !== (int)$user_id) {
                     awNotify($db, $qrow['user_id'], 'answer', 'New answer to your question',
                         'Someone answered "' . mb_substr($qrow['title'], 0, 80) . '".', SITE_URL . '/community.php?id=' . $question_id);
@@ -181,34 +230,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
         echo json_encode(['success' => false, 'error' => 'Please sign in first.']);
         exit;
     }
-    $answer_id = (int)$_POST['answer_id'];
-    // F148: upvotes were not tracked per member, so anyone could upvote any answer (their own
-    // included) without limit. One upvote per member per answer, recorded in the generic
-    // reactions table (UNIQUE user/target/reaction); no upvoting your own answer.
-    $stmt = $db->prepare("SELECT user_id FROM answers WHERE id = ?");
-    $stmt->execute([$answer_id]);
-    $author_id = $stmt->fetchColumn();
-    $stmt->closeCursor();
-    if (!$author_id) {
-        echo json_encode(['success' => false, 'error' => 'Answer not found.']);
-        exit;
-    }
-    if ((int)$author_id === (int)$user_id) {
-        echo json_encode(['success' => false, 'error' => 'This is your own answer.']);
-        exit;
-    }
-    $vote = $db->prepare("INSERT OR IGNORE INTO reactions (user_id, target_type, target_id, reaction_type) VALUES (?, 'answer', ?, 'upvote')");
-    $vote->execute([$user_id, $answer_id]);
-    if ($vote->rowCount() === 0) {
-        echo json_encode(['success' => false, 'error' => 'You have already marked this answer as helpful.']);
-        exit;
-    }
-    $stmt = $db->prepare("UPDATE answers SET upvotes = upvotes + 1 WHERE id = ?");
-    if ($stmt->execute([$answer_id])) {
-        echo json_encode(['success' => true]);
-    } else {
-        echo json_encode(['success' => false, 'error' => 'That did not work. Please try again.']);
-    }
+    // F148 + toggle: one mark per member per answer (not on your own), and it can be taken back
+    $r = aw_qa_toggle_helpful($db, (int)($_POST['answer_id'] ?? 0), (int)$user_id);
+    echo json_encode(['success' => $r['ok']] + $r);
     exit;
 }
 
@@ -216,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upvote_answer'])) {
 // 5. FETCH QUESTIONS
 // ================================================================
 $sql = "
-    SELECT q.*, u.name AS author_name, u.avatar 
+    SELECT q.*, COALESCE(NULLIF(TRIM(u.name), ''), u.username) AS author_name, u.avatar 
     FROM questions q
     JOIN users u ON q.user_id = u.id
     WHERE 1=1
@@ -281,7 +305,7 @@ $answers = [];
 if (isset($_GET['id'])) {
     $qid = (int)$_GET['id'];
     $stmt = $db->prepare("
-        SELECT q.*, u.name AS author_name, u.avatar 
+        SELECT q.*, COALESCE(NULLIF(TRIM(u.name), ''), u.username) AS author_name, u.avatar 
         FROM questions q
         JOIN users u ON q.user_id = u.id
         WHERE q.id = ?
@@ -292,15 +316,26 @@ if (isset($_GET['id'])) {
     if ($single_question) {
         aw_view_record($db, 'question', (int)$qid); // one way to count views (includes/views.php)
         
+        // the reader chooses the order; the accepted answer always comes first
+        $asort = in_array($_GET['asort'] ?? '', ['newest', 'oldest'], true) ? $_GET['asort'] : 'helpful';
+        $aw_order = ['helpful' => 'a.upvotes DESC, a.created_at ASC', 'newest' => 'a.created_at DESC, a.id DESC', 'oldest' => 'a.created_at ASC, a.id ASC'][$asort];
         $stmt = $db->prepare("
-            SELECT a.*, u.name AS author_name, u.avatar 
+            SELECT a.*, COALESCE(NULLIF(TRIM(u.name), ''), u.username) AS author_name, u.avatar
             FROM answers a
             JOIN users u ON a.user_id = u.id
             WHERE a.question_id = ?
-            ORDER BY a.is_accepted DESC, a.upvotes DESC, a.created_at ASC
+            ORDER BY a.is_accepted DESC, $aw_order
         ");
         $stmt->execute([$qid]);
         $answers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // the discussion under each answer, reactions, and following
+        $aw_aids = array_map('intval', array_column($answers, 'id'));
+        $qa_comments = aw_qa_comments($db, $aw_aids);
+        $qa_rx = aw_qa_reactions($db, $aw_aids, (int)$user_id);
+        $qa_following = aw_qa_following($db, (int)$qid, (int)$user_id);
+        $qa_followers = aw_qa_follower_count($db, (int)$qid);
+        $qa_staff = function_exists('aw_cp_staff_mod') && aw_cp_staff_mod();
+        $qa_flash = (string)($_SESSION['qa_flash'] ?? ''); unset($_SESSION['qa_flash']);
 
         // C3: which answers this member has already marked helpful (one mark each, F148)
         $my_helpful = [];
@@ -349,6 +384,14 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                         <span class="answers-count"><i class="fas fa-comments"></i> <?php echo number_format($single_question['answers_count'] ?? 0); ?></span>
                     </div>
                     <div class="question-body"><?php echo nl2br(htmlspecialchars($single_question['body'])); ?></div>
+                    <?php echo aw_qa_assets(); ?>
+                    <div class="qa-follow" style="margin-top:12px;">
+                        <?php if ($user_id): ?>
+                            <button type="button" class="btn btn-sm btn-outline<?php echo $qa_following ? ' active' : ''; ?>" id="qaFollow" data-q="<?php echo (int)$single_question['id']; ?>" aria-pressed="<?php echo $qa_following ? 'true' : 'false'; ?>"><i class="fas fa-bell" aria-hidden="true"></i> <span><?php echo $qa_following ? 'Following' : 'Follow'; ?></span></button>
+                        <?php endif; ?>
+                        <span class="field-hint" id="qaFollowers"><?php echo $qa_followers ? ($qa_followers === 1 ? '1 person follows this question' : $qa_followers . ' people follow this question') : ''; ?></span>
+                    </div>
+                    <?php if ($qa_flash !== ''): ?><div class="alert alert-error" role="alert" style="margin-top:12px;"><?php echo htmlspecialchars($qa_flash); ?></div><?php endif; ?>
                     <?php if ($user_id && (int)$single_question['user_id'] === (int)$user_id): // F149: the edit/delete pages existed but nothing linked to them ?>
                         <div class="question-owner-actions" style="margin-top:12px;display:flex;gap:8px;">
                             <a href="<?php echo SITE_URL; ?>/community_edit.php?id=<?php echo (int)$single_question['id']; ?>" class="btn btn-sm btn-outline">✏️ Edit question</a>
@@ -373,8 +416,12 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                 </div>
 
                 <!-- Answers Section -->
-                <div class="answers-section">
-                    <h3>Answers (<?php echo count($answers); ?>)</h3>
+                <div class="answers-section" id="answers">
+                    <div class="qa-answers-head"><h3>Answers (<?php echo count($answers); ?>)</h3>
+                    <?php if (count($answers) > 1): ?><nav class="qa-sort" aria-label="Order of answers"><span>Show:</span>
+                        <?php foreach (['helpful' => 'Most helpful', 'newest' => 'Newest', 'oldest' => 'Oldest'] as $k => $l): ?>
+                            <a href="?id=<?php echo (int)$single_question['id']; ?>&amp;asort=<?php echo $k; ?>#answers"<?php echo $asort === $k ? ' aria-current="true"' : ''; ?>><?php echo $l; ?></a>
+                        <?php endforeach; ?></nav><?php endif; ?></div>
                     
                     <?php if (count($answers) > 0): ?>
                         <div class="answers-list">
@@ -398,21 +445,37 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                                         <?php // C3: "found this helpful", not a score; no totals or ranks
                                             $aw_h = (int)($answer['upvotes'] ?? 0); $aw_mine = isset($my_helpful[(int)$answer['id']]); $aw_own = $answer['user_id'] == $user_id; ?>
                                         <?php if ($user_id && !$aw_own): ?>
-                                        <button type="button" class="upvote-btn<?php echo $aw_mine ? ' active' : ''; ?>" aria-pressed="<?php echo $aw_mine ? 'true' : 'false'; ?>"<?php echo $aw_mine ? ' disabled' : ''; ?> onclick="upvoteAnswer(<?php echo (int)$answer['id']; ?>, this)">
+                                        <button type="button" class="upvote-btn<?php echo $aw_mine ? ' active' : ''; ?>" aria-pressed="<?php echo $aw_mine ? 'true' : 'false'; ?>"onclick="upvoteAnswer(<?php echo (int)$answer['id']; ?>, this)">
                                             <i class="fas fa-hands-helping" aria-hidden="true"></i> <span class="upvote-label"><?php echo $aw_mine ? 'You found this helpful' : 'This helped me'; ?></span>
                                         </button>
                                         <?php endif; ?>
                                         <span class="helpful-note" id="upvotes-<?php echo (int)$answer['id']; ?>" data-count="<?php echo $aw_h; ?>"><?php echo $aw_h > 0 ? ($aw_h === 1 ? '1 person found this helpful' : number_format($aw_h) . ' people found this helpful') : ''; ?></span>
-                                        <div class="answer-reactions">
-                                            <button onclick="reactAnswer(<?php echo $answer['id']; ?>, 'like')">👍</button>
-                                            <button onclick="reactAnswer(<?php echo $answer['id']; ?>, 'love')">❤️</button>
-                                            <button onclick="reactAnswer(<?php echo $answer['id']; ?>, 'pray')">🙏</button>
+                                        <?php $aw_rx = $qa_rx[(int)$answer['id']] ?? ['counts' => ['like' => 0, 'love' => 0, 'pray' => 0], 'mine' => []]; ?>
+                                        <div class="qa-rx" role="group" aria-label="React to this answer" data-answer="<?php echo (int)$answer['id']; ?>">
+                                            <?php foreach (['like' => ['👍', 'Like'], 'love' => ['❤️', 'Love'], 'pray' => ['🙏', 'Praying']] as $rk => [$em, $rl]): $on = in_array($rk, $aw_rx['mine'], true); ?>
+                                                <button type="button" data-rx="<?php echo $rk; ?>" class="<?php echo $on ? 'active' : ''; ?>" aria-pressed="<?php echo $on ? 'true' : 'false'; ?>" aria-label="<?php echo $rl; ?>"><?php echo $em; ?> <span class="n"><?php echo (int)$aw_rx['counts'][$rk]; ?></span></button>
+                                            <?php endforeach; ?>
                                         </div>
                                         <?php if ($user_id == $single_question['user_id'] && !$answer['is_accepted']): ?>
                                             <button class="btn btn-sm btn-success" onclick="acceptAnswer(<?php echo $answer['id']; ?>)">✓ Accept as Answer</button>
                                         <?php endif; ?>
                                         <button class="btn btn-sm btn-outline" onclick="showReportModal('answer', <?php echo $answer['id']; ?>)">🚩 Report</button>
                                     </div>
+                                    <?php $aw_th = $qa_comments[(int)$answer['id']] ?? []; $aw_n = aw_qa_count($aw_th);
+                                    // open when it has a few comments, or when a link points into it ?>
+                                    <details class="qa-discuss"<?php echo ($aw_n && $aw_n <= 3) ? ' open' : ''; ?> data-answer="<?php echo (int)$answer['id']; ?>">
+                                        <summary><i class="fas fa-comments" aria-hidden="true"></i> <?php echo $aw_n ? ($aw_n === 1 ? '1 comment' : $aw_n . ' comments') : 'Discuss this answer'; ?></summary>
+                                        <?php if ($aw_th): ?><ul class="qa-c-list"><?php foreach ($aw_th as $c) echo aw_qa_render_comment($c, (int)$single_question['id'], (int)$user_id, $qa_staff, $token); ?></ul><?php endif; ?>
+                                        <?php if ($user_id): ?>
+                                            <form method="POST" class="qa-add">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>">
+                                                <input type="hidden" name="add_answer_comment" value="1"><input type="hidden" name="answer_id" value="<?php echo (int)$answer['id']; ?>"><input type="hidden" name="question_id" value="<?php echo (int)$single_question['id']; ?>">
+                                                <label class="sr-only" for="qaNew<?php echo (int)$answer['id']; ?>">Comment on this answer</label>
+                                                <textarea id="qaNew<?php echo (int)$answer['id']; ?>" name="comment" rows="1" maxlength="2000" required placeholder="Add a comment…"></textarea>
+                                                <button type="submit" class="btn btn-sm btn-primary">Comment</button>
+                                            </form>
+                                        <?php else: ?><p class="field-hint"><a href="<?php echo SITE_URL; ?>/login.php?redirect=<?php echo urlencode(SITE_URL . '/community.php?id=' . (int)$single_question['id']); ?>">Sign in</a> to join the discussion.</p><?php endif; ?>
+                                    </details>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -425,6 +488,7 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                         <div class="answer-form-container">
                             <h4><?php echo aw_text('community.h41', 'Write an Answer', 'line'); ?></h4>
                             <form method="POST" class="answer-form">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>">
                                 <input type="hidden" name="question_id" value="<?php echo $single_question['id']; ?>">
                                 <div class="form-group">
                                     <textarea name="body" rows="4" placeholder="Share your answer..." required></textarea>
@@ -477,6 +541,7 @@ $pageTitle = $single_question ? htmlspecialchars($single_question['title']) . ' 
                                 <div class="card-header"><h3><?php echo aw_text('community.h31', 'Ask a Question', 'line'); ?></h3></div>
                                 <div class="card-body">
                                     <form method="POST" class="ask-form">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>">
                                         <div class="form-group">
                                             <input type="text" name="title" placeholder="Question title" required>
                                         </div>
@@ -629,63 +694,56 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ===== Upvote Answer =====
+    // every change carries the page token
+    const AW_TOKEN = <?php echo json_encode($token); ?>, AW_URL = <?php echo json_encode(SITE_URL . '/community.php'); ?>;
+    function post(fields) {
+        const body = new URLSearchParams(fields); body.append('csrf_token', AW_TOKEN);
+        return fetch(AW_URL, { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(r => r.json().catch(() => ({ success: false, error: 'That did not work. Please try again.' })))
+            .catch(() => ({ success: false, error: 'No connection. Please try again.' }));
+    }
+
+    // ===== "This helped me" (can be taken back) =====
     window.upvoteAnswer = function(answerId, btn) {
-        fetch('<?php echo SITE_URL; ?>/community.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'upvote_answer=1&answer_id=' + answerId
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                const span = document.getElementById('upvotes-' + answerId);
-                const n = (parseInt(span.dataset.count, 10) || 0) + 1;
-                span.dataset.count = n;
-                span.textContent = n === 1 ? '1 person found this helpful' : n + ' people found this helpful';
-                if (btn) { btn.classList.add('active'); btn.setAttribute('aria-pressed', 'true'); btn.disabled = true; const l = btn.querySelector('.upvote-label'); if (l) l.textContent = 'You found this helpful'; }
-            } else {
-                alert(data.error || 'That did not work. Please try again.');
-            }
-        })
-        .catch(() => alert('That did not work. Please try again.'));
+        post({ upvote_answer: 1, answer_id: answerId }).then(data => {
+            if (!data.success) { alert(data.error || 'That did not work. Please try again.'); return; }
+            const span = document.getElementById('upvotes-' + answerId), n = data.count;
+            span.dataset.count = n;
+            span.textContent = n > 0 ? (n === 1 ? '1 person found this helpful' : n + ' people found this helpful') : '';
+            if (btn) { btn.classList.toggle('active', data.on); btn.setAttribute('aria-pressed', data.on ? 'true' : 'false'); const l = btn.querySelector('.upvote-label'); if (l) l.textContent = data.on ? 'You found this helpful' : 'This helped me'; }
+        });
     };
 
     // ===== Accept Answer =====
     window.acceptAnswer = function(answerId) {
         if (!confirm('Mark this answer as the accepted answer?')) return;
-        fetch('<?php echo SITE_URL; ?>/community.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'accept_answer=1&answer_id=' + answerId
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert(data.error || 'Failed to accept answer.');
-            }
-        });
+        post({ accept_answer: 1, answer_id: answerId }).then(data => { if (data.success) location.reload(); else alert(data.error || 'Failed to accept answer.'); });
     };
 
-    // ===== React to Answer =====
-    window.reactAnswer = function(answerId, reactionType) {
-        fetch('<?php echo SITE_URL; ?>/community.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'reaction_answer=1&answer_id=' + answerId + '&reaction_type=' + reactionType
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                alert('Reacted with ' + reactionType);
-            } else {
-                alert(data.error || 'Failed to react.');
-            }
-        })
-        .catch(() => alert('Failed to react.'));
-    };
+    // ===== like / love / pray on answers =====
+    document.querySelectorAll('.qa-rx').forEach(group => {
+        group.addEventListener('click', e => {
+            const b = e.target.closest('button[data-rx]'); if (!b || b.dataset.busy) return; b.dataset.busy = '1';
+            post({ reaction_answer: 1, answer_id: group.dataset.answer, reaction_type: b.dataset.rx }).then(data => {
+                delete b.dataset.busy;
+                if (!data.success) { alert(data.error || 'That did not work. Please try again.'); return; }
+                group.querySelectorAll('button[data-rx]').forEach(x => { const k = x.dataset.rx, on = (data.mine || []).includes(k); x.classList.toggle('active', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); x.querySelector('.n').textContent = data.counts[k]; });
+            });
+        });
+    });
+
+    // ===== Follow a question =====
+    const fb = document.getElementById('qaFollow');
+    if (fb) fb.addEventListener('click', () => {
+        post({ follow_question: fb.dataset.q }).then(data => {
+            if (!data.success) { alert(data.error || 'That did not work. Please try again.'); return; }
+            fb.classList.toggle('active', data.on); fb.setAttribute('aria-pressed', data.on ? 'true' : 'false'); fb.querySelector('span').textContent = data.on ? 'Following' : 'Follow';
+            const f = document.getElementById('qaFollowers'); f.textContent = data.count ? (data.count === 1 ? '1 person follows this question' : data.count + ' people follow this question') : '';
+        });
+    });
+
+    // a link to a comment opens its discussion
+    if (location.hash.indexOf('#ac') === 0) { const t = document.querySelector(location.hash); if (t) { const d = t.closest('details'); if (d) d.open = true; t.scrollIntoView({ block: 'center' }); } }
 
     // ===== Report Modal =====
     window.showReportModal = function(targetType, targetId) {
@@ -866,4 +924,5 @@ body { background: var(--bg); color: var(--text); transition: background 0.3s, c
 }
 </style>
 
+<?php echo aw_report_assets(); /* Report and Block in the answer discussions */ ?>
 <?php require_once 'includes/footer.php'; ?>

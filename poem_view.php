@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review']) && i
     }
     $target_type = $_POST['target_type'];
     $target_id = (int)$_POST['target_id'];
-    $rating = (int)$_POST['rating'];
+    $rating = (int)($_POST['rating'] ?? 0);
     $comment = trim($_POST['comment']);
     $parent_id = isset($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
     $is_private = isset($_POST['is_private']) ? 1 : 0;
@@ -215,7 +215,7 @@ $user_id = isLoggedIn() ? $_SESSION['user_id'] : 0;
 $privacy_sql = isAdmin() ? '' : 'AND (r.is_private IS NULL OR r.is_private = 0 OR r.user_id = ?)';
 
 $stmt = $db->prepare("
-    SELECT r.*, u.name AS author_name, u.profile_pic AS author_pic,
+    SELECT r.*, COALESCE(NULLIF(TRIM(u.name), ''), u.username) AS author_name, u.profile_pic AS author_pic,
            (SELECT COUNT(*) FROM reactions WHERE target_type='comment' AND target_id=r.id AND reaction_type='like') AS likes,
            (SELECT COUNT(*) FROM reactions WHERE target_type='comment' AND target_id=r.id) AS total_reactions
     FROM reviews r
@@ -228,18 +228,22 @@ $stmt = $db->prepare("
 $stmt->execute(isAdmin() ? [$id] : [$id, $user_id]);
 $comments_raw = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$comments = [];
-foreach ($comments_raw as $c) {
-    $c['children'] = [];
-    if ($c['parent_id'] === null) {
-        $comments[$c['id']] = $c;
-    } else {
-        if (!isset($comments[$c['parent_id']])) {
-            $comments[$c['parent_id']] = ['children' => []];
-        }
-        $comments[$c['parent_id']]['children'][$c['id']] = $c;
-    }
+// Threads to any depth: a reply to a reply sits under it (it used to make an empty, broken thread).
+// A reply whose comment is hidden (private or deleted) is shown at the top level instead of vanishing.
+$aw_byid = [];
+foreach ($comments_raw as $c) { $c['children'] = []; $aw_byid[(int)$c['id']] = $c; }
+$aw_attach = function ($id) use (&$aw_attach, &$aw_byid, &$aw_kids) {
+    $c = $aw_byid[$id];
+    foreach ($aw_kids[$id] ?? [] as $k) $c['children'][$k] = $aw_attach($k);
+    return $c;
+};
+$aw_kids = []; $aw_roots = [];
+foreach ($aw_byid as $cid => $c) {
+    $pid = (int)($c['parent_id'] ?? 0);
+    if ($pid && isset($aw_byid[$pid]) && $pid !== $cid) $aw_kids[$pid][] = $cid; else $aw_roots[] = $cid;
 }
+$comments = [];
+foreach ($aw_roots as $rid) $comments[$rid] = $aw_attach($rid);
 
 // P12: every comment thread was shown on one page. Top-level comments are paged, 10 at a time,
 // each with all its replies.
@@ -294,7 +298,7 @@ function render_comment($comment, $level = 0) {
     $aw_fold = !empty($comment['user_id']) && isset(aw_blocked_ids($GLOBALS['db'], (int)($_SESSION['user_id'] ?? 0))[(int)$comment['user_id']]);
     if ($aw_fold) echo '<details class="aw-blocked-fold"><summary>A comment from someone you blocked</summary>';
     ?>
-    <div class="review-item" style="margin-left:<?php echo $level*20; ?>px; border-left:<?php echo $level>0?'2px solid var(--rose)':'none'; ?>; padding-left:<?php echo $level>0?'12px':'0'; ?>;">
+    <div class="review-item" style="margin-left:<?php echo min($level, 4) * 20; ?>px; border-left:<?php echo $level>0?'2px solid var(--rose)':'none'; ?>; padding-left:<?php echo $level>0?'12px':'0'; ?>;">
         <div class="review-header">
             <span class="review-author">
                 <i class="fas fa-user-circle"></i>
@@ -822,25 +826,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 const emoji = this.textContent.trim().charAt(0);
                 createReactionBurst(this, emoji);
 
-                fetch('ajax_toggle_reaction.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `target_type=${targetType}&target_id=${targetId}&reaction=${reaction}`
-                })
-                .then(res => res.json())
+                // full address and the page's token; every failure is said out loud (it used to fail silently)
+                const btn = this, say = (m) => { if (window.awToast) awToast(m, 'error'); else alert(m); };
+                if (btn.dataset.busy) return; btn.dataset.busy = '1';
+                const body = new URLSearchParams({ target_type: targetType, target_id: targetId, reaction: reaction, csrf_token: <?php echo json_encode(generate_csrf_token()); ?> });
+                fetch(<?php echo json_encode(SITE_URL . '/ajax_toggle_reaction.php'); ?>, { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                .then(res => res.json().catch(() => ({ error: 'Your reaction could not be saved just now. Please try again.' })))
                 .then(data => {
                     if (data.error) {
-                        if (data.error.includes('logged in')) {
-                            alert(data.error);
-                        }
+                        if (data.login) { if (confirm('Please sign in to react. Go to the sign-in page?')) location.href = <?php echo json_encode(SITE_URL . '/login.php?redirect='); ?> + encodeURIComponent(location.pathname + location.search); }
+                        else say(data.error);
                         return;
                     }
-                    const countSpan = this.querySelector('.count');
-                    countSpan.textContent = data.count;
-                    this.classList.toggle('active', !!data.active);
-                    this.setAttribute('aria-pressed', data.active ? 'true' : 'false');
+                    const counts = data.counts || {}, mine = data.mine || [];
+                    container.querySelectorAll('.reaction-btn').forEach(b => {
+                        const r = b.dataset.reaction, on = mine.includes(r);
+                        if (counts[r] !== undefined) b.querySelector('.count').textContent = counts[r];
+                        b.classList.toggle('active', on);
+                        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    });
                 })
-                .catch(err => console.error('Error toggling reaction:', err));
+                .catch(() => say('No connection. Your reaction was not saved; please try again.'))
+                .finally(() => { delete btn.dataset.busy; });
             });
         });
     });
@@ -920,7 +927,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===== REPLY TOGGLE =====
     document.querySelectorAll('.reply-link').forEach(link => {
         link.addEventListener('click', function() {
-            const form = this.nextElementSibling;
+            // the comment's own reply box (the report control sits between the button and the box)
+            const form = this.closest('.review-item').querySelector(':scope > .comment-reply-form');
+            if (!form) return;
             const open = form.style.display === 'none';
             form.style.display = open ? 'block' : 'none';
             this.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -929,7 +938,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.querySelectorAll('.cancel-reply').forEach(btn => {
         btn.addEventListener('click', function() {
-            this.closest('.comment-reply-form').style.display = 'none';
+            const box = this.closest('.comment-reply-form'); box.style.display = 'none';
+            const link = box.closest('.review-item').querySelector(':scope > .reply-link'); if (link) { link.setAttribute('aria-expanded', 'false'); link.focus(); }
         });
     });
 

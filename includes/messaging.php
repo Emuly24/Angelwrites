@@ -44,6 +44,9 @@ function aw_msg_tables(PDO $db) {
         $db->exec("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, thread_id INTEGER NOT NULL, sender_id INTEGER NOT NULL,
                    body TEXT NOT NULL, as_team INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'sent', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_msg_thread ON messages (thread_id, id)");
+        // quoting: the message a reply quotes (same conversation)
+        $cols = array_column($db->query("PRAGMA table_info(messages)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+        if (!in_array('reply_to', $cols, true)) $db->exec("ALTER TABLE messages ADD COLUMN reply_to INTEGER");
         $db->exec("CREATE TABLE IF NOT EXISTS msg_settings (user_id INTEGER PRIMARY KEY, who TEXT NOT NULL DEFAULT 'everyone', updated_at DATETIME)");
         return $ok = true;
     } catch (Throwable $e) { error_log('msg tables: ' . $e->getMessage()); return $ok = false; }
@@ -190,7 +193,7 @@ function aw_msg_start(PDO $db, $from, $to, $body, $age_tick = false) {
 }
 
 /** Send in a conversation the member can open. $as_team: staff writing in a team conversation. */
-function aw_msg_send(PDO $db, $thread_id, $uid, $body, $as_team = false, $checked = false) {
+function aw_msg_send(PDO $db, $thread_id, $uid, $body, $as_team = false, $checked = false, $reply_to = 0) {
     $o = aw_msg_open($db, $thread_id, $uid);
     if (!$o) return ['ok' => false, 'message' => 'This conversation was not found.'];
     $t = $o['thread'];
@@ -221,7 +224,14 @@ function aw_msg_send(PDO $db, $thread_id, $uid, $body, $as_team = false, $checke
         $pq = $db->prepare("SELECT COALESCE(MAX(id), 0) FROM messages WHERE thread_id = ?");
         $pq->execute([(int)$thread_id]);
         $prevId = (int)$pq->fetchColumn();
-        $db->prepare("INSERT INTO messages (thread_id, sender_id, body, as_team) VALUES (?, ?, ?, ?)")->execute([(int)$thread_id, (int)$uid, $body, $asTeam]);
+        // a quoted message must be in this conversation and not removed
+        $quote = null;
+        if ((int)$reply_to > 0) {
+            $qq = $db->prepare("SELECT id FROM messages WHERE id = ? AND thread_id = ? AND status = 'sent'");
+            $qq->execute([(int)$reply_to, (int)$thread_id]);
+            $quote = (int)$qq->fetchColumn() ?: null;
+        }
+        $db->prepare("INSERT INTO messages (thread_id, sender_id, body, as_team, reply_to) VALUES (?, ?, ?, ?, ?)")->execute([(int)$thread_id, (int)$uid, $body, $asTeam, $quote]);
         $mid = (int)$db->lastInsertId();
         $db->prepare("UPDATE msg_threads SET last_message_at = CURRENT_TIMESTAMP" . ($asTeam ? ", team_read_at = CURRENT_TIMESTAMP, team_read_id = " . $mid : '') . " WHERE id = ?")->execute([(int)$thread_id]);
         if ($o['me']) $db->prepare("UPDATE msg_participants SET last_read_at = CURRENT_TIMESTAMP, last_read_id = ? WHERE thread_id = ? AND user_id = ?")->execute([$mid, (int)$thread_id, (int)$uid]);

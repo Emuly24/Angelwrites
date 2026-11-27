@@ -245,16 +245,16 @@ $aw_groups = [];
 if (!$isLoggedIn) {
     $aw_groups['Explore'] = [['Search', 'fa-magnifying-glass', $aw_u . '/search_results.php', ['search_results.php']], ['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
         ['Reflections', 'fa-dove', $aw_u . '/reflections.php', ['reflections.php']], ['Blog', 'fa-pen-nib', $aw_u . '/blog.php', ['blog.php', 'blog_post.php']], ['Videos', 'fa-circle-play', $aw_u . '/videos.php', ['videos.php', 'video_watch.php']], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
-    $aw_groups['AngelWrites'] = [['About Angella', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Events', 'fa-calendar-days', $aw_u . '/events.php', ['events.php']], ['Devotionals', 'fa-sun', $aw_u . '/plans.php', ['plans.php']], ['Contact', 'fa-envelope', $aw_u . '/contact.php', ['contact.php']]];
+    $aw_groups['AngelWrites'] = [['About AngelWrites', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Events', 'fa-calendar-days', $aw_u . '/events.php', ['events.php']], ['Devotionals', 'fa-sun', $aw_u . '/plans.php', ['plans.php']], ['Contact', 'fa-envelope', $aw_u . '/contact.php', ['contact.php']]];
 } elseif ($isAdmin) {
     $aw_groups['Admin'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/admin/dashboard.php', ['admin/dashboard.php']], ['Books', 'fa-book', $aw_u . '/admin/manage_books.php', ['admin/manage_books.php']], ['Poems', 'fa-feather', $aw_u . '/admin/manage_poems.php', ['admin/manage_poems.php']],
         ['Sessions', 'fa-calendar-check', $aw_u . '/admin/manage_sessions.php', ['admin/manage_sessions.php']], ['Members', 'fa-users', $aw_u . '/admin/manage_users.php', ['admin/manage_users.php']], ['Team desk', 'fa-hands-holding-circle', $aw_u . '/admin/team.php', ['admin/team.php']], ['Moderation', 'fa-shield-heart', $aw_u . '/admin/moderation.php', ['admin/moderation.php']],
         ['Stories & Help', 'fa-seedling', $aw_u . '/admin/community.php', ['admin/community.php']], ['Settings', 'fa-sliders', $aw_u . '/admin/settings.php', ['admin/settings.php']], ["Founder's handbook", 'fa-book-open', $aw_u . '/admin/handbook.php', ['admin/handbook.php']], ['Guided tours', 'fa-route', $aw_u . '/tour.php', ['tour.php']]];
-    $aw_groups['Site'] = [['View the site', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_unread], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
+    $aw_groups['Site'] = [['View the site', 'fa-house', $aw_u . '/index.php', ['index.php']], ['About page', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_unread], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
 } else {
     $aw_groups['You'] = [['Dashboard', 'fa-gauge-high', $aw_u . '/dashboard.php', ['dashboard.php']], ['My library', 'fa-bookmark', $aw_u . '/library.php', ['library.php']], ['My journal', 'fa-book-open', $aw_u . '/journal.php', ['journal.php']],
         ['Messages', 'fa-envelope', $aw_u . '/messages.php', ['messages.php'], $aw_msg_on ? $aw_msg_unread : null], ['Notifications', 'fa-bell', $aw_u . '/notifications.php', ['notifications.php'], $unreadNotifications], ['Profile', 'fa-user', $aw_u . '/profile.php', ['profile.php']], ['Guided tours', 'fa-route', $aw_u . '/tour.php', ['tour.php']]];
-    $aw_groups['Read'] = [['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
+    $aw_groups['Read'] = [['Home', 'fa-house', $aw_u . '/index.php', ['index.php']], ['About AngelWrites', 'fa-heart', $aw_u . '/about.php', ['about.php']], ['Books', 'fa-book', $aw_u . '/books.php', ['books.php', 'book.php']], ['Poems', 'fa-feather', $aw_u . '/poetry.php', ['poetry.php', 'poem_view.php']],
         ['Reflections', 'fa-dove', $aw_u . '/reflections.php', ['reflections.php']], ['Blog', 'fa-pen-nib', $aw_u . '/blog.php', ['blog.php', 'blog_post.php']], ['Videos', 'fa-circle-play', $aw_u . '/videos.php', ['videos.php', 'video_watch.php']], ['Bible', 'fa-book-bible', $aw_u . '/bible_reader.php', ['bible_reader.php']]];
     $aw_groups['Community'] = array_values(array_filter([
         $aw_stories_on ? ['Stories & Help', 'fa-seedling', $aw_u . '/stories.php', ['stories.php', 'story.php', 'story_write.php']] : null,
@@ -279,11 +279,11 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                 <ul class="awh-links" id="navLinks">
                     <?php if (!$isLoggedIn): ?>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/index.php"<?php echo $aw_cur('index.php'); ?>><?php echo aw_t('Home'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/about.php"<?php echo $aw_cur('about.php'); ?>><?php echo aw_t('About'); ?></a></li>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>><?php echo aw_t('Books'); ?></a></li>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>><?php echo aw_t('Poems'); ?></a></li>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>><?php echo aw_t('Reflections'); ?></a></li>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/blog.php"<?php echo $aw_cur(['blog.php', 'blog_post.php']); ?>><?php echo aw_t('Blog'); ?></a></li>
-                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/about.php"<?php echo $aw_cur('about.php'); ?>><?php echo aw_t('About'); ?></a></li>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/contact.php"<?php echo $aw_cur('contact.php'); ?>><?php echo aw_t('Contact'); ?></a></li>
                     <?php elseif ($isAdmin): ?>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/admin/dashboard.php"<?php echo $aw_cur('admin/dashboard.php'); ?>><?php echo aw_t('Dashboard'); ?></a></li>
@@ -298,6 +298,7 @@ $aw_community_pages = ['stories.php', 'story.php', 'story_write.php', 'my_storie
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/books.php"<?php echo $aw_cur(['books.php', 'book.php']); ?>><?php echo aw_t('Books'); ?></a></li>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/poetry.php"<?php echo $aw_cur(['poetry.php', 'poem_view.php']); ?>><?php echo aw_t('Poems'); ?></a></li>
                         <li><a class="awh-link" href="<?php echo $aw_u; ?>/reflections.php"<?php echo $aw_cur('reflections.php'); ?>><?php echo aw_t('Reflections'); ?></a></li>
+                        <li><a class="awh-link" href="<?php echo $aw_u; ?>/about.php"<?php echo $aw_cur('about.php'); ?>><?php echo aw_t('About'); ?></a></li>
                         <li>
                             <button type="button" class="awh-link<?php echo $aw_is($aw_community_pages) ? ' is-active' : ''; ?>" aria-haspopup="true" aria-expanded="false" aria-controls="awhCommunity" onclick="awToggleMenu(this, 'awhCommunity')"><?php echo aw_t('Community'); ?> <i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                             <div class="awh-menu" id="awhCommunity">

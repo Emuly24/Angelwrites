@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $act = (string)($_POST['action'] ?? '');
         $tid = (int)($_POST['t'] ?? 0);
         if ($act === 'send') {
-            $r = aw_msg_send($db, $tid, $uid, (string)($_POST['body'] ?? ''));
+            $r = aw_msg_send($db, $tid, $uid, (string)($_POST['body'] ?? ''), false, false, (int)($_POST['reply_to'] ?? 0));
             if ($r['ok']) $go('t=' . $tid . (!empty($_POST['team']) ? '&team=1' : '') . '#end');
             $error = $r['message'];
         } elseif ($act === 'start') {
@@ -90,7 +90,7 @@ $pageTitle = 'Messages';
 $aw_noindex = true;
 require_once 'includes/header.php';
 ?>
-<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-messages.css?v=1">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/aw-messages.css?v=2">
 <main class="msg" id="main">
 <div class="container">
     <header class="msg-head">
@@ -170,14 +170,27 @@ require_once 'includes/header.php';
                 </div>
             <?php else: ?>
                 <ol class="msg-bubbles" aria-label="Messages">
-                <?php $day = ''; foreach ($msgs as $m): $mine = (int)$m['sender_id'] === $uid && !($open['staff'] && !$m['as_team']); $fromTeam = (int)$m['as_team'] === 1;
+                <?php $aw_byid = []; foreach ($msgs as $m) $aw_byid[(int)$m['id']] = $m;
+                // who wrote a message, as this viewer sees it (for quotes)
+                $aw_who = function ($m) use ($uid, $open, $isTeam, $label, $otherName) {
+                    if ((int)$m['as_team'] === 1) return 'AngelWrites Team';
+                    if ((int)$m['sender_id'] === $uid && !$open['staff']) return 'You';
+                    return $isTeam ? $label($m['sender_id']) : $otherName;
+                };
+                $day = ''; foreach ($msgs as $m): $mine = (int)$m['sender_id'] === $uid && !($open['staff'] && !$m['as_team']); $fromTeam = (int)$m['as_team'] === 1;
                     if ($open['staff']) $mine = $fromTeam;
                     $d = date('j F Y', strtotime($m['created_at'])); if ($d !== $day) { $day = $d; echo '<li class="msg-day"><span>' . htmlspecialchars($d) . '</span></li>'; } ?>
                     <li class="msg-b<?php echo $mine ? ' is-mine' : ''; ?><?php echo $fromTeam ? ' is-team' : ''; ?>" id="m<?php echo (int)$m['id']; ?>">
                         <?php if (!$mine): ?><span class="msg-from"><?php echo $fromTeam ? 'AngelWrites Team' : htmlspecialchars($isTeam ? $label($m['sender_id']) : $otherName); ?></span><?php endif; ?>
+                        <?php if (!empty($m['reply_to']) && $m['status'] === 'sent'):
+                            $q = $aw_byid[(int)$m['reply_to']] ?? null;
+                            if (!$q) { try { $qs = $db->prepare("SELECT * FROM messages WHERE id = ? AND thread_id = ?"); $qs->execute([(int)$m['reply_to'], (int)$t['id']]); $q = $qs->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $e) { $q = null; } } ?>
+                            <a class="msg-quote" href="#m<?php echo (int)$m['reply_to']; ?>"><span class="msg-quote-who"><?php echo $q ? htmlspecialchars($aw_who($q)) : 'Earlier message'; ?></span><span class="msg-quote-text"><?php echo $q && $q['status'] === 'sent' ? htmlspecialchars(mb_strimwidth(preg_replace('/\s+/u', ' ', (string)$q['body']), 0, 160, '…')) : 'This message was removed.'; ?></span></a>
+                        <?php endif; ?>
                         <?php if ($m['status'] !== 'sent'): ?><p class="msg-removed">This message was removed.</p>
                         <?php else: ?><p><?php echo nl2br(htmlspecialchars($m['body'])); ?></p><?php endif; ?>
                         <span class="msg-time"><?php echo htmlspecialchars(date('g:i a', strtotime($m['created_at']))); ?>
+                            <?php if ($m['status'] === 'sent' && !$blocked && !$waiting): ?><button type="button" class="msg-link msg-quote-btn" data-id="<?php echo (int)$m['id']; ?>" data-who="<?php echo htmlspecialchars($aw_who($m)); ?>" data-text="<?php echo htmlspecialchars(mb_strimwidth(preg_replace('/\s+/u', ' ', (string)$m['body']), 0, 160, '…')); ?>">Quote</button><?php endif; ?>
                             <?php if ($m['status'] === 'sent' && (int)$m['sender_id'] === $uid && !$fromTeam): ?>
                                 <form method="post" class="msg-inline" onsubmit="return confirm('Delete this message for everyone?');"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="t" value="<?php echo (int)$t['id']; ?>"><input type="hidden" name="m" value="<?php echo (int)$m['id']; ?>"><button class="msg-link">Delete</button></form>
                             <?php elseif ($m['status'] === 'sent' && !$fromTeam && !$open['staff']): ?>
@@ -196,6 +209,8 @@ require_once 'includes/header.php';
                     <form method="post" class="msg-compose">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token); ?>"><input type="hidden" name="action" value="send"><input type="hidden" name="t" value="<?php echo (int)$t['id']; ?>">
                         <?php if ($open['staff']): ?><input type="hidden" name="team" value="1"><p class="msg-hint">You are writing as the AngelWrites Team.</p><?php endif; ?>
+                        <input type="hidden" name="reply_to" id="msgReplyTo" value="<?php echo $error !== '' ? (int)($_POST['reply_to'] ?? 0) : 0; ?>">
+                        <div class="msg-quoting" id="msgQuoting" hidden><span class="msg-quote"><span class="msg-quote-who" id="msgQuoteWho"></span><span class="msg-quote-text" id="msgQuoteText"></span></span><button type="button" class="msg-quote-x" id="msgQuoteX" aria-label="Stop quoting"><i class="fas fa-xmark" aria-hidden="true"></i></button></div>
                         <label class="sr-only" for="msgBody">Message</label>
                         <textarea id="msgBody" name="body" rows="2" maxlength="<?php echo AW_MSG_LIMITS['body']; ?>" placeholder="Write a message…" required><?php echo htmlspecialchars($error !== '' ? (string)($_POST['body'] ?? '') : ''); ?></textarea>
                         <button type="submit" class="msg-send" aria-label="Send"><i class="fas fa-paper-plane" aria-hidden="true"></i></button>
@@ -271,6 +286,20 @@ require_once 'includes/header.php';
     ta.addEventListener('input', function () { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 220) + 'px'; });
     ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ta.form.requestSubmit ? ta.form.requestSubmit() : ta.form.submit(); } });
   }
+  // Quote: the chosen message shows above the box and is sent with the reply
+  var box = document.getElementById('msgQuoting'), rid = document.getElementById('msgReplyTo');
+  function quote(id, who, text) {
+    if (!box || !rid) return;
+    rid.value = id || 0; box.hidden = !id;
+    document.getElementById('msgQuoteWho').textContent = who || ''; document.getElementById('msgQuoteText').textContent = text || '';
+    if (id && ta) ta.focus();
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.msg-quote-btn'); if (b) { quote(b.dataset.id, 'Replying to ' + b.dataset.who, b.dataset.text); return; }
+    if (e.target.closest('#msgQuoteX')) { quote(0); if (ta) ta.focus(); }
+  });
+  if (rid && +rid.value) { var src = document.querySelector('.msg-quote-btn[data-id="' + rid.value + '"]'); if (src) quote(src.dataset.id, 'Replying to ' + src.dataset.who, src.dataset.text); }
+  if (ta) ta.addEventListener('keydown', function (e) { if (e.key === 'Escape' && box && !box.hidden) quote(0); });
 })();
 </script>
 <?php require_once 'includes/footer.php'; ?>
